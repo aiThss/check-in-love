@@ -39,9 +39,12 @@ const startBodySchema = z.object({
   displayName: z.string().min(1),
   partnerName: z.string().min(1),
   coupleCode: z.string().min(1),
-  loveStartDate: z.string().refine((v) => !isNaN(Date.parse(v)), {
-    message: 'Invalid date',
-  }),
+  loveStartDate: z
+    .string()
+    .optional()
+    .refine((v) => !v || !isNaN(Date.parse(v)), {
+      message: 'Invalid date',
+    }),
   email: z.string().email().optional(),
   password: z.string().min(6).optional(),
   deviceId: z.string().optional(),
@@ -261,7 +264,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!couple) {
         couple = await Couple.create({
           code: normalizedCode,
-          loveStartDate: new Date(loveStartDate),
+          loveStartDate: loveStartDate ? new Date(loveStartDate) : undefined,
           memberIds: [],
           streak: 0,
         });

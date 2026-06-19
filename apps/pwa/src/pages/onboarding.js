@@ -304,6 +304,7 @@ export function renderOnboardingPage() {
             'display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;max-width:360px;';
         let cooldown = 0;
         let cooldownInterval = null;
+        let otpSentSuccessfully = false;
         content.innerHTML = `
       <div style="font-size:72px;line-height:1" class="animate-pulse">📬</div>
       <div style="text-align:center">
@@ -314,6 +315,22 @@ export function renderOnboardingPage() {
         </p>
       </div>
     `;
+        // Offline notice banner (hidden by default)
+        const offlineBanner = document.createElement('div');
+        offlineBanner.style.cssText = `
+      display:none;
+      width:100%;
+      background:rgba(248,113,113,0.12);
+      border:1px solid rgba(248,113,113,0.35);
+      border-radius:12px;
+      padding:12px 16px;
+      text-align:center;
+      font-size:13px;
+      color:#f87171;
+      line-height:1.5;
+    `;
+        offlineBanner.innerHTML = '📡 Không có kết nối mạng<br><span style="color:var(--text-secondary)">Kết nối mạng rồi thử lại, hoặc bỏ qua bước này.</span>';
+        content.appendChild(offlineBanner);
         // OTP input boxes (6 separate inputs)
         const otpWrapper = document.createElement('div');
         otpWrapper.style.cssText = 'display:flex;gap:10px;justify-content:center;width:100%;';
@@ -394,9 +411,34 @@ export function renderOnboardingPage() {
         resendBtn.textContent = 'Gửi lại mã';
         resendBtn.addEventListener('click', () => void handleSendOtp(true));
         content.appendChild(resendBtn);
+        // Skip OTP button — always visible so user can bypass if offline
+        const skipOtpBtn = document.createElement('button');
+        skipOtpBtn.className = 'btn-ghost';
+        skipOtpBtn.style.cssText = 'width:100%;font-size:13px;opacity:0.6;margin-top:-8px;';
+        skipOtpBtn.textContent = 'Bỏ qua xác thực email';
+        skipOtpBtn.addEventListener('click', () => {
+            formData.emailVerified = false;
+            formData.otpCode = '';
+            currentStep++;
+            renderCurrentStep();
+        });
+        content.appendChild(skipOtpBtn);
         renderStep(content);
         // Auto-send OTP on load if not already sent
         void handleSendOtp(false);
+        function isNetworkError(err) {
+            if (!navigator.onLine)
+                return true;
+            if (err instanceof TypeError && err.message.toLowerCase().includes('fetch'))
+                return true;
+            if (err instanceof Error) {
+                const msg = err.message.toLowerCase();
+                return msg.includes('network') || msg.includes('failed to fetch') ||
+                    msg.includes('không có kết nối') || msg.includes('offline') ||
+                    msg.includes('connection');
+            }
+            return false;
+        }
         async function handleSendOtp(isResend) {
             if (cooldown > 0) {
                 showToast(`Vui lòng chờ ${cooldown}s trước khi gửi lại`, 'error');
@@ -406,6 +448,8 @@ export function renderOnboardingPage() {
             resendBtn.textContent = 'Đang gửi...';
             try {
                 await sendOtp(formData.email);
+                otpSentSuccessfully = true;
+                offlineBanner.style.display = 'none';
                 showToast(isResend ? '✉️ Đã gửi lại mã mới!' : `✉️ Mã đã gửi tới ${formData.email}`, 'success');
                 // Start 60s cooldown
                 cooldown = 60;
@@ -423,10 +467,19 @@ export function renderOnboardingPage() {
                 }, 1000);
             }
             catch (err) {
-                const msg = err instanceof Error ? err.message : 'Gửi email thất bại';
-                showToast(msg, 'error');
                 resendBtn.disabled = false;
-                resendBtn.textContent = 'Gửi lại mã';
+                resendBtn.textContent = 'Thử lại';
+                if (isNetworkError(err)) {
+                    // Show offline banner with skip hint
+                    offlineBanner.style.display = 'block';
+                    if (isResend) {
+                        showToast('Không có kết nối mạng', 'error');
+                    }
+                }
+                else {
+                    const msg = err instanceof Error ? err.message : 'Gửi email thất bại';
+                    showToast(msg, 'error');
+                }
             }
         }
         async function handleVerify() {
@@ -456,16 +509,22 @@ export function renderOnboardingPage() {
                 }, 700);
             }
             catch (err) {
-                const msg = err instanceof Error ? err.message : 'Mã không đúng';
-                showToast(msg, 'error');
-                // Shake effect
-                otpInputs.forEach((inp) => {
-                    inp.style.borderColor = '#f87171';
-                    inp.style.animation = 'none';
-                    setTimeout(() => { inp.style.borderColor = 'var(--border)'; }, 600);
-                });
                 verifyBtn.disabled = false;
                 verifyBtn.textContent = 'Xác thực →';
+                if (isNetworkError(err)) {
+                    offlineBanner.style.display = 'block';
+                    showToast('Không có kết nối mạng', 'error');
+                }
+                else {
+                    const msg = err instanceof Error ? err.message : 'Mã không đúng';
+                    showToast(msg, 'error');
+                    // Shake effect
+                    otpInputs.forEach((inp) => {
+                        inp.style.borderColor = '#f87171';
+                        inp.style.animation = 'none';
+                        setTimeout(() => { inp.style.borderColor = 'var(--border)'; }, 600);
+                    });
+                }
             }
         }
         // Focus first input
@@ -554,7 +613,9 @@ export function renderOnboardingPage() {
             showSuccessAndNavigate();
         }
         catch (err) {
-            const message = err instanceof Error ? err.message : 'Có lỗi xảy ra, vui lòng thử lại';
+            const message = err instanceof Error
+                ? err.message
+                : 'Có lỗi xảy ra, vui lòng thử lại';
             showToast(message, 'error');
             if (btn) {
                 btn.disabled = false;

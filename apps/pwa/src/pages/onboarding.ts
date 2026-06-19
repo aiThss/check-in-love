@@ -348,6 +348,7 @@ export function renderOnboardingPage(): HTMLElement {
 
     let cooldown = 0;
     let cooldownInterval: ReturnType<typeof setInterval> | null = null;
+    let otpSentSuccessfully = false;
 
     content.innerHTML = `
       <div style="font-size:72px;line-height:1" class="animate-pulse">📬</div>
@@ -359,6 +360,23 @@ export function renderOnboardingPage(): HTMLElement {
         </p>
       </div>
     `;
+
+    // Offline notice banner (hidden by default)
+    const offlineBanner = document.createElement('div');
+    offlineBanner.style.cssText = `
+      display:none;
+      width:100%;
+      background:rgba(248,113,113,0.12);
+      border:1px solid rgba(248,113,113,0.35);
+      border-radius:12px;
+      padding:12px 16px;
+      text-align:center;
+      font-size:13px;
+      color:#f87171;
+      line-height:1.5;
+    `;
+    offlineBanner.innerHTML = '📡 Không có kết nối mạng<br><span style="color:var(--text-secondary)">Kết nối mạng rồi thử lại, hoặc bỏ qua bước này.</span>';
+    content.appendChild(offlineBanner);
 
     // OTP input boxes (6 separate inputs)
     const otpWrapper = document.createElement('div');
@@ -447,10 +465,35 @@ export function renderOnboardingPage(): HTMLElement {
     resendBtn.addEventListener('click', () => void handleSendOtp(true));
     content.appendChild(resendBtn);
 
+    // Skip OTP button — always visible so user can bypass if offline
+    const skipOtpBtn = document.createElement('button');
+    skipOtpBtn.className = 'btn-ghost';
+    skipOtpBtn.style.cssText = 'width:100%;font-size:13px;opacity:0.6;margin-top:-8px;';
+    skipOtpBtn.textContent = 'Bỏ qua xác thực email';
+    skipOtpBtn.addEventListener('click', () => {
+      formData.emailVerified = false;
+      formData.otpCode = '';
+      currentStep++;
+      renderCurrentStep();
+    });
+    content.appendChild(skipOtpBtn);
+
     renderStep(content);
 
     // Auto-send OTP on load if not already sent
     void handleSendOtp(false);
+
+    function isNetworkError(err: unknown): boolean {
+      if (!navigator.onLine) return true;
+      if (err instanceof TypeError && err.message.toLowerCase().includes('fetch')) return true;
+      if (err instanceof Error) {
+        const msg = err.message.toLowerCase();
+        return msg.includes('network') || msg.includes('failed to fetch') ||
+               msg.includes('không có kết nối') || msg.includes('offline') ||
+               msg.includes('connection');
+      }
+      return false;
+    }
 
     async function handleSendOtp(isResend: boolean) {
       if (cooldown > 0) {
@@ -463,6 +506,8 @@ export function renderOnboardingPage(): HTMLElement {
 
       try {
         await sendOtp(formData.email);
+        otpSentSuccessfully = true;
+        offlineBanner.style.display = 'none';
         showToast(
           isResend ? '✉️ Đã gửi lại mã mới!' : `✉️ Mã đã gửi tới ${formData.email}`,
           'success',
@@ -481,10 +526,18 @@ export function renderOnboardingPage(): HTMLElement {
           }
         }, 1000);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Gửi email thất bại';
-        showToast(msg, 'error');
         resendBtn.disabled = false;
-        resendBtn.textContent = 'Gửi lại mã';
+        resendBtn.textContent = 'Thử lại';
+        if (isNetworkError(err)) {
+          // Show offline banner with skip hint
+          offlineBanner.style.display = 'block';
+          if (isResend) {
+            showToast('Không có kết nối mạng', 'error');
+          }
+        } else {
+          const msg = err instanceof Error ? err.message : 'Gửi email thất bại';
+          showToast(msg, 'error');
+        }
       }
     }
 
@@ -518,16 +571,21 @@ export function renderOnboardingPage(): HTMLElement {
           renderCurrentStep();
         }, 700);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Mã không đúng';
-        showToast(msg, 'error');
-        // Shake effect
-        otpInputs.forEach((inp) => {
-          inp.style.borderColor = '#f87171';
-          inp.style.animation = 'none';
-          setTimeout(() => { inp.style.borderColor = 'var(--border)'; }, 600);
-        });
         verifyBtn.disabled = false;
         verifyBtn.textContent = 'Xác thực →';
+        if (isNetworkError(err)) {
+          offlineBanner.style.display = 'block';
+          showToast('Không có kết nối mạng', 'error');
+        } else {
+          const msg = err instanceof Error ? err.message : 'Mã không đúng';
+          showToast(msg, 'error');
+          // Shake effect
+          otpInputs.forEach((inp) => {
+            inp.style.borderColor = '#f87171';
+            inp.style.animation = 'none';
+            setTimeout(() => { inp.style.borderColor = 'var(--border)'; }, 600);
+          });
+        }
       }
     }
 
@@ -632,8 +690,9 @@ export function renderOnboardingPage(): HTMLElement {
 
       showSuccessAndNavigate();
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Có lỗi xảy ra, vui lòng thử lại';
+      const message = err instanceof Error
+        ? err.message
+        : 'Có lỗi xảy ra, vui lòng thử lại';
       showToast(message, 'error');
       if (btn) {
         btn.disabled = false;
@@ -641,6 +700,7 @@ export function renderOnboardingPage(): HTMLElement {
       }
     }
   }
+
 
   function showSuccessAndNavigate() {
     root.innerHTML = '';

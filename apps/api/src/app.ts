@@ -34,16 +34,30 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(fastifyCors, {
     origin: (origin, cb) => {
+      // Allow requests with no origin (Android WebView, curl, server-to-server)
       if (!origin) {
-        // Allow requests with no origin (e.g., curl, mobile apps)
         cb(null, true);
         return;
       }
+
+      // Allow any configured origin
       if (env.ALLOWED_ORIGINS.includes(origin)) {
         cb(null, true);
-      } else {
-        cb(new Error(`CORS: origin ${origin} not allowed`), false);
+        return;
       }
+
+      // Allow any localhost / 127.0.0.1 origin in development
+      if (env.NODE_ENV !== 'production' && (
+        origin.startsWith('http://localhost') ||
+        origin.startsWith('http://127.0.0.1')
+      )) {
+        cb(null, true);
+        return;
+      }
+
+      // Log rejected origin so it's easy to add to ALLOWED_ORIGINS
+      app.log.warn(`CORS blocked: ${origin} — add to ALLOWED_ORIGINS if needed`);
+      cb(new Error(`CORS: origin not allowed`), false);
     },
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
