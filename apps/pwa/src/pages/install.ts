@@ -35,7 +35,7 @@ export function renderInstallPage(): HTMLElement {
     page.innerHTML = `
       <div style="font-size:72px;line-height:1" class="animate-pulse">💕</div>
       <div>
-        <h1 style="font-size:26px;font-weight:700;letter-spacing:-0.03em;margin-bottom:8px">LoveCheck</h1>
+        <h1 style="font-size:26px;font-weight:700;letter-spacing:-0.03em;margin-bottom:8px">Check IN Love</h1>
         <p style="font-size:15px;color:var(--text-secondary);line-height:1.6">App check-in riêng tư cho hai đứa.<br>Đang mở ứng dụng...</p>
       </div>
       <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
@@ -50,7 +50,7 @@ export function renderInstallPage(): HTMLElement {
 
     <div>
       <h1 style="font-size:26px;font-weight:700;letter-spacing:-0.03em;margin-bottom:8px">
-        Thêm LoveCheck<br>vào màn hình
+        Thêm Check IN Love<br>vào màn hình
       </h1>
       <p style="font-size:15px;color:var(--text-secondary);line-height:1.6">
         Để trải nghiệm tốt nhất, hãy thêm app<br>vào màn hình chính của bạn nhé 💕

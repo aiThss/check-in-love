@@ -36,7 +36,7 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
           <tr>
             <td style="padding:40px 40px 24px;text-align:center;background:linear-gradient(135deg,rgba(255,107,157,0.15),rgba(255,168,107,0.08));">
               <div style="font-size:48px;margin-bottom:12px;">💕</div>
-              <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.5px;">LoveCheck</h1>
+              <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.5px;">Check IN Love</h1>
               <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.5);">Mã xác thực email của bạn</p>
             </td>
           </tr>
@@ -45,7 +45,7 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
           <tr>
             <td style="padding:32px 40px;">
               <p style="margin:0 0 24px;font-size:15px;color:rgba(255,255,255,0.75);line-height:1.6;">
-                Xin chào! Đây là mã xác thực <strong style="color:#ff6b9d;">6 chữ số</strong> để hoàn tất đăng ký tài khoản LoveCheck của bạn:
+                Xin chào! Đây là mã xác thực <strong style="color:#ff6b9d;">6 chữ số</strong> để hoàn tất đăng ký tài khoản Check IN Love của bạn:
               </p>
 
               <!-- OTP Code Box -->
@@ -69,7 +69,7 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
           <tr>
             <td style="padding:0 40px 32px;text-align:center;">
               <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);line-height:1.6;">
-                Email được gửi từ <strong>LoveCheck</strong> — Ứng dụng check-in riêng tư cho cặp đôi 💕<br/>
+                Email được gửi từ <strong>Check IN Love</strong> — Ứng dụng check-in riêng tư cho cặp đôi 💕<br/>
                 ${env.PUBLIC_BASE_URL}
               </p>
             </td>
@@ -84,10 +84,10 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
   `.trim();
 
   await mailer.sendMail({
-    from: `"LoveCheck 💕" <${env.GMAIL_USER}>`,
+    from: `"Check IN Love 💕" <${env.GMAIL_USER}>`,
     to,
-    subject: `${code} – Mã xác thực LoveCheck của bạn`,
+    subject: `${code} – Mã xác thực Check IN Love của bạn`,
     html,
-    text: `Mã xác thực LoveCheck của bạn: ${code}\n\nMã có hiệu lực trong 10 phút. Không chia sẻ mã này với ai.\n\nNếu bạn không yêu cầu, hãy bỏ qua email này.`,
+    text: `Mã xác thực Check IN Love của bạn: ${code}\n\nMã có hiệu lực trong 10 phút. Không chia sẻ mã này với ai.\n\nNếu bạn không yêu cầu, hãy bỏ qua email này.`,
   });
 }

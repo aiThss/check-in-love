@@ -1,6 +1,6 @@
 {
-  "name": "LoveCheck",
-  "short_name": "LoveCheck",
+  "name": "Check IN Love",
+  "short_name": "Check IN Love",
   "description": "App check-in riêng tư cho hai đứa 💕",
   "start_url": "/",
   "scope": "/",

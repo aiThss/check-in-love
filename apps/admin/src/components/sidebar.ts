@@ -24,7 +24,7 @@ export function createSidebar(activePage: string): HTMLElement {
   brand.className = 'sidebar-brand';
   brand.innerHTML = `
     <span class="sidebar-brand-icon">💕</span>
-    <span class="sidebar-brand-text">LoveCheck <span>Admin</span></span>
+    <span class="sidebar-brand-text">Check IN Love <span>Admin</span></span>
   `;
 
   /* Nav */
