@@ -34,10 +34,10 @@ export function showToast(message: string, type: ToastType = 'info'): void {
 
   container.appendChild(toast);
 
-  // Auto remove after 3s
+  // Auto remove after 5s
   const removeTimeout = setTimeout(() => {
     removeToast(toast);
-  }, 3000);
+  }, 5000);
 
   // Allow tap to dismiss
   toast.addEventListener('click', () => {
@@ -50,5 +50,8 @@ function removeToast(toast: HTMLElement): void {
   toast.classList.add('toast-exit');
   toast.addEventListener('animationend', () => {
     toast.remove();
-  });
+  }, { once: true });
+  
+  // Fallback if animationend does not fire
+  setTimeout(() => toast.remove(), 500);
 }

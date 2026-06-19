@@ -73,14 +73,14 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   if (!response.ok) {
-    let errorData: { message?: string; code?: string } = {};
+    let errorData: { message?: string; error?: string; code?: string } = {};
     try {
       errorData = await response.clone().json();
     } catch {
       // ignore parse errors
     }
     throw new ApiError(
-      errorData.message || `Lỗi ${response.status}`,
+      errorData.message || errorData.error || `Lỗi ${response.status}`,
       errorData.code || 'API_ERROR',
       response.status,
     );
