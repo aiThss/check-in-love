@@ -52,7 +52,7 @@ export function login(payload: LoginPayload): Promise<AuthResponse> {
 }
 
 export function getMe(): Promise<MeResponse> {
-  return apiFetch<MeResponse>('/auth/me');
+  return apiFetch<MeResponse>('/me');
 }
 
 export function sendOtp(email: string): Promise<SendOtpResponse> {

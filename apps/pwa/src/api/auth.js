@@ -12,7 +12,7 @@ export function login(payload) {
     });
 }
 export function getMe() {
-    return apiFetch('/auth/me');
+    return apiFetch('/me');
 }
 export function sendOtp(email) {
     return apiFetch('/auth/send-otp', {
