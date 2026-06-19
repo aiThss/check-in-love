@@ -18,10 +18,12 @@ export function renderProfilePage(): HTMLElement {
   const root = document.createElement('div');
   root.className = 'page profile-page animate-fade-in';
   root.style.cssText = `
-    padding: 24px 16px 100px 16px;
+    padding: calc(var(--safe-top) + 24px) 16px calc(var(--safe-bottom) + 100px) 16px;
     max-width: 480px;
     margin: 0 auto;
-    min-height: 100vh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 20px;
