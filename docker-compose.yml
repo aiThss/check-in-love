@@ -38,8 +38,8 @@ services:
       MONGODB_URI: mongodb://mongo:27017/checkinlove
     volumes:
       - uploads_data:/app/uploads
-    ports:
-      - "3001:3001"
+#    ports:
+#      - "3001:3001"
     networks:
       - app_net
     healthcheck:
@@ -59,8 +59,8 @@ services:
         VITE_API_URL: ${VITE_API_URL:-https://api.couple.babyress.games/api}
     container_name: checkinlove_pwa
     restart: unless-stopped
-    ports:
-      - "3000:80"
+#    ports:
+#      - "3000:80"
     networks:
       - app_net
     depends_on:
@@ -77,8 +77,8 @@ services:
         VITE_API_URL: ${VITE_API_URL:-https://api.couple.babyress.games/api}
     container_name: checkinlove_admin
     restart: unless-stopped
-    ports:
-      - "3002:80"
+#    ports:
+#      - "3002:80"
     networks:
       - app_net
     depends_on:
