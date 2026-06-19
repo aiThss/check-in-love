@@ -1,0 +1,95 @@
+version: '3.9'
+
+services:
+  # ─────────────────────────────────────────────
+  # MongoDB Database
+  # ─────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: checkinlove_mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: checkinlove
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # Fastify API Backend
+  # ─────────────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: checkinlove_api
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongo:27017/checkinlove
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "3001:3001"
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────────
+  # PWA Frontend (Nginx)
+  # ─────────────────────────────────────────────
+  pwa:
+    build:
+      context: ./apps/pwa
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.couple.babyress.games/api}
+    container_name: checkinlove_pwa
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    networks:
+      - app_net
+    depends_on:
+      - api
+
+  # ─────────────────────────────────────────────
+  # Admin Dashboard (Nginx)
+  # ─────────────────────────────────────────────
+  admin:
+    build:
+      context: ./apps/admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.couple.babyress.games/api}
+    container_name: checkinlove_admin
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    networks:
+      - app_net
+    depends_on:
+      - api
+
+networks:
+  app_net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+    driver: local
+  uploads_data:
+    driver: local

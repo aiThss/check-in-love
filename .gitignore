@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+.turbo/
+.vite/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Uploads (user content – store in volume, not repo)
+uploads/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Mobile build artifacts (từ project cũ – KHÔNG commit)
+*.apk
+*.aab
+*.ipa
+*.xcarchive
+android/.gradle/
+android/app/build/
+ios/Pods/
+ios/build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+.pub-cache/
+
+# Gradle
+.gradle/
+gradle/
+gradlew
+gradlew.bat
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc
+.cache/
+tmp/
+temp/

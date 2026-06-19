@@ -1,0 +1,43 @@
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastContainer = null;
+function getContainer() {
+    if (!toastContainer || !document.body.contains(toastContainer)) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        toastContainer.setAttribute('aria-live', 'polite');
+        toastContainer.setAttribute('aria-atomic', 'true');
+        document.body.appendChild(toastContainer);
+    }
+    return toastContainer;
+}
+const ICONS = {
+    success: '✅',
+    error: '❌',
+    info: 'ℹ️',
+};
+export function showToast(message, type = 'info') {
+    const container = getContainer();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type} animate-slide-down`;
+    toast.setAttribute('role', 'status');
+    toast.innerHTML = `
+    <span class="toast-icon" aria-hidden="true">${ICONS[type]}</span>
+    <span class="toast-message">${message}</span>
+  `;
+    container.appendChild(toast);
+    // Auto remove after 3s
+    const removeTimeout = setTimeout(() => {
+        removeToast(toast);
+    }, 3000);
+    // Allow tap to dismiss
+    toast.addEventListener('click', () => {
+        clearTimeout(removeTimeout);
+        removeToast(toast);
+    });
+}
+function removeToast(toast) {
+    toast.classList.add('toast-exit');
+    toast.addEventListener('animationend', () => {
+        toast.remove();
+    });
+}
