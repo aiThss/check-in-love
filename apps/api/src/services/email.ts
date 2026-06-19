@@ -70,7 +70,8 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
             <td style="padding:0 40px 32px;text-align:center;">
               <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);line-height:1.6;">
                 Email được gửi từ <strong>Check IN Love</strong> — Ứng dụng check-in riêng tư cho cặp đôi 💕<br/>
-                ${env.PUBLIC_BASE_URL}
+                <a href="https://couple.babyress.games" style="color:rgba(255,255,255,0.4);text-decoration:none;">https://couple.babyress.games</a><br/>
+                &copy; aiThs
               </p>
             </td>
           </tr>

@@ -21,8 +21,11 @@ export function renderProfilePage(): HTMLElement {
     padding: calc(var(--safe-top) + 24px) 16px calc(var(--safe-bottom) + 100px) 16px;
     max-width: 480px;
     margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
     min-height: 100dvh;
     max-height: 100dvh;
+    overflow-x: hidden;
     overflow-y: auto;
     display: flex;
     flex-direction: column;

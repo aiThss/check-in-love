@@ -9,7 +9,11 @@ async function main(): Promise<void> {
   // 2. Build Fastify app
   const app = await buildApp();
 
-  // 3. Start listening
+  // 3. Init cron jobs
+  const { initCronJobs } = await import('./services/cron');
+  initCronJobs();
+
+  // 4. Start listening
   try {
     await app.listen({ port: env.PORT, host: '0.0.0.0' });
     console.log(`🚀 API running on http://0.0.0.0:${env.PORT}`);

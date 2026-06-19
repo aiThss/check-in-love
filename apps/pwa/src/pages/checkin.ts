@@ -35,8 +35,11 @@ export function renderCheckinPage(): HTMLElement {
     gap: 20px;
     max-width: 480px;
     margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
     min-height: 100dvh;
     max-height: 100dvh;
+    overflow-x: hidden;
     overflow-y: auto;
   `;
 

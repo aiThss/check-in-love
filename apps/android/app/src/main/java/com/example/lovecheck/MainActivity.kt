@@ -78,6 +78,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Request notification permission for Android 13+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
+            }
+        }
+
+        setupDailyReminders(this)
+
         setContent {
             val modifier = Modifier.fillMaxSize()
             AndroidView(
@@ -288,6 +297,39 @@ class MainActivity : ComponentActivity() {
             registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
         } else {
             registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        }
+    }
+
+    companion object {
+        fun setupDailyReminders(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            val hours = listOf(7, 12, 18, 23)
+
+            for (hour in hours) {
+                val intent = Intent(context, NotificationReceiver::class.java)
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    hour,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+
+                val calendar = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, hour)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    if (timeInMillis <= System.currentTimeMillis()) {
+                        add(Calendar.DAY_OF_YEAR, 1)
+                    }
+                }
+
+                alarmManager.setInexactRepeating(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    android.app.AlarmManager.INTERVAL_DAY,
+                    pendingIntent
+                )
+            }
         }
     }
 }
