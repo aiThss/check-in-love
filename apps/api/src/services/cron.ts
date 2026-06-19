@@ -34,7 +34,7 @@ async function broadcastPush(message: string) {
   try {
     const subs = await PushSubscription.find().distinct('userId');
     const tasks = subs.map((userId) =>
-      sendPushToUser(userId as string, {
+      sendPushToUser(userId.toString(), {
         title: 'Check IN Love 💕',
         body: message,
       }),
