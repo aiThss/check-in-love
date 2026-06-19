@@ -8,6 +8,7 @@ export interface StartOnboardingPayload {
   loveStartDate?: string;
   email?: string;
   password?: string;
+  otpCode?: string;
 }
 
 export interface LoginPayload {
@@ -26,8 +27,18 @@ export interface MeResponse {
   couple: import('./types').Couple;
 }
 
+export interface SendOtpResponse {
+  message: string;
+  expiresIn: number;
+}
+
+export interface VerifyOtpResponse {
+  verified: boolean;
+  message: string;
+}
+
 export function startOnboarding(payload: StartOnboardingPayload): Promise<AuthResponse> {
-  return apiFetch<AuthResponse>('/auth/onboarding', {
+  return apiFetch<AuthResponse>('/auth/start', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -42,4 +53,18 @@ export function login(payload: LoginPayload): Promise<AuthResponse> {
 
 export function getMe(): Promise<MeResponse> {
   return apiFetch<MeResponse>('/auth/me');
+}
+
+export function sendOtp(email: string): Promise<SendOtpResponse> {
+  return apiFetch<SendOtpResponse>('/auth/send-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function verifyOtp(email: string, code: string): Promise<VerifyOtpResponse> {
+  return apiFetch<VerifyOtpResponse>('/auth/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  });
 }

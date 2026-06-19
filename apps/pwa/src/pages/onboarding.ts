@@ -1,6 +1,6 @@
 import { navigate } from '../router';
 import { store } from '../store/index';
-import { startOnboarding } from '../api/auth';
+import { startOnboarding, sendOtp, verifyOtp } from '../api/auth';
 import { showToast } from '../components/toast';
 
 // ── UUID v4 ───────────────────────────────────────────────────────────────────
@@ -9,7 +9,6 @@ function generateDeviceId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  // Fallback
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
@@ -43,7 +42,7 @@ export function renderOnboardingPage(): HTMLElement {
 
   // State
   let currentStep = 0;
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 5; // Added OTP step
 
   const formData = {
     displayName: '',
@@ -52,7 +51,9 @@ export function renderOnboardingPage(): HTMLElement {
     loveStartDate: '',
     email: '',
     password: '',
+    otpCode: '',
     useAccount: false,
+    emailVerified: false,
   };
 
   // Root container
@@ -63,11 +64,14 @@ export function renderOnboardingPage(): HTMLElement {
   // ── Render helpers ────────────────────────────────────────────────────────
 
   function renderProgressDots(): HTMLElement {
+    // Only show dots for steps relevant to user flow
+    const visibleSteps = formData.useAccount ? TOTAL_STEPS : TOTAL_STEPS - 1;
+    const visibleCurrent = currentStep;
     const dots = document.createElement('div');
     dots.className = 'progress-dots';
-    for (let i = 0; i < TOTAL_STEPS; i++) {
+    for (let i = 0; i < visibleSteps; i++) {
       const dot = document.createElement('div');
-      dot.className = `progress-dot${i === currentStep ? ' active' : ''}`;
+      dot.className = `progress-dot${i === visibleCurrent ? ' active' : ''}`;
       dots.appendChild(dot);
     }
     return dots;
@@ -272,6 +276,9 @@ export function renderOnboardingPage(): HTMLElement {
     emailInput.value = formData.email;
     emailInput.addEventListener('input', () => {
       formData.email = emailInput.value.trim();
+      // Reset verification state if email changes
+      formData.emailVerified = false;
+      formData.otpCode = '';
     });
 
     const passwordInput = document.createElement('input');
@@ -311,6 +318,12 @@ export function renderOnboardingPage(): HTMLElement {
           emailInput.focus();
           return;
         }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+          showToast('Email không hợp lệ', 'error');
+          emailInput.focus();
+          return;
+        }
         if (formData.password.length < 6) {
           showToast('Mật khẩu cần ít nhất 6 ký tự', 'error');
           passwordInput.focus();
@@ -326,9 +339,205 @@ export function renderOnboardingPage(): HTMLElement {
     requestAnimationFrame(() => codeInput.focus());
   }
 
-  // ── Step 4: Love start date ───────────────────────────────────────────────
+  // ── Step 4: Email OTP Verification (only if useAccount) ───────────────────
 
-  function renderStep4(): void {
+  function renderStep4OTP(): void {
+    const content = document.createElement('div');
+    content.style.cssText =
+      'display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;max-width:360px;';
+
+    let cooldown = 0;
+    let cooldownInterval: ReturnType<typeof setInterval> | null = null;
+
+    content.innerHTML = `
+      <div style="font-size:72px;line-height:1" class="animate-pulse">📬</div>
+      <div style="text-align:center">
+        <h1 class="onboarding-title">Xác thực Email</h1>
+        <p class="onboarding-subtitle" style="margin-top:8px">
+          Nhập mã <strong>6 chữ số</strong> được gửi tới<br>
+          <strong style="color:var(--accent)">${formData.email}</strong>
+        </p>
+      </div>
+    `;
+
+    // OTP input boxes (6 separate inputs)
+    const otpWrapper = document.createElement('div');
+    otpWrapper.style.cssText = 'display:flex;gap:10px;justify-content:center;width:100%;';
+    const otpInputs: HTMLInputElement[] = [];
+
+    for (let i = 0; i < 6; i++) {
+      const box = document.createElement('input');
+      box.type = 'text';
+      box.inputMode = 'numeric';
+      box.maxLength = 1;
+      box.setAttribute('aria-label', `Chữ số ${i + 1}`);
+      box.style.cssText = `
+        width:44px;height:56px;
+        text-align:center;font-size:22px;font-weight:700;
+        border:2px solid var(--border);
+        border-radius:14px;
+        background:var(--surface-solid);
+        color:var(--text);
+        caret-color:var(--accent);
+        transition:border-color 0.2s ease;
+        outline:none;
+      `;
+
+      box.addEventListener('focus', () => {
+        box.style.borderColor = 'var(--accent)';
+        box.select();
+      });
+      box.addEventListener('blur', () => {
+        box.style.borderColor = 'var(--border)';
+      });
+      box.addEventListener('input', () => {
+        const val = box.value.replace(/\D/g, '');
+        box.value = val.slice(-1);
+        syncOtpValue();
+        if (val && i < 5) {
+          otpInputs[i + 1]?.focus();
+        }
+      });
+      box.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !box.value && i > 0) {
+          otpInputs[i - 1]?.focus();
+        }
+        if (e.key === 'Enter') {
+          void handleVerify();
+        }
+      });
+      box.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+        text.split('').forEach((ch, idx) => {
+          if (otpInputs[idx]) otpInputs[idx].value = ch;
+        });
+        syncOtpValue();
+        const focusIdx = Math.min(text.length, 5);
+        otpInputs[focusIdx]?.focus();
+      });
+
+      otpInputs.push(box);
+      otpWrapper.appendChild(box);
+    }
+    content.appendChild(otpWrapper);
+
+    function syncOtpValue() {
+      formData.otpCode = otpInputs.map((i) => i.value).join('');
+    }
+
+    // Status message
+    const statusMsg = document.createElement('p');
+    statusMsg.style.cssText = 'font-size:13px;color:var(--text-secondary);text-align:center;min-height:20px;margin:0;';
+    content.appendChild(statusMsg);
+
+    // Verify button
+    const verifyBtn = document.createElement('button');
+    verifyBtn.className = 'btn-primary btn-primary-full';
+    verifyBtn.style.cssText = 'width:100%;font-size:17px;padding:16px;';
+    verifyBtn.textContent = 'Xác thực →';
+    verifyBtn.addEventListener('click', () => void handleVerify());
+    content.appendChild(verifyBtn);
+
+    // Resend button
+    const resendBtn = document.createElement('button');
+    resendBtn.className = 'btn-ghost';
+    resendBtn.style.cssText = 'width:100%;font-size:14px;';
+    resendBtn.textContent = 'Gửi lại mã';
+    resendBtn.addEventListener('click', () => void handleSendOtp(true));
+    content.appendChild(resendBtn);
+
+    renderStep(content);
+
+    // Auto-send OTP on load if not already sent
+    void handleSendOtp(false);
+
+    async function handleSendOtp(isResend: boolean) {
+      if (cooldown > 0) {
+        showToast(`Vui lòng chờ ${cooldown}s trước khi gửi lại`, 'error');
+        return;
+      }
+
+      resendBtn.disabled = true;
+      resendBtn.textContent = 'Đang gửi...';
+
+      try {
+        await sendOtp(formData.email);
+        showToast(
+          isResend ? '✉️ Đã gửi lại mã mới!' : `✉️ Mã đã gửi tới ${formData.email}`,
+          'success',
+        );
+        // Start 60s cooldown
+        cooldown = 60;
+        resendBtn.textContent = `Gửi lại sau ${cooldown}s`;
+        cooldownInterval = setInterval(() => {
+          cooldown--;
+          if (cooldown <= 0) {
+            clearInterval(cooldownInterval!);
+            resendBtn.textContent = 'Gửi lại mã';
+            resendBtn.disabled = false;
+          } else {
+            resendBtn.textContent = `Gửi lại sau ${cooldown}s`;
+          }
+        }, 1000);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Gửi email thất bại';
+        showToast(msg, 'error');
+        resendBtn.disabled = false;
+        resendBtn.textContent = 'Gửi lại mã';
+      }
+    }
+
+    async function handleVerify() {
+      syncOtpValue();
+      if (formData.otpCode.length !== 6) {
+        showToast('Vui lòng nhập đủ 6 chữ số', 'error');
+        otpInputs[0]?.focus();
+        return;
+      }
+
+      verifyBtn.disabled = true;
+      verifyBtn.innerHTML = `<span class="spinner" style="width:18px;height:18px;border-width:2px"></span> Đang xác thực...`;
+
+      try {
+        await verifyOtp(formData.email, formData.otpCode);
+        formData.emailVerified = true;
+
+        // Visual feedback
+        otpInputs.forEach((inp) => {
+          inp.style.borderColor = '#4ade80';
+          inp.style.background = 'rgba(74,222,128,0.08)';
+          inp.disabled = true;
+        });
+        statusMsg.style.color = '#4ade80';
+        statusMsg.textContent = '✓ Email đã được xác thực!';
+
+        showToast('✓ Xác thực thành công!', 'success');
+        setTimeout(() => {
+          currentStep++;
+          renderCurrentStep();
+        }, 700);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Mã không đúng';
+        showToast(msg, 'error');
+        // Shake effect
+        otpInputs.forEach((inp) => {
+          inp.style.borderColor = '#f87171';
+          inp.style.animation = 'none';
+          setTimeout(() => { inp.style.borderColor = 'var(--border)'; }, 600);
+        });
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = 'Xác thực →';
+      }
+    }
+
+    // Focus first input
+    requestAnimationFrame(() => otpInputs[0]?.focus());
+  }
+
+  // ── Step 4/5: Love start date ─────────────────────────────────────────────
+
+  function renderStepDate(): void {
     const content = document.createElement('div');
     content.style.cssText =
       'display:flex;flex-direction:column;align-items:center;gap:24px;width:100%;max-width:360px;';
@@ -409,6 +618,7 @@ export function renderOnboardingPage(): HTMLElement {
         loveStartDate: formData.loveStartDate || undefined,
         email: formData.useAccount && formData.email ? formData.email : undefined,
         password: formData.useAccount && formData.password ? formData.password : undefined,
+        otpCode: formData.useAccount && formData.otpCode ? formData.otpCode : undefined,
       };
 
       const result = await startOnboarding(payload);
@@ -420,7 +630,6 @@ export function renderOnboardingPage(): HTMLElement {
       });
       localStorage.setItem('lovecheck_token', result.token);
 
-      // Success!
       showSuccessAndNavigate();
     } catch (err: unknown) {
       const message =
@@ -458,7 +667,18 @@ export function renderOnboardingPage(): HTMLElement {
       case 0: renderStep1(); break;
       case 1: renderStep2(); break;
       case 2: renderStep3(); break;
-      case 3: renderStep4(); break;
+      case 3:
+        // If using account, show OTP step; otherwise show date step
+        if (formData.useAccount) {
+          renderStep4OTP();
+        } else {
+          renderStepDate();
+        }
+        break;
+      case 4:
+        // Date step (only reached after OTP if useAccount)
+        renderStepDate();
+        break;
     }
   }
 

@@ -1,6 +1,6 @@
 import { apiFetch } from './client';
 export function startOnboarding(payload) {
-    return apiFetch('/auth/onboarding', {
+    return apiFetch('/auth/start', {
         method: 'POST',
         body: JSON.stringify(payload),
     });
@@ -13,4 +13,16 @@ export function login(payload) {
 }
 export function getMe() {
     return apiFetch('/auth/me');
+}
+export function sendOtp(email) {
+    return apiFetch('/auth/send-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+    });
+}
+export function verifyOtp(email, code) {
+    return apiFetch('/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email, code }),
+    });
 }
