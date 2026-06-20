@@ -21,6 +21,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.JavascriptInterface
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,6 +40,13 @@ import java.util.Date
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 import org.json.JSONObject
+
+private class LoveCheckBridge(private val context: Context) {
+    @JavascriptInterface
+    fun updateWidget(streak: Int, partnerName: String) {
+        LoveCheckWidgetProvider.updateWidgetData(context, streak, partnerName)
+    }
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -81,7 +89,7 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { _ -> }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -110,6 +118,7 @@ class MainActivity : ComponentActivity() {
                         settings.setSupportZoom(false)
                         val versionName = packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
                         settings.userAgentString = settings.userAgentString + " LoveCheckAndroidWrapper/$versionName"
+                        addJavascriptInterface(LoveCheckBridge(context.applicationContext), "LoveCheckAndroid")
 
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(
@@ -180,7 +189,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        loadUrl(APP_URL)
+                        loadUrl(initialUrlFromIntent(intent))
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -188,6 +197,12 @@ class MainActivity : ComponentActivity() {
         }
 
         checkUpdate()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        webView?.loadUrl(initialUrlFromIntent(intent))
     }
 
     private fun buildCameraIntent(context: Context): Intent? {
@@ -231,6 +246,11 @@ class MainActivity : ComponentActivity() {
         val imageFileName = "JPEG_${timeStamp}_"
         val storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
         return File.createTempFile(imageFileName, ".jpg", storageDir)
+    }
+
+    private fun initialUrlFromIntent(intent: Intent?): String {
+        val data = intent?.data ?: return APP_URL
+        return if (isAllowedInWebView(data)) data.toString() else APP_URL
     }
 
     override fun onBackPressed() {

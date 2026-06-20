@@ -157,6 +157,7 @@ UPLOAD_DIR=/app/uploads
 MAX_UPLOAD_MB=10
 ALLOWED_ORIGINS=https://couple.babyress.games,https://admin.couple.babyress.games
 VITE_API_URL=https://api.couple.babyress.games/api
+ADMIN_ENABLE_TEST_RESET=true
 ```
 
 ### 6. Volumes trong Dokploy

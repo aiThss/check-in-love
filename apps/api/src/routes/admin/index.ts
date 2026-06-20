@@ -133,6 +133,20 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /**
+   * GET /admin/maintenance/reset — Test reset feature flag status
+   */
+  app.get(
+    '/admin/maintenance/reset',
+    { preHandler: authenticateAdmin },
+    async (_request, reply) => {
+      return reply.status(200).send({
+        enabled: env.ADMIN_ENABLE_TEST_RESET,
+        confirmation: 'RESET CHECK IN LOVE',
+      });
+    },
+  );
+
+  /**
    * POST /admin/maintenance/reset — Clear all app test data
    */
   app.post(

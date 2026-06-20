@@ -24,17 +24,17 @@ export function renderRandomPage(): HTMLElement {
   const root = document.createElement('div');
   root.className = 'page random-page animate-fade-in';
   root.style.cssText = `
-    padding: calc(var(--safe-top) + 24px) 16px calc(var(--safe-bottom) + 100px) 16px;
-    max-width: 480px;
+    padding: calc(var(--safe-top) + 20px) 16px calc(var(--safe-bottom) + 118px) 16px;
     margin: 0 auto;
     width: 100%;
+    max-width: min(480px, 100%);
     box-sizing: border-box;
     min-height: 100dvh;
     overflow-x: hidden;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: clamp(12px, 2.4vh, 20px);
   `;
 
   // Header
@@ -58,7 +58,15 @@ export function renderRandomPage(): HTMLElement {
   root.appendChild(selectorTitle);
 
   const grid = document.createElement('div');
-  grid.style.cssText = 'display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;';
+  grid.className = 'random-category-grid';
+  grid.style.cssText = `
+    width:100%;
+    max-width:100%;
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:clamp(10px, 3vw, 12px);
+    overflow:hidden;
+  `;
   root.appendChild(grid);
 
   // Big Action Button
@@ -115,6 +123,7 @@ export function renderRandomPage(): HTMLElement {
       selectedCategory = undefined;
       updateSelections();
     });
+    styleCategoryCardContent(randomCard);
     grid.appendChild(randomCard);
 
     categories.forEach(cat => {
@@ -131,8 +140,42 @@ export function renderRandomPage(): HTMLElement {
         selectedCategory = cat.category;
         updateSelections();
       });
+      styleCategoryCardContent(card);
       grid.appendChild(card);
     });
+  }
+
+  function styleCategoryCardContent(card: HTMLButtonElement): void {
+    const icon = card.children[0] as HTMLElement | undefined;
+    const title = card.children[1] as HTMLElement | undefined;
+    const meta = card.children[2] as HTMLElement | undefined;
+
+    if (icon) {
+      icon.style.fontSize = 'clamp(24px, 7vw, 34px)';
+      icon.style.lineHeight = '1';
+      icon.style.flexShrink = '0';
+    }
+
+    if (title) {
+      title.style.fontSize = 'clamp(11px, 3.2vw, 14px)';
+      title.style.fontWeight = '600';
+      title.style.marginTop = '6px';
+      title.style.lineHeight = '1.15';
+      title.style.textAlign = 'center';
+      title.style.whiteSpace = 'normal';
+      title.style.overflow = 'visible';
+      title.style.textOverflow = 'clip';
+      title.style.overflowWrap = 'anywhere';
+      title.style.width = '100%';
+      title.style.minWidth = '0';
+    }
+
+    if (meta) {
+      meta.style.fontSize = '9px';
+      meta.style.lineHeight = '1.1';
+      meta.style.textAlign = 'center';
+      meta.style.marginTop = '2px';
+    }
   }
 
   function getCardStyle(selected: boolean): string {
@@ -141,14 +184,19 @@ export function renderRandomPage(): HTMLElement {
       flex-direction:column;
       align-items:center;
       justify-content:center;
-      padding:12px 8px;
-      border-radius:16px;
+      width:100%;
+      min-width:0;
+      max-width:100%;
+      padding:clamp(8px, 2.5vw, 12px) 6px;
+      border-radius:clamp(20px, 6vw, 24px);
       background: ${selected ? 'var(--accent-soft)' : 'var(--surface)'};
       border: 1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'};
       color: ${selected ? 'var(--accent)' : 'var(--text-primary)'};
       transition: all var(--duration-fast) var(--ease);
       cursor:pointer;
-      aspect-ratio: 1;
+      aspect-ratio: 1 / 1;
+      overflow:hidden;
+      box-sizing:border-box;
     `;
   }
 
@@ -158,6 +206,7 @@ export function renderRandomPage(): HTMLElement {
     cards.forEach((card, idx) => {
       const isSelected = idx === 0 ? selectedCategory === undefined : categories[idx - 1].category === selectedCategory;
       card.style.cssText = getCardStyle(isSelected);
+      styleCategoryCardContent(card);
     });
   }
 

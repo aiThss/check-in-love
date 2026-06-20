@@ -36,6 +36,7 @@ services:
     environment:
       NODE_ENV: production
       MONGODB_URI: mongodb://mongo:27017/checkinlove
+      ADMIN_ENABLE_TEST_RESET: "true"
     volumes:
       - uploads_data:/app/uploads
 #    ports:

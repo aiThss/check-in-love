@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/love_check_widget"
+    android:minWidth="180dp"
+    android:minHeight="80dp"
+    android:minResizeWidth="160dp"
+    android:minResizeHeight="72dp"
+    android:previewLayout="@layout/love_check_widget"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

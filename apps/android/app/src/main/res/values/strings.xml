@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Check IN Love</string>
+    <string name="widget_name">Check IN Love Streak</string>
+    <string name="widget_description">Hien thi streak va mo nhanh man gui check-in</string>
 </resources>

@@ -101,6 +101,11 @@ export function renderDashboardPage(): HTMLElement {
       </div>
     </div>
   `;
+  const resetDesc = testToolsCard.querySelector('.danger-zone-desc');
+  resetDesc?.insertAdjacentHTML(
+    'afterend',
+    '<div class="danger-zone-status" id="reset-status">Dang kiem tra trang thai reset...</div>',
+  );
 
   content.appendChild(quickActions);
   content.appendChild(sectionTitle);
@@ -119,11 +124,42 @@ export function renderDashboardPage(): HTMLElement {
   };
 
   reloadDashboard();
+  loadResetStatus(testToolsCard);
   testToolsCard
     .querySelector<HTMLButtonElement>('#reset-data-btn')
     ?.addEventListener('click', () => openResetModal(reloadDashboard));
 
   return layout;
+}
+
+async function loadResetStatus(card: HTMLElement): Promise<void> {
+  const statusEl = card.querySelector<HTMLElement>('#reset-status');
+  const resetBtn = card.querySelector<HTMLButtonElement>('#reset-data-btn');
+  if (!statusEl || !resetBtn) return;
+
+  try {
+    const status = await adminApi.getResetStatus();
+    if (status.enabled) {
+      resetBtn.disabled = false;
+      resetBtn.removeAttribute('title');
+      statusEl.textContent = 'Reset test dang bat tren API.';
+      statusEl.className = 'danger-zone-status is-enabled';
+      return;
+    }
+
+    resetBtn.disabled = true;
+    resetBtn.title = 'Set ADMIN_ENABLE_TEST_RESET=true tren API roi deploy lai.';
+    statusEl.textContent =
+      'Reset test dang tat. Set ADMIN_ENABLE_TEST_RESET=true tren API de dung nut nay.';
+    statusEl.className = 'danger-zone-status is-disabled';
+  } catch (err) {
+    resetBtn.disabled = false;
+    statusEl.textContent = errorMessage(
+      err,
+      'Khong kiem tra duoc trang thai reset. Co the thu lai thu cong.',
+    );
+    statusEl.className = 'danger-zone-status is-unknown';
+  }
 }
 
 async function loadSummary(grid: HTMLElement): Promise<void> {
@@ -263,7 +299,13 @@ function categoryLabel(item: RandomEvent): string {
 }
 
 function errorMessage(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) return err.message;
+  if (err instanceof ApiError) {
+    const code = (err.body as { code?: string } | null)?.code;
+    if (code === 'RESET_DISABLED') {
+      return 'Reset test dang tat tren API. Set ADMIN_ENABLE_TEST_RESET=true roi deploy lai API.';
+    }
+    return err.message;
+  }
   if (err instanceof Error && err.message) return err.message;
   return fallback;
 }

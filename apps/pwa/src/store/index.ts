@@ -13,6 +13,14 @@ export interface AppState {
 const STATE_KEY = 'lovecheck_state';
 const TOKEN_KEY = 'lovecheck_token';
 
+declare global {
+  interface Window {
+    LoveCheckAndroid?: {
+      updateWidget?: (streak: number, partnerName: string) => void;
+    };
+  }
+}
+
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 const defaultState: AppState = {
@@ -44,6 +52,17 @@ function writeToStorage(state: AppState): void {
   }
 }
 
+function syncAndroidWidget(state: AppState): void {
+  try {
+    const bridge = window.LoveCheckAndroid;
+    const streak = state.couple?.streak ?? 0;
+    const partnerName = state.user?.partnerName ?? '';
+    bridge?.updateWidget?.(streak, partnerName);
+  } catch {
+    // Android bridge is best-effort only.
+  }
+}
+
 // ── Apply theme to document ───────────────────────────────────────────────────
 
 export function applyTheme(theme: AppState['theme']): void {
@@ -70,6 +89,7 @@ export const store = {
     const current = readFromStorage();
     const next = { ...current, ...partial };
     writeToStorage(next);
+    syncAndroidWidget(next);
 
     // Keep token in sync with dedicated key for apiFetch
     if (partial.token !== undefined) {
@@ -90,6 +110,7 @@ export const store = {
     localStorage.removeItem(STATE_KEY);
     localStorage.removeItem(TOKEN_KEY);
     document.documentElement.removeAttribute('data-theme');
+    syncAndroidWidget({ ...defaultState });
   },
 
   getToken(): string | null {
@@ -99,7 +120,9 @@ export const store = {
   setToken(token: string): void {
     localStorage.setItem(TOKEN_KEY, token);
     const current = readFromStorage();
-    writeToStorage({ ...current, token });
+    const next = { ...current, token };
+    writeToStorage(next);
+    syncAndroidWidget(next);
   },
 
   isAuthenticated(): boolean {
@@ -111,6 +134,7 @@ export const store = {
   initTheme(): void {
     const state = readFromStorage();
     applyTheme(state.theme);
+    syncAndroidWidget(state);
 
     // Listen for system preference changes when theme is "system"
     window

@@ -86,6 +86,11 @@ export interface ResetResult {
   };
 }
 
+export interface ResetStatus {
+  enabled: boolean;
+  confirmation: string;
+}
+
 type RawPagination = {
   page?: number;
   limit?: number;
@@ -318,5 +323,9 @@ export const adminApi = {
 
   resetAllData(confirmation: string): Promise<ResetResult> {
     return post<ResetResult>('/admin/maintenance/reset', { confirmation });
+  },
+
+  getResetStatus(): Promise<ResetStatus> {
+    return get<ResetStatus>('/admin/maintenance/reset');
   },
 };

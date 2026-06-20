@@ -2,6 +2,11 @@ import { apiFetch } from './client';
 import { store } from '../store/index';
 import type { CheckIn, PaginatedResponse, Reaction, ReactionType } from './types';
 
+export interface CreateCheckinResult {
+  checkIn: CheckIn;
+  streak?: number;
+}
+
 // Map raw backend check-in format to aligned PWA types
 function mapCheckin(item: any): CheckIn {
   if (!item) return null as any;
@@ -90,12 +95,15 @@ export async function getCheckins(
   };
 }
 
-export async function createCheckin(body: FormData | Record<string, any>): Promise<CheckIn> {
+export async function createCheckin(body: FormData | Record<string, any>): Promise<CreateCheckinResult> {
   const res = await apiFetch<any>('/checkins', {
     method: 'POST',
     body: body instanceof FormData ? body : JSON.stringify(body),
   });
-  return mapCheckin(res.checkIn || res);
+  return {
+    checkIn: mapCheckin(res.checkIn || res),
+    streak: typeof res.streak === 'number' ? res.streak : undefined,
+  };
 }
 
 export async function addReaction(

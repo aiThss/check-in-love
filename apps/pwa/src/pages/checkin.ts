@@ -1,5 +1,6 @@
 import { navigate } from '../router';
 import { createCheckin } from '../api/checkins';
+import { store } from '../store/index';
 import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import { openCamera, openGallery } from '../components/camera';
@@ -29,13 +30,13 @@ export function renderCheckinPage(): HTMLElement {
   const root = document.createElement('div');
   root.className = 'page checkin-page animate-fade-in';
   root.style.cssText = `
-    padding: calc(var(--safe-top) + 24px) 16px calc(var(--safe-bottom) + 100px) 16px;
+    padding: calc(var(--safe-top) + 16px) 16px calc(170px + var(--safe-bottom)) 16px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    max-width: 480px;
+    gap: clamp(10px, 2vh, 16px);
     margin: 0 auto;
     width: 100%;
+    max-width: min(480px, 100%);
     box-sizing: border-box;
     min-height: 100dvh;
     overflow-x: hidden;
@@ -44,7 +45,7 @@ export function renderCheckinPage(): HTMLElement {
 
   // Header with back button
   const header = document.createElement('div');
-  header.style.cssText = 'display:flex;align-items:center;gap:12px;margin-bottom:8px;';
+  header.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:0;min-width:0;';
   header.innerHTML = `
     <button id="back-btn" class="btn-icon" style="border-radius:50%;width:44px;height:44px;">←</button>
     <div>
@@ -53,6 +54,23 @@ export function renderCheckinPage(): HTMLElement {
     </div>
   `;
   root.appendChild(header);
+
+  const backButton = header.querySelector<HTMLButtonElement>('#back-btn');
+  if (backButton) {
+    backButton.style.width = '40px';
+    backButton.style.height = '40px';
+    backButton.style.flexShrink = '0';
+  }
+
+  const headerText = header.querySelector<HTMLElement>('div');
+  if (headerText) {
+    headerText.style.minWidth = '0';
+    const subtitle = headerText.querySelector<HTMLElement>('p');
+    if (subtitle) {
+      subtitle.style.fontSize = '12px';
+      subtitle.style.lineHeight = '1.35';
+    }
+  }
 
   header.querySelector('#back-btn')?.addEventListener('click', () => {
     navigate('/app/home');
@@ -67,6 +85,9 @@ export function renderCheckinPage(): HTMLElement {
     border-radius: var(--radius-pill);
     padding: 4px;
     gap: 4px;
+    width:100%;
+    max-width:100%;
+    overflow:hidden;
   `;
   
   const modes = [
@@ -82,8 +103,9 @@ export function renderCheckinPage(): HTMLElement {
     tab.className = `tab-btn ${mode.id === activeMode ? 'active' : ''}`;
     tab.style.cssText = `
       flex: 1;
-      padding: 10px 14px;
-      font-size: 14px;
+      min-width:0;
+      padding: 8px 6px;
+      font-size: clamp(12px, 3.4vw, 14px);
       font-weight: 600;
       border-radius: var(--radius-pill);
       text-align: center;
@@ -91,6 +113,9 @@ export function renderCheckinPage(): HTMLElement {
       color: ${mode.id === activeMode ? 'var(--accent)' : 'var(--text-secondary)'};
       background: ${mode.id === activeMode ? 'var(--bg)' : 'transparent'};
       box-shadow: ${mode.id === activeMode ? 'var(--shadow)' : 'none'};
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     `;
     tab.textContent = mode.label;
     tab.dataset.mode = mode.id;
@@ -101,7 +126,7 @@ export function renderCheckinPage(): HTMLElement {
   // Content Area
   const contentArea = document.createElement('div');
   contentArea.className = 'card';
-  contentArea.style.cssText = 'padding: 20px; display: flex; flex-direction: column; gap: 16px; min-height: 280px;';
+  contentArea.style.cssText = 'padding: clamp(14px, 3.5vw, 18px); display: flex; flex-direction: column; gap: 12px; min-height: 0; width:100%; max-width:100%; overflow:hidden;';
   root.appendChild(contentArea);
 
   // Form State
@@ -109,6 +134,46 @@ export function renderCheckinPage(): HTMLElement {
   let selectedPreviewUrl: string | null = null;
   let selectedMood: string | null = null;
   let selectedQuickMsg: string | null = null;
+
+  function compactUploadPicker(picker: HTMLElement): void {
+    const icon = picker.children[0] as HTMLElement | undefined;
+    const copy = picker.children[1] as HTMLElement | undefined;
+    const title = copy?.querySelector<HTMLElement>('p:first-child');
+    const subtitle = copy?.querySelector<HTMLElement>('p:last-child');
+
+    if (icon) {
+      icon.style.fontSize = 'clamp(46px, 13vw, 56px)';
+      icon.style.lineHeight = '1';
+    }
+
+    if (copy) {
+      copy.style.maxWidth = '100%';
+      copy.style.padding = '0 10px';
+    }
+
+    if (title) {
+      title.style.fontSize = 'clamp(13px, 3.6vw, 15px)';
+      title.style.lineHeight = '1.25';
+    }
+
+    if (subtitle) {
+      subtitle.style.fontSize = '11px';
+      subtitle.style.lineHeight = '1.25';
+    }
+  }
+
+  function compactCaptionGroup(group: HTMLElement): void {
+    group.querySelector('label')?.remove();
+    group.style.gap = '0';
+
+    const input = group.querySelector<HTMLInputElement>('#caption-input');
+    if (input) {
+      input.style.minHeight = '46px';
+      input.style.padding = '12px 14px';
+      input.style.fontSize = '14px';
+      input.style.borderRadius = '16px';
+    }
+  }
 
   // Render content depending on activeMode
   function renderContentForm() {
@@ -120,12 +185,14 @@ export function renderCheckinPage(): HTMLElement {
       picker.style.cssText = `
         border: 2px dashed var(--border);
         border-radius: 20px;
-        aspect-ratio: 4 / 3;
+        height: clamp(188px, 28vh, 232px);
+        min-height: 188px;
+        max-height: 232px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 12px;
+        gap: 8px;
         cursor: pointer;
         overflow: hidden;
         position: relative;
@@ -169,6 +236,7 @@ export function renderCheckinPage(): HTMLElement {
             <p style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Nhấn vào để tải hình ảnh lên</p>
           </div>
         `;
+        compactUploadPicker(picker);
         picker.addEventListener('click', () => {
           // Show options: Camera or Gallery
           const modalContent = document.createElement('div');
@@ -228,23 +296,26 @@ export function renderCheckinPage(): HTMLElement {
         <label class="input-label">Mô tả (Không bắt buộc)</label>
         <input type="text" id="caption-input" class="input" placeholder="Viết vài dòng ngọt ngào..." maxlength="280" />
       `;
+      compactCaptionGroup(capGroup);
       contentArea.appendChild(capGroup);
 
       // Quick message selection
       const quickHeader = document.createElement('label');
       quickHeader.className = 'input-label';
       quickHeader.textContent = 'Chọn nhanh tin nhắn';
+      quickHeader.style.marginBottom = '0';
       contentArea.appendChild(quickHeader);
 
       const chipsWrapper = document.createElement('div');
-      chipsWrapper.style.cssText = 'display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-top:-8px;';
+      chipsWrapper.style.cssText = 'display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding-bottom:4px;margin-top:-8px;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch;';
       QUICK_MESSAGES.forEach(msg => {
         const chip = document.createElement('button');
         chip.className = `btn-ghost ${selectedQuickMsg === msg ? 'active' : ''}`;
         chip.style.cssText = `
           white-space:nowrap;
-          font-size:13px;
-          padding:6px 12px;
+          flex-shrink:0;
+          font-size:12px;
+          padding:5px 10px;
           border-radius:12px;
           background: ${selectedQuickMsg === msg ? 'var(--accent-soft)' : 'var(--surface-solid)'};
           color: ${selectedQuickMsg === msg ? 'var(--accent)' : 'var(--text-primary)'};
@@ -286,22 +357,29 @@ export function renderCheckinPage(): HTMLElement {
         <label class="input-label">Viết gì đó gửi người ấy</label>
         <textarea id="text-input" class="input" placeholder="Hôm nay của bạn thế nào? Kể cho người ấy nghe nhé..." maxlength="280" style="flex:1;min-height:140px;"></textarea>
       `;
+      const textInput = textGroup.querySelector<HTMLTextAreaElement>('#text-input');
+      if (textInput) {
+        textInput.style.minHeight = '112px';
+        textInput.style.lineHeight = '1.45';
+      }
       contentArea.appendChild(textGroup);
 
       // Quick message selection
       const quickHeader = document.createElement('label');
       quickHeader.className = 'input-label';
       quickHeader.textContent = 'Gợi ý tin nhắn';
+      quickHeader.style.marginBottom = '0';
       contentArea.appendChild(quickHeader);
 
       const chipsWrapper = document.createElement('div');
-      chipsWrapper.style.cssText = 'display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-top:-8px;';
+      chipsWrapper.style.cssText = 'display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding-bottom:4px;margin-top:-8px;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch;';
       QUICK_MESSAGES.forEach(msg => {
         const chip = document.createElement('button');
         chip.style.cssText = `
           white-space:nowrap;
-          font-size:13px;
-          padding:6px 12px;
+          flex-shrink:0;
+          font-size:12px;
+          padding:5px 10px;
           border-radius:12px;
           background: var(--surface-solid);
           border: 1px solid var(--border);
@@ -328,6 +406,7 @@ export function renderCheckinPage(): HTMLElement {
 
       const grid = document.createElement('div');
       grid.className = 'mood-grid';
+      grid.style.cssText = 'grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px;width:100%;max-width:100%;';
       MOODS.forEach(mood => {
         const btn = document.createElement('button');
         btn.className = `mood-btn ${selectedMood === mood.value ? 'selected' : ''}`;
@@ -335,6 +414,12 @@ export function renderCheckinPage(): HTMLElement {
           <span class="mood-emoji">${mood.emoji}</span>
           <span class="mood-label">${mood.label}</span>
         `;
+        btn.style.padding = '12px 8px';
+        btn.style.minWidth = '0';
+        btn.style.borderRadius = '18px';
+        btn.querySelector<HTMLElement>('.mood-emoji')!.style.fontSize = 'clamp(34px, 10vw, 42px)';
+        btn.querySelector<HTMLElement>('.mood-label')!.style.fontSize = '12px';
+        btn.querySelector<HTMLElement>('.mood-label')!.style.lineHeight = '1.2';
         btn.addEventListener('click', () => {
           selectedMood = mood.value;
           // Re-render only mood buttons selection
@@ -358,6 +443,7 @@ export function renderCheckinPage(): HTMLElement {
         <label class="input-label">Lời nhắn kèm theo (Không bắt buộc)</label>
         <input type="text" id="caption-input" class="input" placeholder="Tại sao bạn cảm thấy vậy..." maxlength="280" />
       `;
+      compactCaptionGroup(capGroup);
       contentArea.appendChild(capGroup);
     }
   }
@@ -385,7 +471,18 @@ export function renderCheckinPage(): HTMLElement {
   // Send Button
   const sendBtn = document.createElement('button');
   sendBtn.className = 'btn-primary btn-primary-full';
-  sendBtn.style.cssText = 'margin-top:8px;padding:16px;font-size:17px;font-weight:700;';
+  sendBtn.style.cssText = `
+    position:fixed;
+    left:50%;
+    bottom:calc(92px + var(--safe-bottom));
+    transform:translateX(-50%);
+    z-index:90;
+    width:min(448px, calc(100% - 32px));
+    padding:16px;
+    font-size:17px;
+    font-weight:700;
+    box-shadow:0 12px 32px var(--accent-glow);
+  `;
   sendBtn.innerHTML = `Gửi ngay 💕`;
   root.appendChild(sendBtn);
 
@@ -434,7 +531,13 @@ export function renderCheckinPage(): HTMLElement {
     sendBtn.innerHTML = `<span class="spinner" style="width:20px;height:20px;border-width:2px;border-color:#fff transparent transparent transparent;"></span> Đang gửi...`;
 
     try {
-      await createCheckin(payload);
+      const result = await createCheckin(payload);
+      if (typeof result.streak === 'number') {
+        const current = store.get();
+        if (current.couple) {
+          store.set({ couple: { ...current.couple, streak: result.streak } });
+        }
+      }
       
       // Success Heart Burst animation
       showHeartBurstEffect();
