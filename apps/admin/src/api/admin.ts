@@ -280,6 +280,10 @@ export const adminApi = {
     return normalizeUser(raw.user);
   },
 
+  deleteUser(id: string): Promise<void> {
+    return del<void>(`/admin/users/${id}`);
+  },
+
   /* Couples */
   async getCouples(page: number): Promise<PaginatedResponse<Couple>> {
     const params = new URLSearchParams({ page: String(page), limit: '20' });
