@@ -14,6 +14,7 @@ export interface StartOnboardingPayload {
 export interface LoginPayload {
   email: string;
   password: string;
+  otpCode: string;
 }
 
 export interface AuthResponse {
@@ -48,6 +49,16 @@ export function login(payload: LoginPayload): Promise<AuthResponse> {
   return apiFetch<AuthResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export function sendLoginOtp(
+  email: string,
+  password: string,
+): Promise<SendOtpResponse> {
+  return apiFetch<SendOtpResponse>('/auth/login/send-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
   });
 }
 

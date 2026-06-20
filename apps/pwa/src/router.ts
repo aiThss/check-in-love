@@ -65,7 +65,7 @@ function resolveRoute(path: string): string {
 function getRedirect(path: string): string | null {
   const isAuthenticated = store.isAuthenticated();
   const isAppRoute = path.startsWith('/app/');
-  const isAuthRoute = path === '/onboarding' || path === '/';
+  const isAuthRoute = path === '/onboarding' || path === '/login' || path === '/';
 
   // Protect /app/* routes
   if (isAppRoute && !isAuthenticated) {

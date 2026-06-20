@@ -54,8 +54,14 @@ const startBodySchema = z.object({
 const loginBodySchema = z.object({
   email: z.string().email().optional(),
   password: z.string().optional(),
+  otpCode: z.string().length(6).optional(),
   deviceId: z.string().optional(),
   coupleCode: z.string().optional(),
+});
+
+const loginSendOtpBodySchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
 });
 
 const sendOtpBodySchema = z.object({
@@ -111,7 +117,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Invalidate any existing OTPs for this email
-      await OtpCode.deleteMany({ email: email.toLowerCase() });
+      await OtpCode.deleteMany({ email: email.toLowerCase(), purpose: 'signup' });
 
       // Generate new OTP
       const code = generateOtp();
@@ -120,6 +126,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       await OtpCode.create({
         email: email.toLowerCase(),
         code,
+        purpose: 'signup',
         expiresAt,
         verified: false,
       });
@@ -169,6 +176,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const otpDoc = await OtpCode.findOne({
         email: email.toLowerCase(),
+        purpose: 'signup',
         verified: false,
         expiresAt: { $gt: new Date() },
       });
@@ -245,6 +253,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         const verifiedOtp = await OtpCode.findOne({
           email: email.toLowerCase(),
           code: otpCode,
+          purpose: 'signup',
           verified: true,
           expiresAt: { $gt: new Date() },
         });
@@ -302,7 +311,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
 
       // Clean up used OTP
       if (email) {
-        await OtpCode.deleteMany({ email: email.toLowerCase() });
+        await OtpCode.deleteMany({ email: email.toLowerCase(), purpose: 'signup' });
       }
 
       const token = signToken(
@@ -326,8 +335,90 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /**
+   * POST /auth/login/send-otp
+   * Validate credentials and send a fresh OTP code for login.
+   */
+  app.post(
+    '/auth/login/send-otp',
+    {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: '10 minutes',
+        },
+      },
+    },
+    async (request, reply) => {
+      const parsed = loginSendOtpBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: parsed.error.errors[0].message,
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      const { email, password } = parsed.data;
+      const user = await User.findOne({ email: email.toLowerCase() });
+
+      if (!user || !user.passwordHash) {
+        return reply
+          .status(401)
+          .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
+      }
+
+      const valid = await bcrypt.compare(password, user.passwordHash);
+      if (!valid) {
+        return reply
+          .status(401)
+          .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
+      }
+
+      if (user.status === 'blocked') {
+        return reply
+          .status(403)
+          .send({ error: 'Tài khoản bị khóa', code: 'USER_BLOCKED' });
+      }
+
+      if (!env.GMAIL_USER || !env.GMAIL_APP_PASSWORD) {
+        return reply.status(503).send({
+          error: 'Tính năng gửi email chưa được cấu hình',
+          code: 'EMAIL_NOT_CONFIGURED',
+        });
+      }
+
+      await OtpCode.deleteMany({ email: email.toLowerCase(), purpose: 'login' });
+
+      const code = generateOtp();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+      await OtpCode.create({
+        email: email.toLowerCase(),
+        code,
+        purpose: 'login',
+        expiresAt,
+        verified: false,
+      });
+
+      try {
+        await sendOtpEmail(email, code);
+      } catch (err) {
+        app.log.error(err, 'Failed to send login OTP email');
+        return reply.status(500).send({
+          error: 'Không thể gửi email. Vui lòng kiểm tra lại địa chỉ email.',
+          code: 'EMAIL_SEND_FAILED',
+        });
+      }
+
+      return reply.status(200).send({
+        message: `Mã đăng nhập đã được gửi tới ${email}`,
+        expiresIn: 600,
+      });
+    },
+  );
+
+  /**
    * POST /auth/login
-   * Login an existing user by email+password or deviceId+coupleCode.
+   * Login an existing user by email+password+OTP or deviceId+coupleCode.
    */
   app.post(
     '/auth/login',
@@ -347,12 +438,12 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
       }
 
-      const { email, password, deviceId, coupleCode } = parsed.data;
+      const { email, password, otpCode, deviceId, coupleCode } = parsed.data;
 
       let user: InstanceType<typeof User> | null = null;
 
       if (email && password) {
-        // Email + password login
+        // Email + password + OTP login
         user = await User.findOne({ email: email.toLowerCase() });
         if (!user || !user.passwordHash) {
           return reply
@@ -364,6 +455,27 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
           return reply
             .status(401)
             .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
+        }
+
+        if (!otpCode) {
+          return reply.status(400).send({
+            error: 'Vui lòng nhập mã xác thực email',
+            code: 'OTP_REQUIRED',
+          });
+        }
+
+        const loginOtp = await OtpCode.findOne({
+          email: email.toLowerCase(),
+          code: otpCode,
+          purpose: 'login',
+          expiresAt: { $gt: new Date() },
+        });
+
+        if (!loginOtp) {
+          return reply.status(400).send({
+            error: 'Mã đăng nhập không hợp lệ hoặc đã hết hạn',
+            code: 'OTP_INVALID',
+          });
         }
       } else if (deviceId && coupleCode) {
         // Device ID + couple code login
@@ -409,6 +521,10 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         couple._id.toString(),
         user.role,
       );
+
+      if (email && otpCode) {
+        await OtpCode.deleteMany({ email: email.toLowerCase(), purpose: 'login' });
+      }
 
       return reply.status(200).send({
         token,

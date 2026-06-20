@@ -4,6 +4,7 @@ import './styles/animations.css';
 import { store } from './store/index';
 import { initRouter } from './router';
 import { renderInstallPage } from './pages/install';
+import { renderLoginPage } from './pages/login';
 import { renderOnboardingPage } from './pages/onboarding';
 import { renderHomePage } from './pages/home';
 import { renderCheckinPage } from './pages/checkin';
@@ -67,6 +68,7 @@ initRouter({
     return renderOnboardingPage();
   },
   '/install':    () => renderInstallPage(),
+  '/login':      () => renderLoginPage(),
   '/onboarding': () => renderOnboardingPage(),
   '/blocked':    () => renderBlockedPage(),
   '/app/home':      () => renderHomePage(),

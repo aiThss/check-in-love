@@ -1,11 +1,15 @@
 import bcrypt from 'bcryptjs';
 import { FastifyInstance } from 'fastify';
+import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import { Types } from 'mongoose';
+import path from 'path';
 import { z } from 'zod';
 import { env } from '../../config/env';
 import { CheckIn } from '../../db/models/CheckIn';
 import { Couple } from '../../db/models/Couple';
+import { OtpCode } from '../../db/models/OtpCode';
+import { PushSubscription } from '../../db/models/PushSubscription';
 import { RandomEvent } from '../../db/models/RandomEvent';
 import { User } from '../../db/models/User';
 import { authenticateAdmin } from '../../middleware/adminAuth';
@@ -29,6 +33,10 @@ const patchCoupleSchema = z.object({
   code: z.string().min(1).optional(),
 });
 
+const maintenanceResetSchema = z.object({
+  confirmation: z.literal('RESET CHECK IN LOVE'),
+});
+
 function timingSafeEqual(a: string, b: string): boolean {
   // Use Buffer.equals which is timing-safe in Node.js for same-length buffers
   const aBuf = Buffer.from(a, 'utf8');
@@ -44,6 +52,18 @@ function timingSafeEqual(a: string, b: string): boolean {
     return result === 0 && aBuf.length === bBuf.length;
   }
   return aBuf.equals(bBuf);
+}
+
+async function clearUploadDir(): Promise<void> {
+  const uploadDir = path.resolve(env.UPLOAD_DIR);
+  const root = path.parse(uploadDir).root;
+
+  if (uploadDir === root) {
+    throw new Error('Refusing to clear filesystem root as upload directory');
+  }
+
+  await fs.promises.rm(uploadDir, { recursive: true, force: true });
+  await fs.promises.mkdir(uploadDir, { recursive: true });
 }
 
 export default async function adminRoutes(app: FastifyInstance): Promise<void> {
@@ -113,6 +133,60 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
   );
 
   /**
+   * POST /admin/maintenance/reset — Clear all app test data
+   */
+  app.post(
+    '/admin/maintenance/reset',
+    { preHandler: authenticateAdmin },
+    async (request, reply) => {
+      if (!env.ADMIN_ENABLE_TEST_RESET) {
+        return reply.status(403).send({
+          error: 'Test reset is disabled',
+          code: 'RESET_DISABLED',
+        });
+      }
+
+      const parsed = maintenanceResetSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: 'Type RESET CHECK IN LOVE to confirm',
+          code: 'CONFIRMATION_REQUIRED',
+        });
+      }
+
+      const [
+        users,
+        couples,
+        checkIns,
+        randomEvents,
+        pushSubscriptions,
+        otpCodes,
+      ] = await Promise.all([
+        User.deleteMany({}),
+        Couple.deleteMany({}),
+        CheckIn.deleteMany({}),
+        RandomEvent.deleteMany({}),
+        PushSubscription.deleteMany({}),
+        OtpCode.deleteMany({}),
+      ]);
+
+      await clearUploadDir();
+
+      return reply.status(200).send({
+        success: true,
+        deleted: {
+          users: users.deletedCount ?? 0,
+          couples: couples.deletedCount ?? 0,
+          checkIns: checkIns.deletedCount ?? 0,
+          randomEvents: randomEvents.deletedCount ?? 0,
+          pushSubscriptions: pushSubscriptions.deletedCount ?? 0,
+          otpCodes: otpCodes.deletedCount ?? 0,
+        },
+      });
+    },
+  );
+
+  /**
    * GET /admin/users — Paginated user list
    */
   app.get(
@@ -138,6 +212,7 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
       const [users, total] = await Promise.all([
         User.find(filter)
           .select('-passwordHash')
+          .populate('coupleId', 'code')
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
@@ -215,7 +290,7 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
-          .populate('memberIds', 'displayName avatarUrl status')
+          .populate('memberIds', 'displayName email avatarUrl status')
           .lean(),
         Couple.countDocuments(),
       ]);
@@ -361,6 +436,7 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
           .skip(skip)
           .limit(limit)
           .populate('userId', 'displayName email')
+          .populate('coupleId', 'code')
           .lean(),
         RandomEvent.countDocuments(),
       ]);

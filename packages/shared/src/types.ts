@@ -27,7 +27,7 @@ export interface User {
 export interface Couple {
   id: string;
   code: string;
-  loveStartDate: string; // ISO date string
+  loveStartDate?: string; // ISO date string
   memberIds: string[];
   streak: number;
   createdAt: string;

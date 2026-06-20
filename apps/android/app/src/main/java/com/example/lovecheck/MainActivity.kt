@@ -3,7 +3,13 @@ package com.example.lovecheck
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
+import android.app.DownloadManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
@@ -11,17 +17,14 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
-import android.app.PendingIntent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
@@ -29,48 +32,49 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.IOException
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import org.json.JSONObject
-import java.net.URL
 import javax.net.ssl.HttpsURLConnection
-import android.app.AlertDialog
-import android.app.DownloadManager
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.IntentFilter
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
 
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
     private var cameraPhotoUri: Uri? = null
+    private var cameraPhotoFile: File? = null
     private var webView: WebView? = null
 
-    // Register activity result for file chooser (Camera / Gallery upload)
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val data = result.data
-            var results: Array<Uri>? = null
-
-            if (data?.dataString != null) {
-                results = arrayOf(Uri.parse(data.dataString))
-            } else if (cameraPhotoUri != null) {
-                // Ensure captured photo exists and is not empty
-                val file = File(cameraPhotoUri?.path ?: "")
-                if (file.exists() && file.length() > 0) {
-                    results = arrayOf(cameraPhotoUri!!)
-                }
-            }
-
-            fileUploadCallback?.onReceiveValue(results)
-        } else {
-            fileUploadCallback?.onReceiveValue(null)
-        }
+        val callback = fileUploadCallback
         fileUploadCallback = null
+
+        if (callback == null) {
+            cameraPhotoUri = null
+            cameraPhotoFile = null
+            return@registerForActivityResult
+        }
+
+        val uris = if (result.resultCode == Activity.RESULT_OK) {
+            val pickedUri = result.data?.data
+            when {
+                pickedUri != null -> arrayOf(pickedUri)
+                cameraPhotoUri != null &&
+                    cameraPhotoFile?.exists() == true &&
+                    (cameraPhotoFile?.length() ?: 0L) > 0L -> arrayOf(cameraPhotoUri!!)
+                else -> null
+            }
+        } else {
+            null
+        }
+
+        callback.onReceiveValue(uris)
+        cameraPhotoUri = null
+        cameraPhotoFile = null
     }
 
     private val cameraPermissionLauncher = registerForActivityResult(
@@ -80,9 +84,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
 
-        // Request notification permission for Android 13+
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
@@ -92,21 +94,20 @@ class MainActivity : ComponentActivity() {
         setupDailyReminders(this)
 
         setContent {
-            val modifier = Modifier.fillMaxSize()
             AndroidView(
                 factory = { context ->
                     WebView(context).apply {
                         webView = this
-                        
-                        // WebView settings optimal for PWA
+
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.databaseEnabled = true
                         settings.allowFileAccess = true
                         settings.allowContentAccess = true
                         settings.mediaPlaybackRequiresUserGesture = false
-                        
-                        // Identifiable User Agent
+                        settings.loadsImagesAutomatically = true
+                        settings.javaScriptCanOpenWindowsAutomatically = true
+                        settings.setSupportZoom(false)
                         settings.userAgentString = settings.userAgentString + " LoveCheckAndroidWrapper"
 
                         webViewClient = object : WebViewClient() {
@@ -114,19 +115,37 @@ class MainActivity : ComponentActivity() {
                                 view: WebView,
                                 request: WebResourceRequest
                             ): Boolean {
-                                val url = request.url.toString()
-                                // Keep internal links within the WebView
-                                if (url.contains("babyress.games") || url.contains("localhost")) {
+                                if (request.url.scheme == RETRY_SCHEME) {
+                                    view.loadUrl(APP_URL)
+                                    return true
+                                }
+
+                                if (isAllowedInWebView(request.url)) {
                                     return false
                                 }
-                                // External link: launch system browser
+
                                 try {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    // ignore
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, request.url))
+                                } catch (_: Exception) {
+                                    // Ignore malformed/unhandled external links.
                                 }
                                 return true
+                            }
+
+                            override fun onReceivedError(
+                                view: WebView,
+                                request: WebResourceRequest,
+                                error: WebResourceError
+                            ) {
+                                if (request.isForMainFrame) {
+                                    view.loadDataWithBaseURL(
+                                        APP_URL,
+                                        buildErrorHtml(),
+                                        "text/html",
+                                        "UTF-8",
+                                        null
+                                    )
+                                }
                             }
                         }
 
@@ -139,42 +158,20 @@ class MainActivity : ComponentActivity() {
                                 fileUploadCallback?.onReceiveValue(null)
                                 fileUploadCallback = filePathCallback
 
-                                val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                                if (takePictureIntent.resolveActivity(packageManager) != null) {
-                                    var photoFile: File? = null
-                                    try {
-                                        photoFile = createTempImageFile()
-                                    } catch (ex: IOException) {
-                                        // Error creating file
-                                    }
-
-                                    if (photoFile != null) {
-                                        cameraPhotoUri = FileProvider.getUriForFile(
-                                            context,
-                                            "${packageName}.fileprovider",
-                                            photoFile
-                                        )
-                                        takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraPhotoUri)
-                                    } else {
-                                        cameraPhotoUri = null
-                                    }
-                                }
-
-                                val contentSelectionIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                                val cameraIntent = buildCameraIntent(context)
+                                val pickIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
                                     addCategory(Intent.CATEGORY_OPENABLE)
                                     type = "image/*"
                                 }
 
-                                val intentArray: Array<Intent> = if (takePictureIntent.resolveActivity(packageManager) != null) {
-                                    arrayOf(takePictureIntent)
-                                } else {
-                                    emptyArray()
-                                }
-
                                 val chooserIntent = Intent(Intent.ACTION_CHOOSER).apply {
-                                    putExtra(Intent.EXTRA_INTENT, contentSelectionIntent)
+                                    putExtra(Intent.EXTRA_INTENT, pickIntent)
                                     putExtra(Intent.EXTRA_TITLE, "Chọn ảnh check-in")
-                                    putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray)
+                                    putExtra(
+                                        Intent.EXTRA_INITIAL_INTENTS,
+                                        cameraIntent?.let { arrayOf(it) } ?: emptyArray<Intent>()
+                                    )
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
 
                                 fileChooserLauncher.launch(chooserIntent)
@@ -182,24 +179,48 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        // Load user's PWA URL
-                        loadUrl("https://couple.babyress.games")
+                        loadUrl(APP_URL)
                     }
                 },
-                modifier = modifier
+                modifier = Modifier.fillMaxSize()
             )
         }
 
-        // Proactively ask for camera permission for image captures
-        checkAndRequestPermissions()
-        
-        // Check for updates
         checkUpdate()
     }
 
-    private fun checkAndRequestPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+    private fun buildCameraIntent(context: Context): Intent? {
+        val captureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        val hasCameraPermission =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val hasCameraApp = captureIntent.resolveActivity(packageManager) != null
+
+        if (!hasCameraPermission) {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            return null
+        }
+
+        if (!hasCameraApp) return null
+
+        return try {
+            val photoFile = createTempImageFile()
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${packageName}.fileprovider",
+                photoFile
+            )
+
+            cameraPhotoFile = photoFile
+            cameraPhotoUri = uri
+
+            captureIntent.apply {
+                putExtra(MediaStore.EXTRA_OUTPUT, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+        } catch (_: IOException) {
+            cameraPhotoFile = null
+            cameraPhotoUri = null
+            null
         }
     }
 
@@ -224,17 +245,19 @@ class MainActivity : ComponentActivity() {
             try {
                 val url = URL("https://api.github.com/repos/aiThss/check-in-love/releases/latest")
                 val conn = url.openConnection() as HttpsURLConnection
+                conn.connectTimeout = 7000
+                conn.readTimeout = 7000
                 conn.requestMethod = "GET"
                 conn.setRequestProperty("User-Agent", "LoveCheckUpdater")
-                
+
                 if (conn.responseCode == 200) {
                     val response = conn.inputStream.bufferedReader().readText()
                     val json = JSONObject(response)
                     val tagName = json.getString("tag_name")
-                    
-                    val currentVersion = packageManager.getPackageInfo(packageName, 0).versionName
-                    val latestVersion = if (tagName.startsWith("v")) tagName.substring(1) else tagName
-                    
+
+                    val currentVersion = packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+                    val latestVersion = tagName.removePrefix("v")
+
                     if (latestVersion != currentVersion) {
                         val assets = json.getJSONArray("assets")
                         var apkUrl: String? = null
@@ -245,7 +268,7 @@ class MainActivity : ComponentActivity() {
                                 break
                             }
                         }
-                        
+
                         if (apkUrl != null) {
                             runOnUiThread {
                                 showUpdateDialog(latestVersion, apkUrl)
@@ -253,12 +276,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                conn.disconnect()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }.start()
     }
-    
+
     private fun showUpdateDialog(version: String, url: String) {
         AlertDialog.Builder(this)
             .setTitle("Cập nhật phiên bản mới")
@@ -269,17 +293,17 @@ class MainActivity : ComponentActivity() {
             .setNegativeButton("Để sau", null)
             .show()
     }
-    
+
     private fun downloadAndInstallApk(apkUrl: String) {
         val request = DownloadManager.Request(Uri.parse(apkUrl))
             .setTitle("Check IN Love Update")
             .setDescription("Đang tải xuống phiên bản mới...")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "check-in-love-update.apk")
-            
+
         val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val downloadId = downloadManager.enqueue(request)
-        
+
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
@@ -296,7 +320,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        
+
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
         } else {
@@ -305,6 +329,48 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        private const val APP_URL = "https://couple.babyress.games"
+        private const val RETRY_SCHEME = "lovecheck"
+        private val allowedHosts = setOf(
+            "couple.babyress.games",
+            "api.couple.babyress.games",
+            "localhost",
+            "127.0.0.1",
+            "10.0.2.2"
+        )
+
+        private fun isAllowedInWebView(uri: Uri): Boolean {
+            val host = uri.host ?: return false
+            return host in allowedHosts
+        }
+
+        private fun buildErrorHtml(): String = """
+            <!doctype html>
+            <html lang="vi">
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+              <style>
+                html,body{margin:0;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+                body{display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;box-sizing:border-box}
+                .box{max-width:340px}
+                .icon{font-size:64px;margin-bottom:16px}
+                h1{font-size:24px;margin:0 0 10px}
+                p{color:#a3a3a3;line-height:1.5;margin:0 0 24px}
+                button{border:0;border-radius:999px;background:#ff3b7f;color:#fff;padding:14px 24px;font-weight:700;font-size:16px}
+              </style>
+            </head>
+            <body>
+              <div class="box">
+                <div class="icon">📡</div>
+                <h1>Không tải được ứng dụng</h1>
+                <p>Kiểm tra kết nối mạng rồi thử lại nhé.</p>
+                <button onclick="location.href='lovecheck://retry'">Thử lại</button>
+              </div>
+            </body>
+            </html>
+        """.trimIndent()
+
         fun setupDailyReminders(context: Context) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             val hours = listOf(7, 12, 18, 23)

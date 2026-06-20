@@ -21,10 +21,12 @@ const RandomEventSchema = new Schema<RandomEventDocument>(
   {
     coupleId: {
       type: Schema.Types.ObjectId,
+      ref: 'Couple',
       required: true,
     },
     userId: {
       type: Schema.Types.ObjectId,
+      ref: 'User',
       required: true,
     },
     category: {

@@ -59,7 +59,7 @@ export function renderOnboardingPage(): HTMLElement {
   // Root container
   const root = document.createElement('div');
   root.className = 'page-no-nav';
-  root.style.cssText = 'min-height:100dvh;background:var(--bg);position:relative;overflow:hidden;';
+  root.style.cssText = 'min-height:100dvh;background:var(--bg);position:relative;overflow-x:hidden;overflow-y:auto;';
 
   // ── Render helpers ────────────────────────────────────────────────────────
 
@@ -150,6 +150,13 @@ export function renderOnboardingPage(): HTMLElement {
     nextBtn.textContent = 'Tiếp theo →';
     nextBtn.addEventListener('click', goNext);
     content.appendChild(nextBtn);
+
+    const loginBtn = document.createElement('button');
+    loginBtn.className = 'btn-ghost';
+    loginBtn.style.cssText = 'width:100%;font-size:14px;';
+    loginBtn.textContent = 'Đã có tài khoản? Đăng nhập';
+    loginBtn.addEventListener('click', () => navigate('/login', true));
+    content.appendChild(loginBtn);
 
     renderStep(content);
     requestAnimationFrame(() => input.focus());

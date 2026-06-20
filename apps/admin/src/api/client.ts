@@ -61,7 +61,8 @@ export async function apiRequest<T>(
     }
 
     const message =
-      (body as { message?: string })?.message ||
+      (body as { message?: string; error?: string })?.message ||
+      (body as { message?: string; error?: string })?.error ||
       `Request failed with status ${response.status}`;
 
     throw new ApiError(response.status, message, body);

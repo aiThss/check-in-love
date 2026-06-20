@@ -3,7 +3,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 export interface CoupleDocument extends Document {
   _id: Types.ObjectId;
   code: string;
-  loveStartDate: Date;
+  loveStartDate?: Date;
   memberIds: Types.ObjectId[];
   streak: number;
   lastCheckinDate?: Date;
@@ -21,7 +21,7 @@ const CoupleSchema = new Schema<CoupleDocument>(
     },
     loveStartDate: {
       type: Date,
-      required: true,
+      required: false,
     },
     memberIds: {
       type: [{ type: Schema.Types.ObjectId, ref: 'User' }],
