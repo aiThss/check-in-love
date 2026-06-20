@@ -174,13 +174,22 @@ export default async function checkinsRoutes(
         const maxBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
         const parts = request.parts();
 
-        let filePart: MultipartFile | null = null;
+        let imageFile: {
+          buffer: Buffer;
+          mimetype: string;
+          filename: string;
+        } | null = null;
         let caption: string | undefined;
         let quickMessage: string | undefined;
 
         for await (const part of parts) {
           if (part.type === 'file') {
-            filePart = part;
+            if (!part.mimetype.startsWith('image/')) {
+              return reply
+                .status(400)
+                .send({ error: 'Only image files are allowed', code: 'INVALID_MIME' });
+            }
+            imageFile = await readMultipartBuffer(part, maxBytes);
           } else if (part.type === 'field') {
             if (part.fieldname === 'caption') caption = part.value as string;
             if (part.fieldname === 'quickMessage')
@@ -188,29 +197,25 @@ export default async function checkinsRoutes(
           }
         }
 
-        if (!filePart) {
+        if (!imageFile) {
           return reply
             .status(400)
             .send({ error: 'Image file required', code: 'NO_FILE' });
         }
 
-        if (!filePart.mimetype.startsWith('image/')) {
-          return reply
-            .status(400)
-            .send({ error: 'Only image files are allowed', code: 'INVALID_MIME' });
-        }
-
-        let { buffer } = await readMultipartBuffer(filePart, maxBytes);
+        let { buffer } = imageFile;
 
         // Resize to max 1080px wide while preserving quality
         buffer = await sharp(buffer)
+          .rotate()
           .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 88 })
           .toBuffer();
 
         const saved = await storageService.saveFile(
           buffer,
-          filePart.filename,
-          filePart.mimetype,
+          imageFile.filename,
+          'image/jpeg',
         );
 
         checkInData = {

@@ -68,17 +68,8 @@ class MainActivity : ComponentActivity() {
         }
 
         val uris = if (result.resultCode == Activity.RESULT_OK) {
-            val pickedUri = result.data?.data
-            when {
-                pickedUri != null -> arrayOf(pickedUri)
-                cameraPhotoUri != null &&
-                    cameraPhotoFile?.exists() == true &&
-                    (cameraPhotoFile?.length() ?: 0L) > 0L -> arrayOf(cameraPhotoUri!!)
-                else -> null
-            }
-        } else {
-            null
-        }
+            parseFileChooserResult(result.data)
+        } else null
 
         callback.onReceiveValue(uris)
         cameraPhotoUri = null
@@ -169,10 +160,12 @@ class MainActivity : ComponentActivity() {
                                 fileUploadCallback = filePathCallback
 
                                 val cameraIntent = buildCameraIntent(context)
-                                val pickIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                                    addCategory(Intent.CATEGORY_OPENABLE)
-                                    type = "image/*"
+                                if (fileChooserParams.isCaptureEnabled && cameraIntent != null) {
+                                    fileChooserLauncher.launch(cameraIntent)
+                                    return true
                                 }
+
+                                val pickIntent = buildImagePickIntent()
 
                                 val chooserIntent = Intent(Intent.ACTION_CHOOSER).apply {
                                     putExtra(Intent.EXTRA_INTENT, pickIntent)
@@ -203,6 +196,36 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         webView?.loadUrl(initialUrlFromIntent(intent))
+    }
+
+    private fun parseFileChooserResult(data: Intent?): Array<Uri>? {
+        val clipData = data?.clipData
+        if (clipData != null && clipData.itemCount > 0) {
+            return Array(clipData.itemCount) { index -> clipData.getItemAt(index).uri }
+        }
+
+        data?.data?.let { return arrayOf(it) }
+
+        return if (
+            cameraPhotoUri != null &&
+            cameraPhotoFile?.exists() == true &&
+            (cameraPhotoFile?.length() ?: 0L) > 0L
+        ) {
+            arrayOf(cameraPhotoUri!!)
+        } else null
+    }
+
+    private fun buildImagePickIntent(): Intent {
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            Intent(MediaStore.ACTION_PICK_IMAGES).apply {
+                type = "image/*"
+            }
+        } else {
+            Intent(Intent.ACTION_GET_CONTENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
+            }
+        }
     }
 
     private fun buildCameraIntent(context: Context): Intent? {

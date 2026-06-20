@@ -16,6 +16,7 @@ import randomRoutes from './routes/random';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
+    bodyLimit: env.MAX_UPLOAD_MB * 1024 * 1024 + 1024 * 1024,
     logger:
       env.NODE_ENV === 'development'
         ? {

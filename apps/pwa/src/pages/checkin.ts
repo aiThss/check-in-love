@@ -1,10 +1,30 @@
 import { navigate } from '../router';
 import { createCheckin } from '../api/checkins';
+import { ApiError } from '../api/client';
 import { store } from '../store/index';
 import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
-import { openCamera, openGallery } from '../components/camera';
+import {
+  openCamera,
+  openGallery,
+  processImage,
+  revokePreviewUrl,
+  type PhotoFit,
+} from '../components/camera';
 import type { CheckIn } from '../api/types';
+
+type PhotoFrame = {
+  id: string;
+  label: string;
+  ratio: number;
+  cssRatio: string;
+};
+
+const PHOTO_FRAMES: PhotoFrame[] = [
+  { id: 'square', label: '1:1', ratio: 1, cssRatio: '1 / 1' },
+  { id: 'portrait', label: '4:5', ratio: 4 / 5, cssRatio: '4 / 5' },
+  { id: 'classic', label: '3:4', ratio: 3 / 4, cssRatio: '3 / 4' },
+];
 
 const MOODS = [
   { value: 'happy', emoji: '😊', label: 'Vui vẻ' },
@@ -131,9 +151,101 @@ export function renderCheckinPage(): HTMLElement {
 
   // Form State
   let selectedFile: File | null = null;
+  let selectedSourceFile: File | null = null;
   let selectedPreviewUrl: string | null = null;
+  let selectedPhotoFrame = PHOTO_FRAMES[0];
+  let selectedPhotoFit: PhotoFit = 'cover';
+  let isProcessingPhoto = false;
+  let photoCaption = '';
   let selectedMood: string | null = null;
   let selectedQuickMsg: string | null = null;
+
+  function clearSelectedPhoto(): void {
+    selectedSourceFile = null;
+    selectedFile = null;
+    revokePreviewUrl(selectedPreviewUrl);
+    selectedPreviewUrl = null;
+  }
+
+  async function applyPhotoTransform(sourceFile: File): Promise<void> {
+    isProcessingPhoto = true;
+    renderContentForm();
+
+    try {
+      const result = await processImage(sourceFile, {
+        aspectRatio: selectedPhotoFrame.ratio,
+        fit: selectedPhotoFit,
+        maxSize: 1080,
+        quality: 0.82,
+      });
+
+      revokePreviewUrl(selectedPreviewUrl);
+      selectedFile = result.file;
+      selectedPreviewUrl = result.preview;
+    } catch {
+      showToast('Không thể xử lý ảnh này, thử ảnh JPG/PNG khác nhé.', 'error');
+      clearSelectedPhoto();
+    } finally {
+      isProcessingPhoto = false;
+      renderContentForm();
+    }
+  }
+
+  function selectPhoto(file: File): void {
+    selectedSourceFile = file;
+    void applyPhotoTransform(file);
+  }
+
+  function refreshPhotoTransform(): void {
+    if (!selectedSourceFile) {
+      renderContentForm();
+      return;
+    }
+    void applyPhotoTransform(selectedSourceFile);
+  }
+
+  function buildPhotoPayload(file: File, caption: string): FormData {
+    const fd = new FormData();
+    fd.append('type', 'photo');
+    fd.append('file', file, file.name || 'checkin-photo.jpg');
+    if (caption) {
+      fd.append('caption', caption);
+    }
+    return fd;
+  }
+
+  async function createPhotoCheckinWithRetry(caption: string) {
+    if (!selectedFile) {
+      throw new Error('NO_PHOTO');
+    }
+
+    try {
+      return await createCheckin(buildPhotoPayload(selectedFile, caption));
+    } catch (err) {
+      if (
+        !(err instanceof ApiError) ||
+        err.code !== 'NETWORK_ERROR' ||
+        !selectedSourceFile
+      ) {
+        throw err;
+      }
+
+      showToast('Upload ảnh chưa ổn, đang thử bản nhẹ hơn...', 'info');
+      const fallback = await processImage(selectedSourceFile, {
+        aspectRatio: selectedPhotoFrame.ratio,
+        fit: selectedPhotoFit,
+        maxSize: 720,
+        quality: 0.68,
+      });
+
+      revokePreviewUrl(selectedPreviewUrl);
+      selectedFile = fallback.file;
+      selectedPreviewUrl = fallback.preview;
+      renderContentForm();
+
+      return createCheckin(buildPhotoPayload(fallback.file, caption));
+    }
+  }
 
   function compactUploadPicker(picker: HTMLElement): void {
     const icon = picker.children[0] as HTMLElement | undefined;
@@ -175,9 +287,161 @@ export function renderCheckinPage(): HTMLElement {
     }
   }
 
+  function renderPhotoForm(): void {
+    const picker = document.createElement('div');
+    picker.className = `photo-composer${selectedPreviewUrl ? ' has-photo' : ''}`;
+    picker.style.aspectRatio = selectedPhotoFrame.cssRatio;
+
+    if (selectedPreviewUrl) {
+      picker.innerHTML = `
+        <img class="photo-composer-image" src="${selectedPreviewUrl}" alt="Ảnh check-in đã chọn" />
+        <div class="photo-composer-vignette"></div>
+        <div class="photo-composer-topbar">
+          <button id="remove-photo" class="photo-icon-button" aria-label="Xóa ảnh">×</button>
+        </div>
+        <div class="photo-composer-actions">
+          <button id="retake-photo" class="photo-action-button" type="button">Chụp lại</button>
+          <button id="change-photo" class="photo-action-button" type="button">Đổi ảnh</button>
+        </div>
+      `;
+
+      picker.querySelector('#remove-photo')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearSelectedPhoto();
+        renderContentForm();
+      });
+      picker.querySelector('#retake-photo')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCamera((res) => selectPhoto(res.file));
+      });
+      picker.querySelector('#change-photo')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openGallery((res) => selectPhoto(res.file));
+      });
+    } else {
+      picker.innerHTML = `
+        <div class="photo-composer-empty">
+          <div class="photo-composer-lens"></div>
+          <div class="photo-composer-copy">
+            <strong>Gửi ảnh cho người ấy</strong>
+            <span>Chụp mới hoặc chọn ảnh từ album</span>
+          </div>
+          <div class="photo-composer-actions photo-composer-actions-empty">
+            <button id="camera-photo" class="photo-action-button primary" type="button">Chụp</button>
+            <button id="gallery-photo" class="photo-action-button" type="button">Album</button>
+          </div>
+        </div>
+      `;
+
+      picker.querySelector('#camera-photo')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCamera((res) => selectPhoto(res.file));
+      });
+      picker.querySelector('#gallery-photo')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openGallery((res) => selectPhoto(res.file));
+      });
+    }
+
+    if (isProcessingPhoto) {
+      const overlay = document.createElement('div');
+      overlay.className = 'photo-processing';
+      overlay.innerHTML = '<span class="spinner"></span><span>Đang chuẩn bị ảnh...</span>';
+      picker.appendChild(overlay);
+    }
+
+    contentArea.appendChild(picker);
+
+    const frameControls = document.createElement('div');
+    frameControls.className = 'photo-frame-controls';
+    frameControls.innerHTML = `
+      <div class="photo-segment" aria-label="Chọn khung ảnh">
+        ${PHOTO_FRAMES.map((frame) => `
+          <button
+            class="${frame.id === selectedPhotoFrame.id ? 'active' : ''}"
+            data-frame="${frame.id}"
+            type="button"
+          >${frame.label}</button>
+        `).join('')}
+      </div>
+      <div class="photo-segment" aria-label="Chọn kiểu ảnh">
+        <button class="${selectedPhotoFit === 'cover' ? 'active' : ''}" data-fit="cover" type="button">Fill</button>
+        <button class="${selectedPhotoFit === 'contain' ? 'active' : ''}" data-fit="contain" type="button">Fit</button>
+      </div>
+    `;
+    frameControls.querySelectorAll<HTMLButtonElement>('[data-frame]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const frame = PHOTO_FRAMES.find((item) => item.id === btn.dataset.frame);
+        if (!frame || frame.id === selectedPhotoFrame.id) return;
+        selectedPhotoFrame = frame;
+        refreshPhotoTransform();
+      });
+    });
+    frameControls.querySelectorAll<HTMLButtonElement>('[data-fit]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const fit = btn.dataset.fit as PhotoFit | undefined;
+        if (!fit || fit === selectedPhotoFit) return;
+        selectedPhotoFit = fit;
+        refreshPhotoTransform();
+      });
+    });
+    contentArea.appendChild(frameControls);
+
+    const capGroup = document.createElement('div');
+    capGroup.className = 'input-group';
+    capGroup.innerHTML = `
+      <label class="input-label">Mô tả (Không bắt buộc)</label>
+      <input type="text" id="caption-input" class="input" placeholder="Viết vài dòng ngọt ngào..." maxlength="280" />
+    `;
+    compactCaptionGroup(capGroup);
+    const captionInput = capGroup.querySelector<HTMLInputElement>('#caption-input');
+    if (captionInput) {
+      captionInput.value = photoCaption;
+      captionInput.addEventListener('input', () => {
+        photoCaption = captionInput.value;
+      });
+    }
+    contentArea.appendChild(capGroup);
+
+    const quickHeader = document.createElement('label');
+    quickHeader.className = 'input-label';
+    quickHeader.textContent = 'Chọn nhanh tin nhắn';
+    quickHeader.style.marginBottom = '0';
+    contentArea.appendChild(quickHeader);
+
+    const chipsWrapper = document.createElement('div');
+    chipsWrapper.className = 'chip-scroll photo-chip-scroll';
+    QUICK_MESSAGES.forEach((msg) => {
+      const chip = document.createElement('button');
+      chip.className = `chip ${selectedQuickMsg === msg ? 'active' : ''}`;
+      chip.type = 'button';
+      chip.textContent = msg;
+      chip.addEventListener('click', () => {
+        if (selectedQuickMsg === msg) {
+          selectedQuickMsg = null;
+        } else {
+          selectedQuickMsg = msg;
+          photoCaption = msg;
+          const input = contentArea.querySelector<HTMLInputElement>('#caption-input');
+          if (input) input.value = msg;
+        }
+        chipsWrapper.querySelectorAll<HTMLButtonElement>('button').forEach((btn, idx) => {
+          btn.classList.toggle('active', QUICK_MESSAGES[idx] === selectedQuickMsg);
+        });
+      });
+      chipsWrapper.appendChild(chip);
+    });
+    contentArea.appendChild(chipsWrapper);
+  }
+
   // Render content depending on activeMode
   function renderContentForm() {
     contentArea.innerHTML = '';
+
+    if (activeMode === 'photo') {
+      renderPhotoForm();
+      return;
+    }
 
     if (activeMode === 'photo') {
       // Photo Picker Container
@@ -491,18 +755,17 @@ export function renderCheckinPage(): HTMLElement {
     let payload: FormData | Record<string, any>;
     
     if (activeMode === 'photo') {
+      if (isProcessingPhoto) {
+        showToast('Ảnh đang được xử lý, chờ một chút nhé.', 'info');
+        return;
+      }
       if (!selectedFile) {
         showToast('Vui lòng chọn hoặc chụp ảnh!', 'error');
         return;
       }
       const caption = (root.querySelector('#caption-input') as HTMLInputElement)?.value.trim();
-      const fd = new FormData();
-      fd.append('type', 'photo');
-      fd.append('file', selectedFile);
-      if (caption) {
-        fd.append('caption', caption);
-      }
-      payload = fd;
+      photoCaption = caption ?? '';
+      payload = buildPhotoPayload(selectedFile, photoCaption);
     } else if (activeMode === 'text') {
       const text = (root.querySelector('#text-input') as HTMLTextAreaElement)?.value.trim();
       if (!text) {
@@ -531,7 +794,10 @@ export function renderCheckinPage(): HTMLElement {
     sendBtn.innerHTML = `<span class="spinner" style="width:20px;height:20px;border-width:2px;border-color:#fff transparent transparent transparent;"></span> Đang gửi...`;
 
     try {
-      const result = await createCheckin(payload);
+      const result =
+        activeMode === 'photo'
+          ? await createPhotoCheckinWithRetry(photoCaption)
+          : await createCheckin(payload);
       if (typeof result.streak === 'number') {
         const current = store.get();
         if (current.couple) {
@@ -549,7 +815,11 @@ export function renderCheckinPage(): HTMLElement {
 
     } catch (err: any) {
       console.error(err);
+      if (err instanceof ApiError && err.code === 'NETWORK_ERROR' && activeMode === 'photo') {
+        showToast('Upload ảnh chưa tới server. Thử ảnh nhỏ hơn hoặc đổi mạng rồi gửi lại.', 'error');
+      } else {
       showToast(err.message || 'Gửi check-in thất bại!', 'error');
+      }
       sendBtn.disabled = false;
       sendBtn.innerHTML = `Gửi ngay 💕`;
     }

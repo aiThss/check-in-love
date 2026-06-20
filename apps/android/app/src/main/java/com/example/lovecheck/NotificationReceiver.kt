@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import java.util.Calendar
@@ -77,7 +78,9 @@ class NotificationReceiver : BroadcastReceiver() {
         )
 
         val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // Fallback icon
+            .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
+            .setColor(0xFFFF3B7F.toInt())
             .setContentTitle("Check IN Love 💕")
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
