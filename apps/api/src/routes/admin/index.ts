@@ -13,6 +13,7 @@ import { PushSubscription } from '../../db/models/PushSubscription';
 import { RandomEvent } from '../../db/models/RandomEvent';
 import { User } from '../../db/models/User';
 import { authenticateAdmin } from '../../middleware/adminAuth';
+import { storageService } from '../../services/storage';
 
 const adminLoginSchema = z.object({
   email: z.string().email(),
@@ -64,6 +65,42 @@ async function clearUploadDir(): Promise<void> {
 
   await fs.promises.rm(uploadDir, { recursive: true, force: true });
   await fs.promises.mkdir(uploadDir, { recursive: true });
+}
+
+function storagePathFromUploadUrl(uploadUrl?: string): string | undefined {
+  if (!uploadUrl) return undefined;
+
+  const marker = '/uploads/';
+  const markerIndex = uploadUrl.indexOf(marker);
+  if (markerIndex === -1) return undefined;
+
+  try {
+    return decodeURIComponent(uploadUrl.slice(markerIndex + marker.length));
+  } catch {
+    return uploadUrl.slice(markerIndex + marker.length);
+  }
+}
+
+async function deleteStoredFiles(
+  storagePaths: Array<string | undefined>,
+  app: FastifyInstance,
+): Promise<void> {
+  const uniquePaths = Array.from(
+    new Set(storagePaths.filter((path): path is string => Boolean(path))),
+  );
+
+  const results = await Promise.allSettled(
+    uniquePaths.map((storagePath) => storageService.deleteFile(storagePath)),
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      app.log.error(
+        { err: result.reason, storagePath: uniquePaths[index] },
+        'Failed to delete stored file',
+      );
+    }
+  });
 }
 
 export default async function adminRoutes(app: FastifyInstance): Promise<void> {
@@ -283,6 +320,109 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
       }
 
       return reply.status(200).send({ user });
+    },
+  );
+
+  /**
+   * DELETE /admin/users/:id — Hard delete a test user and owned data
+   */
+  app.delete(
+    '/admin/users/:id',
+    { preHandler: authenticateAdmin },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+
+      if (!Types.ObjectId.isValid(id)) {
+        return reply
+          .status(400)
+          .send({ error: 'Invalid user id', code: 'VALIDATION_ERROR' });
+      }
+
+      const userId = new Types.ObjectId(id);
+      const user = await User.findById(userId);
+
+      if (!user || user.role !== 'user') {
+        return reply
+          .status(404)
+          .send({ error: 'User not found', code: 'NOT_FOUND' });
+      }
+
+      const coupleId = user.coupleId;
+      const couple = await Couple.findById(coupleId).lean();
+      const remainingMemberIds =
+        couple?.memberIds.filter((memberId) => !memberId.equals(userId)) ?? [];
+      const shouldDeleteCouple = Boolean(couple && remainingMemberIds.length === 0);
+
+      const checkInFilter = shouldDeleteCouple ? { coupleId } : { ownerId: userId };
+      const randomEventFilter = shouldDeleteCouple
+        ? { coupleId }
+        : { userId };
+      const pushFilter = shouldDeleteCouple ? { coupleId } : { userId };
+
+      const checkInsToDelete = await CheckIn.find(checkInFilter)
+        .select('storagePath')
+        .lean();
+
+      await deleteStoredFiles(
+        [
+          ...checkInsToDelete.map((checkIn) => checkIn.storagePath),
+          storagePathFromUploadUrl(user.avatarUrl),
+          storagePathFromUploadUrl(user.partnerAvatarUrl),
+        ],
+        app,
+      );
+
+      const otpDeletePromise = user.email
+        ? OtpCode.deleteMany({ email: user.email.toLowerCase() })
+        : Promise.resolve({ deletedCount: 0 });
+
+      const [
+        userDelete,
+        checkInsDelete,
+        randomEventsDelete,
+        pushSubscriptionsDelete,
+        otpCodesDelete,
+      ] = await Promise.all([
+        User.deleteOne({ _id: userId }),
+        CheckIn.deleteMany(checkInFilter),
+        RandomEvent.deleteMany(randomEventFilter),
+        PushSubscription.deleteMany(pushFilter),
+        otpDeletePromise,
+      ]);
+
+      let couplesDeleted = 0;
+      let reactionsRemoved = 0;
+
+      if (shouldDeleteCouple) {
+        const coupleDelete = await Couple.deleteOne({ _id: coupleId });
+        couplesDeleted = coupleDelete.deletedCount ?? 0;
+      } else if (couple) {
+        await Couple.updateOne(
+          { _id: coupleId },
+          { $pull: { memberIds: userId } },
+        );
+
+        const reactionUpdate = await CheckIn.updateMany(
+          { 'reactions.userId': userId },
+          { $pull: { reactions: { userId } } },
+        );
+        reactionsRemoved = reactionUpdate.modifiedCount ?? 0;
+      }
+
+      return reply.status(200).send({
+        success: true,
+        deleted: {
+          users: userDelete.deletedCount ?? 0,
+          couples: couplesDeleted,
+          checkIns: checkInsDelete.deletedCount ?? 0,
+          randomEvents: randomEventsDelete.deletedCount ?? 0,
+          pushSubscriptions: pushSubscriptionsDelete.deletedCount ?? 0,
+          otpCodes: otpCodesDelete.deletedCount ?? 0,
+        },
+        updated: {
+          reactions: reactionsRemoved,
+        },
+      });
     },
   );
 
