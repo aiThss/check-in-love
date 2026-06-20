@@ -28,30 +28,24 @@ function getRoute(): Route {
     '/random',
   ];
 
-  if (validRoutes.includes(path as Route)) {
-    return path as Route;
+  let route = validRoutes.includes(path as Route) ? (path as Route) : '/dashboard';
+  
+  const auth = isAuthenticated();
+  
+  if (route === '/login' && auth) {
+    return '/dashboard';
   }
-
-  return '/dashboard';
+  if (route !== '/login' && !auth) {
+    return '/login';
+  }
+  
+  return route;
 }
 
 function renderPage(route: Route): HTMLElement {
-  const auth = isAuthenticated();
-
-  if (route === '/login') {
-    if (auth) {
-      navigate('/dashboard');
-      return document.createElement('div');
-    }
-    return renderLoginPage();
-  }
-
-  if (!auth) {
-    navigate('/login');
-    return document.createElement('div');
-  }
-
   switch (route) {
+    case '/login':
+      return renderLoginPage();
     case '/dashboard':
       return renderDashboardPage();
     case '/users':
@@ -76,8 +70,14 @@ export function mount(): void {
   const app = document.getElementById('app');
   if (!app) return;
 
-  const route = getRoute();
-  const page = renderPage(route);
+  const originalPath = window.location.pathname.replace(/\/$/, '') || '/dashboard';
+  const resolvedRoute = getRoute();
+
+  if (originalPath !== resolvedRoute) {
+    window.history.replaceState({}, '', resolvedRoute);
+  }
+
+  const page = renderPage(resolvedRoute);
 
   app.innerHTML = '';
   app.appendChild(page);
