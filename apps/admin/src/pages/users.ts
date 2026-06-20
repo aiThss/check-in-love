@@ -122,7 +122,7 @@ export function renderUsersPage(): HTMLElement {
         {
           key: 'id',
           label: 'Hành động',
-          width: '140px',
+          width: '220px',
           render: (_v, row) => {
             const isBlocked = row.status === 'blocked';
             return `
@@ -134,6 +134,14 @@ export function renderUsersPage(): HTMLElement {
                   data-name="${escapeHtml(row.name)}"
                 >
                   ${isBlocked ? '✅ Mở khóa' : '🚫 Khóa'}
+                </button>
+                <button
+                  class="btn btn-sm btn-danger"
+                  data-action="delete"
+                  data-id="${row.id}"
+                  data-name="${escapeHtml(row.name)}"
+                >
+                  Xóa
                 </button>
               </div>
             `;
@@ -186,6 +194,29 @@ function handleUserAction(
   userName: string,
   onDone: () => void,
 ): void {
+  if (action === 'delete') {
+    showConfirmModal({
+      icon: '🗑️',
+      title: `Xóa tài khoản?`,
+      description: `Bạn có chắc muốn xóa vĩnh viễn <strong>${escapeHtml(userName)}</strong>? Check-in, random event, OTP và push subscription liên quan cũng sẽ bị xóa để test lại account.`,
+      confirmLabel: 'Xóa tài khoản',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await adminApi.deleteUser(userId);
+          showToast(`Đã xóa ${userName}.`, 'success');
+          onDone();
+        } catch (err) {
+          const msg =
+            err instanceof ApiError ? err.message : 'Thao tác thất bại.';
+          showToast(msg, 'error');
+          throw err;
+        }
+      },
+    });
+    return;
+  }
+
   const isBlock = action === 'block';
 
   showConfirmModal({
