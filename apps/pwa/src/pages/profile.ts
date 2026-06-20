@@ -14,6 +14,110 @@ function calcDaysTogether(loveStartDate?: string): number {
   return Math.max(0, Math.floor(diff / 86400000));
 }
 
+const GITHUB_RELEASE_API = 'https://api.github.com/repos/aiThss/check-in-love/releases/latest';
+const GITHUB_RELEASES_PAGE = 'https://github.com/aiThss/check-in-love/releases/latest';
+
+interface GitHubReleaseAsset {
+  name: string;
+  browser_download_url: string;
+}
+
+interface GitHubRelease {
+  tag_name?: string;
+  name?: string;
+  html_url?: string;
+  assets?: GitHubReleaseAsset[];
+}
+
+function normalizeVersion(version?: string): string {
+  return (version || '').trim().replace(/^v/i, '');
+}
+
+function getCurrentAndroidVersion(): string | null {
+  const match = navigator.userAgent.match(/LoveCheckAndroidWrapper(?:\/([^\s;]+))?/i);
+  return match?.[1] ? normalizeVersion(match[1]) : null;
+}
+
+function compareVersions(left: string, right: string): number {
+  const toParts = (version: string) =>
+    normalizeVersion(version)
+      .split(/[._-]/)
+      .map((part) => Number.parseInt(part, 10) || 0);
+
+  const leftParts = toParts(left);
+  const rightParts = toParts(right);
+  const max = Math.max(leftParts.length, rightParts.length);
+
+  for (let i = 0; i < max; i++) {
+    const diff = (leftParts[i] || 0) - (rightParts[i] || 0);
+    if (diff !== 0) return diff;
+  }
+
+  return 0;
+}
+
+function getApkAsset(release: GitHubRelease): GitHubReleaseAsset | undefined {
+  return release.assets?.find((asset) => asset.name.toLowerCase().endsWith('.apk'));
+}
+
+async function checkApkUpdate(
+  statusEl: HTMLElement,
+  checkButton: HTMLButtonElement,
+  downloadButton: HTMLButtonElement
+) {
+  const previousLabel = checkButton.textContent || 'Kiểm tra';
+  checkButton.disabled = true;
+  checkButton.textContent = 'Đang kiểm tra...';
+  downloadButton.style.display = 'none';
+  statusEl.textContent = 'Đang quét phiên bản APK mới nhất...';
+
+  try {
+    const res = await fetch(GITHUB_RELEASE_API, {
+      cache: 'no-store',
+      headers: { Accept: 'application/vnd.github+json' }
+    });
+
+    if (!res.ok) throw new Error(`GitHub trả về ${res.status}`);
+
+    const release = (await res.json()) as GitHubRelease;
+    const latestVersion = normalizeVersion(release.tag_name || release.name);
+    const apkAsset = getApkAsset(release);
+    const updateUrl = apkAsset?.browser_download_url || release.html_url || GITHUB_RELEASES_PAGE;
+    const currentVersion = getCurrentAndroidVersion();
+
+    downloadButton.dataset.updateUrl = updateUrl;
+    downloadButton.textContent = apkAsset ? 'Tải APK mới' : 'Mở trang release';
+    downloadButton.style.display = 'inline-flex';
+
+    if (!latestVersion) {
+      statusEl.textContent = 'Đã tìm thấy release, nhưng chưa đọc được số phiên bản.';
+      return;
+    }
+
+    if (!currentVersion) {
+      statusEl.textContent = `Không đọc được version APK hiện tại. Bạn có thể tải bản mới nhất v${latestVersion}.`;
+      return;
+    }
+
+    if (compareVersions(currentVersion, latestVersion) >= 0) {
+      statusEl.textContent = `Bạn đang ở bản mới nhất (v${currentVersion}).`;
+      downloadButton.style.display = 'none';
+      return;
+    }
+
+    statusEl.textContent = `Có bản mới v${latestVersion}. Bản đang cài là v${currentVersion}.`;
+  } catch (err: any) {
+    statusEl.textContent = `Không kiểm tra được cập nhật: ${err.message || 'lỗi mạng'}.`;
+    downloadButton.dataset.updateUrl = GITHUB_RELEASES_PAGE;
+    downloadButton.textContent = 'Mở trang release';
+    downloadButton.style.display = 'inline-flex';
+    showToast('Không kiểm tra được cập nhật APK', 'error');
+  } finally {
+    checkButton.disabled = false;
+    checkButton.textContent = previousLabel;
+  }
+}
+
 export function renderProfilePage(): HTMLElement {
   const root = document.createElement('div');
   root.className = 'page profile-page animate-fade-in';
@@ -258,7 +362,44 @@ export function renderProfilePage(): HTMLElement {
     });
     settingsContainer.appendChild(themeRow);
 
-    // 3. Logout Row
+    // 3. APK Update Row
+    const updateRow = document.createElement('div');
+    updateRow.className = 'card-solid';
+    updateRow.style.cssText = 'padding:16px;display:flex;flex-direction:column;gap:12px;';
+    updateRow.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;min-width:0;">
+          <span style="font-size:20px;line-height:1;">⬆️</span>
+          <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+            <span style="font-size:14px;font-weight:600;">Cập nhật APK</span>
+            <span id="apk-update-status" style="font-size:11px;color:var(--text-secondary);line-height:1.4;">
+              Kiểm tra bản Android mới nhất để tránh thiếu tính năng.
+            </span>
+          </div>
+        </div>
+        <button id="check-apk-update-btn" class="btn-ghost" style="padding:8px 10px;font-size:12px;white-space:nowrap;">
+          Kiểm tra
+        </button>
+      </div>
+      <button id="download-apk-update-btn" class="btn-primary" style="display:none;width:100%;padding:10px;justify-content:center;">
+        Tải APK mới
+      </button>
+    `;
+    const statusEl = updateRow.querySelector<HTMLElement>('#apk-update-status');
+    const checkButton = updateRow.querySelector<HTMLButtonElement>('#check-apk-update-btn');
+    const downloadButton = updateRow.querySelector<HTMLButtonElement>('#download-apk-update-btn');
+
+    if (statusEl && checkButton && downloadButton) {
+      checkButton.addEventListener('click', () => {
+        checkApkUpdate(statusEl, checkButton, downloadButton);
+      });
+      downloadButton.addEventListener('click', () => {
+        window.location.href = downloadButton.dataset.updateUrl || GITHUB_RELEASES_PAGE;
+      });
+    }
+    settingsContainer.appendChild(updateRow);
+
+    // 4. Logout Row
     const logoutRow = document.createElement('div');
     logoutRow.className = 'card-solid';
     logoutRow.style.cssText = 'padding:16px;cursor:pointer;display:flex;justify-content:between;align-items:center;border-color:rgba(239, 68, 68, 0.2);';

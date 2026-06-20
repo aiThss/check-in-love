@@ -108,7 +108,8 @@ class MainActivity : ComponentActivity() {
                         settings.loadsImagesAutomatically = true
                         settings.javaScriptCanOpenWindowsAutomatically = true
                         settings.setSupportZoom(false)
-                        settings.userAgentString = settings.userAgentString + " LoveCheckAndroidWrapper"
+                        val versionName = packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
+                        settings.userAgentString = settings.userAgentString + " LoveCheckAndroidWrapper/$versionName"
 
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(
@@ -258,7 +259,7 @@ class MainActivity : ComponentActivity() {
                     val currentVersion = packageManager.getPackageInfo(packageName, 0).versionName ?: ""
                     val latestVersion = tagName.removePrefix("v")
 
-                    if (latestVersion != currentVersion) {
+                    if (compareVersions(latestVersion, currentVersion) > 0) {
                         val assets = json.getJSONArray("assets")
                         var apkUrl: String? = null
                         for (i in 0 until assets.length()) {
@@ -338,6 +339,20 @@ class MainActivity : ComponentActivity() {
             "127.0.0.1",
             "10.0.2.2"
         )
+
+        private fun compareVersions(left: String, right: String): Int {
+            val leftParts = left.split(".", "-", "_").map { it.toIntOrNull() ?: 0 }
+            val rightParts = right.split(".", "-", "_").map { it.toIntOrNull() ?: 0 }
+            val max = maxOf(leftParts.size, rightParts.size)
+
+            for (i in 0 until max) {
+                val leftPart = leftParts.getOrElse(i) { 0 }
+                val rightPart = rightParts.getOrElse(i) { 0 }
+                if (leftPart != rightPart) return leftPart.compareTo(rightPart)
+            }
+
+            return 0
+        }
 
         private fun isAllowedInWebView(uri: Uri): Boolean {
             val host = uri.host ?: return false
