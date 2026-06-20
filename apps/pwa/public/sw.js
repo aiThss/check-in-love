@@ -3,7 +3,7 @@
    Cache name: lovecheck-v1
    ============================================================ */
 
-const CACHE_NAME = 'lovecheck-v2';
+const CACHE_NAME = 'lovecheck-v3';
 const OFFLINE_URL = '/offline.html';
 
 const SHELL_ASSETS = [
@@ -176,11 +176,15 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: '/icons/icon-512.png',
-    badge: '/icons/icon-192.png',
+    icon: data.icon || '/icons/icon-512.png',
+    badge: data.badge || '/icons/icon-192.png',
+    tag: data.tag || 'check-in-love',
+    renotify: true,
     vibrate: [100, 50, 100],
     data: {
       url: data.url || '/app/home',
+      kind: data.kind,
+      checkinId: data.checkinId,
       dateOfArrival: Date.now(),
     },
     actions: [

@@ -12,7 +12,16 @@ import { sendPushToUser } from '../services/push';
 import { storageService } from '../services/storage';
 import { updateStreak } from '../services/streak';
 
-const reactionTypes = ['heart', 'hug', 'kiss', 'laugh', 'miss'] as const;
+const reactionTypes = [
+  'heart',
+  'hug',
+  'kiss',
+  'laugh',
+  'miss',
+  'wow',
+  'fire',
+  'sad',
+] as const;
 
 const createCheckInBodySchema = z.object({
   type: z.enum(['text', 'mood']),
@@ -25,6 +34,10 @@ const createCheckInBodySchema = z.object({
 
 const addReactionSchema = z.object({
   type: z.enum(reactionTypes),
+});
+
+const addReplySchema = z.object({
+  message: z.string().trim().min(1).max(500),
 });
 
 async function readMultipartBuffer(
@@ -243,6 +256,7 @@ export default async function checkinsRoutes(
         ownerName: user.displayName,
         ...checkInData,
         reactions: [],
+        replies: [],
       });
 
       // Update streak
@@ -259,6 +273,11 @@ export default async function checkinsRoutes(
             title: `${user.displayName} đã check-in! 💕`,
             body: checkInData.caption ?? checkInData.quickMessage ?? 'Xem ngay nào!',
             icon: user.avatarUrl,
+            badge: '/icons/icon-192.png',
+            url: '/app/home',
+            tag: `checkin-${checkIn._id.toString()}`,
+            kind: 'checkin',
+            checkinId: checkIn._id.toString(),
           }).catch((err) => {
             app.log.error({ err }, 'Failed to send push notification');
           });
@@ -320,12 +339,92 @@ export default async function checkinsRoutes(
 
       await checkIn.save();
 
+      if (existingIdx === -1 && checkIn.ownerId.toString() !== request.user.id) {
+        const reactor = await User.findById(request.user.id).lean();
+        sendPushToUser(checkIn.ownerId.toString(), {
+          title: `${reactor?.displayName ?? 'Nguoi ay'} reacted to your check-in`,
+          body: 'Mo app de xem reaction moi',
+          icon: reactor?.avatarUrl,
+          badge: '/icons/icon-192.png',
+          url: '/app/memories',
+          tag: `reaction-${checkIn._id.toString()}`,
+          kind: 'reaction',
+          checkinId: checkIn._id.toString(),
+        }).catch((err) => {
+          app.log.error({ err }, 'Failed to send reaction push notification');
+        });
+      }
+
       return reply.status(200).send({ reactions: checkIn.reactions });
     },
   );
 
   /**
-   * DELETE /checkins/:id — Soft delete a check-in
+   * POST /checkins/:id/replies - Add a reply to a check-in
+   */
+  app.post(
+    '/checkins/:id/replies',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+
+      const parsed = addReplySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: parsed.error.errors[0].message,
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      const [checkIn, user] = await Promise.all([
+        CheckIn.findOne({
+          _id: new Types.ObjectId(id),
+          coupleId: new Types.ObjectId(request.user.coupleId),
+          deletedAt: null,
+        }),
+        User.findById(request.user.id).lean(),
+      ]);
+
+      if (!checkIn) {
+        return reply
+          .status(404)
+          .send({ error: 'Check-in not found', code: 'NOT_FOUND' });
+      }
+
+      if (!user) {
+        return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
+      }
+
+      checkIn.replies.push({
+        userId: new Types.ObjectId(request.user.id),
+        userName: user.displayName,
+        message: parsed.data.message,
+        createdAt: new Date(),
+      });
+
+      await checkIn.save();
+
+      if (checkIn.ownerId.toString() !== request.user.id) {
+        sendPushToUser(checkIn.ownerId.toString(), {
+          title: `${user.displayName} replied to your check-in`,
+          body: parsed.data.message,
+          icon: user.avatarUrl,
+          badge: '/icons/icon-192.png',
+          url: '/app/memories',
+          tag: `reply-${checkIn._id.toString()}`,
+          kind: 'reply',
+          checkinId: checkIn._id.toString(),
+        }).catch((err) => {
+          app.log.error({ err }, 'Failed to send reply push notification');
+        });
+      }
+
+      return reply.status(201).send({ replies: checkIn.replies });
+    },
+  );
+
+  /**
+   * DELETE /checkins/:id - Soft delete a check-in
    */
   app.delete(
     '/checkins/:id',

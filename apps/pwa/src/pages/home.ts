@@ -1,11 +1,21 @@
 import { navigate } from '../router';
 import { store, applyTheme } from '../store/index';
-import { getLatestPartnerCheckin, addReaction } from '../api/checkins';
+import { getLatestPartnerCheckin, addReaction, addReply } from '../api/checkins';
+import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { createNav } from '../components/nav';
+import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
-import type { CheckIn, Reaction, ReactionType } from '../api/types';
+import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
+import type { PushSetupResult } from '../api/push';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+function escapeHtml(value: string | undefined): string {
+  return (value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 function formatTime(isoString: string): string {
   const date = new Date(isoString);
@@ -15,10 +25,10 @@ function formatTime(isoString: string): string {
   const diffH = Math.floor(diffMin / 60);
   const diffD = Math.floor(diffH / 24);
 
-  if (diffMin < 1) return 'Vừa xong';
-  if (diffMin < 60) return `${diffMin} phút trước`;
-  if (diffH < 24) return `${diffH} giờ trước`;
-  if (diffD === 1) return 'Hôm qua';
+  if (diffMin < 1) return 'Vua xong';
+  if (diffMin < 60) return `${diffMin} phut truoc`;
+  if (diffH < 24) return `${diffH} gio truoc`;
+  if (diffD === 1) return 'Hom qua';
   return date.toLocaleDateString('vi-VN');
 }
 
@@ -33,24 +43,30 @@ function calcDaysTogether(loveStartDate?: string): number {
   return Math.max(0, Math.floor(diff / 86400000));
 }
 
-const MOOD_LABELS: Record<string, string> = {
-  happy: '😊 Vui vẻ',
-  love: '🥰 Đang yêu',
-  sad: '😢 Buồn',
-  excited: '🤩 Hào hứng',
-  tired: '😴 Mệt mỏi',
-  calm: '😌 Bình yên',
-  miss: '🥺 Nhớ nhau',
-};
-
 const MOOD_EMOJIS: Record<string, string> = {
-  happy: '😊', love: '🥰', sad: '😢', excited: '🤩',
-  tired: '😴', calm: '😌', miss: '🥺',
+  happy: '\u{1F60A}',
+  love: '\u{1F970}',
+  sad: '\u{1F622}',
+  excited: '\u{1F929}',
+  tired: '\u{1F634}',
+  calm: '\u{1F60C}',
+  miss: '\u{1F97A}',
 };
 
-const REACTIONS: ReactionType[] = ['❤️', '🤗', '💋', '😂', '🥺'];
+const REACTIONS: Array<{ type: ReactionType; emoji: string; label: string }> = [
+  { type: 'heart', emoji: '\u2764\uFE0F', label: 'Yeu' },
+  { type: 'hug', emoji: '\u{1F917}', label: 'Om' },
+  { type: 'kiss', emoji: '\u{1F48B}', label: 'Hon' },
+  { type: 'laugh', emoji: '\u{1F602}', label: 'Cuoi' },
+  { type: 'miss', emoji: '\u{1F97A}', label: 'Nho' },
+  { type: 'wow', emoji: '\u{1F929}', label: 'Wow' },
+  { type: 'fire', emoji: '\u{1F525}', label: 'Xinh' },
+  { type: 'sad', emoji: '\u{1F972}', label: 'Thuong' },
+];
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
+function getReaction(checkin: CheckIn, type: ReactionType): Reaction | undefined {
+  return checkin.reactions.find((reaction) => reaction.type === type);
+}
 
 function renderSkeleton(): HTMLElement {
   const wrapper = document.createElement('div');
@@ -63,40 +79,156 @@ function renderSkeleton(): HTMLElement {
   return wrapper;
 }
 
-// ── Reaction Bar ──────────────────────────────────────────────────────────────
+function attachLongPress(target: HTMLElement, onLongPress: () => void): void {
+  let timer: number | undefined;
+  let longPressed = false;
 
-function buildReactionBar(
+  const clear = () => {
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      timer = undefined;
+    }
+  };
+
+  target.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    longPressed = false;
+    clear();
+    timer = window.setTimeout(() => {
+      longPressed = true;
+      onLongPress();
+    }, 420);
+  });
+
+  target.addEventListener('pointerup', clear);
+  target.addEventListener('pointerleave', clear);
+  target.addEventListener('pointercancel', clear);
+  target.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    if (!longPressed) onLongPress();
+  });
+}
+
+function buildReactionPicker(
   checkin: CheckIn,
   onReact: (type: ReactionType) => void,
 ): HTMLElement {
-  const bar = document.createElement('div');
-  bar.className = 'reaction-bar';
-  bar.style.cssText = 'padding:12px 4px;gap:8px;flex-wrap:nowrap;overflow-x:auto;';
+  const picker = document.createElement('div');
+  picker.className = 'reaction-picker';
 
-  REACTIONS.forEach((emoji) => {
-    const existing = checkin.reactions.find((r: Reaction) => r.type === emoji);
-    const count = existing?.count ?? 0;
-    const selected = existing?.reactedByMe ?? false;
-
+  REACTIONS.forEach(({ type, emoji, label }) => {
+    const existing = getReaction(checkin, type);
     const btn = document.createElement('button');
-    btn.className = `reaction-btn${selected ? ' selected' : ''}`;
-    btn.dataset.type = emoji;
-    btn.innerHTML = `
-      <span>${emoji}</span>
-      ${count > 0 ? `<span class="reaction-count">${count}</span>` : ''}
-    `;
-    btn.addEventListener('click', () => onReact(emoji));
-    bar.appendChild(btn);
+    btn.type = 'button';
+    btn.className = `reaction-option${existing?.reactedByMe ? ' selected' : ''}`;
+    btn.dataset.type = type;
+    btn.innerHTML = `<span class="reaction-option-emoji">${emoji}</span><span>${label}</span>`;
+    btn.addEventListener('click', () => onReact(type));
+    picker.appendChild(btn);
   });
 
-  return bar;
+  return picker;
 }
 
-// ── Check-in Card ─────────────────────────────────────────────────────────────
+function buildReactionSummary(
+  checkin: CheckIn,
+  onShowPicker: () => void,
+  onReply: () => void,
+): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'checkin-actions-row';
 
-function buildCheckinCard(checkin: CheckIn, onReact: (type: ReactionType) => void): HTMLElement {
+  const summary = document.createElement('button');
+  summary.type = 'button';
+  summary.className = 'reaction-summary';
+  summary.addEventListener('click', onShowPicker);
+
+  const activeReactions = REACTIONS
+    .map(({ type, emoji }) => ({ emoji, reaction: getReaction(checkin, type) }))
+    .filter((item) => (item.reaction?.count ?? 0) > 0);
+
+  if (activeReactions.length === 0) {
+    summary.innerHTML = `<span class="reaction-hint">Bam giu check-in de react</span>`;
+  } else {
+    summary.innerHTML = activeReactions
+      .map(
+        ({ emoji, reaction }) =>
+          `<span class="reaction-pill${reaction?.reactedByMe ? ' selected' : ''}">${emoji}<strong>${reaction?.count ?? 0}</strong></span>`,
+      )
+      .join('');
+  }
+
+  const replyBtn = document.createElement('button');
+  replyBtn.type = 'button';
+  replyBtn.className = 'reply-button';
+  replyBtn.textContent = `Reply${checkin.replies.length ? ` ${checkin.replies.length}` : ''}`;
+  replyBtn.addEventListener('click', onReply);
+
+  row.appendChild(summary);
+  row.appendChild(replyBtn);
+  return row;
+}
+
+function buildReplyPreview(replies: CheckInReply[]): HTMLElement | null {
+  if (replies.length === 0) return null;
+
   const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+  wrapper.className = 'reply-preview-list';
+
+  replies.slice(-2).forEach((reply) => {
+    const item = document.createElement('div');
+    item.className = `reply-preview${reply.isOwn ? ' own' : ''}`;
+    item.innerHTML = `
+      <strong>${escapeHtml(reply.userName)}</strong>
+      <span>${escapeHtml(reply.message)}</span>
+    `;
+    wrapper.appendChild(item);
+  });
+
+  return wrapper;
+}
+
+function showReplyComposer(
+  checkin: CheckIn,
+  onSaved: (replies: CheckInReply[]) => void,
+): void {
+  const form = document.createElement('div');
+  form.className = 'reply-composer';
+  form.innerHTML = `
+    <textarea id="reply-message" class="reply-textarea" rows="4" maxlength="500" placeholder="Viet reply cho check-in nay"></textarea>
+  `;
+
+  showModal({
+    title: 'Reply check-in',
+    content: form,
+    confirmText: 'Gui reply',
+    cancelText: 'Huy',
+    onConfirm: async () => {
+      const textarea = form.querySelector<HTMLTextAreaElement>('#reply-message');
+      const message = textarea?.value.trim() ?? '';
+      if (!message) {
+        showToast('Nhap noi dung reply truoc nhe', 'error');
+        throw new Error('Reply message required');
+      }
+
+      const replies = await addReply(checkin.id, message);
+      onSaved(replies);
+      showToast('Da gui reply', 'success');
+    },
+  });
+
+  setTimeout(() => {
+    form.querySelector<HTMLTextAreaElement>('#reply-message')?.focus();
+  }, 50);
+}
+
+function buildCheckinCard(
+  checkin: CheckIn,
+  onReact: (type: ReactionType) => void,
+  onReply: () => void,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'checkin-wrapper';
 
   const card = document.createElement('div');
   card.className = 'checkin-card animate-slide-up';
@@ -105,14 +237,14 @@ function buildCheckinCard(checkin: CheckIn, onReact: (type: ReactionType) => voi
     card.innerHTML = `
       <img
         class="checkin-card-image"
-        src="${checkin.photoUrl}"
-        alt="Ảnh check-in"
+        src="${escapeHtml(checkin.photoUrl)}"
+        alt="Anh check-in"
         loading="lazy"
       />
       <div class="checkin-card-overlay">
-        ${checkin.caption ? `<p class="checkin-card-overlay-text">${checkin.caption}</p>` : ''}
+        ${checkin.caption ? `<p class="checkin-card-overlay-text">${escapeHtml(checkin.caption)}</p>` : ''}
         <p class="checkin-card-overlay-meta">
-          ${checkin.mood ? MOOD_EMOJIS[checkin.mood] + ' ' : ''}${checkin.ownerName} · ${formatTime(checkin.createdAt)}
+          ${checkin.mood ? MOOD_EMOJIS[checkin.mood] + ' ' : ''}${escapeHtml(checkin.ownerName)} · ${formatTime(checkin.createdAt)}
         </p>
       </div>
     `;
@@ -120,48 +252,53 @@ function buildCheckinCard(checkin: CheckIn, onReact: (type: ReactionType) => voi
     card.innerHTML = `
       <div class="checkin-card-text">
         ${checkin.mood ? `<div class="checkin-mood-emoji">${MOOD_EMOJIS[checkin.mood]}</div>` : ''}
-        ${checkin.caption ? `<p style="font-size:17px;line-height:1.6;font-weight:500;color:var(--text-primary)">${checkin.caption}</p>` : ''}
+        ${checkin.caption ? `<p style="font-size:17px;line-height:1.6;font-weight:500;color:var(--text-primary)">${escapeHtml(checkin.caption)}</p>` : ''}
         <p style="font-size:13px;color:var(--text-secondary);margin-top:4px">
-          ${checkin.ownerName} · ${formatTime(checkin.createdAt)}
+          ${escapeHtml(checkin.ownerName)} · ${formatTime(checkin.createdAt)}
         </p>
       </div>
     `;
   }
 
+  const picker = buildReactionPicker(checkin, onReact);
+  const showPicker = () => {
+    picker.classList.toggle('open');
+  };
+
+  attachLongPress(card, showPicker);
   wrapper.appendChild(card);
-  wrapper.appendChild(buildReactionBar(checkin, onReact));
+  wrapper.appendChild(picker);
+  wrapper.appendChild(buildReactionSummary(checkin, showPicker, onReply));
+
+  const replies = buildReplyPreview(checkin.replies);
+  if (replies) wrapper.appendChild(replies);
+
   return wrapper;
 }
-
-// ── Empty State ───────────────────────────────────────────────────────────────
 
 function buildEmptyState(partnerName: string): HTMLElement {
   const el = document.createElement('div');
   el.className = 'empty-state animate-fade-in';
   el.innerHTML = `
-    <div class="empty-state-emoji">📭</div>
-    <div class="empty-state-title">Chưa có gì mới hôm nay</div>
-    <p class="empty-state-text">${partnerName} chưa gửi check-in nào hôm nay.<br>Bạn có thể gửi trước để bắt đầu nhé!</p>
+    <div class="empty-state-emoji">\u{1F4ED}</div>
+    <div class="empty-state-title">Chua co gi moi hom nay</div>
+    <p class="empty-state-text">${escapeHtml(partnerName)} chua gui check-in nao hom nay.<br>Ban co the gui truoc de bat dau nhe!</p>
     <button class="btn-primary" id="home-checkin-btn" style="margin-top:8px">
-      Gửi check-in 💕
+      Gui check-in
     </button>
   `;
   return el;
 }
 
-// ── Home Page ─────────────────────────────────────────────────────────────────
-
 export function renderHomePage(): HTMLElement {
   const state = store.get();
   const user = state.user;
   const couple = state.couple;
-  const partnerName = user?.partnerName ?? 'Người ấy';
+  const partnerName = user?.partnerName ?? 'Nguoi ay';
 
-  // Root
   const page = document.createElement('div');
   page.className = 'page animate-fade-in';
 
-  // ── Top bar ─────────────────────────────────────────────────────────────
   const topBar = document.createElement('div');
   topBar.className = 'top-bar';
   topBar.style.cssText =
@@ -171,34 +308,33 @@ export function renderHomePage(): HTMLElement {
   const streak = calcStreak(couple);
   const days = calcDaysTogether(couple?.loveStartDate);
   streakBadge.innerHTML = `
-    <div class="streak-banner">🔥 ${streak} ngày</div>
+    <div class="streak-banner">\u{1F525} ${streak} ngay</div>
     <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;padding-left:2px">
-      ${days} ngày bên nhau
+      ${days} ngay ben nhau
     </div>
   `;
 
   const rightActions = document.createElement('div');
   rightActions.style.cssText = 'display:flex;gap:8px;';
 
-  // Theme toggle button
   const themeBtn = document.createElement('button');
   themeBtn.className = 'btn-icon';
-  themeBtn.setAttribute('aria-label', 'Đổi giao diện');
+  themeBtn.setAttribute('aria-label', 'Doi giao dien');
   const currentTheme = state.theme;
-  themeBtn.textContent = currentTheme === 'dark' ? '☀️' : currentTheme === 'light' ? '🌙' : '🌗';
+  themeBtn.textContent =
+    currentTheme === 'dark' ? '\u2600\uFE0F' : currentTheme === 'light' ? '\u{1F319}' : '\u{1F317}';
   themeBtn.addEventListener('click', () => {
     const s = store.get();
     const next = s.theme === 'dark' ? 'light' : s.theme === 'light' ? 'system' : 'dark';
     store.set({ theme: next });
     applyTheme(next);
-    themeBtn.textContent = next === 'dark' ? '☀️' : next === 'light' ? '🌙' : '🌗';
+    themeBtn.textContent = next === 'dark' ? '\u2600\uFE0F' : next === 'light' ? '\u{1F319}' : '\u{1F317}';
   });
 
-  // Refresh button
   const refreshBtn = document.createElement('button');
   refreshBtn.className = 'btn-icon';
-  refreshBtn.setAttribute('aria-label', 'Làm mới');
-  refreshBtn.textContent = '🔄';
+  refreshBtn.setAttribute('aria-label', 'Lam moi');
+  refreshBtn.textContent = '\u{1F504}';
   refreshBtn.addEventListener('click', () => loadCheckin());
 
   rightActions.appendChild(themeBtn);
@@ -207,26 +343,86 @@ export function renderHomePage(): HTMLElement {
   topBar.appendChild(rightActions);
   page.appendChild(topBar);
 
-  // ── Partner label ───────────────────────────────────────────────────────
+  const pushSlot = document.createElement('div');
+  pushSlot.style.cssText = 'padding:0 16px 10px;';
+  page.appendChild(pushSlot);
+
   const partnerLabel = document.createElement('div');
   partnerLabel.style.cssText =
     'padding:0 20px 8px;font-size:16px;font-weight:600;color:var(--text-primary);';
   partnerLabel.innerHTML = `
-    <span style="color:var(--accent)">${partnerName}</span>
-    <span style="color:var(--text-secondary);font-weight:400"> đã gửi cho bạn:</span>
+    <span style="color:var(--accent)">${escapeHtml(partnerName)}</span>
+    <span style="color:var(--text-secondary);font-weight:400"> da gui cho ban:</span>
   `;
   page.appendChild(partnerLabel);
 
-  // ── Content area ────────────────────────────────────────────────────────
   const contentArea = document.createElement('div');
   contentArea.style.cssText = 'padding:0 16px;';
   contentArea.appendChild(renderSkeleton());
   page.appendChild(contentArea);
 
-  // ── Nav ─────────────────────────────────────────────────────────────────
   page.appendChild(createNav('/app/home'));
 
-  // ── Load check-in ────────────────────────────────────────────────────────
+  async function renderPushPrompt() {
+    if (!store.isAuthenticated()) return;
+
+    const result = await getPushSetupState().catch(() => null);
+    pushSlot.innerHTML = '';
+    if (!result || result.status !== 'prompt') return;
+
+    const card = document.createElement('div');
+    card.className = 'push-permission-card';
+    card.innerHTML = `
+      <div>
+        <strong>Bat thong bao check-in</strong>
+        <span>Nhan noti khi nguoi ay gui check-in, reply hoac react.</span>
+      </div>
+      <button type="button" class="btn-primary">Bat</button>
+    `;
+
+    card.querySelector('button')?.addEventListener('click', async () => {
+      const setup = await ensurePushSubscription(true).catch(
+        (): PushSetupResult => ({ status: 'error', message: 'Chua bat duoc thong bao' }),
+      );
+      if (setup.status === 'subscribed') {
+        card.remove();
+        showToast('Da bat thong bao', 'success');
+      } else {
+        showToast(setup.message ?? 'Chua bat duoc thong bao', 'error');
+      }
+    });
+
+    pushSlot.appendChild(card);
+  }
+
+  function renderLoadedCheckin(checkin: CheckIn) {
+    contentArea.innerHTML = '';
+
+    const render = () => {
+      contentArea.innerHTML = '';
+      const cardEl = buildCheckinCard(
+        checkin,
+        async (type) => {
+          try {
+            checkin.reactions = await addReaction(checkin.id, type);
+            render();
+          } catch {
+            showToast('Khong the react, thu lai nhe', 'error');
+          }
+        },
+        () => {
+          showReplyComposer(checkin, (replies) => {
+            checkin.replies = replies;
+            render();
+          });
+        },
+      );
+      contentArea.appendChild(cardEl);
+    };
+
+    render();
+  }
+
   async function loadCheckin() {
     contentArea.innerHTML = '';
     contentArea.appendChild(renderSkeleton());
@@ -246,48 +442,22 @@ export function renderHomePage(): HTMLElement {
         return;
       }
 
-      partnerLabel.innerHTML = `
-        <span style="color:var(--accent)">${partnerName}</span>
-        <span style="color:var(--text-secondary);font-weight:400"> đã gửi cho bạn:</span>
-      `;
-
-      const cardEl = buildCheckinCard(checkin, async (type) => {
-        try {
-          const updatedReactions = await addReaction(checkin.id, type);
-          // Update reaction bar
-          const bar = cardEl.querySelector('.reaction-bar');
-          if (bar) {
-            REACTIONS.forEach((emoji) => {
-              const btn = bar.querySelector<HTMLElement>(`[data-type="${emoji}"]`);
-              if (!btn) return;
-              const r = updatedReactions.find((rx: Reaction) => rx.type === emoji);
-              const count = r?.count ?? 0;
-              const selected = r?.reactedByMe ?? false;
-              btn.className = `reaction-btn${selected ? ' selected' : ''}`;
-              btn.innerHTML = `<span>${emoji}</span>${count > 0 ? `<span class="reaction-count">${count}</span>` : ''}`;
-            });
-          }
-        } catch {
-          showToast('Không thể thả tim, thử lại nhé 🥺', 'error');
-        }
-      });
-
-      contentArea.appendChild(cardEl);
-    } catch (err) {
+      renderLoadedCheckin(checkin);
+    } catch {
       refreshBtn.classList.remove('animate-spin');
-      contentArea.innerHTML = '';
       contentArea.innerHTML = `
         <div class="empty-state">
-          <div class="empty-state-emoji">😢</div>
-          <div class="empty-state-title">Không tải được dữ liệu</div>
-          <p class="empty-state-text">Kiểm tra kết nối mạng và thử lại</p>
-          <button class="btn-ghost" id="retry-btn" style="margin-top:8px">Thử lại</button>
+          <div class="empty-state-emoji">\u{1F622}</div>
+          <div class="empty-state-title">Khong tai duoc du lieu</div>
+          <p class="empty-state-text">Kiem tra ket noi mang va thu lai</p>
+          <button class="btn-ghost" id="retry-btn" style="margin-top:8px">Thu lai</button>
         </div>
       `;
       contentArea.querySelector('#retry-btn')?.addEventListener('click', () => loadCheckin());
     }
   }
 
+  renderPushPrompt();
   loadCheckin();
   return page;
 }

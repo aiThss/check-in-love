@@ -403,8 +403,13 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
         );
 
         const reactionUpdate = await CheckIn.updateMany(
-          { 'reactions.userId': userId },
-          { $pull: { reactions: { userId } } },
+          {
+            $or: [
+              { 'reactions.userId': userId },
+              { 'replies.userId': userId },
+            ],
+          },
+          { $pull: { reactions: { userId }, replies: { userId } } },
         );
         reactionsRemoved = reactionUpdate.modifiedCount ?? 0;
       }

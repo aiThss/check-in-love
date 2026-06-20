@@ -1,68 +1,101 @@
 import { apiFetch } from './client';
 import { store } from '../store/index';
-import type { CheckIn, PaginatedResponse, Reaction, ReactionType } from './types';
+import type {
+  CheckIn,
+  CheckInReply,
+  PaginatedResponse,
+  Reaction,
+  ReactionType,
+} from './types';
 
 export interface CreateCheckinResult {
   checkIn: CheckIn;
   streak?: number;
 }
 
+const reactionAlias: Record<string, ReactionType> = {
+  heart: 'heart',
+  hug: 'hug',
+  kiss: 'kiss',
+  laugh: 'laugh',
+  miss: 'miss',
+  wow: 'wow',
+  fire: 'fire',
+  sad: 'sad',
+};
+
+function normalizeReactionType(type: string): ReactionType | null {
+  return reactionAlias[type] ?? null;
+}
+
+function mapReplies(rawReplies: any[] = []): CheckInReply[] {
+  const currentUserId = store.get().user?.id;
+
+  return rawReplies.map((reply) => {
+    const userId = String(reply.userId ?? '');
+    return {
+      userId,
+      userName: reply.userName ?? 'Nguoi ay',
+      message: reply.message ?? '',
+      isOwn: currentUserId ? userId === currentUserId : false,
+      createdAt: reply.createdAt,
+    };
+  });
+}
+
+function mapReactionList(rawReactions: any[] = []): Reaction[] {
+  const currentUserId = store.get().user?.id;
+  const reactionGroups: Record<ReactionType, { count: number; reactedByMe: boolean }> = {
+    heart: { count: 0, reactedByMe: false },
+    hug: { count: 0, reactedByMe: false },
+    kiss: { count: 0, reactedByMe: false },
+    laugh: { count: 0, reactedByMe: false },
+    miss: { count: 0, reactedByMe: false },
+    wow: { count: 0, reactedByMe: false },
+    fire: { count: 0, reactedByMe: false },
+    sad: { count: 0, reactedByMe: false },
+  };
+
+  rawReactions.forEach((rx: any) => {
+    const type = normalizeReactionType(String(rx.type ?? ''));
+    if (!type) return;
+
+    reactionGroups[type].count++;
+    if (currentUserId && String(rx.userId) === currentUserId) {
+      reactionGroups[type].reactedByMe = true;
+    }
+  });
+
+  return Object.entries(reactionGroups)
+    .filter(([, value]) => value.count > 0 || value.reactedByMe)
+    .map(([type, value]) => ({
+      type: type as ReactionType,
+      count: value.count,
+      reactedByMe: value.reactedByMe,
+    }));
+}
+
 // Map raw backend check-in format to aligned PWA types
 function mapCheckin(item: any): CheckIn {
   if (!item) return null as any;
-  
+
   const currentUserId = store.get().user?.id;
-  
-  // Aggregate reactions: Group raw reactions by emoji/type
-  const rawReactions = item.reactions || [];
-  const reactionGroups: Record<string, { count: number; reactedByMe: boolean }> = {};
-  
-  rawReactions.forEach((rx: any) => {
-    const type = rx.type;
-    const emojiMap: Record<string, string> = {
-      heart: '❤️',
-      hug: '🤗',
-      kiss: '💋',
-      laugh: '😂',
-      miss: '🥺',
-      '❤️': '❤️',
-      '🤗': '🤗',
-      '💋': '💋',
-      '😂': '😂',
-      '🥺': '🥺'
-    };
-    
-    const emoji = emojiMap[type] || type;
-    
-    if (!reactionGroups[emoji]) {
-      reactionGroups[emoji] = { count: 0, reactedByMe: false };
-    }
-    
-    reactionGroups[emoji].count++;
-    if (currentUserId && rx.userId === currentUserId) {
-      reactionGroups[emoji].reactedByMe = true;
-    }
-  });
-  
-  const reactionsList: Reaction[] = Object.keys(reactionGroups).map(type => ({
-    type: type as ReactionType,
-    count: reactionGroups[type].count,
-    reactedByMe: reactionGroups[type].reactedByMe
-  }));
+  const userId = String(item.ownerId || item.userId || '');
 
   return {
-    id: item._id || item.id,
-    userId: item.ownerId || item.userId,
-    coupleId: item.coupleId,
+    id: String(item._id || item.id),
+    userId,
+    coupleId: String(item.coupleId ?? ''),
     type: item.type,
     photoUrl: item.imageUrl || item.photoUrl,
     caption: item.caption,
     mood: item.mood,
-    reactions: reactionsList,
+    reactions: mapReactionList(item.reactions || []),
+    replies: mapReplies(item.replies || []),
     ownerName: item.ownerName,
-    isOwn: currentUserId ? (item.ownerId || item.userId) === currentUserId : false,
+    isOwn: currentUserId ? userId === currentUserId : false,
     createdAt: item.createdAt,
-    updatedAt: item.updatedAt
+    updatedAt: item.updatedAt,
   };
 }
 
@@ -79,23 +112,27 @@ export async function getCheckins(
   page: number = 1,
   limit: number = 20,
 ): Promise<PaginatedResponse<CheckIn>> {
-  const res = await apiFetch<{ checkIns: any[]; pagination: any }>('/checkins?page=' + page + '&limit=' + limit);
-  
+  const res = await apiFetch<{ checkIns: any[]; pagination: any }>(
+    '/checkins?page=' + page + '&limit=' + limit,
+  );
+
   const data = (res.checkIns || []).map(mapCheckin);
   const total = res.pagination?.total ?? data.length;
   const totalPages = res.pagination?.totalPages ?? 1;
   const hasMore = page < totalPages;
-  
+
   return {
     data,
     total,
     page,
     limit,
-    hasMore
+    hasMore,
   };
 }
 
-export async function createCheckin(body: FormData | Record<string, any>): Promise<CreateCheckinResult> {
+export async function createCheckin(
+  body: FormData | Record<string, any>,
+): Promise<CreateCheckinResult> {
   const res = await apiFetch<any>('/checkins', {
     method: 'POST',
     body: body instanceof FormData ? body : JSON.stringify(body),
@@ -110,55 +147,24 @@ export async function addReaction(
   checkinId: string,
   type: ReactionType,
 ): Promise<Reaction[]> {
-  const nameMap: Record<string, string> = {
-    '❤️': 'heart',
-    '🤗': 'hug',
-    '💋': 'kiss',
-    '😂': 'laugh',
-    '🥺': 'miss'
-  };
-  const backendType = nameMap[type] || type;
-
   const res = await apiFetch<{ reactions: any[] }>(`/checkins/${checkinId}/reactions`, {
     method: 'POST',
-    body: JSON.stringify({ type: backendType }),
-  });
-  
-  const currentUserId = store.get().user?.id;
-  const reactionGroups: Record<string, { count: number; reactedByMe: boolean }> = {};
-  
-  const rawReactions = res.reactions || [];
-  rawReactions.forEach((rx: any) => {
-    const emojiMap: Record<string, string> = {
-      heart: '❤️',
-      hug: '🤗',
-      kiss: '💋',
-      laugh: '😂',
-      miss: '🥺',
-      '❤️': '❤️',
-      '🤗': '🤗',
-      '💋': '💋',
-      '😂': '😂',
-      '🥺': '🥺'
-    };
-    
-    const emoji = emojiMap[rx.type] || rx.type;
-    
-    if (!reactionGroups[emoji]) {
-      reactionGroups[emoji] = { count: 0, reactedByMe: false };
-    }
-    
-    reactionGroups[emoji].count++;
-    if (currentUserId && rx.userId === currentUserId) {
-      reactionGroups[emoji].reactedByMe = true;
-    }
+    body: JSON.stringify({ type }),
   });
 
-  return Object.keys(reactionGroups).map(t => ({
-    type: t as ReactionType,
-    count: reactionGroups[t].count,
-    reactedByMe: reactionGroups[t].reactedByMe
-  }));
+  return mapReactionList(res.reactions || []);
+}
+
+export async function addReply(
+  checkinId: string,
+  message: string,
+): Promise<CheckInReply[]> {
+  const res = await apiFetch<{ replies: any[] }>(`/checkins/${checkinId}/replies`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  });
+
+  return mapReplies(res.replies || []);
 }
 
 export function deleteCheckin(checkinId: string): Promise<void> {

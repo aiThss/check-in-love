@@ -24,6 +24,11 @@ export interface PushPayload {
   title: string;
   body: string;
   icon?: string;
+  badge?: string;
+  url?: string;
+  tag?: string;
+  kind?: 'checkin' | 'reaction' | 'reply' | 'reminder';
+  checkinId?: string;
 }
 
 export async function sendPushToUser(

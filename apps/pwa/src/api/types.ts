@@ -1,6 +1,14 @@
 // Shared types used across API modules
 
-export type ReactionType = '❤️' | '🤗' | '💋' | '😂' | '🥺';
+export type ReactionType =
+  | 'heart'
+  | 'hug'
+  | 'kiss'
+  | 'laugh'
+  | 'miss'
+  | 'wow'
+  | 'fire'
+  | 'sad';
 
 export type MoodType =
   | 'happy'
@@ -41,6 +49,14 @@ export interface Reaction {
   reactedByMe: boolean;
 }
 
+export interface CheckInReply {
+  userId: string;
+  userName: string;
+  message: string;
+  isOwn: boolean;
+  createdAt: string;
+}
+
 export interface CheckIn {
   id: string;
   userId: string;
@@ -50,6 +66,7 @@ export interface CheckIn {
   caption?: string;
   mood?: MoodType;
   reactions: Reaction[];
+  replies: CheckInReply[];
   ownerName: string;
   ownerAvatarUrl?: string;
   isOwn: boolean;

@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { env } from '../config/env';
 import { PushSubscription } from '../db/models/PushSubscription';
 import { authenticate } from '../middleware/auth';
 
@@ -18,6 +19,13 @@ const unsubscribeBodySchema = z.object({
 });
 
 export default async function pushRoutes(app: FastifyInstance): Promise<void> {
+  app.get('/push/config', async (_request, reply) => {
+    return reply.status(200).send({
+      enabled: Boolean(env.VAPID_PUBLIC_KEY),
+      publicKey: env.VAPID_PUBLIC_KEY ?? null,
+    });
+  });
+
   /**
    * POST /push/subscribe — Register or update a push subscription
    */

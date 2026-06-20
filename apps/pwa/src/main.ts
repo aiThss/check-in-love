@@ -11,6 +11,7 @@ import { renderCheckinPage } from './pages/checkin';
 import { renderMemoriesPage } from './pages/memories';
 import { renderRandomPage } from './pages/random';
 import { renderProfilePage } from './pages/profile';
+import { ensurePushSubscription } from './api/push';
 
 // ─── Apply Theme ─────────────────────────────────────────────────────────────
 function applyTheme() {
@@ -28,9 +29,18 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', app
 // ─── Service Worker ───────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.warn('SW registration failed:', err);
-    });
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then(() => {
+        if (store.isAuthenticated() && 'Notification' in window && Notification.permission === 'granted') {
+          ensurePushSubscription(false).catch((err) => {
+            console.warn('Push subscription refresh failed:', err);
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('SW registration failed:', err);
+      });
   });
 }
 

@@ -9,11 +9,26 @@ export type MoodType =
   | 'out'
   | 'eating'
   | 'needhug';
-export type ReactionType = 'heart' | 'hug' | 'kiss' | 'laugh' | 'miss';
+export type ReactionType =
+  | 'heart'
+  | 'hug'
+  | 'kiss'
+  | 'laugh'
+  | 'miss'
+  | 'wow'
+  | 'fire'
+  | 'sad';
 
 export interface ReactionSubDoc {
   userId: Types.ObjectId;
   type: ReactionType;
+  createdAt: Date;
+}
+
+export interface ReplySubDoc {
+  userId: Types.ObjectId;
+  userName: string;
+  message: string;
   createdAt: Date;
 }
 
@@ -29,6 +44,7 @@ export interface CheckInDocument extends Document {
   mood?: MoodType;
   quickMessage?: string;
   reactions: ReactionSubDoc[];
+  replies: ReplySubDoc[];
   deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -39,9 +55,19 @@ const ReactionSchema = new Schema<ReactionSubDoc>(
     userId: { type: Schema.Types.ObjectId, required: true },
     type: {
       type: String,
-      enum: ['heart', 'hug', 'kiss', 'laugh', 'miss'],
+      enum: ['heart', 'hug', 'kiss', 'laugh', 'miss', 'wow', 'fire', 'sad'],
       required: true,
     },
+    createdAt: { type: Date, default: () => new Date() },
+  },
+  { _id: false },
+);
+
+const ReplySchema = new Schema<ReplySubDoc>(
+  {
+    userId: { type: Schema.Types.ObjectId, required: true },
+    userName: { type: String, required: true },
+    message: { type: String, required: true, maxlength: 500 },
     createdAt: { type: Date, default: () => new Date() },
   },
   { _id: false },
@@ -75,6 +101,7 @@ const CheckInSchema = new Schema<CheckInDocument>(
     },
     quickMessage: { type: String, required: false, maxlength: 100 },
     reactions: { type: [ReactionSchema], default: [] },
+    replies: { type: [ReplySchema], default: [] },
     deletedAt: { type: Date, required: false },
   },
   { timestamps: true },
