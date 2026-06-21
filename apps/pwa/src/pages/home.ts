@@ -1,6 +1,6 @@
 import { navigate } from '../router';
 import { store, applyTheme } from '../store/index';
-import { getLatestPartnerCheckin, addReaction, addReply } from '../api/checkins';
+import { getLatestPartnerCheckin, getCachedLatestPartnerCheckin, addReaction, addReply } from '../api/checkins';
 import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { createNav } from '../components/nav';
 import { showModal } from '../components/modal';
@@ -349,7 +349,7 @@ export function renderHomePage(): HTMLElement {
   const refreshBtn = document.createElement('button');
   refreshBtn.className = 'btn-icon';
   refreshBtn.setAttribute('aria-label', 'Làm mới');
-  refreshBtn.textContent = '\u{1F504}';
+  refreshBtn.innerHTML = `<lottie-player src="/icons8-refresh.json" background="transparent" speed="1.2" style="width: 22px; height: 22px;"></lottie-player>`;
   refreshBtn.addEventListener('click', () => loadCheckin());
 
   rightActions.appendChild(themeBtn);
@@ -438,15 +438,33 @@ export function renderHomePage(): HTMLElement {
     render();
   }
 
-  async function loadCheckin() {
-    contentArea.innerHTML = '';
-    contentArea.appendChild(renderSkeleton());
-    refreshBtn.classList.add('animate-spin');
+  async function loadCheckin(useCache = true) {
+    if (useCache) {
+      const cached = getCachedLatestPartnerCheckin();
+      if (cached) {
+        renderLoadedCheckin(cached);
+      } else {
+        contentArea.innerHTML = '';
+        contentArea.appendChild(renderSkeleton());
+      }
+    } else {
+      contentArea.innerHTML = '';
+      contentArea.appendChild(renderSkeleton());
+    }
+
+    const player = refreshBtn.querySelector('lottie-player');
+    if (player) {
+      player.setAttribute('loop', 'true');
+      (player as any).play?.();
+    }
 
     try {
       const checkin = await getLatestPartnerCheckin();
       contentArea.innerHTML = '';
-      refreshBtn.classList.remove('animate-spin');
+      if (player) {
+        player.removeAttribute('loop');
+        (player as any).stop?.();
+      }
 
       if (!checkin) {
         const empty = buildEmptyState(partnerName);
@@ -458,8 +476,31 @@ export function renderHomePage(): HTMLElement {
       }
 
       renderLoadedCheckin(checkin);
+
+      // Sync with Android widget
+      try {
+        const bridge = (window as any).LoveCheckAndroid;
+        if (bridge && typeof bridge.updatePartnerCheckin === 'function') {
+          bridge.updatePartnerCheckin(
+            partnerName,
+            checkin.type,
+            checkin.caption || '',
+            checkin.photoUrl || '',
+            checkin.createdAt
+          );
+        }
+      } catch (e) {
+        // ignore
+      }
     } catch {
-      refreshBtn.classList.remove('animate-spin');
+      if (player) {
+        player.removeAttribute('loop');
+        (player as any).stop?.();
+      }
+      if (getCachedLatestPartnerCheckin()) {
+        showToast('Không thể làm mới dữ liệu', 'error');
+        return;
+      }
       contentArea.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-emoji">\u{1F622}</div>
@@ -468,7 +509,7 @@ export function renderHomePage(): HTMLElement {
           <button class="btn-ghost" id="retry-btn" style="margin-top:8px">Thử lại</button>
         </div>
       `;
-      contentArea.querySelector('#retry-btn')?.addEventListener('click', () => loadCheckin());
+      contentArea.querySelector('#retry-btn')?.addEventListener('click', () => loadCheckin(false));
     }
   }
 

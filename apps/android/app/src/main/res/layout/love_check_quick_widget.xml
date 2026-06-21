@@ -1,28 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/quick_widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="8dp">
+    android:background="@drawable/widget_background">
 
+    <!-- The partner's check-in photo background -->
     <ImageView
-        android:id="@+id/quick_widget_icon"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:src="@mipmap/ic_launcher"
-        android:contentDescription="Check IN Love" />
+        android:id="@+id/quick_widget_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
 
+    <!-- Dark gradient scrim overlay to make text highly readable -->
+    <View
+        android:id="@+id/quick_widget_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80000000"
+        android:visibility="gone" />
+
+    <!-- Content overlay -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:gravity="bottom">
+
+        <TextView
+            android:id="@+id/quick_widget_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Chua co check-in"
+            android:textColor="#E0E0E0"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/quick_widget_body"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Nhan de gui check-in..."
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:ellipsize="end"
+            android:maxLines="3" />
+    </LinearLayout>
+
+    <!-- Small branding heart in the top-right corner to look premium -->
     <TextView
-        android:id="@+id/quick_widget_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="Gửi Check-in"
-        android:textColor="#FFFFFF"
-        android:textSize="10sp"
-        android:textStyle="bold"
-        android:gravity="center" />
-</LinearLayout>
+        android:layout_gravity="top|end"
+        android:layout_margin="12dp"
+        android:text="💕"
+        android:textSize="14sp" />
+</FrameLayout>

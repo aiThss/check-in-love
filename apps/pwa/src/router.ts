@@ -101,9 +101,9 @@ async function renderRoute(path: string): Promise<void> {
   const appEl = document.getElementById('app');
   if (!appEl) return;
 
-  // Fade out
+  // Hide instantly to avoid flash of old content
+  appEl.style.transition = 'none';
   appEl.style.opacity = '0';
-  appEl.style.transition = `opacity 120ms ease`;
 
   try {
     const pageEl = await factory();
@@ -114,11 +114,13 @@ async function renderRoute(path: string): Promise<void> {
     renderError(appEl);
   }
 
-  // Fade in
+  // Fade in quickly
   requestAnimationFrame(() => {
-    appEl.style.opacity = '1';
-    // Scroll to top on route change
-    window.scrollTo({ top: 0 });
+    requestAnimationFrame(() => {
+      appEl.style.transition = 'opacity 60ms ease-out';
+      appEl.style.opacity = '1';
+      window.scrollTo({ top: 0 });
+    });
   });
 }
 

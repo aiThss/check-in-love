@@ -19,7 +19,7 @@ export interface User extends Omit<SharedUser, 'role' | 'status'> {
 
 export interface Couple {
   id: string;
-  coupleCode: string;
+  code: string;
   loveStartDate?: string;
   streak: number;
   totalDays: number;

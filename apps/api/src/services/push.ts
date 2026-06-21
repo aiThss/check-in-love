@@ -113,6 +113,7 @@ export interface PushPayload {
   senderAvatar?: string;
   actionType?: 'checkin' | 'reaction' | 'reply' | 'reminder';
   targetUrl?: string;
+  photoUrl?: string;
 }
 
 export async function sendPushToUser(
@@ -147,6 +148,7 @@ export async function sendPushToUser(
                   actionType: payload.actionType || 'reminder',
                   targetUrl: payload.targetUrl || '/app/home',
                   checkinId: payload.checkinId || '',
+                  photoUrl: payload.photoUrl || '',
                 },
                 android: {
                   priority: 'high',
@@ -191,6 +193,7 @@ export async function sendPushToUser(
             actionType: payload.actionType || 'reminder',
             targetUrl: payload.targetUrl || '/app/home',
             checkinId: payload.checkinId || '',
+            photoUrl: payload.photoUrl || '',
           },
           priority: 'high',
         };

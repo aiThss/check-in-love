@@ -52,6 +52,18 @@ private class LoveCheckBridge(private val context: Context) {
     fun updateWidget(streak: Int, partnerName: String) {
         LoveCheckWidgetProvider.updateWidgetData(context, streak, partnerName)
     }
+
+    @JavascriptInterface
+    fun updatePartnerCheckin(partnerName: String, checkinType: String, text: String, imageUrl: String?, timestamp: String?) {
+        LoveCheckQuickWidgetProvider.updatePartnerCheckin(
+            context,
+            partnerName,
+            checkinType,
+            text,
+            imageUrl,
+            timestamp
+        )
+    }
 }
 
 class MainActivity : ComponentActivity() {

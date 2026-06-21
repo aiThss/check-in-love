@@ -175,7 +175,16 @@ export function renderProfilePage(): HTMLElement {
   root.appendChild(settingsContainer);
 
   async function loadProfile() {
-    profileCard.innerHTML = `<div class="spinner" style="width:28px;height:28px;margin:16px 0;"></div>`;
+    const cachedUser = store.get().user;
+    const cachedCouple = store.get().couple;
+
+    if (cachedUser && cachedCouple) {
+      renderProfileCard({ user: cachedUser, couple: cachedCouple });
+      renderSettings({ user: cachedUser, couple: cachedCouple });
+    } else {
+      profileCard.innerHTML = `<div class="spinner" style="width:28px;height:28px;margin:16px 0;"></div>`;
+    }
+
     try {
       const res = await getMe();
       // Update local store
@@ -189,7 +198,9 @@ export function renderProfilePage(): HTMLElement {
 
     } catch (err) {
       const error = err as Error;
-      showToast('Không thể tải thông tin profile: ' + error.message, 'error');
+      if (!cachedUser || !cachedCouple) {
+        showToast('Không thể tải thông tin profile: ' + error.message, 'error');
+      }
     }
   }
 
@@ -243,14 +254,14 @@ export function renderProfilePage(): HTMLElement {
         cursor:pointer;
       " id="copy-code-container">
         <span style="color:var(--text-secondary);">Couple Code:</span>
-        <strong style="color:var(--accent);font-family:monospace;font-size:15px;letter-spacing:1px;">${couple.coupleCode}</strong>
+        <strong style="color:var(--accent);font-family:monospace;font-size:15px;letter-spacing:1px;">${couple.code}</strong>
         <span style="font-size:11px;color:var(--text-secondary);background:var(--border);padding:2px 6px;border-radius:4px;">Sao chép</span>
       </div>
     `;
 
     // Click to copy code
     profileCard.querySelector('#copy-code-container')?.addEventListener('click', () => {
-      navigator.clipboard.writeText(couple.coupleCode);
+      navigator.clipboard.writeText(couple.code);
       showToast('Đã sao chép couple code!', 'success');
     });
 

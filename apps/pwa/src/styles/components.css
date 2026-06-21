@@ -483,17 +483,16 @@ textarea.input {
   gap: var(--space-sm);
   background: var(--surface-solid);
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-lg);
   padding: 12px 20px;
   box-shadow: var(--shadow-elevated);
   font-size: 14px;
   font-weight: var(--font-weight-medium);
   pointer-events: all;
   animation: slideDown var(--duration-normal) var(--ease) forwards;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .toast-icon {

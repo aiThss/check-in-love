@@ -5,6 +5,10 @@ import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
+let cachedMemories: CheckIn[] = [];
+let cachedTotal = 0;
+let cachedTotalPages = 1;
+
 const MOOD_EMOJIS: Record<string, string> = {
   happy: '\u{1F60A}',
   love: '\u{1F970}',
@@ -238,7 +242,9 @@ export function renderMemoriesPage(): HTMLElement {
       <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.03em;">Kỷ niệm của hai đứa</h1>
       <p id="memories-count" style="font-size:13px;color:var(--text-secondary);">Đang tải khoảnh khắc...</p>
     </div>
-    <button id="refresh-btn" class="btn-icon" style="border-radius:50%;width:40px;height:40px;">\u{1F504}</button>
+    <button id="refresh-btn" class="btn-icon" style="border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;">
+      <lottie-player src="/icons8-refresh.json" background="transparent" speed="1.2" style="width: 22px; height: 22px;"></lottie-player>
+    </button>
   `;
   root.appendChild(header);
 
@@ -252,15 +258,25 @@ export function renderMemoriesPage(): HTMLElement {
   content.appendChild(grid);
 
   let currentPage = 1;
-  let totalPages = 1;
+  let totalPages = cachedTotalPages;
   let isLoading = false;
-  let allItems: CheckIn[] = [];
+  let allItems: CheckIn[] = [...cachedMemories];
 
   const loadMoreBtn = document.createElement('button');
   loadMoreBtn.className = 'btn-ghost';
   loadMoreBtn.style.cssText = 'width:100%;padding:12px;margin-top:12px;font-weight:600;display:none;';
   loadMoreBtn.textContent = 'Xem thêm khoảnh khắc';
   content.appendChild(loadMoreBtn);
+
+  if (cachedMemories.length > 0) {
+    // Render cache immediately
+    renderGrid(allItems);
+    const countEl = header.querySelector('#memories-count');
+    if (countEl) {
+      countEl.textContent = `${cachedTotal} khoảnh khắc đã ghi dấu`;
+    }
+    loadMoreBtn.style.display = currentPage < totalPages ? 'block' : 'none';
+  }
 
   async function reactToItem(item: CheckIn, type: ReactionType, refreshDetail?: () => void) {
     try {
@@ -306,7 +322,13 @@ export function renderMemoriesPage(): HTMLElement {
     if (isLoading) return;
     isLoading = true;
 
-    if (page === 1 && !append) {
+    const player = header.querySelector('lottie-player');
+    if (player) {
+      player.setAttribute('loop', 'true');
+      (player as any).play?.();
+    }
+
+    if (page === 1 && !append && cachedMemories.length === 0) {
       grid.innerHTML = `
         <div class="skeleton" style="height:170px;border-radius:20px;"></div>
         <div class="skeleton" style="height:170px;border-radius:20px;"></div>
@@ -318,12 +340,21 @@ export function renderMemoriesPage(): HTMLElement {
     try {
       const res = await getCheckins(page, 14);
       isLoading = false;
+      if (player) {
+        player.removeAttribute('loop');
+        (player as any).stop?.();
+      }
 
       const items = res.data || [];
       currentPage = res.page;
       totalPages = Math.ceil(res.total / res.limit);
 
       allItems = page === 1 ? items : [...allItems, ...items];
+      if (page === 1) {
+        cachedMemories = items;
+        cachedTotal = res.total;
+        cachedTotalPages = totalPages;
+      }
       renderGrid(allItems);
 
       const countEl = header.querySelector('#memories-count');
@@ -335,6 +366,10 @@ export function renderMemoriesPage(): HTMLElement {
     } catch (err) {
       const error = err as Error;
       isLoading = false;
+      if (player) {
+        player.removeAttribute('loop');
+        (player as any).stop?.();
+      }
       showToast('Không thể tải kỷ niệm: ' + error.message, 'error');
     }
   }

@@ -287,6 +287,7 @@ export default async function checkinsRoutes(
             senderAvatar: user.avatarUrl,
             actionType: 'checkin',
             targetUrl: '/app/home',
+            photoUrl: checkInData.imageUrl || '',
           }).catch((err) => {
             app.log.error({ err }, 'Failed to send push notification');
           });

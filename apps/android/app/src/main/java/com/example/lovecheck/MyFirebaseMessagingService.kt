@@ -54,6 +54,18 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         // Update home screen widget on new checkins or message interactions
         if (actionType == "checkin" || actionType == "reaction" || actionType == "reply") {
             LoveCheckWidgetProvider.updateWidgetNotification(this, senderName, title, body, targetUrl)
+
+            if (actionType == "checkin") {
+                val photoUrl = data["photoUrl"]
+                LoveCheckQuickWidgetProvider.updatePartnerCheckin(
+                    this,
+                    senderName,
+                    if (!photoUrl.isNullOrEmpty()) "photo" else "text",
+                    body,
+                    photoUrl,
+                    null
+                )
+            }
         }
     }
 

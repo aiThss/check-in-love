@@ -126,12 +126,20 @@ function mapCheckin(item: RawCheckIn): CheckIn {
   };
 }
 
+let cachedLatestPartnerCheckin: CheckIn | null = null;
+
+export function getCachedLatestPartnerCheckin(): CheckIn | null {
+  return cachedLatestPartnerCheckin;
+}
+
 export async function getLatestPartnerCheckin(): Promise<CheckIn | null> {
   try {
     const res = await apiFetch<{ checkIn: RawCheckIn | null }>('/checkins/latest-partner');
-    return res && res.checkIn ? mapCheckin(res.checkIn) : null;
+    const checkin = res && res.checkIn ? mapCheckin(res.checkIn) : null;
+    cachedLatestPartnerCheckin = checkin;
+    return checkin;
   } catch {
-    return null;
+    return cachedLatestPartnerCheckin;
   }
 }
 

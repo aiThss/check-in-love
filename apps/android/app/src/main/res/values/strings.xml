@@ -2,6 +2,6 @@
     <string name="app_name">Check IN Love</string>
     <string name="widget_name">Check IN Love Streak</string>
     <string name="widget_description">Hien thi streak va mo nhanh man gui check-in</string>
-    <string name="quick_widget_name">Check IN Love Quick</string>
-    <string name="quick_widget_description">Nut mo nhanh man hinh gui check-in moi</string>
+    <string name="quick_widget_name">Check IN Love Partner</string>
+    <string name="quick_widget_description">Hien thi check-in va anh moi nhat cua doi phuong</string>
 </resources>
