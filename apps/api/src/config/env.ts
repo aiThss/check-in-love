@@ -38,6 +38,8 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   FCM_SERVER_KEY: z.string().optional(),
+  FCM_SERVICE_ACCOUNT_FILE: z.string().optional(),
+  FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
 });
 
 function parseEnv() {
