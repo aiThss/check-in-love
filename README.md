@@ -245,6 +245,7 @@ Có thể build APK wrapper bằng Bubblewrap hoặc PWABuilder sau khi PWA đã
 | `VAPID_EMAIL` | Email thuần cho VAPID, ví dụ `admin@example.com` | ❌ |
 | `GMAIL_USER` | Gmail gửi OTP email | ❌ |
 | `GMAIL_APP_PASSWORD` | Gmail app password gửi OTP email | ❌ |
+| `FCM_SERVER_KEY` | Firebase Cloud Messaging Server Key (Legacy HTTP Key) | ❌ |
 
 ### Generate VAPID keys (nếu muốn Web Push):
 ```bash
@@ -252,6 +253,13 @@ npx web-push generate-vapid-keys
 ```
 
 `VAPID_EMAIL` nhập email thuần, không thêm `mailto:` vì backend sẽ tự thêm prefix này.
+
+### Cấu hình FCM (Firebase Cloud Messaging) Server Key (cho Android APK):
+1. Truy cập [Firebase Console](https://console.firebase.google.com/).
+2. Chọn project Firebase của bạn.
+3. Nhấp vào biểu tượng Bánh răng (Project Settings) ở menu bên trái -> Chọn tab **Cloud Messaging**.
+4. Tại phần **Cloud Messaging API (Legacy)**, nếu trạng thái là **Disabled**, nhấp vào dấu 3 chấm -> Chọn **Manage API in Google Cloud Console** -> Nhấp nút **Enable**.
+5. Quay lại trang Firebase Console, tải lại trang, bạn sẽ thấy **Server key** xuất hiện. Copy chuỗi khóa này và cấu hình vào `.env` ở biến `FCM_SERVER_KEY`.
 
 ---
 
