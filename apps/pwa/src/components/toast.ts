@@ -18,7 +18,7 @@ function getContainer(): HTMLElement {
 const ICONS: Record<ToastType, string> = {
   success: `<lottie-player src="/icons8-correct.json" background="transparent" speed="1.2" style="width: 28px; height: 28px;" autoplay></lottie-player>`,
   error: `<img src="/icons8-error.gif" style="width: 28px; height: 28px; object-fit: contain;" alt="error" />`,
-  info: `<lottie-player src="/icons8-info.json" background="transparent" speed="1" style="width: 28px; height: 28px;" autoplay loop></lottie-player>`,
+  info: `<img src="/icons8-waiting.gif" style="width: 28px; height: 28px; object-fit: contain;" alt="info" />`,
 };
 
 export function showToast(message: string, type: ToastType = 'info'): void {
