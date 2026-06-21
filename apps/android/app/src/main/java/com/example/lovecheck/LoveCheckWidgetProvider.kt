@@ -26,13 +26,38 @@ class LoveCheckWidgetProvider : AppWidgetProvider() {
         private const val KEY_PARTNER_NAME = "partner_name"
         private const val CHECKIN_URL = "https://couple.babyress.games/app/checkin"
 
+        private const val KEY_LATEST_SENDER = "latest_sender"
+        private const val KEY_LATEST_TITLE = "latest_title"
+        private const val KEY_LATEST_BODY = "latest_body"
+        private const val KEY_LATEST_URL = "latest_url"
+
         fun updateWidgetData(context: Context, streak: Int, partnerName: String) {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putInt(KEY_STREAK, streak.coerceAtLeast(0))
                 .putString(KEY_PARTNER_NAME, partnerName)
+                .remove(KEY_LATEST_SENDER)
+                .remove(KEY_LATEST_TITLE)
+                .remove(KEY_LATEST_BODY)
+                .remove(KEY_LATEST_URL)
                 .apply()
 
+            triggerWidgetUpdate(context)
+        }
+
+        fun updateWidgetNotification(context: Context, senderName: String, title: String, body: String, targetUrl: String) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_LATEST_SENDER, senderName)
+                .putString(KEY_LATEST_TITLE, title)
+                .putString(KEY_LATEST_BODY, body)
+                .putString(KEY_LATEST_URL, targetUrl)
+                .apply()
+
+            triggerWidgetUpdate(context)
+        }
+
+        private fun triggerWidgetUpdate(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(
                 ComponentName(context, LoveCheckWidgetProvider::class.java)
@@ -54,15 +79,28 @@ class LoveCheckWidgetProvider : AppWidgetProvider() {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val streak = prefs.getInt(KEY_STREAK, 0)
             val partnerName = prefs.getString(KEY_PARTNER_NAME, "").orEmpty()
-            val subtitle = if (partnerName.isBlank()) {
-                "Nhan + de gui check-in"
+
+            val latestSender = prefs.getString(KEY_LATEST_SENDER, null)
+            val latestBody = prefs.getString(KEY_LATEST_BODY, null)
+            val latestUrl = prefs.getString(KEY_LATEST_URL, null)
+
+            val subtitle = if (!latestBody.isNullOrBlank()) {
+                if (!latestSender.isNullOrBlank()) "$latestSender: $latestBody" else latestBody
+            } else if (partnerName.isBlank()) {
+                "Nhấn + để gửi check-in"
             } else {
-                "Gui check-in cho $partnerName"
+                "Gửi check-in cho $partnerName"
+            }
+
+            val launchUrl = if (!latestUrl.isNullOrBlank()) {
+                "https://couple.babyress.games$latestUrl"
+            } else {
+                CHECKIN_URL
             }
 
             val launchIntent = Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
-                data = Uri.parse(CHECKIN_URL)
+                data = Uri.parse(launchUrl)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
             val pendingIntent = PendingIntent.getActivity(
