@@ -40,6 +40,9 @@ const envSchema = z.object({
   FCM_SERVER_KEY: z.string().optional(),
   FCM_SERVICE_ACCOUNT_FILE: z.string().optional(),
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
 });
 
 function parseEnv() {

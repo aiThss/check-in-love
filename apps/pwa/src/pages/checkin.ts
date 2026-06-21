@@ -162,8 +162,8 @@ export function renderCheckinPage(): HTMLElement {
     try {
       const result = await processImage(sourceFile, {
         aspectRatio: PHOTO_ASPECT_RATIO,
-        maxSize: 900,
-        quality: 0.76,
+        maxSize: 1080,
+        quality: 0.85,
       });
 
       revokePreviewUrl(selectedPreviewUrl);

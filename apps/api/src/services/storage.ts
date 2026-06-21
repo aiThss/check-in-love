@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { v2 as cloudinary } from 'cloudinary';
 import { env } from '../config/env';
 
 export interface StorageService {
@@ -73,7 +74,63 @@ class LocalStorageService implements StorageService {
   }
 }
 
-export const storageService: StorageService = new LocalStorageService(
-  env.UPLOAD_DIR,
-  env.PUBLIC_BASE_URL,
-);
+class CloudinaryStorageService implements StorageService {
+  constructor(cloudName: string, apiKey: string, apiSecret: string) {
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
+  }
+
+  async saveFile(
+    buffer: Buffer,
+    _filename: string,
+    _mimeType: string,
+  ): Promise<{ url: string; storagePath: string }> {
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'check-in-love',
+        },
+        (error, result) => {
+          if (error || !result) {
+            reject(error || new Error('Upload to Cloudinary failed'));
+            return;
+          }
+          resolve({
+            url: result.secure_url,
+            storagePath: result.public_id,
+          });
+        }
+      );
+      uploadStream.end(buffer);
+    });
+  }
+
+  async deleteFile(storagePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader.destroy(storagePath, (error, result) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+}
+
+const isCloudinaryConfigured =
+  env.CLOUDINARY_CLOUD_NAME &&
+  env.CLOUDINARY_API_KEY &&
+  env.CLOUDINARY_API_SECRET;
+
+export const storageService: StorageService = isCloudinaryConfigured
+  ? new CloudinaryStorageService(
+      env.CLOUDINARY_CLOUD_NAME!,
+      env.CLOUDINARY_API_KEY!,
+      env.CLOUDINARY_API_SECRET!,
+    )
+  : new LocalStorageService(env.UPLOAD_DIR, env.PUBLIC_BASE_URL);
