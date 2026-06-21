@@ -347,7 +347,7 @@ export function renderHomePage(): HTMLElement {
   });
 
   const refreshBtn = document.createElement('button');
-  refreshBtn.className = 'btn-icon';
+  refreshBtn.className = 'btn-icon refresh-btn';
   refreshBtn.setAttribute('aria-label', 'Làm mới');
   refreshBtn.innerHTML = `<lottie-player src="/icons8-refresh.json" background="transparent" speed="1.2" style="width: 22px; height: 22px;"></lottie-player>`;
   refreshBtn.addEventListener('click', () => loadCheckin());
@@ -452,6 +452,7 @@ export function renderHomePage(): HTMLElement {
       contentArea.appendChild(renderSkeleton());
     }
 
+    refreshBtn.classList.add('loading');
     const player = refreshBtn.querySelector('lottie-player');
     if (player) {
       player.setAttribute('loop', 'true');
@@ -461,6 +462,7 @@ export function renderHomePage(): HTMLElement {
     try {
       const checkin = await getLatestPartnerCheckin();
       contentArea.innerHTML = '';
+      refreshBtn.classList.remove('loading');
       if (player) {
         player.removeAttribute('loop');
         (player as any).stop?.();

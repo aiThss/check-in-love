@@ -242,7 +242,7 @@ export function renderMemoriesPage(): HTMLElement {
       <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.03em;">Kỷ niệm của hai đứa</h1>
       <p id="memories-count" style="font-size:13px;color:var(--text-secondary);">Đang tải khoảnh khắc...</p>
     </div>
-    <button id="refresh-btn" class="btn-icon" style="border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;">
+    <button id="refresh-btn" class="btn-icon refresh-btn" style="border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;">
       <lottie-player src="/icons8-refresh.json" background="transparent" speed="1.2" style="width: 22px; height: 22px;"></lottie-player>
     </button>
   `;
@@ -322,6 +322,9 @@ export function renderMemoriesPage(): HTMLElement {
     if (isLoading) return;
     isLoading = true;
 
+    const refreshBtn = header.querySelector('#refresh-btn');
+    if (refreshBtn) refreshBtn.classList.add('loading');
+
     const player = header.querySelector('lottie-player');
     if (player) {
       player.setAttribute('loop', 'true');
@@ -340,6 +343,8 @@ export function renderMemoriesPage(): HTMLElement {
     try {
       const res = await getCheckins(page, 14);
       isLoading = false;
+      const refreshBtn = header.querySelector('#refresh-btn');
+      if (refreshBtn) refreshBtn.classList.remove('loading');
       if (player) {
         player.removeAttribute('loop');
         (player as any).stop?.();
@@ -366,6 +371,8 @@ export function renderMemoriesPage(): HTMLElement {
     } catch (err) {
       const error = err as Error;
       isLoading = false;
+      const refreshBtn = header.querySelector('#refresh-btn');
+      if (refreshBtn) refreshBtn.classList.remove('loading');
       if (player) {
         player.removeAttribute('loop');
         (player as any).stop?.();
