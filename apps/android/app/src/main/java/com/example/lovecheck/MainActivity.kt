@@ -349,14 +349,29 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showUpdateDialog(version: String, url: String) {
-        AlertDialog.Builder(this)
-            .setTitle("Cập nhật phiên bản mới")
-            .setMessage("Có phiên bản mới (v$version). Bạn có muốn tải xuống và cập nhật ngay không?")
-            .setPositiveButton("Có") { _, _ ->
-                downloadAndInstallApk(url)
-            }
-            .setNegativeButton("Để sau", null)
-            .show()
+        val dialogView = layoutInflater.inflate(R.layout.dialog_update, null)
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val txtMessage = dialogView.findViewById<android.widget.TextView>(R.id.dialog_message)
+        txtMessage.text = "Có phiên bản mới (v$version). Bạn có muốn tải xuống và cập nhật ngay không?"
+
+        val btnCancel = dialogView.findViewById<android.widget.Button>(R.id.btn_cancel)
+        val btnUpdate = dialogView.findViewById<android.widget.Button>(R.id.btn_update)
+
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        btnUpdate.setOnClickListener {
+            downloadAndInstallApk(url)
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     private fun downloadAndInstallApk(apkUrl: String) {
