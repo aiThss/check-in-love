@@ -158,6 +158,11 @@ MAX_UPLOAD_MB=10
 ALLOWED_ORIGINS=https://couple.babyress.games,https://admin.couple.babyress.games
 VITE_API_URL=https://api.couple.babyress.games/api
 ADMIN_ENABLE_TEST_RESET=true
+VAPID_PUBLIC_KEY=<web_push_public_key>
+VAPID_PRIVATE_KEY=<web_push_private_key>
+VAPID_EMAIL=admin@example.com
+GMAIL_USER=<gmail_address_optional_for_email_otp>
+GMAIL_APP_PASSWORD=<gmail_app_password_optional_for_email_otp>
 ```
 
 ### 6. Volumes trong Dokploy
@@ -203,7 +208,7 @@ Vì iPhone không cho cài APK và không có Apple Developer account:
 4. App sẽ xuất hiện trên Home Screen như app native
 5. Mở app từ Home Screen → chạy ở chế độ fullscreen, không có thanh URL
 
-> **Lưu ý iOS:** Push notification không được support trên iOS PWA (giới hạn của Apple). App dùng badge "Có check-in mới" làm fallback.
+> **Lưu ý iOS:** Web Push chỉ hoạt động khi mở app từ icon đã Add to Home Screen và người dùng bấm cho phép thông báo trong app.
 
 ---
 
@@ -233,14 +238,20 @@ Có thể build APK wrapper bằng Bubblewrap hoặc PWABuilder sau khi PWA đã
 | `UPLOAD_DIR` | Thư mục lưu ảnh trong container | ✅ |
 | `MAX_UPLOAD_MB` | Giới hạn upload MB (default: 10) | ❌ |
 | `ALLOWED_ORIGINS` | CORS whitelist, phân cách bằng dấu phẩy | ✅ |
-| `VAPID_PUBLIC_KEY` | Web Push VAPID public key | ❌ |
-| `VAPID_PRIVATE_KEY` | Web Push VAPID private key | ❌ |
-| `VAPID_EMAIL` | Email cho VAPID | ❌ |
+| `VITE_API_URL` | API URL build-time cho PWA/Admin | ✅ |
+| `ADMIN_ENABLE_TEST_RESET` | Bật endpoint reset/xóa dữ liệu test trong admin | ❌ |
+| `VAPID_PUBLIC_KEY` | Web Push VAPID public key, cần cho push iOS/Android PWA | ❌ |
+| `VAPID_PRIVATE_KEY` | Web Push VAPID private key, cần cho push iOS/Android PWA | ❌ |
+| `VAPID_EMAIL` | Email thuần cho VAPID, ví dụ `admin@example.com` | ❌ |
+| `GMAIL_USER` | Gmail gửi OTP email | ❌ |
+| `GMAIL_APP_PASSWORD` | Gmail app password gửi OTP email | ❌ |
 
 ### Generate VAPID keys (nếu muốn Web Push):
 ```bash
 npx web-push generate-vapid-keys
 ```
+
+`VAPID_EMAIL` nhập email thuần, không thêm `mailto:` vì backend sẽ tự thêm prefix này.
 
 ---
 
@@ -302,10 +313,13 @@ docker exec -i checkinlove_mongo mongorestore \
 | GET | `/api/checkins` | JWT | Danh sách check-ins |
 | POST | `/api/checkins` | JWT | Tạo check-in |
 | POST | `/api/checkins/:id/reactions` | JWT | React |
+| POST | `/api/checkins/:id/replies` | JWT | Reply check-in |
 | DELETE | `/api/checkins/:id` | JWT | Xóa |
 | GET | `/api/random/categories` | JWT | Danh mục random |
 | POST | `/api/random/draw` | JWT | Bốc prompt |
+| GET | `/api/push/config` | - | Lấy VAPID public key |
 | POST | `/api/push/subscribe` | JWT | Đăng ký push |
+| POST | `/api/push/unsubscribe` | JWT | Hủy đăng ký push |
 | POST | `/api/admin/login` | - | Admin login |
 | GET | `/api/admin/summary` | Admin JWT | Dashboard stats |
 | GET | `/api/admin/users` | Admin JWT | Danh sách users |
