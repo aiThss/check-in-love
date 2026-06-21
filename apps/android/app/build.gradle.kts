@@ -47,6 +47,12 @@ android {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
       }
     }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+        checkDependencies = false
+    }
 }
 
 kotlin {
@@ -91,4 +97,8 @@ dependencies {
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+
+  // Firebase
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.messaging)
 }

@@ -147,3 +147,43 @@ export async function getPushSetupState(): Promise<PushSetupResult> {
 
   return { status: 'prompt' };
 }
+
+export async function registerFcmToken(fcmToken: string): Promise<void> {
+  await apiFetch<void>('/push/subscribe-fcm', {
+    method: 'POST',
+    body: JSON.stringify({ fcmToken }),
+  });
+}
+
+declare global {
+  interface Window {
+    LoveCheckAndroid?: {
+      updateWidget?: (streak: number, partnerName: string) => void;
+      getFcmToken?: () => string;
+    };
+    onFcmTokenReceived?: (token: string) => void;
+  }
+}
+
+export function setupAndroidFcm(): void {
+  // Lắng nghe sự kiện callback từ native
+  window.onFcmTokenReceived = (token: string) => {
+    if (token) {
+      registerFcmToken(token).catch((err) => {
+        console.warn('[FCM] Register fcm token failed:', err);
+      });
+    }
+  };
+
+  // Chủ động lấy token nếu bridge đã sẵn sàng
+  try {
+    const token = window.LoveCheckAndroid?.getFcmToken?.();
+    if (token) {
+      registerFcmToken(token).catch((err) => {
+        console.warn('[FCM] Pull and register fcm token failed:', err);
+      });
+    }
+  } catch (_err) {
+    // Ignore if bridge is not loaded yet
+  }
+}

@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { env } from '../config/env';
 import { PushSubscription } from '../db/models/PushSubscription';
+import { User } from '../db/models/User';
 import { authenticate } from '../middleware/auth';
 
 const subscribeBodySchema = z.object({
@@ -80,6 +81,62 @@ export default async function pushRoutes(app: FastifyInstance): Promise<void> {
         endpoint,
         userId: new Types.ObjectId(request.user.id),
       });
+
+      return reply.status(200).send({ success: true });
+    },
+  );
+
+  const subscribeFcmBodySchema = z.object({
+    fcmToken: z.string().min(1),
+  });
+
+  /**
+   * POST /push/subscribe-fcm — Register FCM token
+   */
+  app.post(
+    '/push/subscribe-fcm',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const parsed = subscribeFcmBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: parsed.error.errors[0].message,
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      const { fcmToken } = parsed.data;
+
+      await User.findByIdAndUpdate(
+        request.user.id,
+        { $addToSet: { fcmTokens: fcmToken } }
+      );
+
+      return reply.status(200).send({ success: true });
+    },
+  );
+
+  /**
+   * POST /push/unsubscribe-fcm — Unregister FCM token
+   */
+  app.post(
+    '/push/unsubscribe-fcm',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const parsed = subscribeFcmBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: parsed.error.errors[0].message,
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      const { fcmToken } = parsed.data;
+
+      await User.findByIdAndUpdate(
+        request.user.id,
+        { $pull: { fcmTokens: fcmToken } }
+      );
 
       return reply.status(200).send({ success: true });
     },

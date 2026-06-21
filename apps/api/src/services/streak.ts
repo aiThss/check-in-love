@@ -2,6 +2,20 @@ import { Types } from 'mongoose';
 import { CheckIn } from '../db/models/CheckIn';
 import { Couple } from '../db/models/Couple';
 
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7
+
+/**
+ * Returns the start of the day in Vietnam (UTC+7) as a UTC timestamp.
+ */
+function getVNStartOfDay(date: Date): number {
+  const vnTime = new Date(date.getTime() + VN_OFFSET_MS);
+  return Date.UTC(
+    vnTime.getUTCFullYear(),
+    vnTime.getUTCMonth(),
+    vnTime.getUTCDate()
+  );
+}
+
 /**
  * Recalculates and persists the streak for a couple after a new check-in.
  * Returns the updated streak value.
@@ -29,8 +43,8 @@ export async function updateStreak(coupleId: string): Promise<number> {
   }
 
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterdayStart = new Date(todayStart.getTime() - 86_400_000);
+  const todayStart = getVNStartOfDay(now);
+  const yesterdayStart = todayStart - 86_400_000;
 
   const lastCheckinDate = couple.lastCheckinDate;
 
@@ -40,16 +54,12 @@ export async function updateStreak(coupleId: string): Promise<number> {
     // First ever check-in
     newStreak = 1;
   } else {
-    const lastDay = new Date(
-      lastCheckinDate.getFullYear(),
-      lastCheckinDate.getMonth(),
-      lastCheckinDate.getDate(),
-    );
+    const lastDay = getVNStartOfDay(lastCheckinDate);
 
-    if (lastDay.getTime() === todayStart.getTime()) {
+    if (lastDay === todayStart) {
       // Already checked in today; maintain streak
       newStreak = couple.streak;
-    } else if (lastDay.getTime() === yesterdayStart.getTime()) {
+    } else if (lastDay === yesterdayStart) {
       // Checked in yesterday; increment streak
       newStreak = couple.streak + 1;
     } else {

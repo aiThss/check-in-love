@@ -17,7 +17,9 @@ declare global {
   interface Window {
     LoveCheckAndroid?: {
       updateWidget?: (streak: number, partnerName: string) => void;
+      getFcmToken?: () => string;
     };
+    onFcmTokenReceived?: (token: string) => void;
   }
 }
 

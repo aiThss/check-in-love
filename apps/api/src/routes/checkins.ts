@@ -283,6 +283,10 @@ export default async function checkinsRoutes(
             tag: `checkin-${checkIn._id.toString()}`,
             kind: 'checkin',
             checkinId: checkIn._id.toString(),
+            senderName: user.displayName,
+            senderAvatar: user.avatarUrl,
+            actionType: 'checkin',
+            targetUrl: '/app/home',
           }).catch((err) => {
             app.log.error({ err }, 'Failed to send push notification');
           });
@@ -356,6 +360,10 @@ export default async function checkinsRoutes(
           tag: `reaction-${checkIn._id.toString()}`,
           kind: 'reaction',
           checkinId: checkIn._id.toString(),
+          senderName: reactor?.displayName || 'Người ấy',
+          senderAvatar: reactor?.avatarUrl,
+          actionType: 'reaction',
+          targetUrl: '/app/memories',
         }).catch((err) => {
           app.log.error({ err }, 'Failed to send reaction push notification');
         });
@@ -420,6 +428,10 @@ export default async function checkinsRoutes(
           tag: `reply-${checkIn._id.toString()}`,
           kind: 'reply',
           checkinId: checkIn._id.toString(),
+          senderName: user.displayName,
+          senderAvatar: user.avatarUrl,
+          actionType: 'reply',
+          targetUrl: '/app/memories',
         }).catch((err) => {
           app.log.error({ err }, 'Failed to send reply push notification');
         });

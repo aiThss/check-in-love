@@ -497,18 +497,12 @@ textarea.input {
 }
 
 .toast-icon {
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
-}
-
-.toast-success .toast-icon::before {
-  content: '✅';
-}
-.toast-error .toast-icon::before {
-  content: '❌';
-}
-.toast-info .toast-icon::before {
-  content: 'ℹ️';
 }
 
 .toast-exit {

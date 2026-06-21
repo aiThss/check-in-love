@@ -37,6 +37,7 @@ const envSchema = z.object({
     .optional()
     .default('false')
     .transform((v) => v === 'true'),
+  FCM_SERVER_KEY: z.string().optional(),
 });
 
 function parseEnv() {

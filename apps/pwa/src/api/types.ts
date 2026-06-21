@@ -1,29 +1,20 @@
-// Shared types used across API modules
+import type {
+  CheckInType as SharedCheckInType,
+  MoodType as SharedMoodType,
+  User as SharedUser,
+} from '@checkinlove/shared';
 
+export type CheckInType = SharedCheckInType;
 export type ReactionType = string;
 
 export type MoodType =
-  | 'happy'
+  | SharedMoodType
   | 'love'
-  | 'sad'
   | 'excited'
-  | 'tired'
-  | 'calm'
-  | 'miss';
+  | 'calm';
 
-export type CheckInType = 'photo' | 'text' | 'mood';
-
-export interface User {
-  id: string;
+export interface User extends Omit<SharedUser, 'role' | 'status'> {
   deviceId: string;
-  displayName: string;
-  partnerName: string;
-  avatarUrl?: string;
-  partnerAvatarUrl?: string;
-  email?: string;
-  coupleId: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface Couple {

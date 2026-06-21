@@ -572,7 +572,7 @@ export function renderOnboardingPage(): HTMLElement {
         statusMsg.style.color = '#4ade80';
         statusMsg.textContent = '✓ Email đã được xác thực!';
 
-        showToast('✓ Xác thực thành công!', 'success');
+        showToast('Xác thực thành công!', 'success');
         setTimeout(() => {
           currentStep++;
           renderCurrentStep();

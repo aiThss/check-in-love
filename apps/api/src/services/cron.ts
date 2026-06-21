@@ -1,6 +1,8 @@
 import cron from 'node-cron';
 import { PushSubscription } from '../db/models/PushSubscription';
+import { CheckIn } from '../db/models/CheckIn';
 import { sendPushToUser } from './push';
+import { storageService } from './storage';
 
 const MESSAGES = {
   m7: [
@@ -37,12 +39,52 @@ async function broadcastPush(message: string) {
       sendPushToUser(userId.toString(), {
         title: 'Check IN Love 💕',
         body: message,
+        senderName: 'Check IN Love',
+        actionType: 'reminder',
+        targetUrl: '/app/home',
       }),
     );
     await Promise.allSettled(tasks);
     console.log(`[cron] Broadcasted push to ${subs.length} users: ${message}`);
   } catch (err) {
     console.error('[cron] Error broadcasting push:', err);
+  }
+}
+
+/**
+ * Clean up files and records of check-ins that were soft-deleted more than 30 days ago.
+ */
+async function cleanupDeletedCheckins(): Promise<void> {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Find check-ins soft-deleted more than 30 days ago
+    const expiredCheckins = await CheckIn.find({
+      deletedAt: { $lt: thirtyDaysAgo },
+    });
+
+    if (expiredCheckins.length === 0) {
+      return;
+    }
+
+    console.log(`[cron] Found ${expiredCheckins.length} expired check-ins to clean up.`);
+
+    for (const checkin of expiredCheckins) {
+      if (checkin.storagePath) {
+        try {
+          await storageService.deleteFile(checkin.storagePath);
+          console.log(`[cron] Deleted physical file for check-in: ${checkin._id} (${checkin.storagePath})`);
+        } catch (fileErr) {
+          console.error(`[cron] Failed to delete physical file for check-in ${checkin._id}:`, fileErr);
+        }
+      }
+      // Delete document from database
+      await CheckIn.deleteOne({ _id: checkin._id });
+    }
+
+    console.log(`[cron] Completed physical cleanup for ${expiredCheckins.length} check-ins.`);
+  } catch (err) {
+    console.error('[cron] Error during check-in cleanup:', err);
   }
 }
 
@@ -67,5 +109,12 @@ export function initCronJobs() {
     broadcastPush(getRandomMessage('m23'));
   }, { timezone: "Asia/Ho_Chi_Minh" });
 
-  console.log('[cron] Scheduled push notification jobs initialized.');
+  // 3:00 AM: Clean up soft-deleted checkins
+  cron.schedule('0 3 * * *', () => {
+    cleanupDeletedCheckins().catch((err) => {
+      console.error('[cron] Failed to run cleanupDeletedCheckins job:', err);
+    });
+  }, { timezone: "Asia/Ho_Chi_Minh" });
+
+  console.log('[cron] Scheduled push notification and cleanup jobs initialized.');
 }

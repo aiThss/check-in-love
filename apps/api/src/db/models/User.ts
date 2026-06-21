@@ -9,6 +9,7 @@ export interface UserDocument extends Document {
   avatarUrl?: string;
   partnerAvatarUrl?: string;
   trustedDevices: string[];
+  fcmTokens?: string[];
   role: 'user' | 'admin';
   status: 'active' | 'blocked';
   coupleId: Types.ObjectId;
@@ -25,6 +26,7 @@ const UserSchema = new Schema<UserDocument>(
     avatarUrl: { type: String, required: false },
     partnerAvatarUrl: { type: String, required: false },
     trustedDevices: { type: [String], default: [] },
+    fcmTokens: { type: [String], default: [] },
     role: {
       type: String,
       enum: ['user', 'admin'],

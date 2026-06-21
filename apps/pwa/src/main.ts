@@ -11,7 +11,7 @@ import { renderCheckinPage } from './pages/checkin';
 import { renderMemoriesPage } from './pages/memories';
 import { renderRandomPage } from './pages/random';
 import { renderProfilePage } from './pages/profile';
-import { ensurePushSubscription } from './api/push';
+import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 
 // ─── Apply Theme ─────────────────────────────────────────────────────────────
 function applyTheme() {
@@ -25,6 +25,7 @@ function applyTheme() {
 
 applyTheme();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+setupAndroidFcm();
 
 // ─── Service Worker ───────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {

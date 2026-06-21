@@ -164,7 +164,14 @@ async function syncPendingCheckins() {
 
 // ── Push Notifications ───────────────────────────────────────
 self.addEventListener('push', (event) => {
-  let data = { title: 'LoveCheck 💕', body: 'Người ấy vừa gửi check-in mới!' };
+  let data = {
+    title: 'Check IN Love 💕',
+    body: 'Có tương tác mới!',
+    senderName: '',
+    senderAvatar: '',
+    actionType: 'reminder',
+    targetUrl: '/app/home'
+  };
 
   if (event.data) {
     try {
@@ -174,16 +181,36 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  // Normalize fields between legacy and new structure
+  const actionType = data.actionType || data.kind || 'reminder';
+  const targetUrl = data.targetUrl || data.url || '/app/home';
+  const senderName = data.senderName || 'Người ấy';
+  const senderAvatar = data.senderAvatar || data.icon || '/icons/icon-512.png';
+
+  let displayTitle = data.title;
+  let displayBody = data.body;
+
+  if (actionType === 'reaction') {
+    displayTitle = `${senderName} đã bày tỏ cảm xúc`;
+    displayBody = displayBody || 'Đã react check-in của bạn';
+  } else if (actionType === 'reply') {
+    displayTitle = `${senderName} đã phản hồi check-in`;
+    displayBody = displayBody;
+  } else if (actionType === 'checkin') {
+    displayTitle = `${senderName} đã gửi check-in mới! 💕`;
+    displayBody = displayBody || 'Mở app xem ngay nhé!';
+  }
+
   const options = {
-    body: data.body,
-    icon: data.icon || '/icons/icon-512.png',
-    badge: data.badge || '/icons/icon-192.png',
-    tag: data.tag || 'check-in-love',
+    body: displayBody,
+    icon: senderAvatar,
+    badge: '/icons/badge.svg',
+    tag: data.tag || `lovecheck-${actionType}`,
     renotify: true,
     vibrate: [100, 50, 100],
     data: {
-      url: data.url || '/app/home',
-      kind: data.kind,
+      url: targetUrl,
+      kind: actionType,
       checkinId: data.checkinId,
       dateOfArrival: Date.now(),
     },
@@ -193,7 +220,7 @@ self.addEventListener('push', (event) => {
     ],
   };
 
-  event.waitUntil(self.registration.showNotification(data.title, options));
+  event.waitUntil(self.registration.showNotification(displayTitle, options));
 });
 
 // Handle notification click

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="firebase_api_key">YOUR_API_KEY</string>
+    <string name="firebase_application_id">YOUR_APP_ID</string>
+    <string name="firebase_project_id">YOUR_PROJECT_ID</string>
+    <string name="firebase_gcm_sender_id">YOUR_SENDER_ID</string>
+    <color name="notification_color">#FF3B7F</color>
+</resources>

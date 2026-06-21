@@ -40,6 +40,12 @@ import java.util.Date
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 import org.json.JSONObject
+import android.os.Build
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.messaging.FirebaseMessaging
+import android.app.NotificationChannel
+import android.app.NotificationManager
 
 private class LoveCheckBridge(private val context: Context) {
     @JavascriptInterface
@@ -54,6 +60,17 @@ class MainActivity : ComponentActivity() {
     private var cameraPhotoUri: Uri? = null
     private var cameraPhotoFile: File? = null
     private var webView: WebView? = null
+
+    private val fcmReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val token = intent?.getStringExtra("token")
+            if (token != null) {
+                runOnUiThread {
+                    webView?.evaluateJavascript("if (typeof window.onFcmTokenReceived === 'function') { window.onFcmTokenReceived('$token'); }", null)
+                }
+            }
+        }
+    }
 
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -76,13 +93,31 @@ class MainActivity : ComponentActivity() {
         cameraPhotoFile = null
     }
 
-    private val cameraPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { _ -> }
-
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val filter = IntentFilter("com.example.lovecheck.FCM_TOKEN_UPDATE")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(fcmReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(fcmReceiver, filter)
+        }
+
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task: com.google.android.gms.tasks.Task<String> ->
+                if (task.isSuccessful) {
+                    val token = task.result
+                    val prefs = getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
+                    prefs.edit().putString("fcm_token", token).apply()
+                    runOnUiThread {
+                        webView?.evaluateJavascript("if (typeof window.onFcmTokenReceived === 'function') { window.onFcmTokenReceived('$token'); }", null)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -218,17 +253,6 @@ class MainActivity : ComponentActivity() {
 
     private fun buildCameraIntent(context: Context): Intent? {
         val captureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        val hasCameraPermission =
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val hasCameraApp = captureIntent.resolveActivity(packageManager) != null
-
-        if (!hasCameraPermission) {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            return null
-        }
-
-        if (!hasCameraApp) return null
-
         return try {
             val photoFile = createTempImageFile()
             val uri = FileProvider.getUriForFile(
@@ -270,6 +294,15 @@ class MainActivity : ComponentActivity() {
         } else {
             super.onBackPressed()
         }
+    }
+
+    override fun onDestroy() {
+        try {
+            unregisterReceiver(fcmReceiver)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        super.onDestroy()
     }
 
     private fun checkUpdate() {

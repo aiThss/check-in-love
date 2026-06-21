@@ -9,6 +9,13 @@ export interface ImageProcessOptions {
   quality?: number;
 }
 
+/**
+ * Checks if the current PWA is running inside the Android wrapper WebView.
+ */
+export function isAndroidApp(): boolean {
+  return navigator.userAgent.includes('LoveCheckAndroidWrapper');
+}
+
 function createFileInput(accept: string, capture?: string): HTMLInputElement {
   const input = document.createElement('input');
   input.type = 'file';
@@ -192,9 +199,172 @@ async function handleFileSelection(
   });
 }
 
-export function openCamera(onResult: (result: CameraResult) => void): void {
+function openCameraCapture(onResult: (result: CameraResult) => void): void {
   const input = createFileInput('image/*', 'environment');
   void handleFileSelection(input, onResult);
+}
+
+/**
+ * Fallback Web Camera using getUserMedia streaming into an overlay video player.
+ */
+async function openCameraStream(onResult: (result: CameraResult) => void): Promise<void> {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  `;
+
+  const video = document.createElement('video');
+  video.autoplay = true;
+  video.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+  // Required attribute flags for iOS Safari
+  video.setAttribute('playsinline', 'true');
+  video.setAttribute('webkit-playsinline', 'true');
+  overlay.appendChild(video);
+
+  const controls = document.createElement('div');
+  controls.style.cssText = `
+    position: absolute;
+    bottom: max(40px, calc(40px + var(--safe-bottom)));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 80%;
+    max-width: 400px;
+    z-index: 10000;
+  `;
+
+  const closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '✕';
+  closeBtn.type = 'button';
+  closeBtn.style.cssText = `
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.25);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+  controls.appendChild(closeBtn);
+
+  const captureBtn = document.createElement('button');
+  captureBtn.type = 'button';
+  captureBtn.style.cssText = `
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    border: 5px solid #fff;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+  const innerCircle = document.createElement('div');
+  innerCircle.style.cssText = 'width: 56px; height: 56px; border-radius: 50%; background: #fff;';
+  captureBtn.appendChild(innerCircle);
+  controls.appendChild(captureBtn);
+
+  // Balance layout placeholder
+  const placeholder = document.createElement('div');
+  placeholder.style.width = '50px';
+  controls.appendChild(placeholder);
+
+  overlay.appendChild(controls);
+  document.body.appendChild(overlay);
+
+  let localStream: MediaStream | null = null;
+
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1080 },
+        height: { ideal: 1080 }
+      },
+      audio: false
+    });
+    video.srcObject = localStream;
+  } catch (err) {
+    console.warn('[camera] getUserMedia failed, falling back to file capture:', err);
+    if (document.body.contains(overlay)) {
+      document.body.removeChild(overlay);
+    }
+    openCameraCapture(onResult);
+    return;
+  }
+
+  const stopStream = () => {
+    if (localStream) {
+      localStream.getTracks().forEach((track) => track.stop());
+      localStream = null;
+    }
+    if (document.body.contains(overlay)) {
+      document.body.removeChild(overlay);
+    }
+  };
+
+  closeBtn.addEventListener('click', stopStream);
+
+  captureBtn.addEventListener('click', async () => {
+    if (!video.videoWidth) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        async (blob) => {
+          if (blob) {
+            const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            try {
+              onResult(await processImage(file));
+            } catch {
+              onResult({
+                file,
+                preview: URL.createObjectURL(file),
+              });
+            }
+          }
+          stopStream();
+        },
+        'image/jpeg',
+        0.88,
+      );
+    } else {
+      stopStream();
+    }
+  });
+}
+
+/**
+ * Open device camera. If forceStream is true (not on Android app), falls back to getUserMedia web stream.
+ */
+export function openCamera(onResult: (result: CameraResult) => void, forceStream = false): void {
+  if (forceStream && !isAndroidApp() && typeof navigator.mediaDevices?.getUserMedia === 'function') {
+    void openCameraStream(onResult);
+  } else {
+    openCameraCapture(onResult);
+  }
 }
 
 export function openGallery(onResult: (result: CameraResult) => void): void {
