@@ -65,3 +65,6 @@ pubspec.lock
 .cache/
 tmp/
 temp/
+
+# Firebase local config
+google-services.json
