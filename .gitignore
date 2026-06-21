@@ -68,3 +68,6 @@ temp/
 
 # Firebase local config
 google-services.json
+check-in-love-firebase.json
+*-service-account.json
+firebase-service-account.json
