@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { v2 as cloudinary } from 'cloudinary';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { env } from '../config/env';
 
 export interface StorageService {
@@ -74,63 +74,96 @@ class LocalStorageService implements StorageService {
   }
 }
 
-class CloudinaryStorageService implements StorageService {
-  constructor(cloudName: string, apiKey: string, apiSecret: string) {
-    cloudinary.config({
-      cloud_name: cloudName,
-      api_key: apiKey,
-      api_secret: apiSecret,
-      secure: true,
+class R2StorageService implements StorageService {
+  private readonly s3Client: S3Client;
+  private readonly bucketName: string;
+  private readonly publicUrl: string;
+
+  constructor(
+    accountId: string,
+    accessKeyId: string,
+    secretAccessKey: string,
+    bucketName: string,
+    publicUrl: string,
+  ) {
+    this.bucketName = bucketName;
+    this.publicUrl = publicUrl.endsWith('/') ? publicUrl.slice(0, -1) : publicUrl;
+
+    this.s3Client = new S3Client({
+      region: 'auto',
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
     });
   }
 
   async saveFile(
     buffer: Buffer,
-    _filename: string,
-    _mimeType: string,
+    filename: string,
+    mimeType: string,
   ): Promise<{ url: string; storagePath: string }> {
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'check-in-love',
-        },
-        (error, result) => {
-          if (error || !result) {
-            reject(error || new Error('Upload to Cloudinary failed'));
-            return;
-          }
-          resolve({
-            url: result.secure_url,
-            storagePath: result.public_id,
-          });
-        }
-      );
-      uploadStream.end(buffer);
-    });
+    const ext = this.getExtFromMime(mimeType) ?? path.extname(filename) ?? '';
+    const uniqueFilename = `${Date.now()}-${uuidv4()}${ext}`;
+
+    const now = new Date();
+    const year = now.getFullYear().toString();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+
+    // Relative storage path: YYYY/MM/filename
+    const storagePath = `${year}/${month}/${uniqueFilename}`;
+
+    await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: storagePath,
+        Body: buffer,
+        ContentType: mimeType,
+      })
+    );
+
+    const url = `${this.publicUrl}/${storagePath}`;
+
+    return { url, storagePath };
   }
 
   async deleteFile(storagePath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      cloudinary.uploader.destroy(storagePath, (error, result) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
-    });
+    await this.s3Client.send(
+      new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: storagePath,
+      })
+    );
+  }
+
+  private getExtFromMime(mimeType: string): string {
+    const map: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'image/png': '.png',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'image/heic': '.heic',
+      'image/heif': '.heif',
+    };
+    return map[mimeType] ?? '.bin';
   }
 }
 
-const isCloudinaryConfigured =
-  env.CLOUDINARY_CLOUD_NAME &&
-  env.CLOUDINARY_API_KEY &&
-  env.CLOUDINARY_API_SECRET;
+const isR2Configured =
+  env.R2_ACCOUNT_ID &&
+  env.R2_ACCESS_KEY_ID &&
+  env.R2_SECRET_ACCESS_KEY &&
+  env.R2_BUCKET_NAME &&
+  env.R2_PUBLIC_URL;
 
-export const storageService: StorageService = isCloudinaryConfigured
-  ? new CloudinaryStorageService(
-      env.CLOUDINARY_CLOUD_NAME!,
-      env.CLOUDINARY_API_KEY!,
-      env.CLOUDINARY_API_SECRET!,
+export const storageService: StorageService = isR2Configured
+  ? new R2StorageService(
+      env.R2_ACCOUNT_ID!,
+      env.R2_ACCESS_KEY_ID!,
+      env.R2_SECRET_ACCESS_KEY!,
+      env.R2_BUCKET_NAME!,
+      env.R2_PUBLIC_URL!,
     )
   : new LocalStorageService(env.UPLOAD_DIR, env.PUBLIC_BASE_URL);

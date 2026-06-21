@@ -40,9 +40,11 @@ const envSchema = z.object({
   FCM_SERVER_KEY: z.string().optional(),
   FCM_SERVICE_ACCOUNT_FILE: z.string().optional(),
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
-  CLOUDINARY_CLOUD_NAME: z.string().optional(),
-  CLOUDINARY_API_KEY: z.string().optional(),
-  CLOUDINARY_API_SECRET: z.string().optional(),
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET_NAME: z.string().optional(),
+  R2_PUBLIC_URL: z.string().optional(),
 });
 
 function parseEnv() {
