@@ -119,8 +119,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .addMessage(body, System.currentTimeMillis(), sender)
             .setConversationTitle(if (actionType == "checkin") title else null)
 
+        val largeIcon = if (avatarBitmap != null) {
+            avatarBitmap
+        } else {
+            BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+        }
+
         val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(largeIcon)
             .setColor(ContextCompat.getColor(this, R.color.notification_color))
             .setStyle(messagingStyle)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
