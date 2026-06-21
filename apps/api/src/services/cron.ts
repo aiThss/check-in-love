@@ -3,6 +3,7 @@ import { PushSubscription } from '../db/models/PushSubscription';
 import { CheckIn } from '../db/models/CheckIn';
 import { sendPushToUser } from './push';
 import { storageService } from './storage';
+import { logger } from '../utils/logger';
 
 const MESSAGES = {
   m7: [
@@ -45,9 +46,9 @@ async function broadcastPush(message: string) {
       }),
     );
     await Promise.allSettled(tasks);
-    console.log(`[cron] Broadcasted push to ${subs.length} users: ${message}`);
+    logger.info(`[cron] Broadcasted push to ${subs.length} users`, { message });
   } catch (err) {
-    console.error('[cron] Error broadcasting push:', err);
+    logger.error('[cron] Error broadcasting push', err);
   }
 }
 
@@ -67,24 +68,24 @@ async function cleanupDeletedCheckins(): Promise<void> {
       return;
     }
 
-    console.log(`[cron] Found ${expiredCheckins.length} expired check-ins to clean up.`);
+    logger.info(`[cron] Found ${expiredCheckins.length} expired check-ins to clean up`);
 
     for (const checkin of expiredCheckins) {
       if (checkin.storagePath) {
         try {
           await storageService.deleteFile(checkin.storagePath);
-          console.log(`[cron] Deleted physical file for check-in: ${checkin._id} (${checkin.storagePath})`);
+          logger.info(`[cron] Deleted physical file for check-in: ${checkin._id}`, { storagePath: checkin.storagePath });
         } catch (fileErr) {
-          console.error(`[cron] Failed to delete physical file for check-in ${checkin._id}:`, fileErr);
+          logger.error(`[cron] Failed to delete physical file for check-in ${checkin._id}`, fileErr);
         }
       }
       // Delete document from database
       await CheckIn.deleteOne({ _id: checkin._id });
     }
 
-    console.log(`[cron] Completed physical cleanup for ${expiredCheckins.length} check-ins.`);
+    logger.info(`[cron] Completed physical cleanup for ${expiredCheckins.length} check-ins`);
   } catch (err) {
-    console.error('[cron] Error during check-in cleanup:', err);
+    logger.error('[cron] Error during check-in cleanup', err);
   }
 }
 

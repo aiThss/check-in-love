@@ -52,7 +52,7 @@ export function createTable<T>(
 
       columns.forEach((col) => {
         const td = document.createElement('td');
-        const rawValue = (row as any)[col.key];
+        const rawValue = (row as Record<string, unknown>)[col.key];
 
         if (col.render) {
           td.innerHTML = col.render(rawValue, row);

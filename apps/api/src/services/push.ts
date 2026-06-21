@@ -5,6 +5,7 @@ import path from 'path';
 import { env } from '../config/env';
 import { PushSubscription } from '../db/models/PushSubscription';
 import { User } from '../db/models/User';
+import { logger } from '../utils/logger';
 
 interface ServiceAccount {
   project_id: string;
@@ -21,7 +22,7 @@ async function getFcmAccessToken(): Promise<{ accessToken: string; projectId: st
       try {
         serviceAccount = JSON.parse(env.FCM_SERVICE_ACCOUNT_JSON);
       } catch (err) {
-        console.error('[push] Failed to parse FCM_SERVICE_ACCOUNT_JSON:', err);
+        logger.error('[push] Failed to parse FCM_SERVICE_ACCOUNT_JSON', err);
       }
     }
     if (!serviceAccount && env.FCM_SERVICE_ACCOUNT_FILE) {
@@ -64,7 +65,7 @@ async function getFcmAccessToken(): Promise<{ accessToken: string; projectId: st
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('[push] Failed to exchange JWT for access token:', errText);
+      logger.error('[push] Failed to exchange JWT for access token', null, { details: errText });
       return null;
     }
 
@@ -76,7 +77,7 @@ async function getFcmAccessToken(): Promise<{ accessToken: string; projectId: st
 
     return { accessToken: data.access_token, projectId: serviceAccount.project_id };
   } catch (err) {
-    console.error('[push] Error getting FCM access token:', err);
+    logger.error('[push] Error getting FCM access token', err);
     return null;
   }
 }
@@ -164,17 +165,17 @@ export async function sendPushToUser(
               });
               if (!res.ok) {
                 const text = await res.text();
-                console.error('[push] FCM v1 send error for token:', token, text);
+                logger.error('[push] FCM v1 send error for token', null, { token, details: text });
               }
             } catch (err) {
-              console.error('[push] FCM v1 network error for token:', token, err);
+              logger.error('[push] FCM v1 network error for token', err, { token });
             }
           });
           await Promise.allSettled(fcmRequests);
         }
       }
     } catch (err) {
-      console.error('[push] Error sending FCM v1 message:', err);
+      logger.error('[push] Error sending FCM v1 message', err);
     }
   } else if (env.FCM_SERVER_KEY) {
     try {
@@ -205,21 +206,21 @@ export async function sendPushToUser(
           .then(async (res) => {
             if (!res.ok) {
               const text = await res.text();
-              console.error('[push] FCM legacy server response error:', text);
+              logger.error('[push] FCM legacy server response error', null, { details: text });
             }
           })
           .catch((err) => {
-            console.error('[push] FCM legacy fetch network error:', err);
+            logger.error('[push] FCM legacy fetch network error', err);
           });
       }
     } catch (err) {
-      console.error('[push] Error querying user for FCM tokens:', err);
+      logger.error('[push] Error querying user for FCM tokens', err);
     }
   }
 
   // 2. Send Web Push (for iOS PWA / Chrome PWA)
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_EMAIL) {
-    console.warn(
+    logger.warn(
       '[push] VAPID keys not configured — skipping Web Push notification',
     );
     return;
@@ -251,9 +252,9 @@ export async function sendPushToUser(
       if (webErr.statusCode === 410) {
         // Subscription is no longer valid — clean it up
         await PushSubscription.deleteOne({ _id: sub._id });
-        console.info(`[push] Removed expired subscription ${sub.endpoint}`);
+        logger.info(`[push] Removed expired subscription ${sub.endpoint}`);
       } else {
-        console.error('[push] Failed to send web notification:', err);
+        logger.error('[push] Failed to send web notification', err);
       }
     }
   });

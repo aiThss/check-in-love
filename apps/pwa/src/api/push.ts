@@ -1,4 +1,5 @@
 import { apiFetch } from './client';
+import { logger } from '../utils/logger';
 
 interface PushConfig {
   enabled: boolean;
@@ -170,7 +171,7 @@ export function setupAndroidFcm(): void {
   window.onFcmTokenReceived = (token: string) => {
     if (token) {
       registerFcmToken(token).catch((err) => {
-        console.warn('[FCM] Register fcm token failed:', err);
+        logger.warn('[FCM] Register fcm token failed', err);
       });
     }
   };
@@ -180,7 +181,7 @@ export function setupAndroidFcm(): void {
     const token = window.LoveCheckAndroid?.getFcmToken?.();
     if (token) {
       registerFcmToken(token).catch((err) => {
-        console.warn('[FCM] Pull and register fcm token failed:', err);
+        logger.warn('[FCM] Pull and register fcm token failed', err);
       });
     }
   } catch (_err) {

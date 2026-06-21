@@ -2,6 +2,7 @@ export interface CameraResult {
   file: File;
   preview: string;
 }
+import { logger } from '../utils/logger';
 
 export interface ImageProcessOptions {
   aspectRatio?: number;
@@ -303,7 +304,7 @@ async function openCameraStream(onResult: (result: CameraResult) => void): Promi
     });
     video.srcObject = localStream;
   } catch (err) {
-    console.warn('[camera] getUserMedia failed, falling back to file capture:', err);
+    logger.warn('[camera] getUserMedia failed, falling back to file capture', err);
     if (document.body.contains(overlay)) {
       document.body.removeChild(overlay);
     }

@@ -26,6 +26,7 @@ export interface AuthResponse {
 export interface MeResponse {
   user: import('./types').User;
   couple: import('./types').Couple;
+  partnerUser?: import('./types').User;
 }
 
 export interface SendOtpResponse {

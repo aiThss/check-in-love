@@ -3,6 +3,8 @@ import { store } from '../store/index';
 import type {
   CheckIn,
   CheckInReply,
+  CheckInType,
+  MoodType,
   PaginatedResponse,
   Reaction,
   ReactionType,
@@ -11,6 +13,36 @@ import type {
 export interface CreateCheckinResult {
   checkIn: CheckIn;
   streak?: number;
+}
+
+export interface RawReply {
+  userId?: string;
+  userName?: string;
+  message?: string;
+  createdAt: string;
+}
+
+export interface RawReaction {
+  type?: string;
+  userId?: string;
+}
+
+export interface RawCheckIn {
+  _id?: string;
+  id?: string;
+  ownerId?: string;
+  userId?: string;
+  coupleId?: string;
+  type: CheckInType;
+  imageUrl?: string;
+  photoUrl?: string;
+  caption?: string;
+  mood?: MoodType;
+  reactions?: RawReaction[];
+  replies?: RawReply[];
+  ownerName: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const legacyReactionMap: Record<string, string> = {
@@ -29,7 +61,7 @@ function normalizeReactionType(type: string): string {
   return legacyReactionMap[trimmed] ?? trimmed;
 }
 
-function mapReplies(rawReplies: any[] = []): CheckInReply[] {
+function mapReplies(rawReplies: RawReply[] = []): CheckInReply[] {
   const currentUserId = store.get().user?.id;
 
   return rawReplies.map((reply) => {
@@ -44,11 +76,11 @@ function mapReplies(rawReplies: any[] = []): CheckInReply[] {
   });
 }
 
-function mapReactionList(rawReactions: any[] = []): Reaction[] {
+function mapReactionList(rawReactions: RawReaction[] = []): Reaction[] {
   const currentUserId = store.get().user?.id;
   const reactionGroups: Record<string, { count: number; reactedByMe: boolean }> = {};
 
-  rawReactions.forEach((rx: any) => {
+  rawReactions.forEach((rx) => {
     const type = normalizeReactionType(String(rx.type ?? ''));
     if (!type) return;
 
@@ -71,8 +103,8 @@ function mapReactionList(rawReactions: any[] = []): Reaction[] {
 }
 
 // Map raw backend check-in format to aligned PWA types
-function mapCheckin(item: any): CheckIn {
-  if (!item) return null as any;
+function mapCheckin(item: RawCheckIn): CheckIn {
+  if (!item) return null as unknown as CheckIn;
 
   const currentUserId = store.get().user?.id;
   const userId = String(item.ownerId || item.userId || '');
@@ -96,18 +128,25 @@ function mapCheckin(item: any): CheckIn {
 
 export async function getLatestPartnerCheckin(): Promise<CheckIn | null> {
   try {
-    const res = await apiFetch<{ checkIn: any | null }>('/checkins/latest-partner');
+    const res = await apiFetch<{ checkIn: RawCheckIn | null }>('/checkins/latest-partner');
     return res && res.checkIn ? mapCheckin(res.checkIn) : null;
   } catch {
     return null;
   }
 }
 
+export interface PaginationInfo {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export async function getCheckins(
   page: number = 1,
   limit: number = 20,
 ): Promise<PaginatedResponse<CheckIn>> {
-  const res = await apiFetch<{ checkIns: any[]; pagination: any }>(
+  const res = await apiFetch<{ checkIns: RawCheckIn[]; pagination: PaginationInfo }>(
     '/checkins?page=' + page + '&limit=' + limit,
   );
 
@@ -126,14 +165,14 @@ export async function getCheckins(
 }
 
 export async function createCheckin(
-  body: FormData | Record<string, any>,
+  body: FormData | Record<string, unknown>,
 ): Promise<CreateCheckinResult> {
-  const res = await apiFetch<any>('/checkins', {
+  const res = await apiFetch<{ checkIn: RawCheckIn; streak?: number }>('/checkins', {
     method: 'POST',
     body: body instanceof FormData ? body : JSON.stringify(body),
   });
   return {
-    checkIn: mapCheckin(res.checkIn || res),
+    checkIn: mapCheckin(res.checkIn),
     streak: typeof res.streak === 'number' ? res.streak : undefined,
   };
 }
@@ -142,7 +181,7 @@ export async function addReaction(
   checkinId: string,
   type: ReactionType,
 ): Promise<Reaction[]> {
-  const res = await apiFetch<{ reactions: any[] }>(`/checkins/${checkinId}/reactions`, {
+  const res = await apiFetch<{ reactions: RawReaction[] }>(`/checkins/${checkinId}/reactions`, {
     method: 'POST',
     body: JSON.stringify({ type }),
   });
@@ -154,7 +193,7 @@ export async function addReply(
   checkinId: string,
   message: string,
 ): Promise<CheckInReply[]> {
-  const res = await apiFetch<{ replies: any[] }>(`/checkins/${checkinId}/replies`, {
+  const res = await apiFetch<{ replies: RawReply[] }>(`/checkins/${checkinId}/replies`, {
     method: 'POST',
     body: JSON.stringify({ message }),
   });

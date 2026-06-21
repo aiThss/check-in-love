@@ -225,8 +225,9 @@ export function renderRandomPage(): HTMLElement {
       loadHistory();
       loadCategories();
 
-    } catch (err: any) {
-      showToast('Không rút được bài: ' + err.message, 'error');
+    } catch (err) {
+      const error = err as Error;
+      showToast('Không rút được bài: ' + error.message, 'error');
     } finally {
       actionBtn.disabled = false;
       actionBtn.innerHTML = `Bốc ngay! 🎲`;

@@ -2,6 +2,7 @@ import { navigate } from '../router';
 import { createCheckin } from '../api/checkins';
 import { ApiError } from '../api/client';
 import { store } from '../store/index';
+import { logger } from '../utils/logger';
 import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import {
@@ -385,7 +386,7 @@ export function renderCheckinPage(): HTMLElement {
       return;
     }
 
-    if (activeMode === 'text') {    } else if (activeMode === 'text') {
+    if (activeMode === 'text') {
       // Text Checkin
       const textGroup = document.createElement('div');
       textGroup.className = 'input-group';
@@ -586,12 +587,12 @@ export function renderCheckinPage(): HTMLElement {
         navigate('/app/home');
       }, 1200);
 
-    } catch (err: any) {
-      console.error(err);
+    } catch (err) {
+      logger.error('Failed to submit check-in', err);
       if (err instanceof ApiError && err.code === 'NETWORK_ERROR' && activeMode === 'photo') {
         showToast('Upload ảnh chưa tới server. Thử ảnh nhỏ hơn hoặc đổi mạng rồi gửi lại.', 'error');
       } else {
-      showToast(err.message || 'Gửi check-in thất bại!', 'error');
+        showToast((err as Error).message || 'Gửi check-in thất bại!', 'error');
       }
       sendBtn.disabled = false;
       sendBtn.innerHTML = `Gửi ngay 💕`;

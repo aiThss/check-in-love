@@ -332,9 +332,10 @@ export function renderMemoriesPage(): HTMLElement {
       }
 
       loadMoreBtn.style.display = currentPage < totalPages ? 'block' : 'none';
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as Error;
       isLoading = false;
-      showToast('Không thể tải kỷ niệm: ' + err.message, 'error');
+      showToast('Không thể tải kỷ niệm: ' + error.message, 'error');
     }
   }
 

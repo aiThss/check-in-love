@@ -34,7 +34,25 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(fastifyCors, {
-    origin: true, // Allow all origins for debugging
+    origin: (origin, cb) => {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) {
+        cb(null, true);
+        return;
+      }
+
+      const isAllowed = env.ALLOWED_ORIGINS.includes(origin) ||
+        (env.NODE_ENV === 'development' && (
+          origin.startsWith('http://localhost:') ||
+          origin.startsWith('http://127.0.0.1:')
+        ));
+
+      if (isAllowed) {
+        cb(null, true);
+      } else {
+        cb(new Error('Not allowed by CORS'), false);
+      }
+    },
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

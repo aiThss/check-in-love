@@ -1,11 +1,12 @@
 import { navigate } from '../router';
 import { store } from '../store/index';
 import { updateProfile, uploadAvatar, uploadPartnerAvatar } from '../api/profile';
-import { getMe } from '../api/auth';
+import { getMe, MeResponse } from '../api/auth';
 import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
-import { openCamera, openGallery } from '../components/camera';
+import { openCamera, openGallery, CameraResult } from '../components/camera';
+import type { User, Couple } from '../api/types';
 
 function calcDaysTogether(loveStartDate?: string): number {
   if (!loveStartDate) return 0;
@@ -70,6 +71,9 @@ async function checkApkUpdate(
   checkButton.textContent = 'Đang kiểm tra...';
   downloadButton.style.display = 'none';
   statusEl.textContent = 'Đang quét phiên bản APK mới nhất...';
+  showToast('Đang quét tìm phiên bản mới...', 'info');
+
+  const startTime = Date.now();
 
   try {
     const res = await fetch(GITHUB_RELEASE_API, {
@@ -85,29 +89,44 @@ async function checkApkUpdate(
     const updateUrl = apkAsset?.browser_download_url || release.html_url || GITHUB_RELEASES_PAGE;
     const currentVersion = getCurrentAndroidVersion();
 
+    // Giữ trạng thái đang tải tối thiểu 800ms để tránh việc nháy nút quá nhanh
+    const elapsed = Date.now() - startTime;
+    if (elapsed < 800) {
+      await new Promise((resolve) => setTimeout(resolve, 800 - elapsed));
+    }
+
     downloadButton.dataset.updateUrl = updateUrl;
     downloadButton.textContent = apkAsset ? 'Tải APK mới' : 'Mở trang release';
     downloadButton.style.display = 'inline-flex';
 
     if (!latestVersion) {
       statusEl.textContent = 'Đã tìm thấy release, nhưng chưa đọc được số phiên bản.';
+      showToast('Đã tìm thấy release mới nhưng chưa rõ phiên bản', 'info');
       return;
     }
 
     if (!currentVersion) {
       statusEl.textContent = `Không đọc được version APK hiện tại. Bạn có thể tải bản mới nhất v${latestVersion}.`;
+      showToast(`Đã quét xong: Có phiên bản v${latestVersion} trên GitHub`, 'info');
       return;
     }
 
     if (compareVersions(currentVersion, latestVersion) >= 0) {
       statusEl.textContent = `Bạn đang ở bản mới nhất (v${currentVersion}).`;
       downloadButton.style.display = 'none';
+      showToast(`Ứng dụng đang ở phiên bản mới nhất v${currentVersion}!`, 'success');
       return;
     }
 
     statusEl.textContent = `Có bản mới v${latestVersion}. Bản đang cài là v${currentVersion}.`;
-  } catch (err: any) {
-    statusEl.textContent = `Không kiểm tra được cập nhật: ${err.message || 'lỗi mạng'}.`;
+    showToast(`Có phiên bản mới v${latestVersion}!`, 'success');
+  } catch (err) {
+    const error = err as Error;
+    const elapsed = Date.now() - startTime;
+    if (elapsed < 800) {
+      await new Promise((resolve) => setTimeout(resolve, 800 - elapsed));
+    }
+    statusEl.textContent = `Không kiểm tra được cập nhật: ${error.message || 'lỗi mạng'}.`;
     downloadButton.dataset.updateUrl = GITHUB_RELEASES_PAGE;
     downloadButton.textContent = 'Mở trang release';
     downloadButton.style.display = 'inline-flex';
@@ -168,12 +187,13 @@ export function renderProfilePage(): HTMLElement {
       renderProfileCard(res);
       renderSettings(res);
 
-    } catch (err: any) {
-      showToast('Không thể tải thông tin profile: ' + err.message, 'error');
+    } catch (err) {
+      const error = err as Error;
+      showToast('Không thể tải thông tin profile: ' + error.message, 'error');
     }
   }
 
-  function renderProfileCard(data: any) {
+  function renderProfileCard(data: MeResponse) {
     const user = data.user;
     const couple = data.couple;
     const partner = data.partnerUser;
@@ -207,7 +227,7 @@ export function renderProfilePage(): HTMLElement {
       <div style="display:flex;flex-direction:column;align-items:center;gap:4px;border-top:1px solid var(--border);width:100%;padding-top:16px;">
         <span style="font-size:32px;font-weight:800;color:var(--accent);">${days}</span>
         <span style="font-size:13px;font-weight:600;color:var(--text-secondary);">ngày bên nhau 💕</span>
-        <span style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Bắt đầu từ: ${new Date(couple.loveStartDate).toLocaleDateString('vi-VN')}</span>
+        <span style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Bắt đầu từ: ${couple.loveStartDate ? new Date(couple.loveStartDate).toLocaleDateString('vi-VN') : 'Chưa đặt'}</span>
       </div>
 
       <div style="
@@ -223,14 +243,14 @@ export function renderProfilePage(): HTMLElement {
         cursor:pointer;
       " id="copy-code-container">
         <span style="color:var(--text-secondary);">Couple Code:</span>
-        <strong style="color:var(--accent);font-family:monospace;font-size:15px;letter-spacing:1px;">${couple.code}</strong>
+        <strong style="color:var(--accent);font-family:monospace;font-size:15px;letter-spacing:1px;">${couple.coupleCode}</strong>
         <span style="font-size:11px;color:var(--text-secondary);background:var(--border);padding:2px 6px;border-radius:4px;">Sao chép</span>
       </div>
     `;
 
     // Click to copy code
     profileCard.querySelector('#copy-code-container')?.addEventListener('click', () => {
-      navigator.clipboard.writeText(couple.code);
+      navigator.clipboard.writeText(couple.coupleCode);
       showToast('Đã sao chép couple code!', 'success');
     });
 
@@ -269,7 +289,7 @@ export function renderProfilePage(): HTMLElement {
 
     sheet.querySelector('#btn-cancel-av-sheet')?.addEventListener('click', closeSheet);
     
-    const handleAvatarResult = async (res: any) => {
+    const handleAvatarResult = async (res: CameraResult) => {
       showToast('Đang tải ảnh lên...', 'info');
       try {
         if (type === 'my') {
@@ -279,8 +299,9 @@ export function renderProfilePage(): HTMLElement {
         }
         showToast('Cập nhật avatar thành công!', 'success');
         loadProfile();
-      } catch (err: any) {
-        showToast('Lỗi tải ảnh lên: ' + err.message, 'error');
+      } catch (err) {
+        const error = err as Error;
+        showToast('Lỗi tải ảnh lên: ' + error.message, 'error');
       }
     };
 
@@ -294,7 +315,7 @@ export function renderProfilePage(): HTMLElement {
     });
   }
 
-  function renderSettings(data: any) {
+  function renderSettings(data: MeResponse) {
     settingsContainer.innerHTML = '';
     const user = data.user;
     const couple = data.couple;
@@ -444,12 +465,12 @@ export function renderProfilePage(): HTMLElement {
     settingsContainer.appendChild(logoutRow);
   }
 
-  function showEditProfileModal(user: any, couple: any) {
+  function showEditProfileModal(user: User, couple: Couple) {
     const form = document.createElement('div');
     form.style.cssText = 'display:flex;flex-direction:column;gap:14px;width:100%;text-align:left;';
     
     // Format loveStartDate to YYYY-MM-DD for date input
-    const originalDate = new Date(couple.loveStartDate);
+    const originalDate = couple.loveStartDate ? new Date(couple.loveStartDate) : new Date();
     const dateString = originalDate.toISOString().substring(0, 10);
 
     form.innerHTML = `
@@ -491,9 +512,10 @@ export function renderProfilePage(): HTMLElement {
           });
           showToast('Cập nhật thông tin thành công!', 'success');
           loadProfile();
-        } catch (err: any) {
-          showToast('Lỗi cập nhật: ' + err.message, 'error');
-          throw err;
+         } catch (err) {
+          const error = err as Error;
+          showToast('Lỗi cập nhật: ' + error.message, 'error');
+          throw error;
         }
       }
     });

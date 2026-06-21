@@ -1,4 +1,5 @@
 import { store } from './store/index';
+import { logger } from './utils/logger';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -109,7 +110,7 @@ async function renderRoute(path: string): Promise<void> {
     appEl.innerHTML = '';
     appEl.appendChild(pageEl);
   } catch (err) {
-    console.error('[Router] Failed to render route:', resolvedPath, err);
+    logger.error(`[Router] Failed to render route: ${resolvedPath}`, err);
     renderError(appEl);
   }
 

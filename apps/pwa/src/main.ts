@@ -3,6 +3,7 @@ import './styles/components.css';
 import './styles/animations.css';
 import { store } from './store/index';
 import { initRouter } from './router';
+import { logger } from './utils/logger';
 import { renderInstallPage } from './pages/install';
 import { renderLoginPage } from './pages/login';
 import { renderOnboardingPage } from './pages/onboarding';
@@ -35,12 +36,12 @@ if ('serviceWorker' in navigator) {
       .then(() => {
         if (store.isAuthenticated() && 'Notification' in window && Notification.permission === 'granted') {
           ensurePushSubscription(false).catch((err) => {
-            console.warn('Push subscription refresh failed:', err);
+            logger.warn('Push subscription refresh failed', err);
           });
         }
       })
       .catch((err) => {
-        console.warn('SW registration failed:', err);
+        logger.warn('SW registration failed', err);
       });
   });
 }

@@ -1,6 +1,7 @@
 import { buildApp } from './app';
 import { env } from './config/env';
 import { connectDB } from './db/connection';
+import { logger } from './utils/logger';
 
 async function main(): Promise<void> {
   // 1. Connect to MongoDB
@@ -16,21 +17,21 @@ async function main(): Promise<void> {
   // 4. Start listening
   try {
     await app.listen({ port: env.PORT, host: '0.0.0.0' });
-    console.log(`🚀 API running on http://0.0.0.0:${env.PORT}`);
+    logger.info(`🚀 API running on http://0.0.0.0:${env.PORT}`);
   } catch (err) {
-    app.log.error(err);
+    logger.error('API failed to start', err);
     process.exit(1);
   }
 
   // 4. Graceful shutdown
   const shutdown = async (signal: string): Promise<void> => {
-    console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+    logger.info(`Received ${signal}. Shutting down gracefully...`);
     try {
       await app.close();
-      console.log('Server closed.');
+      logger.info('Server closed.');
       process.exit(0);
     } catch (err) {
-      console.error('Error during shutdown:', err);
+      logger.error('Error during shutdown', err);
       process.exit(1);
     }
   };
@@ -40,6 +41,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('Fatal error during startup:', err);
+  logger.error('Fatal error during startup', err);
   process.exit(1);
 });
