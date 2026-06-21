@@ -347,9 +347,9 @@ export function renderHomePage(): HTMLElement {
   });
 
   const refreshBtn = document.createElement('button');
-  refreshBtn.className = 'btn-icon refresh-btn';
+  refreshBtn.className = 'btn-icon';
   refreshBtn.setAttribute('aria-label', 'Làm mới');
-  refreshBtn.innerHTML = `<lottie-player src="/icons8-refresh.json" background="transparent" speed="1.2" style="width: 22px; height: 22px;"></lottie-player>`;
+  refreshBtn.textContent = '\u{1F504}';
   refreshBtn.addEventListener('click', () => loadCheckin());
 
   rightActions.appendChild(themeBtn);
@@ -452,21 +452,12 @@ export function renderHomePage(): HTMLElement {
       contentArea.appendChild(renderSkeleton());
     }
 
-    refreshBtn.classList.add('loading');
-    const player = refreshBtn.querySelector('lottie-player');
-    if (player) {
-      player.setAttribute('loop', 'true');
-      (player as any).play?.();
-    }
+    refreshBtn.classList.add('animate-spin');
 
     try {
       const checkin = await getLatestPartnerCheckin();
       contentArea.innerHTML = '';
-      refreshBtn.classList.remove('loading');
-      if (player) {
-        player.removeAttribute('loop');
-        (player as any).stop?.();
-      }
+      refreshBtn.classList.remove('animate-spin');
 
       if (!checkin) {
         const empty = buildEmptyState(partnerName);
@@ -495,10 +486,7 @@ export function renderHomePage(): HTMLElement {
         // ignore
       }
     } catch {
-      if (player) {
-        player.removeAttribute('loop');
-        (player as any).stop?.();
-      }
+      refreshBtn.classList.remove('animate-spin');
       if (getCachedLatestPartnerCheckin()) {
         showToast('Không thể làm mới dữ liệu', 'error');
         return;

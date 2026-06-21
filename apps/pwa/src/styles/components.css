@@ -200,26 +200,6 @@ a {
   transform: scale(0.92);
 }
 
-/* ── Refresh Button Custom Styles ────────────────────────── */
-.refresh-btn {
-  transition: background var(--duration-fast) var(--ease),
-    transform var(--duration-fast) var(--ease);
-}
-
-[data-theme="dark"] .refresh-btn {
-  background: #ffffff !important;
-  border-color: #ffffff !important;
-}
-
-.refresh-btn.loading lottie-player {
-  animation: spin-refresh 1.2s linear infinite;
-}
-
-@keyframes spin-refresh {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
 /* ── Bottom Navigation ──────────────────────────────────────── */
 .bottom-nav {
   position: fixed;
