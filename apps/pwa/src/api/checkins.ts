@@ -13,19 +13,20 @@ export interface CreateCheckinResult {
   streak?: number;
 }
 
-const reactionAlias: Record<string, ReactionType> = {
-  heart: 'heart',
-  hug: 'hug',
-  kiss: 'kiss',
-  laugh: 'laugh',
-  miss: 'miss',
-  wow: 'wow',
-  fire: 'fire',
-  sad: 'sad',
+const legacyReactionMap: Record<string, string> = {
+  heart: '❤️',
+  hug: '🤗',
+  kiss: '😘',
+  laugh: '😂',
+  miss: '🥺',
+  wow: '🥰',
+  fire: '🔥',
+  sad: '😭',
 };
 
-function normalizeReactionType(type: string): ReactionType | null {
-  return reactionAlias[type] ?? null;
+function normalizeReactionType(type: string): string {
+  const trimmed = type.trim();
+  return legacyReactionMap[trimmed] ?? trimmed;
 }
 
 function mapReplies(rawReplies: any[] = []): CheckInReply[] {
@@ -35,7 +36,7 @@ function mapReplies(rawReplies: any[] = []): CheckInReply[] {
     const userId = String(reply.userId ?? '');
     return {
       userId,
-      userName: reply.userName ?? 'Nguoi ay',
+      userName: reply.userName ?? 'Người ấy',
       message: reply.message ?? '',
       isOwn: currentUserId ? userId === currentUserId : false,
       createdAt: reply.createdAt,
@@ -45,20 +46,15 @@ function mapReplies(rawReplies: any[] = []): CheckInReply[] {
 
 function mapReactionList(rawReactions: any[] = []): Reaction[] {
   const currentUserId = store.get().user?.id;
-  const reactionGroups: Record<ReactionType, { count: number; reactedByMe: boolean }> = {
-    heart: { count: 0, reactedByMe: false },
-    hug: { count: 0, reactedByMe: false },
-    kiss: { count: 0, reactedByMe: false },
-    laugh: { count: 0, reactedByMe: false },
-    miss: { count: 0, reactedByMe: false },
-    wow: { count: 0, reactedByMe: false },
-    fire: { count: 0, reactedByMe: false },
-    sad: { count: 0, reactedByMe: false },
-  };
+  const reactionGroups: Record<string, { count: number; reactedByMe: boolean }> = {};
 
   rawReactions.forEach((rx: any) => {
     const type = normalizeReactionType(String(rx.type ?? ''));
     if (!type) return;
+
+    if (!reactionGroups[type]) {
+      reactionGroups[type] = { count: 0, reactedByMe: false };
+    }
 
     reactionGroups[type].count++;
     if (currentUserId && String(rx.userId) === currentUserId) {
@@ -67,9 +63,8 @@ function mapReactionList(rawReactions: any[] = []): Reaction[] {
   });
 
   return Object.entries(reactionGroups)
-    .filter(([, value]) => value.count > 0 || value.reactedByMe)
     .map(([type, value]) => ({
-      type: type as ReactionType,
+      type,
       count: value.count,
       reactedByMe: value.reactedByMe,
     }));

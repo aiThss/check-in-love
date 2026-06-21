@@ -12,17 +12,6 @@ import { sendPushToUser } from '../services/push';
 import { storageService } from '../services/storage';
 import { updateStreak } from '../services/streak';
 
-const reactionTypes = [
-  'heart',
-  'hug',
-  'kiss',
-  'laugh',
-  'miss',
-  'wow',
-  'fire',
-  'sad',
-] as const;
-
 const createCheckInBodySchema = z.object({
   type: z.enum(['text', 'mood']),
   caption: z.string().max(280).optional(),
@@ -33,12 +22,28 @@ const createCheckInBodySchema = z.object({
 });
 
 const addReactionSchema = z.object({
-  type: z.enum(reactionTypes),
+  type: z.string().trim().min(1).max(32),
 });
 
 const addReplySchema = z.object({
   message: z.string().trim().min(1).max(500),
 });
+
+const legacyReactionMap: Record<string, string> = {
+  heart: '❤️',
+  hug: '🤗',
+  kiss: '😘',
+  laugh: '😂',
+  miss: '🥺',
+  wow: '🥰',
+  fire: '🔥',
+  sad: '😭',
+};
+
+function normalizeReactionType(type: string): string {
+  const trimmed = type.trim();
+  return legacyReactionMap[trimmed] ?? trimmed;
+}
 
 async function readMultipartBuffer(
   part: MultipartFile,
@@ -305,7 +310,7 @@ export default async function checkinsRoutes(
         });
       }
 
-      const { type } = parsed.data;
+      const type = normalizeReactionType(parsed.data.type);
 
       const checkIn = await CheckIn.findOne({
         _id: new Types.ObjectId(id),
@@ -322,7 +327,8 @@ export default async function checkinsRoutes(
       const userId = new Types.ObjectId(request.user.id);
       const existingIdx = checkIn.reactions.findIndex(
         (r) =>
-          r.userId.toString() === request.user.id && r.type === (type as ReactionType),
+          r.userId.toString() === request.user.id &&
+          normalizeReactionType(r.type) === type,
       );
 
       if (existingIdx !== -1) {
@@ -342,8 +348,8 @@ export default async function checkinsRoutes(
       if (existingIdx === -1 && checkIn.ownerId.toString() !== request.user.id) {
         const reactor = await User.findById(request.user.id).lean();
         sendPushToUser(checkIn.ownerId.toString(), {
-          title: `${reactor?.displayName ?? 'Nguoi ay'} reacted to your check-in`,
-          body: 'Mo app de xem reaction moi',
+          title: `${reactor?.displayName ?? 'Người ấy'} đã react check-in của bạn`,
+          body: 'Mở app để xem reaction mới',
           icon: reactor?.avatarUrl,
           badge: '/icons/icon-192.png',
           url: '/app/memories',
@@ -406,7 +412,7 @@ export default async function checkinsRoutes(
 
       if (checkIn.ownerId.toString() !== request.user.id) {
         sendPushToUser(checkIn.ownerId.toString(), {
-          title: `${user.displayName} replied to your check-in`,
+          title: `${user.displayName} đã reply check-in của bạn`,
           body: parsed.data.message,
           icon: user.avatarUrl,
           badge: '/icons/icon-192.png',

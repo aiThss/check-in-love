@@ -1,5 +1,3 @@
-export type PhotoFit = 'cover' | 'contain';
-
 export interface CameraResult {
   file: File;
   preview: string;
@@ -7,7 +5,6 @@ export interface CameraResult {
 
 export interface ImageProcessOptions {
   aspectRatio?: number;
-  fit?: PhotoFit;
   maxSize?: number;
   quality?: number;
 }
@@ -78,37 +75,12 @@ function drawCover(
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
 }
 
-function drawContain(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  width: number,
-  height: number,
-): void {
-  ctx.fillStyle = '#111111';
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.save();
-  ctx.globalAlpha = 0.35;
-  ctx.filter = 'blur(18px)';
-  drawCover(ctx, img, width, height);
-  ctx.restore();
-
-  const scale = Math.min(width / img.naturalWidth, height / img.naturalHeight);
-  const drawWidth = Math.round(img.naturalWidth * scale);
-  const drawHeight = Math.round(img.naturalHeight * scale);
-  const dx = Math.round((width - drawWidth) / 2);
-  const dy = Math.round((height - drawHeight) / 2);
-
-  ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
-}
-
 export async function processImage(
   file: File,
   options: ImageProcessOptions = {},
 ): Promise<CameraResult> {
   const {
     aspectRatio,
-    fit = 'cover',
     maxSize = 1440,
     quality = 0.9,
   } = options;
@@ -137,11 +109,7 @@ export async function processImage(
         return;
       }
 
-      if (fit === 'contain') {
-        drawContain(ctx, img, width, height);
-      } else {
-        drawCover(ctx, img, width, height);
-      }
+      drawCover(ctx, img, width, height);
 
       canvas.toBlob(
         (blob) => {

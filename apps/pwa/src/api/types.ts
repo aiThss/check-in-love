@@ -1,14 +1,6 @@
 // Shared types used across API modules
 
-export type ReactionType =
-  | 'heart'
-  | 'hug'
-  | 'kiss'
-  | 'laugh'
-  | 'miss'
-  | 'wow'
-  | 'fire'
-  | 'sad';
+export type ReactionType = string;
 
 export type MoodType =
   | 'happy'

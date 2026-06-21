@@ -16,14 +16,15 @@ const MOOD_EMOJIS: Record<string, string> = {
 };
 
 const REACTIONS: Array<{ type: ReactionType; emoji: string; label: string }> = [
-  { type: 'heart', emoji: '\u2764\uFE0F', label: 'Yeu' },
-  { type: 'hug', emoji: '\u{1F917}', label: 'Om' },
-  { type: 'kiss', emoji: '\u{1F48B}', label: 'Hon' },
-  { type: 'laugh', emoji: '\u{1F602}', label: 'Cuoi' },
-  { type: 'miss', emoji: '\u{1F97A}', label: 'Nho' },
-  { type: 'wow', emoji: '\u{1F929}', label: 'Wow' },
-  { type: 'fire', emoji: '\u{1F525}', label: 'Xinh' },
-  { type: 'sad', emoji: '\u{1F972}', label: 'Thuong' },
+  { type: '❤️', emoji: '❤️', label: 'Yêu' },
+  { type: '🥰', emoji: '🥰', label: 'Thương' },
+  { type: '😘', emoji: '😘', label: 'Hôn' },
+  { type: '😂', emoji: '😂', label: 'Cười' },
+  { type: '🥺', emoji: '🥺', label: 'Nhớ' },
+  { type: '🤗', emoji: '🤗', label: 'Ôm' },
+  { type: '🔥', emoji: '🔥', label: 'Xinh' },
+  { type: '✨', emoji: '✨', label: 'Lấp lánh' },
+  { type: '😭', emoji: '😭', label: 'Thương quá' },
 ];
 
 function escapeHtml(value: string | undefined): string {
@@ -43,10 +44,10 @@ function formatTime(isoString: string): string {
   const diffH = Math.floor(diffMin / 60);
   const diffD = Math.floor(diffH / 24);
 
-  if (diffMin < 1) return 'Vua xong';
-  if (diffMin < 60) return `${diffMin} phut truoc`;
-  if (diffH < 24) return `${diffH} gio truoc`;
-  if (diffD === 1) return 'Hom qua';
+  if (diffMin < 1) return 'Vừa xong';
+  if (diffMin < 60) return `${diffMin} phút trước`;
+  if (diffH < 24) return `${diffH} giờ trước`;
+  if (diffD === 1) return 'Hôm qua';
   return date.toLocaleDateString('vi-VN', {
     month: 'long',
     day: 'numeric',
@@ -127,16 +128,35 @@ function buildReactionPicker(
     picker.appendChild(btn);
   });
 
+  const custom = document.createElement('form');
+  custom.className = 'reaction-custom-form';
+  custom.innerHTML = `
+    <input aria-label="Emoji tùy chọn" maxlength="16" placeholder="Emoji" />
+    <button type="submit">Gửi</button>
+  `;
+  custom.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = custom.querySelector<HTMLInputElement>('input');
+    const value = input?.value.trim();
+    if (!value) return;
+    onReact(value);
+    if (input) input.value = '';
+  });
+  picker.appendChild(custom);
+
   return picker;
 }
 
-function buildSocialRow(item: CheckIn, onShowPicker: () => void): HTMLElement {
+function buildSocialRow(
+  item: CheckIn,
+  onShowPicker: () => void,
+  onShowReactionDetails: () => void,
+  onReply: () => void,
+): HTMLElement {
   const row = document.createElement('div');
   row.className = 'memory-social-row';
 
-  const activeReactions = REACTIONS
-    .map(({ type, emoji }) => ({ emoji, reaction: getReaction(item, type) }))
-    .filter((entry) => (entry.reaction?.count ?? 0) > 0);
+  const activeReactions = item.reactions.filter((reaction) => reaction.count > 0);
 
   const reactionBtn = document.createElement('button');
   reactionBtn.type = 'button';
@@ -144,22 +164,30 @@ function buildSocialRow(item: CheckIn, onShowPicker: () => void): HTMLElement {
   reactionBtn.addEventListener('click', onShowPicker);
 
   if (activeReactions.length === 0) {
-    reactionBtn.textContent = 'Bam giu de react';
+    reactionBtn.textContent = 'Giữ để react.';
   } else {
     reactionBtn.innerHTML = activeReactions
-      .slice(0, 4)
       .map(
-        ({ emoji, reaction }) =>
-          `<span class="reaction-pill${reaction?.reactedByMe ? ' selected' : ''}">${emoji}<strong>${reaction?.count ?? 0}</strong></span>`,
+        (reaction) =>
+          `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${escapeHtml(reaction.type)}<strong>${reaction.count}</strong></span>`,
       )
       .join('');
   }
 
-  const replyCount = document.createElement('span');
+  const detailBtn = document.createElement('button');
+  detailBtn.type = 'button';
+  detailBtn.className = 'memory-react-detail-btn';
+  detailBtn.textContent = 'Chi tiết';
+  detailBtn.addEventListener('click', onShowReactionDetails);
+
+  const replyCount = document.createElement('button');
+  replyCount.type = 'button';
   replyCount.className = 'memory-reply-count';
-  replyCount.textContent = item.replies.length ? `${item.replies.length} reply` : 'Chua co reply';
+  replyCount.textContent = item.replies.length ? `${item.replies.length} reply` : 'No reply';
+  replyCount.addEventListener('click', onReply);
 
   row.appendChild(reactionBtn);
+  row.appendChild(detailBtn);
   row.appendChild(replyCount);
   return row;
 }
@@ -168,7 +196,7 @@ function renderReplies(container: HTMLElement, replies: CheckInReply[]): void {
   container.innerHTML = '';
 
   if (replies.length === 0) {
-    container.innerHTML = `<p class="reply-empty">Chua co reply nao.</p>`;
+    container.innerHTML = `<p class="reply-empty">No reply.</p>`;
     return;
   }
 
@@ -207,8 +235,8 @@ export function renderMemoriesPage(): HTMLElement {
   header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px;';
   header.innerHTML = `
     <div>
-      <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.03em;">Ky niem cua hai dua</h1>
-      <p id="memories-count" style="font-size:13px;color:var(--text-secondary);">Dang tai khoanh khac...</p>
+      <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.03em;">Kỷ niệm của hai đứa</h1>
+      <p id="memories-count" style="font-size:13px;color:var(--text-secondary);">Đang tải khoảnh khắc...</p>
     </div>
     <button id="refresh-btn" class="btn-icon" style="border-radius:50%;width:40px;height:40px;">\u{1F504}</button>
   `;
@@ -231,7 +259,7 @@ export function renderMemoriesPage(): HTMLElement {
   const loadMoreBtn = document.createElement('button');
   loadMoreBtn.className = 'btn-ghost';
   loadMoreBtn.style.cssText = 'width:100%;padding:12px;margin-top:12px;font-weight:600;display:none;';
-  loadMoreBtn.textContent = 'Xem them khoanh khac';
+  loadMoreBtn.textContent = 'Xem thêm khoảnh khắc';
   content.appendChild(loadMoreBtn);
 
   async function reactToItem(item: CheckIn, type: ReactionType, refreshDetail?: () => void) {
@@ -243,8 +271,35 @@ export function renderMemoriesPage(): HTMLElement {
       renderGrid(allItems);
       refreshDetail?.();
     } catch {
-      showToast('Khong react duoc, thu lai nhe', 'error');
+      showToast('Không react được, thử lại nhé', 'error');
     }
+  }
+
+  function showReactionDetails(item: CheckIn) {
+    const content = document.createElement('div');
+    content.className = 'reaction-detail-list';
+
+    const activeReactions = item.reactions.filter((reaction) => reaction.count > 0);
+    if (activeReactions.length === 0) {
+      content.innerHTML = `<p class="reply-empty">Chưa có reaction nào.</p>`;
+    } else {
+      activeReactions.forEach((reaction) => {
+        const row = document.createElement('div');
+        row.className = `reaction-detail-row${reaction.reactedByMe ? ' selected' : ''}`;
+        row.innerHTML = `
+          <span class="reaction-detail-emoji">${escapeHtml(reaction.type)}</span>
+          <span>${reaction.count} lượt react</span>
+          ${reaction.reactedByMe ? '<strong>Bạn</strong>' : ''}
+        `;
+        content.appendChild(row);
+      });
+    }
+
+    showModal({
+      title: 'Chi tiết react',
+      content,
+      center: true,
+    });
   }
 
   async function fetchMemories(page = 1, append = false) {
@@ -273,13 +328,13 @@ export function renderMemoriesPage(): HTMLElement {
 
       const countEl = header.querySelector('#memories-count');
       if (countEl) {
-        countEl.textContent = `${res.total} khoanh khac da ghi dau`;
+        countEl.textContent = `${res.total} khoảnh khắc đã ghi dấu`;
       }
 
       loadMoreBtn.style.display = currentPage < totalPages ? 'block' : 'none';
     } catch (err: any) {
       isLoading = false;
-      showToast('Khong the tai ky niem: ' + err.message, 'error');
+      showToast('Không thể tải kỷ niệm: ' + err.message, 'error');
     }
   }
 
@@ -292,9 +347,9 @@ export function renderMemoriesPage(): HTMLElement {
       empty.className = 'empty-state animate-fade-in';
       empty.innerHTML = `
         <div class="empty-state-emoji">\u{1F338}</div>
-        <h3 class="empty-state-title">Chua co ky niem nao</h3>
-        <p class="empty-state-text">Hay gui tam check-in dau tien de ghi lai khoanh khac ben nhau nhe!</p>
-        <button id="empty-checkin-btn" class="btn-primary" style="margin-top:12px;">Gui Check-in Ngay</button>
+        <h3 class="empty-state-title">Chưa có kỷ niệm nào</h3>
+        <p class="empty-state-text">Hãy gửi tấm check-in đầu tiên để ghi lại khoảnh khắc bên nhau nhé!</p>
+        <button id="empty-checkin-btn" class="btn-primary" style="margin-top:12px;">Gửi check-in ngay</button>
       `;
       content.appendChild(empty);
 
@@ -322,7 +377,7 @@ export function renderMemoriesPage(): HTMLElement {
           <div class="memory-item-info">
             <span style="font-size:11px;opacity:0.9;color:#fff;">${escapeHtml(item.ownerName)}</span>
             <span class="memory-item-info-text" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              ${escapeHtml(item.caption || 'Gui anh check-in')}
+              ${escapeHtml(item.caption || 'Gửi ảnh check-in')}
             </span>
           </div>
         `;
@@ -333,7 +388,7 @@ export function renderMemoriesPage(): HTMLElement {
         card.innerHTML = `
           <span style="font-size:40px;">${emoji}</span>
           <span style="font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
-            ${escapeHtml(item.caption || 'Cam xuc hien tai')}
+            ${escapeHtml(item.caption || 'Cảm xúc hiện tại')}
           </span>
           <span style="font-size:10px;color:var(--text-secondary);">${escapeHtml(item.ownerName)} - ${formatTime(item.createdAt)}</span>
         `;
@@ -360,7 +415,14 @@ export function renderMemoriesPage(): HTMLElement {
 
       tile.appendChild(card);
       tile.appendChild(picker);
-      tile.appendChild(buildSocialRow(item, () => picker.classList.toggle('open')));
+      tile.appendChild(
+        buildSocialRow(
+          item,
+          () => picker.classList.toggle('open'),
+          () => showReactionDetails(item),
+          () => showCheckinDetail(item),
+        ),
+      );
       grid.appendChild(tile);
     });
   }
@@ -374,7 +436,7 @@ export function renderMemoriesPage(): HTMLElement {
       if (item.type === 'photo') {
         contentHtml = `
           <div class="checkin-detail-media">
-            <img src="${escapeHtml(item.photoUrl)}" alt="Anh check-in" />
+            <img src="${escapeHtml(item.photoUrl)}" alt="Ảnh check-in" />
           </div>
           ${item.caption ? `<p class="checkin-detail-caption">${escapeHtml(item.caption)}</p>` : ''}
         `;
@@ -392,14 +454,12 @@ export function renderMemoriesPage(): HTMLElement {
         `;
       }
 
-      const activeReactions = REACTIONS
-        .map(({ type, emoji }) => ({ emoji, reaction: getReaction(item, type) }))
-        .filter((entry) => (entry.reaction?.count ?? 0) > 0);
+      const activeReactions = item.reactions.filter((reaction) => reaction.count > 0);
 
       detail.innerHTML = `
         ${contentHtml}
         <div class="checkin-detail-meta">
-          <span>Gui boi <strong>${escapeHtml(item.ownerName)}</strong></span>
+          <span>Gửi bởi <strong>${escapeHtml(item.ownerName)}</strong></span>
           <time>${formatFullDateTime(item.createdAt)}</time>
         </div>
         <div class="checkin-detail-social">
@@ -408,11 +468,11 @@ export function renderMemoriesPage(): HTMLElement {
               activeReactions.length
                 ? activeReactions
                     .map(
-                      ({ emoji, reaction }) =>
-                        `<span class="reaction-pill${reaction?.reactedByMe ? ' selected' : ''}">${emoji}<strong>${reaction?.count ?? 0}</strong></span>`,
+                      (reaction) =>
+                        `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${escapeHtml(reaction.type)}<strong>${reaction.count}</strong></span>`,
                     )
                     .join('')
-                : '<span class="reaction-hint">Bam giu card de react</span>'
+                : '<span class="reaction-hint">Giữ để react.</span>'
             }
           </div>
         </div>
@@ -423,8 +483,8 @@ export function renderMemoriesPage(): HTMLElement {
           </div>
           <div id="reply-list" class="reply-detail-list"></div>
           <form id="reply-form" class="inline-reply-form">
-            <input id="reply-input" maxlength="500" placeholder="Viet reply..." />
-            <button type="submit">Gui</button>
+            <input id="reply-input" maxlength="500" placeholder="Viết reply..." />
+            <button type="submit">Gửi</button>
           </form>
         </div>
       `;
@@ -448,7 +508,7 @@ export function renderMemoriesPage(): HTMLElement {
           renderDetailContent();
           renderGrid(allItems);
         } catch {
-          showToast('Khong gui duoc reply', 'error');
+          showToast('Không gửi được reply', 'error');
         }
       });
     };
@@ -456,7 +516,7 @@ export function renderMemoriesPage(): HTMLElement {
     renderDetailContent();
 
     showModal({
-      title: 'Chi tiet khoanh khac',
+      title: 'Chi tiết khoảnh khắc',
       content: detail,
       center: true,
     });
@@ -466,7 +526,7 @@ export function renderMemoriesPage(): HTMLElement {
 
   header.querySelector('#refresh-btn')?.addEventListener('click', () => {
     fetchMemories(1);
-    showToast('Dang tai lai ky niem...', 'info');
+    showToast('Đang tải lại kỷ niệm...', 'info');
   });
 
   loadMoreBtn.addEventListener('click', () => {

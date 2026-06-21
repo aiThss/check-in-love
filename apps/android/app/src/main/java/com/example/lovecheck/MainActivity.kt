@@ -165,19 +165,7 @@ class MainActivity : ComponentActivity() {
                                     return true
                                 }
 
-                                val pickIntent = buildImagePickIntent()
-
-                                val chooserIntent = Intent(Intent.ACTION_CHOOSER).apply {
-                                    putExtra(Intent.EXTRA_INTENT, pickIntent)
-                                    putExtra(Intent.EXTRA_TITLE, "Chọn ảnh check-in")
-                                    putExtra(
-                                        Intent.EXTRA_INITIAL_INTENTS,
-                                        cameraIntent?.let { arrayOf(it) } ?: emptyArray<Intent>()
-                                    )
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-
-                                fileChooserLauncher.launch(chooserIntent)
+                                fileChooserLauncher.launch(buildImagePickIntent())
                                 return true
                             }
                         }

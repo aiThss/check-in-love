@@ -320,45 +320,59 @@ export function renderProfilePage(): HTMLElement {
 
     // 2. Theme Toggle Row
     const themeRow = document.createElement('div');
-    themeRow.className = 'card-solid';
-    themeRow.style.cssText = 'padding:16px;display:flex;justify-content:between;align-items:center;';
+    themeRow.className = 'card-solid theme-settings-card';
     
     const state = store.get();
     const curTheme = state.theme || 'system';
 
+    const themeOptions: Array<{ value: 'light' | 'dark' | 'system'; label: string; icon: string; hint: string }> = [
+      { value: 'light', label: 'Sáng', icon: '☀️', hint: 'Giao diện sáng' },
+      { value: 'dark', label: 'Tối', icon: '🌙', hint: 'Giao diện tối' },
+      { value: 'system', label: 'Hệ thống', icon: '⚙️', hint: 'Theo thiết bị' },
+    ];
+
     themeRow.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:20px;">🎨</span>
-        <div style="display:flex;flex-direction:column;">
-          <span style="font-size:14px;font-weight:600;">Giao diện (Theme)</span>
-          <span style="font-size:11px;color:var(--text-secondary);">Chọn Light, Dark hoặc tự động</span>
+      <div class="theme-settings-copy">
+        <span class="theme-settings-icon">🎨</span>
+        <div>
+          <span class="theme-settings-title">Giao diện</span>
+          <span class="theme-settings-subtitle">Chọn cách app hiển thị theo mắt bạn.</span>
         </div>
       </div>
-      <select id="theme-select" style="
-        background:var(--bg);
-        border:1px solid var(--border);
-        padding:6px 12px;
-        border-radius:8px;
-        font-size:13px;
-        font-weight:600;
-        color:var(--text-primary);
-        outline:none;
-      ">
-        <option value="light" ${curTheme === 'light' ? 'selected' : ''}>Sáng</option>
-        <option value="dark" ${curTheme === 'dark' ? 'selected' : ''}>Tối</option>
-        <option value="system" ${curTheme === 'system' ? 'selected' : ''}>Hệ thống</option>
-      </select>
+      <div class="theme-segmented" role="radiogroup" aria-label="Chọn giao diện">
+        ${themeOptions.map((option) => `
+          <button
+            type="button"
+            class="theme-choice${curTheme === option.value ? ' active' : ''}"
+            data-theme-choice="${option.value}"
+            role="radio"
+            aria-checked="${curTheme === option.value}"
+          >
+            <span>${option.icon}</span>
+            <strong>${option.label}</strong>
+            <small>${option.hint}</small>
+          </button>
+        `).join('')}
+      </div>
     `;
-    themeRow.querySelector('#theme-select')?.addEventListener('change', (e) => {
-      const selected = (e.target as HTMLSelectElement).value as 'light' | 'dark' | 'system';
-      store.set({ theme: selected });
-      
-      // Trigger apply theme
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const useDark = selected === 'dark' || (selected === 'system' && prefersDark);
-      document.documentElement.setAttribute('data-theme', useDark ? 'dark' : 'light');
-      
-      showToast('Đã đổi giao diện thành công!', 'success');
+
+    themeRow.querySelectorAll<HTMLButtonElement>('[data-theme-choice]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const selected = btn.dataset.themeChoice as 'light' | 'dark' | 'system';
+        store.set({ theme: selected });
+
+        themeRow.querySelectorAll<HTMLButtonElement>('[data-theme-choice]').forEach((item) => {
+          const active = item.dataset.themeChoice === selected;
+          item.classList.toggle('active', active);
+          item.setAttribute('aria-checked', String(active));
+        });
+
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const useDark = selected === 'dark' || (selected === 'system' && prefersDark);
+        document.documentElement.setAttribute('data-theme', useDark ? 'dark' : 'light');
+
+        showToast('Đã đổi giao diện thành công!', 'success');
+      });
     });
     settingsContainer.appendChild(themeRow);
 

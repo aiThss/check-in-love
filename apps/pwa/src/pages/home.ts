@@ -25,10 +25,10 @@ function formatTime(isoString: string): string {
   const diffH = Math.floor(diffMin / 60);
   const diffD = Math.floor(diffH / 24);
 
-  if (diffMin < 1) return 'Vua xong';
-  if (diffMin < 60) return `${diffMin} phut truoc`;
-  if (diffH < 24) return `${diffH} gio truoc`;
-  if (diffD === 1) return 'Hom qua';
+  if (diffMin < 1) return 'Vừa xong';
+  if (diffMin < 60) return `${diffMin} phút trước`;
+  if (diffH < 24) return `${diffH} giờ trước`;
+  if (diffD === 1) return 'Hôm qua';
   return date.toLocaleDateString('vi-VN');
 }
 
@@ -54,14 +54,15 @@ const MOOD_EMOJIS: Record<string, string> = {
 };
 
 const REACTIONS: Array<{ type: ReactionType; emoji: string; label: string }> = [
-  { type: 'heart', emoji: '\u2764\uFE0F', label: 'Yeu' },
-  { type: 'hug', emoji: '\u{1F917}', label: 'Om' },
-  { type: 'kiss', emoji: '\u{1F48B}', label: 'Hon' },
-  { type: 'laugh', emoji: '\u{1F602}', label: 'Cuoi' },
-  { type: 'miss', emoji: '\u{1F97A}', label: 'Nho' },
-  { type: 'wow', emoji: '\u{1F929}', label: 'Wow' },
-  { type: 'fire', emoji: '\u{1F525}', label: 'Xinh' },
-  { type: 'sad', emoji: '\u{1F972}', label: 'Thuong' },
+  { type: '❤️', emoji: '❤️', label: 'Yêu' },
+  { type: '🥰', emoji: '🥰', label: 'Thương' },
+  { type: '😘', emoji: '😘', label: 'Hôn' },
+  { type: '😂', emoji: '😂', label: 'Cười' },
+  { type: '🥺', emoji: '🥺', label: 'Nhớ' },
+  { type: '🤗', emoji: '🤗', label: 'Ôm' },
+  { type: '🔥', emoji: '🔥', label: 'Xinh' },
+  { type: '✨', emoji: '✨', label: 'Lấp lánh' },
+  { type: '😭', emoji: '😭', label: 'Thương quá' },
 ];
 
 function getReaction(checkin: CheckIn, type: ReactionType): Reaction | undefined {
@@ -127,6 +128,22 @@ function buildReactionPicker(
     picker.appendChild(btn);
   });
 
+  const custom = document.createElement('form');
+  custom.className = 'reaction-custom-form';
+  custom.innerHTML = `
+    <input aria-label="Emoji tùy chọn" maxlength="16" placeholder="Emoji" />
+    <button type="submit">Gửi</button>
+  `;
+  custom.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = custom.querySelector<HTMLInputElement>('input');
+    const value = input?.value.trim();
+    if (!value) return;
+    onReact(value);
+    if (input) input.value = '';
+  });
+  picker.appendChild(custom);
+
   return picker;
 }
 
@@ -143,17 +160,15 @@ function buildReactionSummary(
   summary.className = 'reaction-summary';
   summary.addEventListener('click', onShowPicker);
 
-  const activeReactions = REACTIONS
-    .map(({ type, emoji }) => ({ emoji, reaction: getReaction(checkin, type) }))
-    .filter((item) => (item.reaction?.count ?? 0) > 0);
+  const activeReactions = checkin.reactions.filter((reaction) => reaction.count > 0);
 
   if (activeReactions.length === 0) {
-    summary.innerHTML = `<span class="reaction-hint">Bam giu check-in de react</span>`;
+    summary.innerHTML = `<span class="reaction-hint">Giữ để react.</span>`;
   } else {
     summary.innerHTML = activeReactions
       .map(
-        ({ emoji, reaction }) =>
-          `<span class="reaction-pill${reaction?.reactedByMe ? ' selected' : ''}">${emoji}<strong>${reaction?.count ?? 0}</strong></span>`,
+        (reaction) =>
+          `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${escapeHtml(reaction.type)}<strong>${reaction.count}</strong></span>`,
       )
       .join('');
   }
@@ -195,25 +210,25 @@ function showReplyComposer(
   const form = document.createElement('div');
   form.className = 'reply-composer';
   form.innerHTML = `
-    <textarea id="reply-message" class="reply-textarea" rows="4" maxlength="500" placeholder="Viet reply cho check-in nay"></textarea>
+    <textarea id="reply-message" class="reply-textarea" rows="4" maxlength="500" placeholder="Viết reply cho check-in này"></textarea>
   `;
 
   showModal({
     title: 'Reply check-in',
     content: form,
-    confirmText: 'Gui reply',
-    cancelText: 'Huy',
+    confirmText: 'Gửi reply',
+    cancelText: 'Hủy',
     onConfirm: async () => {
       const textarea = form.querySelector<HTMLTextAreaElement>('#reply-message');
       const message = textarea?.value.trim() ?? '';
       if (!message) {
-        showToast('Nhap noi dung reply truoc nhe', 'error');
+        showToast('Nhập nội dung reply trước nhé', 'error');
         throw new Error('Reply message required');
       }
 
       const replies = await addReply(checkin.id, message);
       onSaved(replies);
-      showToast('Da gui reply', 'success');
+      showToast('Đã gửi reply', 'success');
     },
   });
 
@@ -238,7 +253,7 @@ function buildCheckinCard(
       <img
         class="checkin-card-image"
         src="${escapeHtml(checkin.photoUrl)}"
-        alt="Anh check-in"
+        alt="Ảnh check-in"
         loading="lazy"
       />
       <div class="checkin-card-overlay">
@@ -281,10 +296,10 @@ function buildEmptyState(partnerName: string): HTMLElement {
   el.className = 'empty-state animate-fade-in';
   el.innerHTML = `
     <div class="empty-state-emoji">\u{1F4ED}</div>
-    <div class="empty-state-title">Chua co gi moi hom nay</div>
-    <p class="empty-state-text">${escapeHtml(partnerName)} chua gui check-in nao hom nay.<br>Ban co the gui truoc de bat dau nhe!</p>
+    <div class="empty-state-title">Chưa có gì mới hôm nay</div>
+    <p class="empty-state-text">${escapeHtml(partnerName)} chưa gửi check-in nào hôm nay.<br>Bạn có thể gửi trước để bắt đầu nhé!</p>
     <button class="btn-primary" id="home-checkin-btn" style="margin-top:8px">
-      Gui check-in
+      Gửi check-in
     </button>
   `;
   return el;
@@ -294,7 +309,7 @@ export function renderHomePage(): HTMLElement {
   const state = store.get();
   const user = state.user;
   const couple = state.couple;
-  const partnerName = user?.partnerName ?? 'Nguoi ay';
+  const partnerName = user?.partnerName ?? 'Người ấy';
 
   const page = document.createElement('div');
   page.className = 'page animate-fade-in';
@@ -308,9 +323,9 @@ export function renderHomePage(): HTMLElement {
   const streak = calcStreak(couple);
   const days = calcDaysTogether(couple?.loveStartDate);
   streakBadge.innerHTML = `
-    <div class="streak-banner">\u{1F525} ${streak} ngay</div>
+    <div class="streak-banner">\u{1F525} ${streak} ngày</div>
     <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;padding-left:2px">
-      ${days} ngay ben nhau
+      ${days} ngày bên nhau
     </div>
   `;
 
@@ -319,7 +334,7 @@ export function renderHomePage(): HTMLElement {
 
   const themeBtn = document.createElement('button');
   themeBtn.className = 'btn-icon';
-  themeBtn.setAttribute('aria-label', 'Doi giao dien');
+  themeBtn.setAttribute('aria-label', 'Đổi giao diện');
   const currentTheme = state.theme;
   themeBtn.textContent =
     currentTheme === 'dark' ? '\u2600\uFE0F' : currentTheme === 'light' ? '\u{1F319}' : '\u{1F317}';
@@ -333,7 +348,7 @@ export function renderHomePage(): HTMLElement {
 
   const refreshBtn = document.createElement('button');
   refreshBtn.className = 'btn-icon';
-  refreshBtn.setAttribute('aria-label', 'Lam moi');
+  refreshBtn.setAttribute('aria-label', 'Làm mới');
   refreshBtn.textContent = '\u{1F504}';
   refreshBtn.addEventListener('click', () => loadCheckin());
 
@@ -352,7 +367,7 @@ export function renderHomePage(): HTMLElement {
     'padding:0 20px 8px;font-size:16px;font-weight:600;color:var(--text-primary);';
   partnerLabel.innerHTML = `
     <span style="color:var(--accent)">${escapeHtml(partnerName)}</span>
-    <span style="color:var(--text-secondary);font-weight:400"> da gui cho ban:</span>
+    <span style="color:var(--text-secondary);font-weight:400"> đã gửi cho bạn:</span>
   `;
   page.appendChild(partnerLabel);
 
@@ -374,21 +389,21 @@ export function renderHomePage(): HTMLElement {
     card.className = 'push-permission-card';
     card.innerHTML = `
       <div>
-        <strong>Bat thong bao check-in</strong>
-        <span>Nhan noti khi nguoi ay gui check-in, reply hoac react.</span>
+        <strong>Bật thông báo check-in</strong>
+        <span>Nhận noti khi người ấy gửi check-in, reply hoặc react.</span>
       </div>
-      <button type="button" class="btn-primary">Bat</button>
+      <button type="button" class="btn-primary">Bật</button>
     `;
 
     card.querySelector('button')?.addEventListener('click', async () => {
       const setup = await ensurePushSubscription(true).catch(
-        (): PushSetupResult => ({ status: 'error', message: 'Chua bat duoc thong bao' }),
+        (): PushSetupResult => ({ status: 'error', message: 'Chưa bật được thông báo' }),
       );
       if (setup.status === 'subscribed') {
         card.remove();
-        showToast('Da bat thong bao', 'success');
+        showToast('Đã bật thông báo', 'success');
       } else {
-        showToast(setup.message ?? 'Chua bat duoc thong bao', 'error');
+        showToast(setup.message ?? 'Chưa bật được thông báo', 'error');
       }
     });
 
@@ -407,7 +422,7 @@ export function renderHomePage(): HTMLElement {
             checkin.reactions = await addReaction(checkin.id, type);
             render();
           } catch {
-            showToast('Khong the react, thu lai nhe', 'error');
+            showToast('Không thể react, thử lại nhé', 'error');
           }
         },
         () => {
@@ -448,9 +463,9 @@ export function renderHomePage(): HTMLElement {
       contentArea.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-emoji">\u{1F622}</div>
-          <div class="empty-state-title">Khong tai duoc du lieu</div>
-          <p class="empty-state-text">Kiem tra ket noi mang va thu lai</p>
-          <button class="btn-ghost" id="retry-btn" style="margin-top:8px">Thu lai</button>
+          <div class="empty-state-title">Không tải được dữ liệu</div>
+          <p class="empty-state-text">Kiểm tra kết nối mạng và thử lại</p>
+          <button class="btn-ghost" id="retry-btn" style="margin-top:8px">Thử lại</button>
         </div>
       `;
       contentArea.querySelector('#retry-btn')?.addEventListener('click', () => loadCheckin());

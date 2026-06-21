@@ -9,15 +9,7 @@ export type MoodType =
   | 'out'
   | 'eating'
   | 'needhug';
-export type ReactionType =
-  | 'heart'
-  | 'hug'
-  | 'kiss'
-  | 'laugh'
-  | 'miss'
-  | 'wow'
-  | 'fire'
-  | 'sad';
+export type ReactionType = string;
 
 export interface ReactionSubDoc {
   userId: Types.ObjectId;
@@ -55,7 +47,7 @@ const ReactionSchema = new Schema<ReactionSubDoc>(
     userId: { type: Schema.Types.ObjectId, required: true },
     type: {
       type: String,
-      enum: ['heart', 'hug', 'kiss', 'laugh', 'miss', 'wow', 'fire', 'sad'],
+      maxlength: 32,
       required: true,
     },
     createdAt: { type: Date, default: () => new Date() },

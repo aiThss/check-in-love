@@ -9,22 +9,11 @@ import {
   openGallery,
   processImage,
   revokePreviewUrl,
-  type PhotoFit,
 } from '../components/camera';
 import type { CheckIn } from '../api/types';
 
-type PhotoFrame = {
-  id: string;
-  label: string;
-  ratio: number;
-  cssRatio: string;
-};
-
-const PHOTO_FRAMES: PhotoFrame[] = [
-  { id: 'square', label: '1:1', ratio: 1, cssRatio: '1 / 1' },
-  { id: 'portrait', label: '4:5', ratio: 4 / 5, cssRatio: '4 / 5' },
-  { id: 'classic', label: '3:4', ratio: 3 / 4, cssRatio: '3 / 4' },
-];
+const PHOTO_ASPECT_RATIO = 1;
+const PHOTO_CSS_RATIO = '1 / 1';
 
 const MOODS = [
   { value: 'happy', emoji: '😊', label: 'Vui vẻ' },
@@ -153,8 +142,6 @@ export function renderCheckinPage(): HTMLElement {
   let selectedFile: File | null = null;
   let selectedSourceFile: File | null = null;
   let selectedPreviewUrl: string | null = null;
-  let selectedPhotoFrame = PHOTO_FRAMES[0];
-  let selectedPhotoFit: PhotoFit = 'cover';
   let isProcessingPhoto = false;
   let photoCaption = '';
   let selectedMood: string | null = null;
@@ -173,10 +160,9 @@ export function renderCheckinPage(): HTMLElement {
 
     try {
       const result = await processImage(sourceFile, {
-        aspectRatio: selectedPhotoFrame.ratio,
-        fit: selectedPhotoFit,
-        maxSize: 1080,
-        quality: 0.82,
+        aspectRatio: PHOTO_ASPECT_RATIO,
+        maxSize: 900,
+        quality: 0.76,
       });
 
       revokePreviewUrl(selectedPreviewUrl);
@@ -194,14 +180,6 @@ export function renderCheckinPage(): HTMLElement {
   function selectPhoto(file: File): void {
     selectedSourceFile = file;
     void applyPhotoTransform(file);
-  }
-
-  function refreshPhotoTransform(): void {
-    if (!selectedSourceFile) {
-      renderContentForm();
-      return;
-    }
-    void applyPhotoTransform(selectedSourceFile);
   }
 
   function buildPhotoPayload(file: File, caption: string): FormData {
@@ -232,10 +210,9 @@ export function renderCheckinPage(): HTMLElement {
 
       showToast('Upload ảnh chưa ổn, đang thử bản nhẹ hơn...', 'info');
       const fallback = await processImage(selectedSourceFile, {
-        aspectRatio: selectedPhotoFrame.ratio,
-        fit: selectedPhotoFit,
-        maxSize: 720,
-        quality: 0.68,
+        aspectRatio: PHOTO_ASPECT_RATIO,
+        maxSize: 640,
+        quality: 0.62,
       });
 
       revokePreviewUrl(selectedPreviewUrl);
@@ -290,7 +267,7 @@ export function renderCheckinPage(): HTMLElement {
   function renderPhotoForm(): void {
     const picker = document.createElement('div');
     picker.className = `photo-composer${selectedPreviewUrl ? ' has-photo' : ''}`;
-    picker.style.aspectRatio = selectedPhotoFrame.cssRatio;
+    picker.style.aspectRatio = PHOTO_CSS_RATIO;
 
     if (selectedPreviewUrl) {
       picker.innerHTML = `
@@ -352,41 +329,6 @@ export function renderCheckinPage(): HTMLElement {
 
     contentArea.appendChild(picker);
 
-    const frameControls = document.createElement('div');
-    frameControls.className = 'photo-frame-controls';
-    frameControls.innerHTML = `
-      <div class="photo-segment" aria-label="Chọn khung ảnh">
-        ${PHOTO_FRAMES.map((frame) => `
-          <button
-            class="${frame.id === selectedPhotoFrame.id ? 'active' : ''}"
-            data-frame="${frame.id}"
-            type="button"
-          >${frame.label}</button>
-        `).join('')}
-      </div>
-      <div class="photo-segment" aria-label="Chọn kiểu ảnh">
-        <button class="${selectedPhotoFit === 'cover' ? 'active' : ''}" data-fit="cover" type="button">Fill</button>
-        <button class="${selectedPhotoFit === 'contain' ? 'active' : ''}" data-fit="contain" type="button">Fit</button>
-      </div>
-    `;
-    frameControls.querySelectorAll<HTMLButtonElement>('[data-frame]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const frame = PHOTO_FRAMES.find((item) => item.id === btn.dataset.frame);
-        if (!frame || frame.id === selectedPhotoFrame.id) return;
-        selectedPhotoFrame = frame;
-        refreshPhotoTransform();
-      });
-    });
-    frameControls.querySelectorAll<HTMLButtonElement>('[data-fit]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const fit = btn.dataset.fit as PhotoFit | undefined;
-        if (!fit || fit === selectedPhotoFit) return;
-        selectedPhotoFit = fit;
-        refreshPhotoTransform();
-      });
-    });
-    contentArea.appendChild(frameControls);
-
     const capGroup = document.createElement('div');
     capGroup.className = 'input-group';
     capGroup.innerHTML = `
@@ -443,176 +385,7 @@ export function renderCheckinPage(): HTMLElement {
       return;
     }
 
-    if (activeMode === 'photo') {
-      // Photo Picker Container
-      const picker = document.createElement('div');
-      picker.style.cssText = `
-        border: 2px dashed var(--border);
-        border-radius: 20px;
-        height: clamp(188px, 28vh, 232px);
-        min-height: 188px;
-        max-height: 232px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        cursor: pointer;
-        overflow: hidden;
-        position: relative;
-        background: var(--surface-solid);
-        transition: border-color var(--duration-fast);
-      `;
-
-      if (selectedPreviewUrl) {
-        picker.innerHTML = `
-          <img src="${selectedPreviewUrl}" style="width:100%;height:100%;object-fit:cover;" />
-          <button id="remove-photo" style="
-            position:absolute;
-            top:12px;
-            right:12px;
-            background:rgba(0,0,0,0.6);
-            color:#fff;
-            border-radius:50%;
-            width:32px;
-            height:32px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-size:16px;
-            font-weight:bold;
-            border:none;
-            backdrop-filter:blur(4px);
-            z-index: 10;
-          ">×</button>
-        `;
-        picker.querySelector('#remove-photo')?.addEventListener('click', (e) => {
-          e.stopPropagation();
-          selectedFile = null;
-          selectedPreviewUrl = null;
-          renderContentForm();
-        });
-      } else {
-        picker.innerHTML = `
-          <div style="font-size:44px;line-height:1;">📸</div>
-          <div style="text-align:center;">
-            <p style="font-size:15px;font-weight:600;color:var(--text-primary);">Chụp ảnh hoặc Chọn từ album</p>
-            <p style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Nhấn vào để tải hình ảnh lên</p>
-          </div>
-        `;
-        compactUploadPicker(picker);
-        picker.addEventListener('click', () => {
-          // Show options: Camera or Gallery
-          const modalContent = document.createElement('div');
-          modalContent.style.cssText = 'display:flex;flex-direction:column;gap:12px;padding:8px 0;';
-          modalContent.innerHTML = `
-            <button id="opt-camera" class="btn-ghost" style="width:100%;padding:14px;font-weight:600;">📷 Chụp ảnh mới</button>
-            <button id="opt-gallery" class="btn-ghost" style="width:100%;padding:14px;font-weight:600;">🖼️ Chọn từ thư viện</button>
-          `;
-
-          // Custom small bottom sheet or modal
-          const overlay = document.createElement('div');
-          overlay.className = 'modal-overlay';
-          overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:1000;';
-          
-          const sheet = document.createElement('div');
-          sheet.className = 'modal animate-slide-up';
-          sheet.style.cssText = 'background:var(--bg);border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:440px;box-shadow:var(--shadow-elevated);';
-          sheet.innerHTML = `
-            <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px auto;"></div>
-            <h3 style="font-size:16px;font-weight:700;text-align:center;margin-bottom:16px;">Chọn phương thức</h3>
-            <div style="display:flex;flex-direction:column;gap:10px;">
-              <button id="btn-camera" class="btn-primary" style="width:100%;padding:12px;">📷 Chụp ảnh mới</button>
-              <button id="btn-gallery" class="btn-ghost" style="width:100%;padding:12px;">🖼️ Chọn ảnh có sẵn</button>
-              <button id="btn-cancel-sheet" class="btn-ghost" style="width:100%;padding:12px;border:none;margin-top:4px;">Hủy bỏ</button>
-            </div>
-          `;
-          overlay.appendChild(sheet);
-          document.body.appendChild(overlay);
-
-          const closeSheet = () => document.body.removeChild(overlay);
-
-          sheet.querySelector('#btn-cancel-sheet')?.addEventListener('click', closeSheet);
-          sheet.querySelector('#btn-camera')?.addEventListener('click', () => {
-            closeSheet();
-            openCamera((res) => {
-              selectedFile = res.file;
-              selectedPreviewUrl = res.preview;
-              renderContentForm();
-            });
-          });
-          sheet.querySelector('#btn-gallery')?.addEventListener('click', () => {
-            closeSheet();
-            openGallery((res) => {
-              selectedFile = res.file;
-              selectedPreviewUrl = res.preview;
-              renderContentForm();
-            });
-          });
-        });
-      }
-      contentArea.appendChild(picker);
-
-      // Caption
-      const capGroup = document.createElement('div');
-      capGroup.className = 'input-group';
-      capGroup.innerHTML = `
-        <label class="input-label">Mô tả (Không bắt buộc)</label>
-        <input type="text" id="caption-input" class="input" placeholder="Viết vài dòng ngọt ngào..." maxlength="280" />
-      `;
-      compactCaptionGroup(capGroup);
-      contentArea.appendChild(capGroup);
-
-      // Quick message selection
-      const quickHeader = document.createElement('label');
-      quickHeader.className = 'input-label';
-      quickHeader.textContent = 'Chọn nhanh tin nhắn';
-      quickHeader.style.marginBottom = '0';
-      contentArea.appendChild(quickHeader);
-
-      const chipsWrapper = document.createElement('div');
-      chipsWrapper.style.cssText = 'display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding-bottom:4px;margin-top:-8px;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch;';
-      QUICK_MESSAGES.forEach(msg => {
-        const chip = document.createElement('button');
-        chip.className = `btn-ghost ${selectedQuickMsg === msg ? 'active' : ''}`;
-        chip.style.cssText = `
-          white-space:nowrap;
-          flex-shrink:0;
-          font-size:12px;
-          padding:5px 10px;
-          border-radius:12px;
-          background: ${selectedQuickMsg === msg ? 'var(--accent-soft)' : 'var(--surface-solid)'};
-          color: ${selectedQuickMsg === msg ? 'var(--accent)' : 'var(--text-primary)'};
-          border-color: ${selectedQuickMsg === msg ? 'var(--accent)' : 'var(--border)'};
-        `;
-        chip.textContent = msg;
-        chip.addEventListener('click', () => {
-          if (selectedQuickMsg === msg) {
-            selectedQuickMsg = null;
-          } else {
-            selectedQuickMsg = msg;
-            const captionInput = contentArea.querySelector('#caption-input') as HTMLInputElement;
-            if (captionInput) captionInput.value = msg;
-          }
-          renderContentFormOnlyChips();
-        });
-        chipsWrapper.appendChild(chip);
-      });
-      contentArea.appendChild(chipsWrapper);
-
-      function renderContentFormOnlyChips() {
-        // Just visual updates to chips
-        const chips = chipsWrapper.querySelectorAll('button');
-        chips.forEach((btn, idx) => {
-          const msg = QUICK_MESSAGES[idx];
-          const isSelected = selectedQuickMsg === msg;
-          btn.style.background = isSelected ? 'var(--accent-soft)' : 'var(--surface-solid)';
-          btn.style.color = isSelected ? 'var(--accent)' : 'var(--text-primary)';
-          btn.style.borderColor = isSelected ? 'var(--accent)' : 'var(--border)';
-        });
-      }
-
-    } else if (activeMode === 'text') {
+    if (activeMode === 'text') {    } else if (activeMode === 'text') {
       // Text Checkin
       const textGroup = document.createElement('div');
       textGroup.className = 'input-group';

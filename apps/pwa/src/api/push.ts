@@ -74,7 +74,7 @@ export async function ensurePushSubscription(
   if (!isPushSupported()) {
     return {
       status: 'unsupported',
-      message: 'Thiet bi nay chua ho tro push cho PWA',
+      message: 'Thiết bị này chưa hỗ trợ push cho PWA',
     };
   }
 
@@ -82,14 +82,14 @@ export async function ensurePushSubscription(
   if (!config?.enabled || !config.publicKey) {
     return {
       status: 'disabled',
-      message: 'Server chua cau hinh VAPID push key',
+      message: 'Server chưa cấu hình VAPID push key',
     };
   }
 
   if (Notification.permission === 'denied') {
     return {
       status: 'denied',
-      message: 'Thong bao dang bi tat trong cai dat trinh duyet',
+      message: 'Thông báo đang bị tắt trong cài đặt trình duyệt',
     };
   }
 
@@ -102,7 +102,7 @@ export async function ensurePushSubscription(
     if (permission !== 'granted') {
       return {
         status: permission === 'denied' ? 'denied' : 'prompt',
-        message: 'Ban chua cap quyen thong bao',
+        message: 'Bạn chưa cấp quyền thông báo',
       };
     }
   }
@@ -111,7 +111,7 @@ export async function ensurePushSubscription(
   if (!registration) {
     return {
       status: 'error',
-      message: 'Khong dang ky duoc service worker',
+      message: 'Không đăng ký được service worker',
     };
   }
 
