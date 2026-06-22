@@ -281,8 +281,10 @@ a {
   justify-content: center;
   width: 52px;
   height: 52px;
-  border-radius: 16px;
-  background: transparent;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
   box-shadow: 0 4px 16px var(--accent-glow);
   margin: 6px 8px;
   cursor: pointer;
@@ -514,6 +516,14 @@ textarea.input {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
+}
+
+/* White circular background for info toast loading/waiting icon in dark mode */
+[data-theme='dark'] .toast-info .toast-icon img,
+:root:not([data-theme='light']) .toast-info .toast-icon img {
+  background: #ffffff;
+  border-radius: 50%;
+  padding: 1px;
 }
 
 .toast-exit {

@@ -455,28 +455,6 @@ export function renderMemoriesPage(): HTMLElement {
   }
 
   function showCheckinDetail(item: CheckIn) {
-    // ── Android native photo viewer ──────────────────────────────────────
-    const isAndroidWrapper = navigator.userAgent.includes('LoveCheckAndroidWrapper');
-    if (
-      isAndroidWrapper &&
-      item.type === 'photo' &&
-      item.photoUrl &&
-      typeof (window as any).LoveCheckAndroid?.openPhotoViewer === 'function'
-    ) {
-      const ts  = new Date(item.createdAt);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const fileName = `checkin-love-${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}-${pad(ts.getHours())}-${pad(ts.getMinutes())}.jpg`;
-      const dateStr = `${pad(ts.getHours())}:${pad(ts.getMinutes())} ${ts.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}`;
-      (window as any).LoveCheckAndroid.openPhotoViewer(
-        item.photoUrl,
-        item.caption ?? '',
-        item.ownerName,
-        dateStr,
-        fileName,
-      );
-      return; // Don't show web modal for photo type on Android — native viewer handles it
-    }
-
     const detail = document.createElement('div');
     detail.className = 'checkin-detail';
 
