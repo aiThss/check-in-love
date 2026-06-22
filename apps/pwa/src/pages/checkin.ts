@@ -162,7 +162,8 @@ export function renderCheckinPage(): HTMLElement {
     try {
       const result = await processImage(sourceFile, {
         aspectRatio: PHOTO_ASPECT_RATIO,
-        maxSize: 1080,
+        // Max 1600px — balance between quality and upload speed
+        maxSize: 1600,
         quality: 0.85,
       });
 
@@ -567,11 +568,33 @@ export function renderCheckinPage(): HTMLElement {
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner" style="width:20px;height:20px;border-width:2px;border-color:#fff transparent transparent transparent;"></span> Đang gửi...`;
 
+    // For photo mode: navigate home immediately after validation so UX feels instant.
+    // The upload continues in the background and updates the store on success.
+    if (activeMode === 'photo') {
+      showHeartBurstEffect();
+      showToast('Đang gửi ảnh... 💕', 'info');
+      navigate('/app/home');
+
+      // Fire-and-forget background upload
+      createPhotoCheckinWithRetry(photoCaption)
+        .then((result) => {
+          if (typeof result.streak === 'number') {
+            const current = store.get();
+            if (current.couple) {
+              store.set({ couple: { ...current.couple, streak: result.streak } });
+            }
+          }
+          showToast('Gửi check-in thành công! 💕', 'success');
+        })
+        .catch((err: unknown) => {
+          logger.error('Background photo upload failed', err);
+          showToast('Gửi ảnh thất bại, thử lại nhé.', 'error');
+        });
+      return;
+    }
+
     try {
-      const result =
-        activeMode === 'photo'
-          ? await createPhotoCheckinWithRetry(photoCaption)
-          : await createCheckin(payload);
+      const result = await createCheckin(payload);
       if (typeof result.streak === 'number') {
         const current = store.get();
         if (current.couple) {
@@ -589,11 +612,7 @@ export function renderCheckinPage(): HTMLElement {
 
     } catch (err) {
       logger.error('Failed to submit check-in', err);
-      if (err instanceof ApiError && err.code === 'NETWORK_ERROR' && activeMode === 'photo') {
-        showToast('Upload ảnh chưa tới server. Thử ảnh nhỏ hơn hoặc đổi mạng rồi gửi lại.', 'error');
-      } else {
-        showToast((err as Error).message || 'Gửi check-in thất bại!', 'error');
-      }
+      showToast((err as Error).message || 'Gửi check-in thất bại!', 'error');
       sendBtn.disabled = false;
       sendBtn.innerHTML = `Gửi ngay 💕`;
     }

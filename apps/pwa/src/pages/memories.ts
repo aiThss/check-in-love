@@ -467,6 +467,7 @@ export function renderMemoriesPage(): HTMLElement {
           </div>
           ${item.caption ? `<p class="checkin-detail-caption">${escapeHtml(item.caption)}</p>` : ''}
         `;
+
       } else if (item.type === 'mood') {
         const emoji = MOOD_EMOJIS[item.mood || ''] || '\u{1F60A}';
         contentHtml = `
@@ -518,6 +519,55 @@ export function renderMemoriesPage(): HTMLElement {
 
       const replyList = detail.querySelector<HTMLElement>('#reply-list');
       if (replyList) renderReplies(replyList, item.replies);
+
+      // Inject download button into media wrapper for photo check-ins
+      if (item.type === 'photo' && item.photoUrl) {
+        const mediaEl = detail.querySelector<HTMLElement>('.checkin-detail-media');
+        if (mediaEl) {
+          const dlBtn = document.createElement('button');
+          dlBtn.type = 'button';
+          dlBtn.className = 'download-btn';
+          dlBtn.setAttribute('aria-label', 'Tải ảnh xuống');
+          dlBtn.innerHTML = '&#x2193;'; // ↓ arrow icon
+
+          dlBtn.addEventListener('click', async () => {
+            const photoUrl = item.photoUrl;
+            if (!photoUrl) return;
+
+            dlBtn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#fff transparent transparent transparent;"></span>';
+            dlBtn.style.pointerEvents = 'none';
+
+            try {
+              // Fetch as blob to support cross-origin images
+              const response = await fetch(photoUrl, { mode: 'cors' });
+              const blob = await response.blob();
+              const objectUrl = URL.createObjectURL(blob);
+
+              const ts = new Date(item.createdAt);
+              const pad = (n: number) => String(n).padStart(2, '0');
+              const fileName = `checkin-love-${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}-${pad(ts.getHours())}-${pad(ts.getMinutes())}.jpg`;
+
+              const anchor = document.createElement('a');
+              anchor.href = objectUrl;
+              anchor.download = fileName;
+              anchor.style.display = 'none';
+              document.body.appendChild(anchor);
+              anchor.click();
+              document.body.removeChild(anchor);
+
+              setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+            } catch {
+              // Fallback: open in new tab so user can long-press save
+              window.open(photoUrl, '_blank', 'noopener,noreferrer');
+            } finally {
+              dlBtn.innerHTML = '&#x2193;';
+              dlBtn.style.pointerEvents = '';
+            }
+          });
+
+          mediaEl.appendChild(dlBtn);
+        }
+      }
 
       const replyForm = detail.querySelector<HTMLFormElement>('#reply-form');
       replyForm?.addEventListener('submit', async (event) => {

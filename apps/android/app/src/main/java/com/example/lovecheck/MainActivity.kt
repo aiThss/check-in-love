@@ -72,14 +72,17 @@ class MainActivity : ComponentActivity() {
     private var cameraPhotoUri: Uri? = null
     private var cameraPhotoFile: File? = null
     private var webView: WebView? = null
+    // Holds the FCM token that arrived before the WebView page had finished loading.
+    // Injected into JS inside onPageFinished to avoid the race condition where
+    // window.onFcmTokenReceived is not yet registered.
+    private var pendingFcmToken: String? = null
+    private var webPageLoaded = false
 
     private val fcmReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val token = intent?.getStringExtra("token")
             if (token != null) {
-                runOnUiThread {
-                    webView?.evaluateJavascript("if (typeof window.onFcmTokenReceived === 'function') { window.onFcmTokenReceived('$token'); }", null)
-                }
+                runOnUiThread { injectFcmToken(token) }
             }
         }
     }
@@ -122,9 +125,8 @@ class MainActivity : ComponentActivity() {
                     val token = task.result
                     val prefs = getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
                     prefs.edit().putString("fcm_token", token).apply()
-                    runOnUiThread {
-                        webView?.evaluateJavascript("if (typeof window.onFcmTokenReceived === 'function') { window.onFcmTokenReceived('$token'); }", null)
-                    }
+                    // Defer injection until page is loaded
+                    runOnUiThread { injectFcmToken(token) }
                 }
             }
         } catch (e: Exception) {
@@ -159,6 +161,16 @@ class MainActivity : ComponentActivity() {
                         addJavascriptInterface(LoveCheckBridge(context.applicationContext), "LoveCheckAndroid")
 
                         webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView, url: String) {
+                                super.onPageFinished(view, url)
+                                webPageLoaded = true
+                                // Inject any token that arrived before the page was ready
+                                pendingFcmToken?.let { token ->
+                                    pendingFcmToken = null
+                                    injectFcmToken(token)
+                                }
+                            }
+
                             override fun shouldOverrideUrlLoading(
                                 view: WebView,
                                 request: WebResourceRequest
@@ -298,6 +310,23 @@ class MainActivity : ComponentActivity() {
     private fun initialUrlFromIntent(intent: Intent?): String {
         val data = intent?.data ?: return APP_URL
         return if (isAllowedInWebView(data)) data.toString() else APP_URL
+    }
+
+    /**
+     * Injects the FCM token into the WebView JS context.
+     * If the page has not finished loading yet, saves the token as [pendingFcmToken]
+     * so it can be injected inside [WebViewClient.onPageFinished].
+     */
+    private fun injectFcmToken(token: String) {
+        if (!webPageLoaded) {
+            pendingFcmToken = token
+            return
+        }
+        val escaped = token.replace("'", "\\'")
+        webView?.evaluateJavascript(
+            "if (typeof window.onFcmTokenReceived === 'function') { window.onFcmTokenReceived('$escaped'); }",
+            null
+        )
     }
 
     override fun onBackPressed() {

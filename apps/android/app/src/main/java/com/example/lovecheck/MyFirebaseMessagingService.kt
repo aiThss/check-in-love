@@ -39,15 +39,37 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
 
+        // Server sends data-only FCM messages (no notification block) so that
+        // onMessageReceived is always called even when the app is in background.
+        // We also handle notification payload here as a fallback for compatibility.
         val data = remoteMessage.data
-        if (data.isEmpty()) return
+        val notification = remoteMessage.notification
 
-        val title = data["title"] ?: "Check IN Love 💕"
-        val body = data["body"] ?: ""
-        val senderName = data["senderName"] ?: "Người ấy"
-        val senderAvatar = data["senderAvatar"]
-        val actionType = data["actionType"] ?: "reminder"
-        val targetUrl = data["targetUrl"] ?: "/app/home"
+        val title: String
+        val body: String
+        val senderName: String
+        val senderAvatar: String?
+        val actionType: String
+        val targetUrl: String
+
+        if (data.isNotEmpty()) {
+            title = data["title"] ?: notification?.title ?: "Check IN Love 💕"
+            body = data["body"] ?: notification?.body ?: ""
+            senderName = data["senderName"] ?: "Người ấy"
+            senderAvatar = data["senderAvatar"]
+            actionType = data["actionType"] ?: "reminder"
+            targetUrl = data["targetUrl"] ?: "/app/home"
+        } else if (notification != null) {
+            // Notification-only message (e.g., sent via Firebase Console)
+            title = notification.title ?: "Check IN Love 💕"
+            body = notification.body ?: ""
+            senderName = "Người ấy"
+            senderAvatar = null
+            actionType = "reminder"
+            targetUrl = "/app/home"
+        } else {
+            return
+        }
 
         showMessagingNotification(title, body, senderName, senderAvatar, actionType, targetUrl)
 

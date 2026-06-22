@@ -1,10 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Pixel-art heart notification icon — matches the PWA app logo.
+    Built from axis-aligned rectangles to replicate the blocky pixel art style.
+    Android notification icons must be white (#FFFFFFFF) on transparent background.
+    The system tints this icon with the notification_color (#FF3B7F).
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M12,21.35L10.55,20.03C5.4,15.36 2,12.28 2,8.5C2,5.42 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.42 22,8.5C22,12.28 18.6,15.36 13.45,20.04L12,21.35Z" />
+
+    <!--
+        Pixel grid: 12x12 logical pixels mapped into a 24×24 viewport.
+        Each "pixel" = 2×2 units in viewport space.
+        Heart shape (12×12 grid, 1=filled):
+          Row 0: . . 1 1 . . . . 1 1 . .
+          Row 1: . 1 1 1 1 . . 1 1 1 1 .
+          Row 2: 1 1 1 1 1 1 1 1 1 1 1 1
+          Row 3: 1 1 1 1 1 1 1 1 1 1 1 1
+          Row 4: 1 1 1 1 1 1 1 1 1 1 1 1
+          Row 5: . 1 1 1 1 1 1 1 1 1 1 .
+          Row 6: . . 1 1 1 1 1 1 1 1 . .
+          Row 7: . . . 1 1 1 1 1 1 . . .
+          Row 8: . . . . 1 1 1 1 . . . .
+          Row 9: . . . . . 1 1 . . . . .
+    -->
+
+    <!-- Row 0: cols 2-3 and 8-9 -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M4,1 h4 v2 h-4 z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M16,1 h4 v2 h-4 z"/>
+
+    <!-- Row 1: cols 1-4 and 7-10 -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M2,3 h8 v2 h-8 z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M14,3 h8 v2 h-8 z"/>
+
+    <!-- Row 2: full width cols 0-11 -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M0,5 h24 v2 h-24 z"/>
+
+    <!-- Row 3: full width -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M0,7 h24 v2 h-24 z"/>
+
+    <!-- Row 4: full width -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M0,9 h24 v2 h-24 z"/>
+
+    <!-- Row 5: cols 1-10 -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M2,11 h20 v2 h-20 z"/>
+
+    <!-- Row 6: cols 2-9 -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M4,13 h16 v2 h-16 z"/>
+
+    <!-- Row 7: cols 3-8 -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M6,15 h12 v2 h-12 z"/>
+
+    <!-- Row 8: cols 4-7 -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M8,17 h8 v2 h-8 z"/>
+
+    <!-- Row 9: cols 5-6 (tip) -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M10,19 h4 v2 h-4 z"/>
+
 </vector>
