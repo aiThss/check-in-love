@@ -537,16 +537,52 @@ export function renderMemoriesPage(): HTMLElement {
             dlBtn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#fff transparent transparent transparent;"></span>';
             dlBtn.style.pointerEvents = 'none';
 
+            const ts = new Date(item.createdAt);
+            const pad = (n: number) => String(n).padStart(2, '0');
+            const fileName = `checkin-love-${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}-${pad(ts.getHours())}-${pad(ts.getMinutes())}.jpg`;
+
+            // 1. Android Native App Wrapper
+            const isAndroidWrapper = navigator.userAgent.includes('LoveCheckAndroidWrapper');
+            if (isAndroidWrapper && (window as any).LoveCheckAndroid && typeof (window as any).LoveCheckAndroid.downloadFile === 'function') {
+              try {
+                (window as any).LoveCheckAndroid.downloadFile(photoUrl, fileName);
+                showToast('Đang tải ảnh xuống...', 'info');
+              } catch (e) {
+                window.open(photoUrl, '_blank', 'noopener,noreferrer');
+              } finally {
+                setTimeout(() => {
+                  dlBtn.innerHTML = '&#x2193;';
+                  dlBtn.style.pointerEvents = '';
+                }, 1000);
+              }
+              return;
+            }
+
+            // 2. Web / PWA (with iOS Web Share API fallback for files)
             try {
-              // Fetch as blob to support cross-origin images
               const response = await fetch(photoUrl, { mode: 'cors' });
               const blob = await response.blob();
+              
+              // On iOS (or browsers supporting file sharing), try Web Share API
+              const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+              if (isIOS && navigator.canShare && navigator.share) {
+                try {
+                  const file = new File([blob], fileName, { type: blob.type });
+                  if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                      files: [file],
+                      title: 'Ảnh check-in',
+                    });
+                    showToast('Đã mở trình chia sẻ', 'success');
+                    return;
+                  }
+                } catch (shareError) {
+                  console.log('Share failed, trying standard download:', shareError);
+                }
+              }
+
+              // Standard blob download
               const objectUrl = URL.createObjectURL(blob);
-
-              const ts = new Date(item.createdAt);
-              const pad = (n: number) => String(n).padStart(2, '0');
-              const fileName = `checkin-love-${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}-${pad(ts.getHours())}-${pad(ts.getMinutes())}.jpg`;
-
               const anchor = document.createElement('a');
               anchor.href = objectUrl;
               anchor.download = fileName;
@@ -555,11 +591,14 @@ export function renderMemoriesPage(): HTMLElement {
               anchor.click();
               document.body.removeChild(anchor);
 
+              showToast('Đã tải ảnh xuống thành công', 'success');
               setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
-            } catch {
-              // Fallback: open in new tab so user can long-press save
+            } catch (err) {
+              console.error('Download failed:', err);
               window.open(photoUrl, '_blank', 'noopener,noreferrer');
+              showToast('Mở ảnh trong tab mới. Hãy nhấn giữ để lưu.', 'info');
             } finally {
+              // Ensure button is reset only if we didn't return early (e.g. Android wrapper returned early)
               dlBtn.innerHTML = '&#x2193;';
               dlBtn.style.pointerEvents = '';
             }

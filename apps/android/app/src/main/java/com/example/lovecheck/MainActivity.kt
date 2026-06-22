@@ -64,6 +64,22 @@ private class LoveCheckBridge(private val context: Context) {
             timestamp
         )
     }
+
+    @JavascriptInterface
+    fun downloadFile(url: String, filename: String) {
+        try {
+            val request = DownloadManager.Request(Uri.parse(url))
+                .setTitle(filename)
+                .setDescription("Đang tải ảnh check-in...")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            downloadManager.enqueue(request)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }
 
 class MainActivity : ComponentActivity() {
