@@ -482,7 +482,8 @@ export function renderMemoriesPage(): HTMLElement {
         `;
       }
 
-      const activeReactions = item.reactions.filter((reaction) => reaction.count > 0);
+      const replies = item.replies ?? [];
+      const activeReactions = (item.reactions ?? []).filter((reaction) => reaction.count > 0);
 
       detail.innerHTML = `
         ${contentHtml}
@@ -507,7 +508,7 @@ export function renderMemoriesPage(): HTMLElement {
         <div class="reply-section">
           <div class="reply-section-title">
             <h4>Replies</h4>
-            <span>${item.replies.length}</span>
+            <span>${replies.length}</span>
           </div>
           <div id="reply-list" class="reply-detail-list"></div>
           <form id="reply-form" class="inline-reply-form">
@@ -518,7 +519,7 @@ export function renderMemoriesPage(): HTMLElement {
       `;
 
       const replyList = detail.querySelector<HTMLElement>('#reply-list');
-      if (replyList) renderReplies(replyList, item.replies);
+      if (replyList) renderReplies(replyList, replies);
 
       // Inject download button into media wrapper for photo check-ins
       if (item.type === 'photo' && item.photoUrl) {
