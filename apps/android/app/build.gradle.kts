@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.lovecheck"
         minSdk = 24
         targetSdk = 36
-        versionCode = 16
-        versionName = "1.1.6"
+        versionCode = 17
+        versionName = "1.1.7"
     }
 
     signingConfigs {
@@ -101,4 +101,8 @@ dependencies {
   // Firebase
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.messaging)
+
+  // Image loading (native photo viewer)
+  implementation(libs.coil.compose)
+  implementation(libs.coil.network.okhttp)
 }

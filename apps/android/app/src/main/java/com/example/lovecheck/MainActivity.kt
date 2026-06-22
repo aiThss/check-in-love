@@ -80,6 +80,23 @@ private class LoveCheckBridge(private val context: Context) {
             e.printStackTrace()
         }
     }
+
+    @JavascriptInterface
+    fun openPhotoViewer(photoUrl: String, caption: String, ownerName: String, dateStr: String, fileName: String) {
+        try {
+            val intent = Intent(context, PhotoViewerActivity::class.java).apply {
+                putExtra("photoUrl", photoUrl)
+                putExtra("caption", caption)
+                putExtra("ownerName", ownerName)
+                putExtra("dateStr", dateStr)
+                putExtra("fileName", fileName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }
 
 class MainActivity : ComponentActivity() {

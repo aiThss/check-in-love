@@ -30,20 +30,30 @@ setupAndroidFcm();
 
 // ─── Service Worker ───────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then(() => {
-        if (store.isAuthenticated() && 'Notification' in window && Notification.permission === 'granted') {
-          ensurePushSubscription(false).catch((err) => {
-            logger.warn('Push subscription refresh failed', err);
-          });
-        }
-      })
-      .catch((err) => {
-        logger.warn('SW registration failed', err);
-      });
-  });
+  const isAndroidWrapper = navigator.userAgent.includes('LoveCheckAndroidWrapper');
+  if (isAndroidWrapper) {
+    // Android WebView: unregister all existing SWs so the WebView always
+    // fetches fresh code from the network (prevents stale-bundle issues).
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((reg) => reg.unregister());
+    }).catch(() => {});
+  } else {
+    // PWA (iOS / desktop): register service worker normally for offline support
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then(() => {
+          if (store.isAuthenticated() && 'Notification' in window && Notification.permission === 'granted') {
+            ensurePushSubscription(false).catch((err) => {
+              logger.warn('Push subscription refresh failed', err);
+            });
+          }
+        })
+        .catch((err) => {
+          logger.warn('SW registration failed', err);
+        });
+    });
+  }
 }
 
 // ─── iOS PWA Detection ────────────────────────────────────────────────────────
