@@ -26,6 +26,12 @@ function applyTheme() {
 
 applyTheme();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+
+// Detect APK wrapper and add helper class to documentElement
+if (navigator.userAgent.includes('LoveCheckAndroidWrapper')) {
+  document.documentElement.classList.add('android-wrapper');
+}
+
 setupAndroidFcm();
 
 // ─── Service Worker ───────────────────────────────────────────────────────────

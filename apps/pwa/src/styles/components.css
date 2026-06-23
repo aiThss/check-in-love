@@ -2810,3 +2810,40 @@ textarea.input {
   color: var(--text-secondary) !important;
   opacity: 0.75;
 }
+
+/* ── Fallback styles for Android WebView Wrapper (preventing modal collapse) ── */
+.android-wrapper .modal.modal-checkin-detail {
+  max-height: 82vh !important;
+  height: auto !important;
+  overflow-y: auto !important;
+}
+
+.android-wrapper .checkin-detail {
+  display: block !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.android-wrapper .checkin-detail-media {
+  width: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  min-height: 260px !important;
+  height: auto !important;
+  overflow: hidden !important;
+  border-radius: 28px !important;
+}
+
+.android-wrapper .checkin-detail-media img,
+.android-wrapper .checkin-detail-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+.android-wrapper .reply-detail-list {
+  max-height: 130px !important;
+  overflow-y: auto !important;
+}
