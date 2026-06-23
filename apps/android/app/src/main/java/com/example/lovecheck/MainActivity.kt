@@ -25,6 +25,8 @@ import android.webkit.JavascriptInterface
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -180,10 +182,6 @@ class MainActivity : ComponentActivity() {
                     WebView(context).apply {
                         webView = this
 
-                        // Clear cache on startup and disable cache for testing
-                        clearCache(true)
-                        settings.cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
-
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.databaseEnabled = true
@@ -193,6 +191,9 @@ class MainActivity : ComponentActivity() {
                         settings.loadsImagesAutomatically = true
                         settings.javaScriptCanOpenWindowsAutomatically = true
                         settings.setSupportZoom(false)
+                        // Dùng LOAD_DEFAULT để tận dụng HTTP cache bình thường
+                        // (trước đây dùng LOAD_NO_CACHE khiến ảnh tải lại mỗi lần mở app)
+                        settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
                         val versionName = packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
                         settings.userAgentString = settings.userAgentString + " LoveCheckAndroidWrapper/$versionName"
                         addJavascriptInterface(LoveCheckBridge(context.applicationContext), "LoveCheckAndroid")
@@ -201,6 +202,24 @@ class MainActivity : ComponentActivity() {
                             override fun onPageFinished(view: WebView, url: String) {
                                 super.onPageFinished(view, url)
                                 webPageLoaded = true
+
+                                // Inject chiều cao status bar thực tế vào CSS variable
+                                // để modal có padding-top chính xác trên mọi thiết bị Android
+                                val insets = ViewCompat.getRootWindowInsets(window.decorView)
+                                val statusBarPx = insets?.getInsets(WindowInsetsCompat.Type.statusBars())?.top ?: 0
+                                val navBarPx = insets?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
+                                val density = resources.displayMetrics.density
+                                val statusBarDp = (statusBarPx.toFloat() / density + 0.5f).toInt()
+                                val navBarDp = (navBarPx.toFloat() / density + 0.5f).toInt()
+                                view.evaluateJavascript(
+                                    """(function(){
+                                        var r=document.documentElement.style;
+                                        r.setProperty('--android-status-bar','${statusBarDp}px');
+                                        r.setProperty('--android-nav-bar','${navBarDp}px');
+                                    })();""",
+                                    null
+                                )
+
                                 // Inject any token that arrived before the page was ready
                                 pendingFcmToken?.let { token ->
                                     pendingFcmToken = null

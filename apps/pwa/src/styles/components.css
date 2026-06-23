@@ -626,13 +626,21 @@ textarea.input {
 
 /* Tối ưu hóa padding và cuộn của modal chi tiết khoảnh khắc */
 .modal-overlay.modal-checkin-detail-overlay {
-  /* Padding đều 4 phía — modal nổi giữa backdrop, không bám sát cạnh màn hình */
+  /*
+   * Trên Android WebView: --android-status-bar được inject từ Kotlin (giá trị dp thực)
+   * Fallback: env(safe-area-inset-top) → 0px trên Android cũ không hỗ trợ
+   * Fallback cuối: 48px — đủ để tránh status bar trên mọi Android (max ~44dp)
+   */
+  --_status-bar: var(--android-status-bar, env(safe-area-inset-top, 0px));
+  --_nav-bar: var(--android-nav-bar, env(safe-area-inset-bottom, 0px));
+
   align-items: flex-start;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* Trên: tránh status bar; Dưới: tránh home indicator; Ngang: margin đẹp */
-  padding-top: max(48px, calc(var(--safe-top) + 24px));
-  padding-bottom: max(48px, calc(var(--safe-bottom) + 24px));
+  /* Trên: status bar thực + 16px buffer */
+  padding-top: max(48px, calc(var(--_status-bar) + 16px));
+  /* Dưới: nav bar + 16px buffer */
+  padding-bottom: max(32px, calc(var(--_nav-bar) + 16px));
   padding-left: 16px;
   padding-right: 16px;
 }

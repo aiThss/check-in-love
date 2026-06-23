@@ -9,6 +9,10 @@ export interface ModalOptions {
   onCancel?: () => void;
   danger?: boolean;
   center?: boolean;
+  /** CSS class(es) to add directly to the overlay element at creation time */
+  overlayClass?: string;
+  /** CSS class(es) to add directly to the modal element at creation time */
+  modalClass?: string;
 }
 
 let activeOverlay: HTMLElement | null = null;
@@ -18,13 +22,18 @@ export function showModal(options: ModalOptions): void {
   closeModal();
 
   const overlay = document.createElement('div');
-  overlay.className = `modal-overlay${options.center ? ' modal-center' : ''}`;
+  const overlayClasses = ['modal-overlay'];
+  if (options.center) overlayClasses.push('modal-center');
+  if (options.overlayClass) overlayClasses.push(...options.overlayClass.split(' '));
+  overlay.className = overlayClasses.join(' ');
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', options.title);
 
   const modal = document.createElement('div');
-  modal.className = 'modal animate-scale-in';
+  const modalClasses = ['modal', 'animate-scale-in'];
+  if (options.modalClass) modalClasses.push(...options.modalClass.split(' '));
+  modal.className = modalClasses.join(' ');
 
   // Title
   const title = document.createElement('h2');
