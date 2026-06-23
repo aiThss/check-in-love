@@ -923,7 +923,7 @@ textarea.input {
 
 .reaction-picker.open {
   display: flex;
-  animation: scaleIn var(--duration-fast) var(--ease-spring);
+  animation: reactionPickerScaleIn var(--duration-fast) var(--ease-spring);
 }
 
 .memory-reaction-picker {
@@ -933,6 +933,17 @@ textarea.input {
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
+}
+
+@keyframes reactionPickerScaleIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
 }
 
 .reaction-option {
