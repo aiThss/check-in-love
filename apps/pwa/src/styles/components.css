@@ -615,16 +615,10 @@ textarea.input {
 }
 
 /* Tối ưu hóa padding của modal chi tiết khoảnh khắc */
-.modal-overlay:has(.checkin-detail) .modal {
+.modal.modal-checkin-detail {
   padding: 16px;
   max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-overlay:has(.checkin-detail) .modal .checkin-detail {
   overflow-y: auto;
-  padding-right: 4px;
   -webkit-overflow-scrolling: touch;
 }
 

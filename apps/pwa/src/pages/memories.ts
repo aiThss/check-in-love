@@ -860,6 +860,12 @@ export function renderMemoriesPage(): HTMLElement {
       content: detail,
       center: true,
     });
+
+    // Thêm class cụ thể để tùy biến CSS mà không dùng :has() tránh lỗi tương thích WebView cũ
+    const modalEl = detail.closest('.modal');
+    if (modalEl) {
+      modalEl.classList.add('modal-checkin-detail');
+    }
   }
 
   fetchMemories(1);
