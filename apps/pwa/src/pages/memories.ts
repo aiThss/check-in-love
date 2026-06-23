@@ -864,10 +864,9 @@ export function renderMemoriesPage(): HTMLElement {
       center: true,
     });
 
-    const modalEl = detail.closest('.modal');
-    if (modalEl) {
-      modalEl.classList.add('modal-checkin-detail');
-    }
+    requestAnimationFrame(() => {
+      detail.closest('.modal')?.classList.add('modal-checkin-detail');
+    });
   }
 
   fetchMemories(1);

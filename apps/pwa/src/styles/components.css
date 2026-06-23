@@ -2812,10 +2812,12 @@ textarea.input {
 }
 
 /* ── Fallback styles for Android WebView Wrapper (preventing modal collapse) ── */
-.android-wrapper .modal.modal-checkin-detail {
-  max-height: 82vh !important;
+.android-wrapper .modal.modal-checkin-detail,
+.android-wrapper .modal:has(.checkin-detail) {
+  max-height: calc(100vh - 120px) !important;
   height: auto !important;
-  overflow-y: auto !important;
+  overflow: auto !important;
+  display: block !important;
 }
 
 .android-wrapper .checkin-detail {
@@ -2828,9 +2830,10 @@ textarea.input {
 
 .android-wrapper .checkin-detail-media {
   width: 100% !important;
-  aspect-ratio: 1 / 1 !important;
+  height: min(calc(100vw - 96px), 420px) !important;
   min-height: 260px !important;
-  height: auto !important;
+  max-height: 420px !important;
+  aspect-ratio: auto !important;
   overflow: hidden !important;
   border-radius: 28px !important;
 }
