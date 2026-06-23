@@ -178,13 +178,16 @@ function buildSocialRow(
 
   const activeReactions = item.reactions.filter((reaction) => reaction.count > 0);
 
-  // Khu vực hiển thị reaction pills hiện có (hoặc trống)
-  const reactionDisplay = document.createElement('div');
-  reactionDisplay.className = 'reaction-summary memory-reaction-display';
-  reactionDisplay.style.cssText = 'flex:1;min-width:0;display:flex;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;';
+  // Nút React — hiển thị chữ "React" (nếu chưa có react) hoặc danh sách reaction pills (nếu đã có react)
+  const reactionBtn = document.createElement('button');
+  reactionBtn.type = 'button';
+  reactionBtn.className = 'memory-reaction-summary';
 
-  if (activeReactions.length > 0) {
-    reactionDisplay.innerHTML = activeReactions
+  if (activeReactions.length === 0) {
+    reactionBtn.textContent = 'React';
+  } else {
+    reactionBtn.classList.add('has-reactions');
+    reactionBtn.innerHTML = activeReactions
       .map(
         (reaction) =>
           `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${escapeHtml(reaction.type)}<strong>${reaction.count}</strong></span>`,
@@ -192,11 +195,6 @@ function buildSocialRow(
       .join('');
   }
 
-  // Nút React — border pill, long-press để mở picker
-  const reactionBtn = document.createElement('button');
-  reactionBtn.type = 'button';
-  reactionBtn.className = 'memory-reaction-summary';
-  reactionBtn.textContent = 'React';
   // Long-press để mở picker (giữ để chọn)
   attachLongPress(reactionBtn, onShowPicker);
   // Ngăn chặn click thông thường để không kích hoạt bấm để chọn
@@ -217,7 +215,6 @@ function buildSocialRow(
   replyCount.textContent = item.replies.length ? `${item.replies.length} reply` : 'No reply';
   replyCount.addEventListener('click', onReply);
 
-  row.appendChild(reactionDisplay);
   row.appendChild(reactionBtn);
   row.appendChild(detailBtn);
   row.appendChild(replyCount);

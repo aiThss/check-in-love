@@ -1060,6 +1060,22 @@ textarea.input {
   border-color: var(--accent);
 }
 
+/* Khi đã có reaction, nút React biến thành dòng chứa các reaction pills (như code cũ) */
+.memory-reaction-summary.has-reactions {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: default;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .reaction-pill {
   display: inline-flex;
   align-items: center;
