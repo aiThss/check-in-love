@@ -625,12 +625,23 @@ textarea.input {
 }
 
 /* Tối ưu hóa padding và cuộn của modal chi tiết khoảnh khắc */
+.modal-overlay.modal-checkin-detail-overlay {
+  /* Dùng flex-start + padding để giả lập center, cho phép scroll khi content dài */
+  align-items: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-top: max(5vh, calc(var(--safe-top) + 16px));
+  padding-bottom: max(5vh, calc(var(--safe-bottom) + 16px));
+}
+
 .modal.modal-checkin-detail {
   padding: 16px;
-  max-height: 90vh;
-  overflow: auto !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch;
+  /* Không dùng max-height cứng — để overlay scroll thay thế */
+  max-height: none;
+  overflow: visible;
+  overflow-x: hidden;
+  /* Đảm bảo border-radius đúng với card style */
+  border-radius: var(--radius-card);
 }
 
 .modal-checkin-detail .modal-title {

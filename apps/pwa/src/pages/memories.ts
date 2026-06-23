@@ -857,16 +857,19 @@ export function renderMemoriesPage(): HTMLElement {
     };
 
     renderDetailContent();
-    console.log('[LoveCheck] memories detail layout unified v2');
+    console.log('[LoveCheck] memories detail layout unified v3');
 
     showModal({
       title: 'Chi tiết khoảnh khắc',
       content: detail,
-      center: true,
+      // Không dùng center:true — tự add class để kiểm soát layout cho cả web và Android WebView
     });
 
     requestAnimationFrame(() => {
-      detail.closest('.modal')?.classList.add('modal-checkin-detail');
+      const modalEl = detail.closest('.modal');
+      const overlayEl = detail.closest('.modal-overlay');
+      if (modalEl) modalEl.classList.add('modal-checkin-detail');
+      if (overlayEl) overlayEl.classList.add('modal-checkin-detail-overlay');
     });
   }
 
