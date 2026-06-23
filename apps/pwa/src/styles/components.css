@@ -1890,12 +1890,12 @@ textarea.input {
   margin: 0 auto;
   overflow: hidden;
   border-radius: 30px;
-  background:
-    radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.12), transparent 26%),
-    #0f0f12;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: radial-gradient(circle at 50% 50%, rgba(235, 235, 240, 0.25) 0%, rgba(85, 85, 90, 0.45) 60%, rgba(30, 30, 33, 0.8) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
   isolation: isolate;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .photo-composer.has-photo {
