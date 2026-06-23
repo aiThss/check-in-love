@@ -2589,7 +2589,12 @@ textarea.input {
   position: relative;
   overflow: hidden;
   border-radius: 20px !important;
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 255, 255, 0.72) 0%,
+    rgba(240, 240, 245, 0.58) 60%,
+    rgba(225, 225, 230, 0.48) 100%
+  ) !important;
   -webkit-backdrop-filter: blur(27px) saturate(160%);
   backdrop-filter: blur(27px) saturate(160%);
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
