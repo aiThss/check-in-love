@@ -258,9 +258,45 @@ export function renderMemoriesPage(): HTMLElement {
       <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.03em;">Kỷ niệm của hai đứa</h1>
       <p id="memories-count" style="font-size:13px;color:var(--text-secondary);">Đang tải khoảnh khắc...</p>
     </div>
-    <button id="refresh-btn" class="btn-icon" style="border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;">\u{1F504}</button>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+      <button id="search-btn" class="mem-icon-btn" aria-label="Tìm kỷ niệm">
+        <img src="/icons8-search-for-love.png" alt="" width="26" height="26"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+          style="display:block;" />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round"
+          style="display:none;width:20px;height:20px;">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </button>
+      <button id="refresh-btn" class="mem-icon-btn" aria-label="Làm mới">\u{1F504}</button>
+    </div>
   `;
   root.appendChild(header);
+
+  // ── Search bar (hidden by default, slides open when search-btn clicked) ──
+  let searchQuery = '';
+  const searchBar = document.createElement('div');
+  searchBar.className = 'memories-search-bar';
+  searchBar.innerHTML = `
+    <div class="memories-search-inner">
+      <svg class="memories-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input
+        id="search-input"
+        class="memories-search-input"
+        type="search"
+        placeholder="Tìm kỷ niệm, ngày, caption…"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      />
+      <button id="search-clear" class="memories-search-clear" aria-label="Xóa tìm kiếm" style="display:none;">&#x2715;</button>
+    </div>
+  `;
+  root.insertBefore(searchBar, root.children[1]);
 
   const content = document.createElement('div');
   content.style.cssText = 'display:flex;flex-direction:column;gap:12px;width:100%;';
@@ -332,6 +368,75 @@ export function renderMemoriesPage(): HTMLElement {
     });
   }
 
+  // ── Search helpers ────────────────────────────────────────────────────────
+  const DAY_NAMES = ['chủ nhật', 'thứ hai', 'thứ ba', 'thứ tư', 'thứ năm', 'thứ sáu', 'thứ bảy'];
+
+  function matchesSearch(item: CheckIn, q: string): boolean {
+    if (!q) return true;
+    const lower = q.toLowerCase().trim();
+    const d = new Date(item.createdAt);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateTokens = [
+      `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`,
+      `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`,
+      `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`,
+      `${pad(d.getDate())}-${pad(d.getMonth() + 1)}`,
+      String(d.getFullYear()),
+      DAY_NAMES[d.getDay()],
+    ];
+    const haystack = [
+      item.caption || '',
+      item.ownerName || '',
+      ...dateTokens,
+    ].join(' ').toLowerCase();
+    return haystack.includes(lower);
+  }
+
+  function applySearch() {
+    const filtered = searchQuery ? allItems.filter((item) => matchesSearch(item, searchQuery)) : allItems;
+    renderGrid(filtered, Boolean(searchQuery));
+    const countEl = header.querySelector('#memories-count');
+    if (countEl) {
+      countEl.textContent = searchQuery
+        ? `Tìm thấy ${filtered.length} kỷ niệm`
+        : `${cachedTotal} khoảnh khắc đã ghi dấu`;
+    }
+    // Hide load-more while searching
+    loadMoreBtn.style.display = !searchQuery && currentPage < totalPages ? 'block' : 'none';
+  }
+
+  // Wire up search events once DOM is ready
+  const searchInput = searchBar.querySelector<HTMLInputElement>('#search-input')!;
+  const searchClear = searchBar.querySelector<HTMLButtonElement>('#search-clear')!;
+
+  searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value;
+    searchClear.style.display = searchQuery ? 'flex' : 'none';
+    applySearch();
+  });
+
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchQuery = '';
+    searchClear.style.display = 'none';
+    searchInput.focus();
+    applySearch();
+  });
+
+  header.querySelector('#search-btn')?.addEventListener('click', () => {
+    searchBar.classList.toggle('open');
+    if (searchBar.classList.contains('open')) {
+      setTimeout(() => searchInput.focus(), 180);
+    } else {
+      // closing — reset search
+      searchInput.value = '';
+      searchQuery = '';
+      searchClear.style.display = 'none';
+      applySearch();
+    }
+  });
+  // ─────────────────────────────────────────────────────────────────────────
+
   async function fetchMemories(page = 1, append = false) {
     if (isLoading) return;
     isLoading = true;
@@ -364,14 +469,14 @@ export function renderMemoriesPage(): HTMLElement {
         cachedTotal = res.total;
         cachedTotalPages = totalPages;
       }
-      renderGrid(allItems);
+      applySearch();
 
       const countEl = header.querySelector('#memories-count');
-      if (countEl) {
+      if (countEl && !searchQuery) {
         countEl.textContent = `${res.total} khoảnh khắc đã ghi dấu`;
       }
 
-      loadMoreBtn.style.display = currentPage < totalPages ? 'block' : 'none';
+      loadMoreBtn.style.display = !searchQuery && currentPage < totalPages ? 'block' : 'none';
     } catch (err) {
       const error = err as Error;
       isLoading = false;
@@ -381,30 +486,38 @@ export function renderMemoriesPage(): HTMLElement {
     }
   }
 
-  function renderGrid(items: CheckIn[]) {
+  function renderGrid(items: CheckIn[], isFiltered = false) {
     grid.innerHTML = '';
+
+    const oldEmpty = content.querySelector('.empty-state');
+    if (oldEmpty) oldEmpty.remove();
 
     if (items.length === 0) {
       grid.style.display = 'none';
       const empty = document.createElement('div');
       empty.className = 'empty-state animate-fade-in';
-      empty.innerHTML = `
-        <div class="empty-state-emoji">\u{1F338}</div>
-        <h3 class="empty-state-title">Chưa có kỷ niệm nào</h3>
-        <p class="empty-state-text">Hãy gửi tấm check-in đầu tiên để ghi lại khoảnh khắc bên nhau nhé!</p>
-        <button id="empty-checkin-btn" class="btn-primary" style="margin-top:12px;">Gửi check-in ngay</button>
-      `;
+      if (isFiltered) {
+        empty.innerHTML = `
+          <div class="empty-state-emoji">\u{1F50D}</div>
+          <h3 class="empty-state-title">Không tìm thấy kỷ niệm nào</h3>
+          <p class="empty-state-text">Thử tìm bằng ngày hoặc vài chữ trong caption nhé</p>
+        `;
+      } else {
+        empty.innerHTML = `
+          <div class="empty-state-emoji">\u{1F338}</div>
+          <h3 class="empty-state-title">Chưa có kỷ niệm nào</h3>
+          <p class="empty-state-text">Hãy gửi tấm check-in đầu tiên để ghi lại khoảnh khắc bên nhau nhé!</p>
+          <button id="empty-checkin-btn" class="btn-primary" style="margin-top:12px;">Gửi check-in ngay</button>
+        `;
+        empty.querySelector('#empty-checkin-btn')?.addEventListener('click', () => {
+          navigate('/app/checkin');
+        });
+      }
       content.appendChild(empty);
-
-      empty.querySelector('#empty-checkin-btn')?.addEventListener('click', () => {
-        navigate('/app/checkin');
-      });
       return;
     }
 
     grid.style.display = 'grid';
-    const oldEmpty = content.querySelector('.empty-state');
-    if (oldEmpty) oldEmpty.remove();
 
     items.forEach((item) => {
       const tile = document.createElement('div');

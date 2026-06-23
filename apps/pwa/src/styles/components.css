@@ -12,6 +12,43 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ── Prevent text selection on non-input UI (app-like feel) ──────── */
+html,
+body,
+.page,
+.app-shell,
+.memory-tile,
+.memory-item,
+.checkin-detail,
+.nav,
+button,
+img,
+[class*="card"],
+[class*="tile"],
+[class*="pill"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Keep inputs fully editable */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* Snappier taps on interactive elements, no double-tap zoom */
+button,
+.memory-item,
+.memory-tile,
+.memory-reaction-summary,
+.reaction-option {
+  touch-action: manipulation;
+}
+
 html {
   height: 100%;
   scroll-behavior: smooth;
@@ -2316,8 +2353,127 @@ textarea.input {
   letter-spacing: -0.02em;
 }
 
-/* ── Scroll to top ──────────────────────────────────────────── */
+/* ── Scroll to top ───────────────────────────────── */
 ::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+/* ── Memories icon buttons (search + refresh) ──────────────── */
+.mem-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text-primary);
+  font-size: 20px;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease),
+    background var(--duration-fast) var(--ease);
+  touch-action: manipulation;
+  padding: 0;
+}
+
+.mem-icon-btn:active {
+  transform: scale(0.88);
+}
+
+.mem-icon-btn img {
+  display: block;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ── Memories search bar (slides down under header) ──────── */
+.memories-search-bar {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition:
+    max-height 240ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    margin-bottom 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.memories-search-bar.open {
+  max-height: 64px;
+  opacity: 1;
+  margin-bottom: 4px;
+}
+
+.memories-search-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 14px;
+  height: 48px;
+}
+
+.memories-search-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.memories-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+  /* Remove native search input chrome */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.memories-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Hide native × clear button on Chrome/Safari */
+.memories-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.memories-search-clear {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: var(--text-secondary);
+  color: var(--bg);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  touch-action: manipulation;
+}
+
+.memories-search-clear:active {
+  transform: scale(0.88);
 }
