@@ -300,7 +300,7 @@ export function renderCheckinPage(): HTMLElement {
     } else {
       picker.innerHTML = `
         <div class="photo-composer-empty">
-          <div class="photo-composer-lens"></div>
+          <img class="photo-composer-lens" src="/icons8-photo-gallery-96.apng.png" alt="Gallery Icon" width="96" height="96" />
           <div class="photo-composer-copy">
             <strong>Gửi ảnh cho người ấy</strong>
             <span>Chụp mới hoặc chọn ảnh từ album</span>
@@ -311,6 +311,16 @@ export function renderCheckinPage(): HTMLElement {
           </div>
         </div>
       `;
+
+      const lensImg = picker.querySelector<HTMLImageElement>('.photo-composer-lens');
+      const resetAnimation = () => {
+        if (lensImg) {
+          lensImg.src = '/icons8-photo-gallery-96.apng.png?t=' + Date.now();
+        }
+      };
+
+      picker.addEventListener('pointerenter', resetAnimation);
+      picker.addEventListener('click', resetAnimation);
 
       picker.querySelector('#camera-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();

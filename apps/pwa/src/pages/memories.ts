@@ -712,20 +712,22 @@ export function renderMemoriesPage(): HTMLElement {
           <span>Gửi bởi <strong>${escapeHtml(item.ownerName)}</strong></span>
           <time>${formatFullDateTime(item.createdAt)}</time>
         </div>
-        <div class="checkin-detail-social">
-          <div class="reaction-summary detail-reactions">
-            ${
-              activeReactions.length
-                ? activeReactions
-                    .map(
-                      (reaction) =>
-                        `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${escapeHtml(reaction.type)}<strong>${reaction.count}</strong></span>`,
-                    )
-                    .join('')
-                : '<span class="reaction-hint">Giữ để react.</span>'
-            }
-          </div>
-        </div>
+        ${
+          activeReactions.length
+            ? `
+            <div class="checkin-detail-social">
+              <div class="reaction-summary detail-reactions">
+                ${activeReactions
+                  .map(
+                    (reaction) =>
+                      `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${escapeHtml(reaction.type)}<strong>${reaction.count}</strong></span>`,
+                  )
+                  .join('')}
+              </div>
+            </div>
+            `
+            : ''
+        }
         <div class="reply-section">
           <div class="reply-section-title">
             <h4>Replies</h4>
