@@ -43,6 +43,13 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then((regs) => {
       regs.forEach((reg) => reg.unregister());
     }).catch(() => {});
+
+    // Force clear Cache Storage (PWA offline cache)
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        return Promise.all(keys.map((key) => caches.delete(key)));
+      }).catch(() => {});
+    }
   } else {
     // PWA (iOS / desktop): register service worker normally for offline support
     window.addEventListener('load', () => {

@@ -180,6 +180,10 @@ class MainActivity : ComponentActivity() {
                     WebView(context).apply {
                         webView = this
 
+                        // Clear cache on startup and disable cache for testing
+                        clearCache(true)
+                        settings.cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
+
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.databaseEnabled = true

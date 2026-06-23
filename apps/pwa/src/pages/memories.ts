@@ -857,6 +857,7 @@ export function renderMemoriesPage(): HTMLElement {
     };
 
     renderDetailContent();
+    console.log('[LoveCheck] memories detail layout unified v2');
 
     showModal({
       title: 'Chi tiết khoảnh khắc',

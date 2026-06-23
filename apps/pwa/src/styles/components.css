@@ -628,7 +628,8 @@ textarea.input {
 .modal.modal-checkin-detail {
   padding: 16px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: auto !important;
+  overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -2811,42 +2812,4 @@ textarea.input {
   opacity: 0.75;
 }
 
-/* ── Fallback styles for Android WebView Wrapper (preventing modal collapse) ── */
-.android-wrapper .modal.modal-checkin-detail,
-.android-wrapper .modal:has(.checkin-detail) {
-  max-height: calc(100vh - 120px) !important;
-  height: auto !important;
-  overflow: auto !important;
-  display: block !important;
-}
 
-.android-wrapper .checkin-detail {
-  display: block !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  width: 100% !important;
-  height: auto !important;
-}
-
-.android-wrapper .checkin-detail-media {
-  width: 100% !important;
-  height: min(calc(100vw - 96px), 420px) !important;
-  min-height: 260px !important;
-  max-height: 420px !important;
-  aspect-ratio: auto !important;
-  overflow: hidden !important;
-  border-radius: 28px !important;
-}
-
-.android-wrapper .checkin-detail-media img,
-.android-wrapper .checkin-detail-image {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  display: block !important;
-}
-
-.android-wrapper .reply-detail-list {
-  max-height: 130px !important;
-  overflow-y: auto !important;
-}
