@@ -272,7 +272,7 @@ export function renderMemoriesPage(): HTMLElement {
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
       <button id="search-btn" class="mem-icon-btn" aria-label="Tìm kỷ niệm">
-        <img src="/icons8-search-for-love.png" alt="" width="26" height="26"
+        <img src="/icons8-search-48.apng.png" alt="" width="26" height="26"
           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
           style="display:block;" />
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
