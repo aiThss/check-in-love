@@ -40,6 +40,22 @@ function escapeHtml(value: string | undefined): string {
     .replace(/'/g, '&#039;');
 }
 
+/**
+ * Trả về URL ảnh tốt nhất từ item, thử lần lượt các trường.
+ * Dùng để xử lý trường hợp API trả field khác nhau tuỳ version,
+ * hoặc WebView cache dữ liệu cũ thiếu photoUrl.
+ */
+function getCheckinPhotoUrl(item: CheckIn): string | undefined {
+  return (
+    (item as any).photoUrl ||
+    (item as any).cardUrl ||
+    (item as any).imageUrl ||
+    (item as any).originalUrl ||
+    (item as any).thumbnailUrl ||
+    undefined
+  );
+}
+
 function formatTime(isoString: string): string {
   const date = new Date(isoString);
   const now = new Date();
@@ -455,19 +471,41 @@ export function renderMemoriesPage(): HTMLElement {
   }
 
   function showCheckinDetail(item: CheckIn) {
+    // ── DEBUG: log để trace lỗi trong WebView Android ──────────────────
+    const resolvedPhotoUrl = getCheckinPhotoUrl(item);
+    console.debug('[Detail] id=%s type=%s photoUrl=%s cardUrl=%s imageUrl=%s resolved=%s',
+      item.id,
+      item.type,
+      (item as any).photoUrl ?? '(none)',
+      (item as any).cardUrl   ?? '(none)',
+      (item as any).imageUrl  ?? '(none)',
+      resolvedPhotoUrl        ?? '(none)',
+    );
+    // ───────────────────────────────────────────────────────────────────
+
     const detail = document.createElement('div');
     detail.className = 'checkin-detail';
 
     const renderDetailContent = () => {
+      // Lấy URL ảnh tốt nhất, kể cả khi type lệch hoặc field thiếu
+      const photoUrl = getCheckinPhotoUrl(item);
+      const hasPhoto = Boolean(photoUrl);
+
       let contentHtml = '';
-      if (item.type === 'photo') {
+
+      if (hasPhoto) {
+        // Hiển thị ảnh nếu có URL — không phụ thuộc cứng vào item.type
         contentHtml = `
           <div class="checkin-detail-media">
-            <img src="${escapeHtml(item.photoUrl)}" alt="Ảnh check-in" />
+            <img
+              class="checkin-detail-image"
+              src="${escapeHtml(photoUrl)}"
+              alt="Ảnh check-in"
+              loading="eager"
+            />
           </div>
           ${item.caption ? `<p class="checkin-detail-caption">${escapeHtml(item.caption)}</p>` : ''}
         `;
-
       } else if (item.type === 'mood') {
         const emoji = MOOD_EMOJIS[item.mood || ''] || '\u{1F60A}';
         contentHtml = `
@@ -521,8 +559,8 @@ export function renderMemoriesPage(): HTMLElement {
       const replyList = detail.querySelector<HTMLElement>('#reply-list');
       if (replyList) renderReplies(replyList, replies);
 
-      // Inject download button into media wrapper for photo check-ins
-      if (item.type === 'photo' && item.photoUrl) {
+      // Inject nút download vào media wrapper — chỉ khi có URL ảnh
+      if (hasPhoto) {
         const mediaEl = detail.querySelector<HTMLElement>('.checkin-detail-media');
         if (mediaEl) {
           const dlBtn = document.createElement('button');
@@ -532,8 +570,9 @@ export function renderMemoriesPage(): HTMLElement {
           dlBtn.innerHTML = '&#x2193;'; // ↓ arrow icon
 
           dlBtn.addEventListener('click', async () => {
-            const photoUrl = item.photoUrl;
-            if (!photoUrl) return;
+            // Dùng fallback URL — không hardcode item.photoUrl
+            const downloadUrl = getCheckinPhotoUrl(item);
+            if (!downloadUrl) return;
 
             dlBtn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#fff transparent transparent transparent;"></span>';
             dlBtn.style.pointerEvents = 'none';
@@ -546,10 +585,10 @@ export function renderMemoriesPage(): HTMLElement {
             const isAndroidWrapper = navigator.userAgent.includes('LoveCheckAndroidWrapper');
             if (isAndroidWrapper && (window as any).LoveCheckAndroid && typeof (window as any).LoveCheckAndroid.downloadFile === 'function') {
               try {
-                (window as any).LoveCheckAndroid.downloadFile(photoUrl, fileName);
+                (window as any).LoveCheckAndroid.downloadFile(downloadUrl, fileName);
                 showToast('Đang tải ảnh xuống...', 'info');
               } catch (e) {
-                window.open(photoUrl, '_blank', 'noopener,noreferrer');
+                window.open(downloadUrl, '_blank', 'noopener,noreferrer');
               } finally {
                 setTimeout(() => {
                   dlBtn.innerHTML = '&#x2193;';
@@ -561,9 +600,9 @@ export function renderMemoriesPage(): HTMLElement {
 
             // 2. Web / PWA (with iOS Web Share API fallback for files)
             try {
-              const response = await fetch(photoUrl, { mode: 'cors' });
+              const response = await fetch(downloadUrl, { mode: 'cors' });
               const blob = await response.blob();
-              
+
               // On iOS (or browsers supporting file sharing), try Web Share API
               const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
               if (isIOS && navigator.canShare && navigator.share) {
@@ -596,10 +635,9 @@ export function renderMemoriesPage(): HTMLElement {
               setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
             } catch (err) {
               console.error('Download failed:', err);
-              window.open(photoUrl, '_blank', 'noopener,noreferrer');
+              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
               showToast('Mở ảnh trong tab mới. Hãy nhấn giữ để lưu.', 'info');
             } finally {
-              // Ensure button is reset only if we didn't return early (e.g. Android wrapper returned early)
               dlBtn.innerHTML = '&#x2193;';
               dlBtn.style.pointerEvents = '';
             }

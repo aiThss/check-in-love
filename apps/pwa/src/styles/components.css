@@ -1133,17 +1133,18 @@ textarea.input {
   background: #000000;
   display: block;
   position: relative;
-  /* Wrap content height naturally */
   width: 100%;
+  /* Vuông 1:1 — đồng nhất giữa WebView Android và Chrome PWA */
+  aspect-ratio: 1 / 1;
 }
 
-.checkin-detail-media img {
+.checkin-detail-media img,
+.checkin-detail-image {
   width: 100%;
-  height: auto;
-  max-height: 70vh;
-  object-fit: contain;
+  height: 100%;
+  object-fit: cover;
   display: block;
-  /* Allow iOS web-native behavior in detail view (save/share/copy) */
+  /* Cho phép iOS web-native long-press để lưu/chia sẻ ảnh */
   -webkit-touch-callout: default;
   pointer-events: auto;
 }
@@ -1151,17 +1152,17 @@ textarea.input {
 /* Download button overlay — top-right of the media container */
 .download-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
+  top: 14px;
+  right: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: #ffffff;
-  font-size: 16px;
+  font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
