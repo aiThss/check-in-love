@@ -178,21 +178,32 @@ function buildSocialRow(
 
   const activeReactions = item.reactions.filter((reaction) => reaction.count > 0);
 
-  const reactionBtn = document.createElement('button');
-  reactionBtn.type = 'button';
-  reactionBtn.className = 'memory-reaction-summary';
-  reactionBtn.addEventListener('click', onShowPicker);
+  // Khu vực hiển thị reaction pills hiện có (hoặc trống)
+  const reactionDisplay = document.createElement('div');
+  reactionDisplay.className = 'reaction-summary memory-reaction-display';
+  reactionDisplay.style.cssText = 'flex:1;min-width:0;display:flex;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;';
 
-  if (activeReactions.length === 0) {
-    reactionBtn.textContent = 'Giữ để react.';
-  } else {
-    reactionBtn.innerHTML = activeReactions
+  if (activeReactions.length > 0) {
+    reactionDisplay.innerHTML = activeReactions
       .map(
         (reaction) =>
           `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${escapeHtml(reaction.type)}<strong>${reaction.count}</strong></span>`,
       )
       .join('');
   }
+
+  // Nút React — border pill, long-press để mở picker
+  const reactionBtn = document.createElement('button');
+  reactionBtn.type = 'button';
+  reactionBtn.className = 'memory-reaction-summary';
+  reactionBtn.textContent = 'React';
+  // Long-press để mở picker (giữ để chọn)
+  attachLongPress(reactionBtn, onShowPicker);
+  // Ngăn chặn click thông thường để không kích hoạt bấm để chọn
+  reactionBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
 
   const detailBtn = document.createElement('button');
   detailBtn.type = 'button';
@@ -206,6 +217,7 @@ function buildSocialRow(
   replyCount.textContent = item.replies.length ? `${item.replies.length} reply` : 'No reply';
   replyCount.addEventListener('click', onReply);
 
+  row.appendChild(reactionDisplay);
   row.appendChild(reactionBtn);
   row.appendChild(detailBtn);
   row.appendChild(replyCount);
@@ -371,10 +383,71 @@ export function renderMemoriesPage(): HTMLElement {
   // ── Search helpers ────────────────────────────────────────────────────────
   const DAY_NAMES = ['chủ nhật', 'thứ hai', 'thứ ba', 'thứ tư', 'thứ năm', 'thứ sáu', 'thứ bảy'];
 
+  function matchDateFlexible(d: Date, lowerQuery: string): boolean {
+    let q = lowerQuery
+      .replace(/(\d+)\s*(?:st|nd|rd|th)\s*(\d*)/g, '$1-$2')
+      .replace(/[^a-z0-9]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const tokens = q.split(' ');
+    const day = d.getDate();
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+
+    if (tokens.length === 2) {
+      const t1 = parseInt(tokens[0], 10);
+      const t2 = parseInt(tokens[1], 10);
+      if (!isNaN(t1) && !isNaN(t2)) {
+        if (t1 === day && t2 === month) return true;
+        if (t1 === month && t2 === year) return true;
+      }
+    }
+
+    if (tokens.length === 3) {
+      const t1 = parseInt(tokens[0], 10);
+      const t2 = parseInt(tokens[1], 10);
+      const t3 = parseInt(tokens[2], 10);
+      if (!isNaN(t1) && !isNaN(t2) && !isNaN(t3)) {
+        if (t1 === day && t2 === month && t3 === year) return true;
+      }
+    }
+
+    const dayP = String(day).padStart(2, '0');
+    const monthP = String(month).padStart(2, '0');
+    const yearS = String(year);
+
+    const formats = [
+      `${day}/${month}`,
+      `${day}/${monthP}`,
+      `${dayP}/${month}`,
+      `${dayP}/${monthP}`,
+      `${day}-${month}`,
+      `${day}-${monthP}`,
+      `${dayP}-${month}`,
+      `${dayP}-${monthP}`,
+      `${day}th${month}`,
+      `${day}th${monthP}`,
+      `${dayP}th${month}`,
+      `${dayP}th${monthP}`,
+      `${day}/${month}/${yearS}`,
+      `${dayP}/${monthP}/${yearS}`,
+      `${day}-${month}-${yearS}`,
+      `${dayP}-${monthP}-${yearS}`,
+      `${day}th${month}/${yearS}`,
+    ];
+
+    const cleanQuery = lowerQuery.replace(/\s+/g, '');
+    return formats.some((f) => f.includes(cleanQuery));
+  }
+
   function matchesSearch(item: CheckIn, q: string): boolean {
     if (!q) return true;
     const lower = q.toLowerCase().trim();
     const d = new Date(item.createdAt);
+
+    if (matchDateFlexible(d, lower)) return true;
+
     const pad = (n: number) => String(n).padStart(2, '0');
     const dateTokens = [
       `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`,

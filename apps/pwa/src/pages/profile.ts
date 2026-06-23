@@ -212,7 +212,7 @@ export function renderProfilePage(): HTMLElement {
     const days = calcDaysTogether(couple.loveStartDate);
     const myAvatar = user.avatarUrl
       ? `<img src="${user.avatarUrl}" style="width:100%;height:100%;object-fit:cover;" />`
-      : `<img src="https://img.icons8.com/isometric/50/person-female.png" alt="avatar" style="width:70%;height:70%;object-fit:contain;" />`;
+      : `<img src="/profile.png" alt="avatar" style="width:70%;height:70%;object-fit:contain;" />`;
     const partnerAvatar = user.partnerAvatarUrl ? `<img src="${user.partnerAvatarUrl}" style="width:100%;height:100%;object-fit:cover;" />` : '💖';
 
     profileCard.innerHTML = `

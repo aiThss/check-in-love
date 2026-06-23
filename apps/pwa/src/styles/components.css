@@ -1016,8 +1016,7 @@ textarea.input {
   justify-content: center;
 }
 
-.reaction-summary,
-.memory-reaction-summary {
+.reaction-summary {
   min-width: 0;
   flex: 1;
   display: flex;
@@ -1033,6 +1032,32 @@ textarea.input {
   cursor: pointer;
   white-space: nowrap;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Nút "React" — bordered pill có icon + chữ React */
+.memory-reaction-summary {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-solid);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+  user-select: none;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.memory-reaction-summary:active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .reaction-pill {
@@ -1289,6 +1314,12 @@ textarea.input {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* Cố định chiều cao tối đa và cho phép cuộn khi reply nhiều */
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
 }
 
 .reply-detail-item {
@@ -2390,6 +2421,16 @@ textarea.input {
   pointer-events: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Vòng tròn trắng mờ cho icon kính lúp ở dark mode */
+[data-theme='dark'] #search-btn img,
+:root:not([data-theme='light']) #search-btn img {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  padding: 4px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
 }
 
 /* ── Memories search bar (slides down under header) ──────── */
