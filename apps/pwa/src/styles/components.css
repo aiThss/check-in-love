@@ -624,6 +624,18 @@ textarea.input {
   margin-bottom: var(--space-md);
 }
 
+/* Tối ưu hóa padding và cuộn của modal chi tiết khoảnh khắc */
+.modal.modal-checkin-detail {
+  padding: 16px;
+  max-height: 90vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-checkin-detail .modal-title {
+  display: none !important;
+}
+
 .modal-actions {
   display: flex;
   gap: var(--space-sm);
@@ -2539,10 +2551,13 @@ textarea.input {
 
 /* ── Liquid Glass / iOS Glass (Light Mode only) ── */
 :root {
-  --glass-light-bg: rgba(255, 255, 255, 0.52);
-  --glass-light-bg-strong: rgba(255, 255, 255, 0.68);
-  --glass-light-border: rgba(255, 255, 255, 0.72);
-  --glass-light-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+  --love-pink: #ff3b7f;
+  --love-pink-soft: rgba(255, 59, 127, 0.14);
+
+  --glass-light-bg: rgba(255, 255, 255, 0.68);
+  --glass-light-bg-strong: rgba(255, 255, 255, 0.82);
+  --glass-light-border: rgba(255, 255, 255, 0.76);
+  --glass-light-shadow: 0 16px 40px rgba(0, 0, 0, 0.05);
   --glass-light-inner: inset 0 1px 0 rgba(255, 255, 255, 0.65),
                        inset 0 -1px 0 rgba(255, 255, 255, 0.15);
 }
@@ -2557,25 +2572,32 @@ textarea.input {
 }
 
 /* Giao diện Liquid Glass cho các card/mục trong Light Mode */
+:root:not([data-theme='dark']) .glass-surface,
 :root:not([data-theme='dark']) .glass-card,
+:root:not([data-theme='dark']) .glass-profile-card,
+:root:not([data-theme='dark']) .glass-modal,
 :root:not([data-theme='dark']) .card,
 :root:not([data-theme='dark']) .card-solid,
 :root:not([data-theme='dark']) .modal,
+[data-theme='light'] .glass-surface,
 [data-theme='light'] .glass-card,
+[data-theme='light'] .glass-profile-card,
+[data-theme='light'] .glass-modal,
 [data-theme='light'] .card,
 [data-theme='light'] .card-solid,
 [data-theme='light'] .modal {
   position: relative;
   overflow: hidden;
+  border-radius: 32px !important;
   background:
     linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.68),
-      rgba(255, 255, 255, 0.32)
+      rgba(255, 255, 255, 0.72),
+      rgba(255, 255, 255, 0.42)
     ),
     var(--glass-light-bg) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
   border: 1px solid var(--glass-light-border) !important;
   box-shadow:
     var(--glass-light-shadow),
@@ -2583,12 +2605,18 @@ textarea.input {
   transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Tạo hiệu ứng highlight mép trên & viền mờ cho glass elements */
+/* Highlight mép trên & viền mờ cho glass elements */
+:root:not([data-theme='dark']) .glass-surface::before,
 :root:not([data-theme='dark']) .glass-card::before,
+:root:not([data-theme='dark']) .glass-profile-card::before,
+:root:not([data-theme='dark']) .glass-modal::before,
 :root:not([data-theme='dark']) .card::before,
 :root:not([data-theme='dark']) .card-solid::before,
 :root:not([data-theme='dark']) .modal::before,
+[data-theme='light'] .glass-surface::before,
 [data-theme='light'] .glass-card::before,
+[data-theme='light'] .glass-profile-card::before,
+[data-theme='light'] .glass-modal::before,
 [data-theme='light'] .card::before,
 [data-theme='light'] .card-solid::before,
 [data-theme='light'] .modal::before {
@@ -2608,24 +2636,32 @@ textarea.input {
 
 /* Giao diện Glass cho các pills/buttons trong Light Mode */
 :root:not([data-theme='dark']) .glass-pill,
-:root:not([data-theme='dark']) .memory-reaction-summary,
+:root:not([data-theme='dark']) .glass-action,
+:root:not([data-theme='dark']) .memory-reaction-summary:not(.has-reactions),
+:root:not([data-theme='dark']) .reaction-pill,
 :root:not([data-theme='dark']) .memory-reply-count,
 :root:not([data-theme='dark']) .reaction-option,
 :root:not([data-theme='dark']) .theme-choice,
+:root:not([data-theme='dark']) .reaction-detail-row,
+:root:not([data-theme='dark']) .reply-detail-item,
 [data-theme='light'] .glass-pill,
-[data-theme='light'] .memory-reaction-summary,
+[data-theme='light'] .glass-action,
+[data-theme='light'] .memory-reaction-summary:not(.has-reactions),
+[data-theme='light'] .reaction-pill,
 [data-theme='light'] .memory-reply-count,
 [data-theme='light'] .reaction-option,
-[data-theme='light'] .theme-choice {
+[data-theme='light'] .theme-choice,
+[data-theme='light'] .reaction-detail-row,
+[data-theme='light'] .reply-detail-item {
   background:
     linear-gradient(
       180deg,
       rgba(255, 255, 255, 0.76),
       rgba(255, 255, 255, 0.42)
     ),
-    rgba(255, 255, 255, 0.52) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
-  backdrop-filter: blur(16px) saturate(160%);
+    rgba(255, 255, 255, 0.68) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
   border: 1px solid rgba(0, 0, 0, 0.05) !important;
   box-shadow:
     0 6px 20px rgba(0, 0, 0, 0.04),
@@ -2634,15 +2670,41 @@ textarea.input {
   transition: all 120ms ease;
 }
 
+/* Bo tròn 999px cho các pill */
+:root:not([data-theme='dark']) .glass-pill,
+:root:not([data-theme='dark']) .memory-reaction-summary:not(.has-reactions),
+:root:not([data-theme='dark']) .reaction-pill,
+:root:not([data-theme='dark']) .memory-reply-count,
+[data-theme='light'] .glass-pill,
+[data-theme='light'] .memory-reaction-summary:not(.has-reactions),
+[data-theme='light'] .reaction-pill,
+[data-theme='light'] .memory-reply-count {
+  border-radius: 999px !important;
+}
+
+/* Bo tròn 16px cho glass actions */
+:root:not([data-theme='dark']) .glass-action,
+[data-theme='light'] .glass-action {
+  border-radius: 16px !important;
+}
+
 /* Option đang chọn / Trạng thái active trong Light Mode */
 :root:not([data-theme='dark']) .glass-pill.selected,
-:root:not([data-theme='dark']) .memory-reaction-summary:active,
+:root:not([data-theme='dark']) .glass-action.primary,
+:root:not([data-theme='dark']) .memory-reaction-summary:not(.has-reactions):active,
+:root:not([data-theme='dark']) .reaction-pill.selected,
 :root:not([data-theme='dark']) .theme-choice.active,
 :root:not([data-theme='dark']) .reaction-option.selected,
+:root:not([data-theme='dark']) .reaction-detail-row.selected,
+:root:not([data-theme='dark']) .reply-detail-item.own,
 [data-theme='light'] .glass-pill.selected,
-[data-theme='light'] .memory-reaction-summary:active,
+[data-theme='light'] .glass-action.primary,
+[data-theme='light'] .memory-reaction-summary:not(.has-reactions):active,
+[data-theme='light'] .reaction-pill.selected,
 [data-theme='light'] .theme-choice.active,
-[data-theme='light'] .reaction-option.selected {
+[data-theme='light'] .reaction-option.selected,
+[data-theme='light'] .reaction-detail-row.selected,
+[data-theme='light'] .reply-detail-item.own {
   color: var(--accent) !important;
   border-color: rgba(255, 59, 127, 0.38) !important;
   background:
@@ -2651,10 +2713,16 @@ textarea.input {
       rgba(255, 255, 255, 0.88),
       rgba(255, 214, 231, 0.48)
     ),
-    rgba(255, 59, 127, 0.06) !important;
+    rgba(255, 59, 127, 0.12) !important;
   box-shadow:
     0 8px 24px rgba(255, 59, 127, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Hiển thị số của reaction pill selected có màu hồng đậm hơn để dễ đọc */
+:root:not([data-theme='dark']) .reaction-pill.selected strong,
+[data-theme='light'] .reaction-pill.selected strong {
+  color: var(--accent) !important;
 }
 
 /* Nút Chi tiết trong Light Mode */
@@ -2685,6 +2753,19 @@ textarea.input {
 /* Tối ưu hóa Copy Code Box ở trang Profile trong Light Mode */
 :root:not([data-theme='dark']) #copy-code-container,
 [data-theme='light'] #copy-code-container {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+}
+
+:root:not([data-theme='dark']) #copy-code-container span:last-child,
+[data-theme='light'] #copy-code-container span:last-child {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Tối ưu hóa theme-segmented container trong Light Mode */
+:root:not([data-theme='dark']) .theme-segmented,
+[data-theme='light'] .theme-segmented {
   background: rgba(255, 255, 255, 0.3) !important;
   border: 1px solid rgba(255, 255, 255, 0.5) !important;
 }

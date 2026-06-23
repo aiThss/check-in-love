@@ -859,10 +859,15 @@ export function renderMemoriesPage(): HTMLElement {
     renderDetailContent();
 
     showModal({
-      title: '',
+      title: 'Chi tiết khoảnh khắc',
       content: detail,
       center: true,
     });
+
+    const modalEl = detail.closest('.modal');
+    if (modalEl) {
+      modalEl.classList.add('modal-checkin-detail');
+    }
   }
 
   fetchMemories(1);
