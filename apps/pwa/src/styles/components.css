@@ -2588,20 +2588,16 @@ textarea.input {
 [data-theme='light'] .modal {
   position: relative;
   overflow: hidden;
-  border-radius: 32px !important;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.72),
-      rgba(255, 255, 255, 0.42)
-    ),
-    var(--glass-light-bg) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
-  border: 1px solid var(--glass-light-border) !important;
-  box-shadow:
-    var(--glass-light-shadow),
-    var(--glass-light-inner) !important;
+  border-radius: 20px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  -webkit-backdrop-filter: blur(27px) saturate(160%);
+  backdrop-filter: blur(27px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 32px 16px rgba(255, 255, 255, 0.16) !important;
   transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -2620,15 +2616,48 @@ textarea.input {
 [data-theme='light'] .card::before,
 [data-theme='light'] .card-solid::before,
 [data-theme='light'] .modal::before {
-  content: "";
+  content: '';
   position: absolute;
-  inset: 0 0 auto 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 1px;
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.85),
+    rgba(255, 255, 255, 0.8),
     transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Highlight viền dọc bên trái */
+:root:not([data-theme='dark']) .glass-surface::after,
+:root:not([data-theme='dark']) .glass-card::after,
+:root:not([data-theme='dark']) .glass-profile-card::after,
+:root:not([data-theme='dark']) .glass-modal::after,
+:root:not([data-theme='dark']) .card::after,
+:root:not([data-theme='dark']) .card-solid::after,
+:root:not([data-theme='dark']) .modal::after,
+[data-theme='light'] .glass-surface::after,
+[data-theme='light'] .glass-card::after,
+[data-theme='light'] .glass-profile-card::after,
+[data-theme='light'] .glass-modal::after,
+[data-theme='light'] .card::after,
+[data-theme='light'] .card-solid::after,
+[data-theme='light'] .modal::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.8),
+    transparent,
+    rgba(255, 255, 255, 0.3)
   );
   pointer-events: none;
   z-index: 1;
