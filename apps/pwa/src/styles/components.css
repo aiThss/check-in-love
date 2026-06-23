@@ -2423,15 +2423,6 @@ textarea.input {
   user-select: none;
 }
 
-/* Vòng tròn trắng mờ cho icon kính lúp ở dark mode */
-[data-theme='dark'] #search-btn img,
-:root:not([data-theme='light']) #search-btn img {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1.5px solid rgba(255, 255, 255, 0.7);
-  border-radius: 50%;
-  padding: 4px;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
-}
 
 /* ── Memories search bar (slides down under header) ──────── */
 .memories-search-bar {
