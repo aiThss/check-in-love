@@ -10,6 +10,7 @@ import {
   openGallery,
   processImage,
   revokePreviewUrl,
+  type CameraResult,
 } from '../components/camera';
 import type { CheckIn } from '../api/types';
 
@@ -179,9 +180,13 @@ export function renderCheckinPage(): HTMLElement {
     }
   }
 
-  function selectPhoto(file: File): void {
-    selectedSourceFile = file;
-    void applyPhotoTransform(file);
+  function selectPhoto(res: CameraResult): void {
+    selectedSourceFile = res.file;
+    const rawPreview = res.preview;
+    void applyPhotoTransform(res.file).then(() => {
+      // Revoke the temporary raw-file blob URL produced by camera capture
+      revokePreviewUrl(rawPreview);
+    });
   }
 
   function buildPhotoPayload(file: File, caption: string): FormData {
@@ -291,11 +296,11 @@ export function renderCheckinPage(): HTMLElement {
       });
       picker.querySelector('#retake-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        openCamera((res) => selectPhoto(res.file));
+        openCamera((res) => selectPhoto(res));
       });
       picker.querySelector('#change-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        openGallery((res) => selectPhoto(res.file));
+        openGallery((res) => selectPhoto(res));
       });
     } else {
       picker.innerHTML = `
@@ -324,11 +329,11 @@ export function renderCheckinPage(): HTMLElement {
 
       picker.querySelector('#camera-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        openCamera((res) => selectPhoto(res.file));
+        openCamera((res) => selectPhoto(res));
       });
       picker.querySelector('#gallery-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        openGallery((res) => selectPhoto(res.file));
+        openGallery((res) => selectPhoto(res));
       });
     }
 
