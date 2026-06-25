@@ -12,7 +12,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '📸', label: 'Kỷ niệm', path: '/app/memories' },
   { icon: '', label: '', path: '/app/checkin', isCheckin: true },
   { icon: '🎲', label: 'Random', path: '/app/random' },
-  { icon: '👤', label: 'Profile', path: '/app/profile' },
+  { icon: '<img src="/profile.png" alt="Profile" style="width:22px;height:22px;object-fit:contain;display:block;" />', label: 'Profile', path: '/app/profile' },
 ];
 
 export function createNav(activePage: string): HTMLElement {
