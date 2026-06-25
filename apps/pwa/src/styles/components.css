@@ -63,8 +63,6 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background var(--duration-normal) var(--ease),
-    color var(--duration-normal) var(--ease);
   overflow-x: hidden;
 }
 
@@ -118,8 +116,6 @@ a {
 /* ── Card ───────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow);
@@ -259,8 +255,6 @@ a {
   width: 100%;
   max-width: 440px;
   background: var(--surface);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-elevated);
@@ -584,8 +578,6 @@ textarea.input {
   inset: 0;
   z-index: 1000;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1291,8 +1283,6 @@ textarea.input {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   color: #ffffff;
   font-size: 18px;
   display: flex;
@@ -1923,8 +1913,6 @@ textarea.input {
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
   isolation: isolate;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 .photo-composer.has-photo {
@@ -2015,8 +2003,6 @@ textarea.input {
 
 .photo-icon-button,
 .photo-action-button {
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
   background: rgba(0, 0, 0, 0.42);
@@ -2062,8 +2048,6 @@ textarea.input {
   font-size: 13px;
   font-weight: var(--font-weight-semibold);
   background: rgba(0, 0, 0, 0.58);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .photo-chip-scroll {
@@ -2429,7 +2413,6 @@ textarea.input {
   inset: 0;
   z-index: 2000;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2467,8 +2450,6 @@ textarea.input {
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   color: var(--text-primary);
   font-size: 20px;
   cursor: pointer;
@@ -2514,8 +2495,6 @@ textarea.input {
   align-items: center;
   gap: 10px;
   background: var(--surface);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0 14px;
@@ -2614,87 +2593,14 @@ textarea.input {
 [data-theme='light'] .card,
 [data-theme='light'] .card-solid,
 [data-theme='light'] .modal {
-  position: relative;
-  overflow: hidden;
-  border-radius: 20px !important;
-  background: radial-gradient(
-    circle at 50% 50%,
-    rgba(255, 255, 255, 0.72) 0%,
-    rgba(240, 240, 245, 0.58) 60%,
-    rgba(225, 225, 230, 0.48) 100%
-  ) !important;
-  -webkit-backdrop-filter: blur(27px) saturate(160%);
-  backdrop-filter: blur(27px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 0 32px 16px rgba(255, 255, 255, 0.16) !important;
-  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
 }
 
-/* Highlight mép trên & viền mờ cho glass elements */
-:root:not([data-theme='dark']) .glass-surface::before,
-:root:not([data-theme='dark']) .glass-card::before,
-:root:not([data-theme='dark']) .glass-profile-card::before,
-:root:not([data-theme='dark']) .glass-modal::before,
-:root:not([data-theme='dark']) .card::before,
-:root:not([data-theme='dark']) .card-solid::before,
-:root:not([data-theme='dark']) .modal::before,
-[data-theme='light'] .glass-surface::before,
-[data-theme='light'] .glass-card::before,
-[data-theme='light'] .glass-profile-card::before,
-[data-theme='light'] .glass-modal::before,
-[data-theme='light'] .card::before,
-[data-theme='light'] .card-solid::before,
-[data-theme='light'] .modal::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.8),
-    transparent
-  );
-  pointer-events: none;
-  z-index: 1;
-}
 
-/* Highlight viền dọc bên trái */
-:root:not([data-theme='dark']) .glass-surface::after,
-:root:not([data-theme='dark']) .glass-card::after,
-:root:not([data-theme='dark']) .glass-profile-card::after,
-:root:not([data-theme='dark']) .glass-modal::after,
-:root:not([data-theme='dark']) .card::after,
-:root:not([data-theme='dark']) .card-solid::after,
-:root:not([data-theme='dark']) .modal::after,
-[data-theme='light'] .glass-surface::after,
-[data-theme='light'] .glass-card::after,
-[data-theme='light'] .glass-profile-card::after,
-[data-theme='light'] .glass-modal::after,
-[data-theme='light'] .card::after,
-[data-theme='light'] .card-solid::after,
-[data-theme='light'] .modal::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 1px;
-  height: 100%;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.8),
-    transparent,
-    rgba(255, 255, 255, 0.3)
-  );
-  pointer-events: none;
-  z-index: 1;
-}
 
 /* Giao diện Glass cho các pills/buttons trong Light Mode */
 :root:not([data-theme='dark']) .glass-pill,
@@ -2715,21 +2621,12 @@ textarea.input {
 [data-theme='light'] .theme-choice,
 [data-theme='light'] .reaction-detail-row,
 [data-theme='light'] .reply-detail-item {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.76),
-      rgba(255, 255, 255, 0.42)
-    ),
-    rgba(255, 255, 255, 0.68) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
-  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
   box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+    0 4px 16px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
   color: var(--text-primary) !important;
-  transition: all 120ms ease;
 }
 
 /* Bo tròn 999px cho các pill */
@@ -2806,8 +2703,6 @@ textarea.input {
       rgba(255, 255, 255, 0.6)
     ),
     rgba(255, 255, 255, 0.4) !important;
-  -webkit-backdrop-filter: blur(26px) saturate(170%);
-  backdrop-filter: blur(26px) saturate(170%);
   border: 1px solid rgba(255, 255, 255, 0.76) !important;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.08) !important;
 }
