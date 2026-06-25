@@ -13,6 +13,7 @@ export interface User {
   displayName: string;
   partnerName: string;
   email?: string;
+  email_aliases?: string[];
   avatarUrl?: string;
   partnerAvatarUrl?: string;
   role: UserRole;

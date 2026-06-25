@@ -257,7 +257,11 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
       const filter: Record<string, unknown> = { role: 'user' };
       if (query.search) {
         const regex = new RegExp(query.search, 'i');
-        filter.$or = [{ displayName: regex }, { email: regex }];
+        filter.$or = [
+          { displayName: regex },
+          { email: regex },
+          { email_aliases: regex },
+        ];
       }
 
       const [users, total] = await Promise.all([

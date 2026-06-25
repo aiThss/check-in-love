@@ -14,6 +14,7 @@ function toSafeUser(user: InstanceType<typeof User>) {
     displayName: user.displayName,
     partnerName: user.partnerName,
     email: user.email,
+    email_aliases: user.email_aliases || [],
     avatarUrl: user.avatarUrl,
     partnerAvatarUrl: user.partnerAvatarUrl,
     role: user.role,

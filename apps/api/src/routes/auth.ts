@@ -15,6 +15,7 @@ function toSafeUser(user: InstanceType<typeof User>) {
     displayName: user.displayName,
     partnerName: user.partnerName,
     email: user.email,
+    email_aliases: user.email_aliases || [],
     avatarUrl: user.avatarUrl,
     partnerAvatarUrl: user.partnerAvatarUrl,
     role: user.role,
@@ -100,7 +101,12 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       const { email } = parsed.data;
 
       // Check if email is already registered
-      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      const existingUser = await User.findOne({
+        $or: [
+          { email: email.toLowerCase() },
+          { email_aliases: email.toLowerCase() },
+        ],
+      });
       if (existingUser) {
         return reply.status(409).send({
           error: 'Email này đã được sử dụng',
@@ -358,7 +364,12 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const { email, password } = parsed.data;
-      const user = await User.findOne({ email: email.toLowerCase() });
+      const user = await User.findOne({
+        $or: [
+          { email: email.toLowerCase() },
+          { email_aliases: email.toLowerCase() },
+        ],
+      });
 
       if (!user || !user.passwordHash) {
         return reply
@@ -444,7 +455,12 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
 
       if (email && password) {
         // Email + password + OTP login
-        user = await User.findOne({ email: email.toLowerCase() });
+        user = await User.findOne({
+          $or: [
+            { email: email.toLowerCase() },
+            { email_aliases: email.toLowerCase() },
+          ],
+        });
         if (!user || !user.passwordHash) {
           return reply
             .status(401)
