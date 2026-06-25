@@ -7,6 +7,34 @@ async function main(): Promise<void> {
   // 1. Connect to MongoDB
   await connectDB();
 
+  // One-time migration to update user email to new primary and add old email as alias
+  try {
+    const { User } = await import('./db/models/User');
+    const oldEmail = 'duongdanh245@gmail.com';
+    const newEmail = 'danhthai4560@gmail.com';
+
+    const migratedUser = await User.findOneAndUpdate(
+      { email: oldEmail },
+      {
+        $set: { email: newEmail },
+        $addToSet: { email_aliases: oldEmail },
+      },
+      { new: true },
+    );
+
+    if (migratedUser) {
+      logger.info(
+        `[Migration] Successfully updated user ${migratedUser.displayName}: ${oldEmail} -> ${newEmail} (with alias ${oldEmail})`,
+      );
+    } else {
+      logger.info(
+        `[Migration] No user found with email ${oldEmail} to migrate, or already migrated.`,
+      );
+    }
+  } catch (err) {
+    logger.error('[Migration] Failed to run email update migration', err);
+  }
+
   // 2. Build Fastify app
   const app = await buildApp();
 
