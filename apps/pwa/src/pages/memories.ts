@@ -320,6 +320,7 @@ export function renderMemoriesPage(): HTMLElement {
   content.appendChild(grid);
 
   let currentPage = 1;
+  let displayedLimit = 14;
   let totalPages = cachedTotalPages;
   let isLoading = false;
   let allItems: CheckIn[] = [...cachedMemories];
@@ -332,12 +333,9 @@ export function renderMemoriesPage(): HTMLElement {
 
   if (cachedMemories.length > 0) {
     // Render cache immediately
-    renderGrid(allItems);
-    const countEl = header.querySelector('#memories-count');
-    if (countEl) {
-      countEl.textContent = `${cachedTotal} khoảnh khắc đã ghi dấu`;
-    }
-    loadMoreBtn.style.display = currentPage < totalPages ? 'block' : 'none';
+    applySearch();
+    // Fetch all in background to sync latest memories
+    loadAllMemories();
   }
 
   async function reactToItem(item: CheckIn, type: ReactionType, refreshDetail?: () => void) {
@@ -346,7 +344,7 @@ export function renderMemoriesPage(): HTMLElement {
       const matchedItem = allItems.find((candidate) => candidate.id === item.id);
       if (matchedItem) matchedItem.reactions = newReactions;
       item.reactions = newReactions;
-      renderGrid(allItems);
+      applySearch();
       refreshDetail?.();
     } catch {
       showToast('Không react được, thử lại nhé', 'error');
@@ -467,15 +465,16 @@ export function renderMemoriesPage(): HTMLElement {
 
   function applySearch() {
     const filtered = searchQuery ? allItems.filter((item) => matchesSearch(item, searchQuery)) : allItems;
-    renderGrid(filtered, Boolean(searchQuery));
+    const toRender = searchQuery ? filtered : filtered.slice(0, displayedLimit);
+    renderGrid(toRender, Boolean(searchQuery));
     const countEl = header.querySelector('#memories-count');
     if (countEl) {
       countEl.textContent = searchQuery
         ? `Tìm thấy ${filtered.length} kỷ niệm`
         : `${cachedTotal} khoảnh khắc đã ghi dấu`;
     }
-    // Hide load-more while searching
-    loadMoreBtn.style.display = !searchQuery && currentPage < totalPages ? 'block' : 'none';
+    const hasMoreItems = allItems.length > displayedLimit || cachedTotal > displayedLimit;
+    loadMoreBtn.style.display = !searchQuery && hasMoreItems ? 'block' : 'none';
   }
 
   // Wire up search events once DOM is ready
@@ -510,6 +509,37 @@ export function renderMemoriesPage(): HTMLElement {
   });
   // ─────────────────────────────────────────────────────────────────────────
 
+  async function loadAllMemories() {
+    try {
+      let page = 1;
+      let hasMore = true;
+      let tempAll: CheckIn[] = [...allItems];
+
+      while (hasMore) {
+        const res = await getCheckins(page, 50);
+        const newItems = (res.data || []).filter(
+          (item) => !tempAll.some((existing) => existing.id === item.id)
+        );
+        tempAll = [...tempAll, ...newItems];
+
+        // Sort newest first
+        tempAll.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        allItems = tempAll;
+        cachedMemories = tempAll;
+        cachedTotal = Math.max(res.total, tempAll.length);
+        cachedTotalPages = Math.ceil(cachedTotal / 14);
+
+        applySearch();
+
+        hasMore = res.page < Math.ceil(res.total / res.limit);
+        page++;
+      }
+    } catch (err) {
+      console.error('Failed to load all memories in background:', err);
+    }
+  }
+
   async function fetchMemories(page = 1, append = false) {
     if (isLoading) return;
     isLoading = true;
@@ -541,6 +571,8 @@ export function renderMemoriesPage(): HTMLElement {
         cachedMemories = items;
         cachedTotal = res.total;
         cachedTotalPages = totalPages;
+        // Trigger background load
+        loadAllMemories();
       }
       applySearch();
 
@@ -849,7 +881,7 @@ export function renderMemoriesPage(): HTMLElement {
           item.replies = replies;
           if (input) input.value = '';
           renderDetailContent();
-          renderGrid(allItems);
+          applySearch();
         } catch {
           showToast('Không gửi được reply', 'error');
         }
@@ -872,12 +904,17 @@ export function renderMemoriesPage(): HTMLElement {
   fetchMemories(1);
 
   header.querySelector('#refresh-btn')?.addEventListener('click', () => {
+    displayedLimit = 14;
+    currentPage = 1;
     fetchMemories(1);
     showToast('Đang tải lại kỷ niệm...', 'info');
   });
 
   loadMoreBtn.addEventListener('click', () => {
-    if (currentPage < totalPages) {
+    displayedLimit += 14;
+    applySearch();
+    // Fallback: if we need to fetch more because allItems doesn't have it yet
+    if (allItems.length < displayedLimit && currentPage < totalPages) {
       fetchMemories(currentPage + 1, true);
     }
   });

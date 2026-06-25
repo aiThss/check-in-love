@@ -22,8 +22,8 @@
   --accent-glow: rgba(255, 59, 127, 0.18);
 
   /* ── Shadows ──────────────────────────────────────────────── */
-  --shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
-  --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.1);
+  --shadow: none;
+  --shadow-elevated: none;
 
   /* ── Radii ────────────────────────────────────────────────── */
   --radius-card: 28px;
@@ -72,8 +72,8 @@
   --accent: #ff3b7f;
   --accent-soft: rgba(255, 59, 127, 0.18);
   --accent-glow: rgba(255, 59, 127, 0.28);
-  --shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
-  --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.6);
+  --shadow: none;
+  --shadow-elevated: none;
 }
 
 /* ── System Dark Mode (fallback when theme is "system") ─────── */
@@ -88,7 +88,7 @@
     --accent: #ff3b7f;
     --accent-soft: rgba(255, 59, 127, 0.18);
     --accent-glow: rgba(255, 59, 127, 0.28);
-    --shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
-    --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.6);
+    --shadow: none;
+    --shadow-elevated: none;
   }
 }
