@@ -164,13 +164,16 @@ async function handleFileSelection(
 ): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
+    // Track whether Android already popped the dummy state so cleanup doesn't double-back
+    let dummyStatePopped = false;
 
     const cleanup = () => {
       if (document.body.contains(input)) {
         document.body.removeChild(input);
       }
-      // Pop the dummy history state we pushed (if still there)
-      if (isCamera && (history.state as Record<string, unknown>)?.cameraOpen) {
+      // Pop the dummy history state only if Android hasn't already done so
+      if (isCamera && !dummyStatePopped && (history.state as Record<string, unknown>)?.cameraOpen) {
+        dummyStatePopped = true;
         history.back();
       }
     };
@@ -183,30 +186,27 @@ async function handleFileSelection(
       }
     };
 
-    // On Android WebView, push a dummy history entry so the native back button
-    // consumed by camera close doesn't pop the SPA route.
+    // On Android WebView, push a dummy history entry so when the native camera
+    // activity closes and Android triggers onBackPressed → webView.goBack(),
+    // it consumes this dummy entry instead of popping the real SPA route.
     if (isCamera && isAndroidApp()) {
       history.pushState({ cameraOpen: true }, '');
 
-      // If back is pressed (camera cancelled via hardware back), settle gracefully.
+      // When Android pops the dummy state (camera close), just mark it as popped.
+      // Do NOT resolve here — wait for input.onchange to deliver the file.
       const onPop = () => {
         window.removeEventListener('popstate', onPop);
-        settle();
+        dummyStatePopped = true;
+        // If camera was cancelled (no file will come), resolve after a short grace period
+        // to give onchange/oncancel a chance to fire first.
+        setTimeout(() => {
+          if (!settled) settle();
+        }, 300);
       };
       window.addEventListener('popstate', onPop);
     }
 
     input.onchange = async () => {
-      // Remove popstate guard since user confirmed a file
-      if (isCamera && isAndroidApp()) {
-        // Pop the dummy state silently before handling the result
-        if ((history.state as Record<string, unknown>)?.cameraOpen) {
-          history.back();
-          // Give history.back() a tick to settle before continuing
-          await new Promise<void>((r) => setTimeout(r, 50));
-        }
-      }
-
       const file = input.files?.[0];
       input.value = '';
 
