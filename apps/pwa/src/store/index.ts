@@ -67,8 +67,19 @@ function syncAndroidWidget(state: AppState): void {
 
 // ── Apply theme to document ───────────────────────────────────────────────────
 
+let themeTransitionTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function applyTheme(theme: AppState['theme']): void {
   const root = document.documentElement;
+
+  // Add transitioning class so CSS can smoothly animate theme switch
+  // Clear any pending removal first to avoid race conditions
+  if (themeTransitionTimer !== null) {
+    clearTimeout(themeTransitionTimer);
+    themeTransitionTimer = null;
+  }
+  root.classList.add('theme-transitioning');
+
   if (theme === 'dark') {
     root.setAttribute('data-theme', 'dark');
   } else if (theme === 'light') {
@@ -78,6 +89,12 @@ export function applyTheme(theme: AppState['theme']): void {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
   }
+
+  // Remove transitioning class after transitions complete (350ms matches CSS)
+  themeTransitionTimer = setTimeout(() => {
+    root.classList.remove('theme-transitioning');
+    themeTransitionTimer = null;
+  }, 350);
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────

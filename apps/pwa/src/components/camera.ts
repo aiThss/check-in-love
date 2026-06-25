@@ -160,23 +160,66 @@ export function revokePreviewUrl(preview?: string | null): void {
 async function handleFileSelection(
   input: HTMLInputElement,
   onResult: (result: CameraResult) => void,
+  isCamera = false,
 ): Promise<void> {
   return new Promise((resolve) => {
+    let settled = false;
+
     const cleanup = () => {
       if (document.body.contains(input)) {
         document.body.removeChild(input);
       }
+      // Pop the dummy history state we pushed (if still there)
+      if (isCamera && (history.state as Record<string, unknown>)?.cameraOpen) {
+        history.back();
+      }
     };
 
+    const settle = () => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        resolve();
+      }
+    };
+
+    // On Android WebView, push a dummy history entry so the native back button
+    // consumed by camera close doesn't pop the SPA route.
+    if (isCamera && isAndroidApp()) {
+      history.pushState({ cameraOpen: true }, '');
+
+      // If back is pressed (camera cancelled via hardware back), settle gracefully.
+      const onPop = () => {
+        window.removeEventListener('popstate', onPop);
+        settle();
+      };
+      window.addEventListener('popstate', onPop);
+    }
+
     input.onchange = async () => {
+      // Remove popstate guard since user confirmed a file
+      if (isCamera && isAndroidApp()) {
+        // Pop the dummy state silently before handling the result
+        if ((history.state as Record<string, unknown>)?.cameraOpen) {
+          history.back();
+          // Give history.back() a tick to settle before continuing
+          await new Promise<void>((r) => setTimeout(r, 50));
+        }
+      }
+
       const file = input.files?.[0];
       input.value = '';
 
+      if (document.body.contains(input)) {
+        document.body.removeChild(input);
+      }
+
       if (!file) {
-        cleanup();
-        resolve();
+        if (!settled) { settled = true; resolve(); }
         return;
       }
+
+      settled = true;
 
       try {
         onResult(await processImage(file));
@@ -186,14 +229,12 @@ async function handleFileSelection(
           preview: URL.createObjectURL(file),
         });
       } finally {
-        cleanup();
         resolve();
       }
     };
 
     input.oncancel = () => {
-      cleanup();
-      resolve();
+      settle();
     };
 
     input.click();
@@ -202,7 +243,7 @@ async function handleFileSelection(
 
 function openCameraCapture(onResult: (result: CameraResult) => void): void {
   const input = createFileInput('image/*', 'environment');
-  void handleFileSelection(input, onResult);
+  void handleFileSelection(input, onResult, true);
 }
 
 /**

@@ -1,5 +1,5 @@
 import { navigate } from '../router';
-import { store } from '../store/index';
+import { store, applyTheme } from '../store/index';
 import { updateProfile, uploadAvatar, uploadPartnerAvatar } from '../api/profile';
 import { getMe, MeResponse } from '../api/auth';
 import { createNav } from '../components/nav';
@@ -401,9 +401,7 @@ export function renderProfilePage(): HTMLElement {
           item.setAttribute('aria-checked', String(active));
         });
 
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const useDark = selected === 'dark' || (selected === 'system' && prefersDark);
-        document.documentElement.setAttribute('data-theme', useDark ? 'dark' : 'light');
+        applyTheme(selected);
 
         showToast('Đã đổi giao diện thành công!', 'success');
       });

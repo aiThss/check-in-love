@@ -54,6 +54,29 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ── Smooth theme transitions ─────────────────────────────────── */
+/* Applied via JS during theme switch to animate all visual properties */
+.theme-transitioning body,
+.theme-transitioning .card,
+.theme-transitioning .card-solid,
+.theme-transitioning .modal,
+.theme-transitioning .glass-surface,
+.theme-transitioning .glass-card,
+.theme-transitioning .glass-profile-card,
+.theme-transitioning .glass-modal,
+.theme-transitioning .bottom-nav-inner,
+.theme-transitioning .btn-primary,
+.theme-transitioning .btn-icon,
+.theme-transitioning .input,
+.theme-transitioning .chip {
+  transition:
+    background 0.3s ease,
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    color 0.3s ease !important;
+}
+
 body {
   min-height: 100%;
   background: var(--bg);
@@ -2596,6 +2619,7 @@ textarea.input {
     radial-gradient(circle at 20% 8%, rgba(255, 59, 127, 0.08), transparent 26%),
     radial-gradient(circle at 85% 18%, rgba(120, 160, 255, 0.08), transparent 28%),
     #f7f7f9 !important;
+  /* Transition is handled by .theme-transitioning class on html */
 }
 
 /* Giao diện Liquid Glass cho các card/mục trong Light Mode */
@@ -2630,7 +2654,7 @@ textarea.input {
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     inset 0 -1px 0 rgba(255, 255, 255, 0.1),
     inset 0 0 32px 16px rgba(255, 255, 255, 0.16) !important;
-  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Highlight mép trên & viền mờ cho glass elements */
