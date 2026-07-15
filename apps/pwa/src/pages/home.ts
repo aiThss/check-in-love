@@ -5,7 +5,7 @@ import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { createNav } from '../components/nav';
 import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
-import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
+import { isEmojiOnlyReaction, openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -509,7 +509,6 @@ function buildRecentMemoriesSection(): HTMLElement {
           }
         });
 
-        topRow.appendChild(heartBtn);
 
         const replyForm = document.createElement('form');
         replyForm.className = 'rm-inline-composer';
@@ -520,6 +519,12 @@ function buildRecentMemoriesSection(): HTMLElement {
         `;
 
         const replyInput = replyForm.querySelector<HTMLInputElement>('input');
+        let isEmojiMode = false;
+        replyInput?.addEventListener('input', () => {
+          if (isEmojiMode && replyInput.value && !isEmojiOnlyReaction(replyInput.value)) {
+            replyInput.value = '';
+          }
+        });
         replyForm.addEventListener('submit', async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -527,9 +532,23 @@ function buildRecentMemoriesSection(): HTMLElement {
           if (!message) return;
 
           try {
-            item.replies = await addReply(item.id, message);
-            if (replyInput) replyInput.value = '';
-            showToast('Đã gửi tin nhắn', 'success');
+            const sendingEmoji = isEmojiMode;
+            if (sendingEmoji) {
+              if (!isEmojiOnlyReaction(message)) {
+                showToast('Chế độ này chỉ gửi emoji', 'error');
+                return;
+              }
+              item.reactions = await addReaction(item.id, message);
+              isEmojiMode = false;
+              replyForm.classList.remove('emoji-mode');
+            } else {
+              item.replies = await addReply(item.id, message);
+            }
+            if (replyInput) {
+              replyInput.value = '';
+              replyInput.placeholder = 'Gửi tin nhắn...';
+            }
+            showToast(sendingEmoji ? 'Đã thả cảm xúc' : 'Đã gửi tin nhắn', 'success');
           } catch {
             showToast('Không gửi được tin nhắn, thử lại nhé', 'error');
           }
@@ -537,7 +556,13 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         replyForm.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
           event.stopPropagation();
-          openReactionPicker(item, updateReactionBadges);
+          isEmojiMode = true;
+          replyForm.classList.add('emoji-mode');
+          if (replyInput) {
+            replyInput.value = '';
+            replyInput.placeholder = 'Chỉ gửi emoji...';
+            replyInput.focus();
+          }
         });
 
         reactionRow.appendChild(replyForm);

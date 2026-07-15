@@ -17,6 +17,16 @@ export function reactionPillsHtml(checkin: CheckIn): string {
     .join('');
 }
 
+export function isEmojiOnlyReaction(value: string): boolean {
+  const compact = value.replace(/\s/g, '');
+  return compact.length > 0 && [...compact].every((character) => (
+    /\p{Extended_Pictographic}/u.test(character)
+    || /\p{Emoji_Component}/u.test(character)
+    || character === '\u200D'
+    || character === '\uFE0F'
+  ));
+}
+
 export function openReactionPicker(checkin: CheckIn, onUpdated?: () => void): void {
   const content = document.createElement('div');
   content.className = 'choice-reaction-picker';
