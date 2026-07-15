@@ -598,8 +598,17 @@ export function renderCheckinPage(): HTMLElement {
     }
 
     const rect = sendBtn.getBoundingClientRect();
-    const x = rect.left + rect.width / 2;
-    const y = rect.top + rect.height / 2;
+    let x = rect.left + rect.width / 2;
+    let y = rect.top + rect.height / 2;
+
+    // Fallback to center of viewport if coordinates are invalid (0 or NaN)
+    if (!x || !y || isNaN(x) || isNaN(y)) {
+      x = window.innerWidth / 2;
+      y = window.innerHeight / 2;
+      logger.warn('[HeartBurst] Invalid button coordinates, falling back to viewport center:', { x, y, rect });
+    } else {
+      logger.info('[HeartBurst] Triggered at button coordinates:', { x, y, rect });
+    }
 
     const particleCount = 18;
     const hearts = ["❤️", "💖", "💕", "🌸", "🥰"];
