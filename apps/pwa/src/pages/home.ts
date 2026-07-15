@@ -5,7 +5,7 @@ import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { createNav } from '../components/nav';
 import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
-import { isEmojiOnlyReaction, openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
+import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -520,11 +520,6 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         const replyInput = replyForm.querySelector<HTMLInputElement>('input');
         let isEmojiMode = false;
-        replyInput?.addEventListener('input', () => {
-          if (isEmojiMode && replyInput.value && !isEmojiOnlyReaction(replyInput.value)) {
-            replyInput.value = '';
-          }
-        });
         replyForm.addEventListener('submit', async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -534,10 +529,6 @@ function buildRecentMemoriesSection(): HTMLElement {
           try {
             const sendingEmoji = isEmojiMode;
             if (sendingEmoji) {
-              if (!isEmojiOnlyReaction(message)) {
-                showToast('Chế độ này chỉ gửi emoji', 'error');
-                return;
-              }
               item.reactions = await addReaction(item.id, message);
               isEmojiMode = false;
               replyForm.classList.remove('emoji-mode');
@@ -560,7 +551,7 @@ function buildRecentMemoriesSection(): HTMLElement {
           replyForm.classList.add('emoji-mode');
           if (replyInput) {
             replyInput.value = '';
-            replyInput.placeholder = 'Chỉ gửi emoji...';
+            replyInput.placeholder = 'Gửi reaction...';
             replyInput.focus();
           }
         });

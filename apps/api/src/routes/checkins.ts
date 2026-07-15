@@ -437,14 +437,14 @@ export default async function checkinsRoutes(
           body: parsed.data.message,
           icon: user.avatarUrl,
           badge: '/icons/icon-192.png',
-          url: '/app/memories',
+          url: '/app/messages',
           tag: `reply-${checkIn._id.toString()}`,
           kind: 'reply',
           checkinId: checkIn._id.toString(),
           senderName: user.displayName,
           senderAvatar: user.avatarUrl,
           actionType: 'reply',
-          targetUrl: '/app/memories',
+          targetUrl: '/app/messages',
         }).catch((err) => {
           app.log.error({ err }, 'Failed to send reply push notification');
         });

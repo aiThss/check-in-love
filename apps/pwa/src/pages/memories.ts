@@ -3,7 +3,6 @@ import { getCheckins, addReaction, addReply } from '../api/checkins';
 import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
-import { isEmojiOnlyReaction } from '../components/reaction-picker';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
 let cachedMemories: CheckIn[] = [];
@@ -185,9 +184,6 @@ function buildSocialRow(
   `;
   const input = form.querySelector<HTMLInputElement>('input');
   let isEmojiMode = false;
-  input?.addEventListener('input', () => {
-    if (isEmojiMode && input.value && !isEmojiOnlyReaction(input.value)) input.value = '';
-  });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const message = input?.value.trim() ?? '';
@@ -195,10 +191,6 @@ function buildSocialRow(
     try {
       const sendingEmoji = isEmojiMode;
       if (sendingEmoji) {
-        if (!isEmojiOnlyReaction(message)) {
-          showToast('Chế độ này chỉ gửi emoji', 'error');
-          return;
-        }
         item.reactions = await addReaction(item.id, message);
         isEmojiMode = false;
         form.classList.remove('emoji-mode');
@@ -220,7 +212,7 @@ function buildSocialRow(
     form.classList.add('emoji-mode');
     if (input) {
       input.value = '';
-      input.placeholder = 'Chỉ gửi emoji...';
+      input.placeholder = 'Gửi reaction...';
       input.focus();
     }
   });
@@ -875,11 +867,6 @@ export function renderMemoriesPage(): HTMLElement {
       const replyForm = detail.querySelector<HTMLFormElement>('#reply-form');
       let isEmojiMode = false;
       const detailReplyInput = detail.querySelector<HTMLInputElement>('#reply-input');
-      detailReplyInput?.addEventListener('input', () => {
-        if (isEmojiMode && detailReplyInput.value && !isEmojiOnlyReaction(detailReplyInput.value)) {
-          detailReplyInput.value = '';
-        }
-      });
       replyForm?.addEventListener('submit', async (event) => {
         event.preventDefault();
         const input = detail.querySelector<HTMLInputElement>('#reply-input');
@@ -889,10 +876,6 @@ export function renderMemoriesPage(): HTMLElement {
         try {
           const sendingEmoji = isEmojiMode;
           if (sendingEmoji) {
-            if (!isEmojiOnlyReaction(message)) {
-              showToast('Chế độ này chỉ gửi emoji', 'error');
-              return;
-            }
             item.reactions = await addReaction(item.id, message);
             isEmojiMode = false;
           } else {
@@ -914,7 +897,7 @@ export function renderMemoriesPage(): HTMLElement {
         const input = detail.querySelector<HTMLInputElement>('#reply-input');
         if (input) {
           input.value = '';
-          input.placeholder = 'Chỉ gửi emoji...';
+          input.placeholder = 'Gửi reaction...';
           input.focus();
         }
       });
