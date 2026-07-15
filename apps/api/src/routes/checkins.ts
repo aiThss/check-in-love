@@ -151,7 +151,11 @@ export default async function checkinsRoutes(
       if (query.after) {
         const after = new Date(query.after);
         if (!Number.isNaN(after.getTime())) {
-          filter.createdAt = { $gt: after };
+          // A reply to an older photo belongs in the current chat stream too.
+          filter.$or = [
+            { createdAt: { $gt: after } },
+            { 'replies.createdAt': { $gt: after } },
+          ];
         }
       }
 

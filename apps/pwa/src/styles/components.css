@@ -3959,6 +3959,11 @@ textarea:focus-visible,
   backdrop-filter: blur(24px) saturate(145%);
 }
 
+.messages-page > .messages-composer {
+  position: fixed;
+  inset: auto 14px calc(80px + var(--safe-bottom));
+}
+
 .messages-photo-button,
 .messages-send {
   display: grid;

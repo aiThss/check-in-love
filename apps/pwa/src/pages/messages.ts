@@ -19,6 +19,11 @@ function formatTime(value: string): string {
   return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 
+function getLatestActivityTime(item: CheckIn): number {
+  const replyTimes = (item.replies ?? []).map((reply) => new Date(reply.createdAt).getTime());
+  return Math.max(new Date(item.createdAt).getTime(), ...replyTimes);
+}
+
 export function renderMessagesPage(): HTMLElement {
   const page = document.createElement('div');
   page.className = 'page messages-page animate-fade-in';
@@ -105,7 +110,7 @@ export function renderMessagesPage(): HTMLElement {
       // Load a recent window when opening the tab; older photos stay in Memories.
       const response = await getCheckins(1, 50, messageStartedAt);
       const messages = response.data.sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+        (a, b) => getLatestActivityTime(a) - getLatestActivityTime(b),
       );
       thread.innerHTML = '';
 
