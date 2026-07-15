@@ -589,41 +589,47 @@ export function renderCheckinPage(): HTMLElement {
 
   // Helper for Heart Burst Effect
   function showHeartBurstEffect() {
-    const burstContainer = document.createElement('div');
-    burstContainer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;display:flex;align-items:center;justify-content:center;';
-    document.body.appendChild(burstContainer);
-
-    for (let i = 0; i < 24; i++) {
-      const heart = document.createElement('div');
-      heart.textContent = ['💖', '💕', '❤️', '🌸', '✨'][Math.floor(Math.random() * 5)];
-      heart.style.cssText = `
-        position: absolute;
-        font-size: ${Math.floor(Math.random() * 24) + 16}px;
-        opacity: 0;
-        transform: translate(0, 0) scale(0.5);
-        transition: all 1s cubic-bezier(0.1, 0.8, 0.3, 1);
-      `;
-      burstContainer.appendChild(heart);
-
-      const angle = Math.random() * Math.PI * 2;
-      const distance = Math.floor(Math.random() * 150) + 50;
-      const tx = Math.cos(angle) * distance;
-      const ty = Math.sin(angle) * distance;
-
-      requestAnimationFrame(() => {
-        heart.style.opacity = '1';
-        heart.style.transform = `translate(${tx}px, ${ty}px) scale(1) rotate(${Math.floor(Math.random() * 180) - 90}deg)`;
-        
-        // fade out
-        setTimeout(() => {
-          heart.style.opacity = '0';
-        }, 600);
-      });
+    let burstContainer = document.getElementById('heart-burst-container');
+    if (!burstContainer) {
+      burstContainer = document.createElement('div');
+      burstContainer.id = 'heart-burst-container';
+      burstContainer.className = 'heart-burst-container';
+      document.body.appendChild(burstContainer);
     }
 
-    setTimeout(() => {
-      document.body.removeChild(burstContainer);
-    }, 1200);
+    const rect = sendBtn.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    const particleCount = 18;
+    const hearts = ["❤️", "💖", "💕", "🌸", "🥰"];
+
+    for (let i = 0; i < particleCount; i++) {
+      const particle = document.createElement('div');
+      particle.className = 'particle-heart';
+      particle.textContent = hearts[Math.floor(Math.random() * hearts.length)];
+
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 60 + Math.random() * 120;
+      const tx = Math.cos(angle) * distance;
+      const ty = Math.sin(angle) * distance - 40; // bias upwards
+      const scale = 0.5 + Math.random() * 0.8;
+      const rot = -45 + Math.random() * 90;
+
+      particle.style.setProperty('--tx', `${tx}px`);
+      particle.style.setProperty('--ty', `${ty}px`);
+      particle.style.setProperty('--scale', `${scale}`);
+      particle.style.setProperty('--rot', `${rot}deg`);
+
+      particle.style.left = `${x}px`;
+      particle.style.top = `${y}px`;
+
+      burstContainer.appendChild(particle);
+
+      particle.addEventListener('animationend', () => {
+        particle.remove();
+      });
+    }
   }
 
   // Inject Nav

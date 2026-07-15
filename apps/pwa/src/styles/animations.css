@@ -238,6 +238,40 @@
   animation: fadeIn var(--duration-normal) var(--ease) both;
 }
 
+/* ── Heart Burst Particles ────────────────────────────────────── */
+.heart-burst-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.particle-heart {
+  position: absolute;
+  font-size: 24px;
+  animation: particleFly 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  transform: scale(0.5);
+  pointer-events: none;
+}
+
+@keyframes particleFly {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5) rotate(0deg);
+  }
+  15% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx), var(--ty)) scale(var(--scale)) rotate(var(--rot));
+  }
+}
+
 /* ── Reduced motion ──────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,
