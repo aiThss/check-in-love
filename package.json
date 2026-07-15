@@ -11,9 +11,18 @@
     "dev:pwa": "npm run dev --workspace=apps/pwa",
     "dev:admin": "npm run dev --workspace=apps/admin",
     "build": "npm run build --workspaces",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
+    "typescript-eslint": "^8.64.0",
+    "vitest": "^4.1.10"
   }
 }

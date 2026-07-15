@@ -5,16 +5,16 @@
 
 :root {
   /* ── Backgrounds ──────────────────────────────────────────── */
-  --bg: #ffffff;
+  --bg: #fffafa;
   --surface: rgba(255, 255, 255, 0.72);
-  --surface-solid: #f8f8f8;
+  --surface-solid: #fff4f7;
 
   /* ── Text ─────────────────────────────────────────────────── */
   --text-primary: #050505;
   --text-secondary: #737373;
 
   /* ── Borders ──────────────────────────────────────────────── */
-  --border: #ededed;
+  --border: rgba(255, 255, 255, 0.88);
 
   /* ── Accent ───────────────────────────────────────────────── */
   --accent: #ff3b7f;
@@ -22,8 +22,8 @@
   --accent-glow: rgba(255, 59, 127, 0.18);
 
   /* ── Shadows ──────────────────────────────────────────────── */
-  --shadow: none;
-  --shadow-elevated: none;
+  --shadow: 0 18px 46px rgba(115, 44, 68, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  --shadow-elevated: 0 22px 50px rgba(115, 44, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 
   /* ── Radii ────────────────────────────────────────────────── */
   --radius-card: 28px;
@@ -56,39 +56,39 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ── Nav ──────────────────────────────────────────────────── */
-  --nav-height: 80px;
+  --nav-height: 86px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ── Dark Theme ──────────────────────────────────────────────── */
 [data-theme='dark'] {
-  --bg: #000000;
-  --surface: rgba(18, 18, 18, 0.78);
-  --surface-solid: #111111;
+  --bg: #151115;
+  --surface: rgba(27, 22, 25, 0.74);
+  --surface-solid: #211a1e;
   --text-primary: #ffffff;
-  --text-secondary: #a3a3a3;
-  --border: #262626;
+  --text-secondary: #b6afb4;
+  --border: rgba(255, 255, 255, 0.1);
   --accent: #ff3b7f;
   --accent-soft: rgba(255, 59, 127, 0.18);
   --accent-glow: rgba(255, 59, 127, 0.28);
-  --shadow: none;
-  --shadow-elevated: none;
+  --shadow: 0 18px 46px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-elevated: 0 22px 50px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* ── System Dark Mode (fallback when theme is "system") ─────── */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #000000;
-    --surface: rgba(18, 18, 18, 0.78);
-    --surface-solid: #111111;
+    --bg: #151115;
+    --surface: rgba(27, 22, 25, 0.74);
+    --surface-solid: #211a1e;
     --text-primary: #ffffff;
-    --text-secondary: #a3a3a3;
-    --border: #262626;
+    --text-secondary: #b6afb4;
+    --border: rgba(255, 255, 255, 0.1);
     --accent: #ff3b7f;
     --accent-soft: rgba(255, 59, 127, 0.18);
     --accent-glow: rgba(255, 59, 127, 0.28);
-    --shadow: none;
-    --shadow-elevated: none;
+    --shadow: 0 18px 46px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --shadow-elevated: 0 22px 50px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 }
