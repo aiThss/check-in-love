@@ -4,6 +4,7 @@ import './styles/animations.css';
 import { store } from './store/index';
 import { initRouter } from './router';
 import { logger } from './utils/logger';
+import { initKeyboardViewport } from './utils/keyboard';
 import { renderInstallPage } from './pages/install';
 import { renderLoginPage } from './pages/login';
 import { renderOnboardingPage } from './pages/onboarding';
@@ -27,6 +28,7 @@ function applyTheme() {
 }
 
 applyTheme();
+initKeyboardViewport();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
 // Restore check-in reminder timer after reload (browser-only best-effort)

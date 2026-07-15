@@ -4045,6 +4045,19 @@ textarea:focus-visible,
   inset: auto 16px calc(82px + var(--safe-bottom));
 }
 
+:root.keyboard-open .messages-page > .messages-composer {
+  bottom: calc(3px + var(--keyboard-offset));
+}
+
+:root.keyboard-open .bottom-nav {
+  display: none;
+}
+
+input[type='text'],
+textarea {
+  scroll-margin-bottom: calc(var(--keyboard-offset, 0px) + 3px);
+}
+
 .messages-photo-button,
 .messages-send {
   display: grid;
