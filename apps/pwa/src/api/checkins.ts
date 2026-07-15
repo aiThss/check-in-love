@@ -154,10 +154,12 @@ export async function getCheckins(
   page: number = 1,
   limit: number = 20,
   after?: string,
+  type?: string,
 ): Promise<PaginatedResponse<CheckIn>> {
   const afterQuery = after ? '&after=' + encodeURIComponent(after) : '';
+  const typeQuery = type ? '&type=' + encodeURIComponent(type) : '';
   const res = await apiFetch<{ checkIns: RawCheckIn[]; pagination: PaginationInfo }>(
-    '/checkins?page=' + page + '&limit=' + limit + afterQuery,
+    '/checkins?page=' + page + '&limit=' + limit + afterQuery + typeQuery,
   );
 
   const data = (res.checkIns || []).map(mapCheckin);

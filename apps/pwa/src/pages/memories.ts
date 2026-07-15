@@ -505,7 +505,7 @@ export function renderMemoriesPage(): HTMLElement {
       let tempAll: CheckIn[] = [...allItems];
 
       while (hasMore) {
-        const res = await getCheckins(page, 50);
+        const res = await getCheckins(page, 50, undefined, 'photo');
         const newItems = (res.data || []).filter(
           (item) => !tempAll.some((existing) => existing.id === item.id)
         );
@@ -546,7 +546,7 @@ export function renderMemoriesPage(): HTMLElement {
     }
 
     try {
-      const res = await getCheckins(page, 14);
+        const res = await getCheckins(page, 14, undefined, 'photo');
       isLoading = false;
       const refreshBtn = header.querySelector('#refresh-btn');
       if (refreshBtn) refreshBtn.classList.remove('animate-spin');

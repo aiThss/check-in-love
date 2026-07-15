@@ -1,6 +1,6 @@
 import { createCheckin, getCheckins } from '../api/checkins';
 import { createNav } from '../components/nav';
-import { processImage, revokePreviewUrl } from '../components/camera';
+import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
 import { showToast } from '../components/toast';
 import type { CheckIn } from '../api/types';
 
@@ -33,9 +33,13 @@ export function renderMessagesPage(): HTMLElement {
     <main class="messages-thread" aria-live="polite"></main>
     <form class="messages-composer">
       <input id="message-photo" type="file" accept="image/*" hidden />
-      <button class="messages-photo-button" type="button" aria-label="Đính kèm ảnh">+</button>
+      <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm">+</button>
+      <div class="messages-attach-menu" hidden>
+        <button type="button" data-attach="gallery">Chọn ảnh</button>
+        <button type="button" data-attach="camera">Chụp check-in</button>
+      </div>
       <div class="messages-input-wrap">
-        <img class="messages-photo-preview" alt="Ảnh đã chọn" hidden />
+        <span class="messages-photo-preview" hidden>Ảnh đã chọn</span>
         <input id="message-input" maxlength="280" placeholder="Gửi tin nhắn..." aria-label="Nội dung tin nhắn" />
       </div>
       <button class="messages-send" type="submit" aria-label="Gửi tin nhắn">↑</button>
@@ -47,7 +51,8 @@ export function renderMessagesPage(): HTMLElement {
   const messageInput = page.querySelector<HTMLInputElement>('#message-input')!;
   const photoInput = page.querySelector<HTMLInputElement>('#message-photo')!;
   const photoButton = page.querySelector<HTMLButtonElement>('.messages-photo-button')!;
-  const preview = page.querySelector<HTMLImageElement>('.messages-photo-preview')!;
+  const attachMenu = page.querySelector<HTMLElement>('.messages-attach-menu')!;
+  const preview = page.querySelector<HTMLElement>('.messages-photo-preview')!;
   const sendButton = page.querySelector<HTMLButtonElement>('.messages-send')!;
   let selectedPhoto: File | null = null;
   let previewUrl: string | null = null;
@@ -55,6 +60,16 @@ export function renderMessagesPage(): HTMLElement {
   localStorage.setItem(MESSAGE_START_KEY, messageStartedAt);
 
   function renderCheckin(item: CheckIn): HTMLElement {
+    if (!item.photoUrl) {
+      const message = document.createElement('article');
+      message.className = `chat-text-message${item.isOwn ? ' own' : ''}`;
+      message.innerHTML = `
+        <div class="chat-text-bubble"><p>${escapeHtml(item.caption)}</p></div>
+        <time>${formatTime(item.createdAt)}</time>
+      `;
+      return message;
+    }
+
     const group = document.createElement('section');
     group.className = 'chat-checkin-group';
     const hasPhoto = Boolean(item.photoUrl);
@@ -111,11 +126,34 @@ export function renderMessagesPage(): HTMLElement {
     revokePreviewUrl(previewUrl);
     previewUrl = null;
     preview.hidden = true;
-    preview.removeAttribute('src');
+    preview.textContent = '';
     photoInput.value = '';
   }
 
-  photoButton.addEventListener('click', () => photoInput.click());
+  photoButton.addEventListener('click', () => {
+    attachMenu.hidden = !attachMenu.hidden;
+  });
+  attachMenu.querySelector('[data-attach="gallery"]')?.addEventListener('click', () => {
+    attachMenu.hidden = true;
+    photoInput.click();
+  });
+  attachMenu.querySelector('[data-attach="camera"]')?.addEventListener('click', () => {
+    attachMenu.hidden = true;
+    openCamera((result) => {
+      void (async () => {
+        try {
+          const processed = await processImage(result.file, { aspectRatio: 1, maxSize: 1600, quality: 0.85 });
+          revokePreviewUrl(result.preview);
+          clearSelectedPhoto();
+          selectedPhoto = processed.file;
+          preview.textContent = 'Ảnh đã chọn';
+          preview.hidden = false;
+        } catch {
+          showToast('Không xử lý được ảnh này', 'error');
+        }
+      })();
+    });
+  });
   photoInput.addEventListener('change', async () => {
     const source = photoInput.files?.[0];
     if (!source) return;
@@ -126,7 +164,7 @@ export function renderMessagesPage(): HTMLElement {
       clearSelectedPhoto();
       selectedPhoto = processed.file;
       previewUrl = processed.preview;
-      preview.src = previewUrl;
+      preview.textContent = 'Ảnh đã chọn';
       preview.hidden = false;
     } catch {
       showToast('Không xử lý được ảnh này, thử ảnh khác nhé', 'error');
