@@ -3,6 +3,7 @@ import { getCheckins, addReaction, addReply } from '../api/checkins';
 import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
+import { openReactionPicker } from '../components/reaction-picker';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
 let cachedMemories: CheckIn[] = [];
@@ -183,38 +184,24 @@ function buildSocialRow(
     <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
   `;
   const input = form.querySelector<HTMLInputElement>('input');
-  let isEmojiMode = false;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const message = input?.value.trim() ?? '';
     if (!message) return;
     try {
-      const sendingEmoji = isEmojiMode;
-      if (sendingEmoji) {
-        item.reactions = await addReaction(item.id, message);
-        isEmojiMode = false;
-        form.classList.remove('emoji-mode');
-      } else {
-        item.replies = await addReply(item.id, message);
-      }
+      item.replies = await addReply(item.id, message);
       if (input) {
         input.value = '';
         input.placeholder = 'Gửi tin nhắn...';
       }
-      showToast(sendingEmoji ? 'Đã thả cảm xúc' : 'Đã gửi tin nhắn', 'success');
+      showToast('Đã gửi tin nhắn', 'success');
     } catch {
       showToast('Không gửi được tin nhắn', 'error');
     }
   });
   form.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
     event.stopPropagation();
-    isEmojiMode = true;
-    form.classList.add('emoji-mode');
-    if (input) {
-      input.value = '';
-      input.placeholder = 'Gửi reaction...';
-      input.focus();
-    }
+    openReactionPicker(item);
   });
   row.appendChild(form);
   return row;
@@ -865,8 +852,6 @@ export function renderMemoriesPage(): HTMLElement {
       }
 
       const replyForm = detail.querySelector<HTMLFormElement>('#reply-form');
-      let isEmojiMode = false;
-      const detailReplyInput = detail.querySelector<HTMLInputElement>('#reply-input');
       replyForm?.addEventListener('submit', async (event) => {
         event.preventDefault();
         const input = detail.querySelector<HTMLInputElement>('#reply-input');
@@ -874,16 +859,10 @@ export function renderMemoriesPage(): HTMLElement {
         if (!message) return;
 
         try {
-          const sendingEmoji = isEmojiMode;
-          if (sendingEmoji) {
-            item.reactions = await addReaction(item.id, message);
-            isEmojiMode = false;
-          } else {
-            const replies = await addReply(item.id, message);
-            const matchedItem = allItems.find((candidate) => candidate.id === item.id);
-            if (matchedItem) matchedItem.replies = replies;
-            item.replies = replies;
-          }
+          const replies = await addReply(item.id, message);
+          const matchedItem = allItems.find((candidate) => candidate.id === item.id);
+          if (matchedItem) matchedItem.replies = replies;
+          item.replies = replies;
           if (input) input.value = '';
           renderDetailContent();
           applySearch();
@@ -893,13 +872,7 @@ export function renderMemoriesPage(): HTMLElement {
       });
 
       detail.querySelector<HTMLButtonElement>('.memory-reaction-choice')?.addEventListener('click', () => {
-        isEmojiMode = true;
-        const input = detail.querySelector<HTMLInputElement>('#reply-input');
-        if (input) {
-          input.value = '';
-          input.placeholder = 'Gửi reaction...';
-          input.focus();
-        }
+        openReactionPicker(item, renderDetailContent);
       });
     };
 

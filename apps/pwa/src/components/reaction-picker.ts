@@ -31,6 +31,12 @@ export function openReactionPicker(checkin: CheckIn, onUpdated?: () => void): vo
   const content = document.createElement('div');
   content.className = 'choice-reaction-picker';
 
+  const submitReaction = async (type: string): Promise<void> => {
+    checkin.reactions = await addReaction(checkin.id, type);
+    closeModal();
+    onUpdated?.();
+  };
+
   REACTIONS.forEach((type) => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -39,9 +45,7 @@ export function openReactionPicker(checkin: CheckIn, onUpdated?: () => void): vo
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
-        checkin.reactions = await addReaction(checkin.id, type);
-        closeModal();
-        onUpdated?.();
+        await submitReaction(type);
       } catch {
         button.disabled = false;
         showToast('Không gửi được cảm xúc, thử lại nhé', 'error');
@@ -49,6 +53,25 @@ export function openReactionPicker(checkin: CheckIn, onUpdated?: () => void): vo
     });
     content.appendChild(button);
   });
+
+  const custom = document.createElement('form');
+  custom.className = 'choice-reaction-custom';
+  custom.innerHTML = `
+    <input maxlength="32" placeholder="React tùy chọn" aria-label="React tùy chọn" />
+    <button type="submit">Gửi</button>
+  `;
+  custom.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const input = custom.querySelector<HTMLInputElement>('input');
+    const value = input?.value.trim();
+    if (!value) return;
+    try {
+      await submitReaction(value);
+    } catch {
+      showToast('Không gửi được cảm xúc, thử lại nhé', 'error');
+    }
+  });
+  content.appendChild(custom);
 
   showModal({ title: 'Thả cảm xúc', content, center: true });
 }

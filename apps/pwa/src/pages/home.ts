@@ -387,9 +387,6 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         const card = document.createElement('div');
         card.className = 'recent-memory-card';
-        card.setAttribute('role', 'button');
-        card.setAttribute('tabindex', '0');
-        card.setAttribute('aria-label', `Kỷ niệm: ${escapeHtml(item.caption || formatTime(item.createdAt))}`);
 
         // ── Media section ──
         const photoUrl = getCheckinPhotoUrl(item);
@@ -519,7 +516,6 @@ function buildRecentMemoriesSection(): HTMLElement {
         `;
 
         const replyInput = replyForm.querySelector<HTMLInputElement>('input');
-        let isEmojiMode = false;
         replyForm.addEventListener('submit', async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -527,19 +523,12 @@ function buildRecentMemoriesSection(): HTMLElement {
           if (!message) return;
 
           try {
-            const sendingEmoji = isEmojiMode;
-            if (sendingEmoji) {
-              item.reactions = await addReaction(item.id, message);
-              isEmojiMode = false;
-              replyForm.classList.remove('emoji-mode');
-            } else {
-              item.replies = await addReply(item.id, message);
-            }
+            item.replies = await addReply(item.id, message);
             if (replyInput) {
               replyInput.value = '';
               replyInput.placeholder = 'Gửi tin nhắn...';
             }
-            showToast(sendingEmoji ? 'Đã thả cảm xúc' : 'Đã gửi tin nhắn', 'success');
+            showToast('Đã gửi tin nhắn', 'success');
           } catch {
             showToast('Không gửi được tin nhắn, thử lại nhé', 'error');
           }
@@ -547,13 +536,7 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         replyForm.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
           event.stopPropagation();
-          isEmojiMode = true;
-          replyForm.classList.add('emoji-mode');
-          if (replyInput) {
-            replyInput.value = '';
-            replyInput.placeholder = 'Gửi reaction...';
-            replyInput.focus();
-          }
+          openReactionPicker(item, updateReactionBadges);
         });
 
         reactionRow.appendChild(replyForm);
@@ -574,17 +557,6 @@ function buildRecentMemoriesSection(): HTMLElement {
         }
 
         card.appendChild(body);
-
-        // Click card → open memories page (detail view handled there)
-        card.addEventListener('click', () => {
-          navigate('/app/memories');
-        });
-        card.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            navigate('/app/memories');
-          }
-        });
 
         // Stagger animation delay
         card.style.animationDelay = `${idx * 60}ms`;
