@@ -119,7 +119,17 @@ export function renderMessagesPage(): HTMLElement {
         return;
       }
 
-      messages.forEach((item) => thread.appendChild(renderCheckin(item)));
+      let previousActivity = 0;
+      messages.forEach((item) => {
+        const message = renderCheckin(item);
+        const activityTime = getLatestActivityTime(item);
+        if (previousActivity > 0 && activityTime - previousActivity >= 20 * 60 * 1000) {
+          message.classList.add('show-timestamp');
+        }
+        previousActivity = activityTime;
+        message.addEventListener('click', () => message.classList.toggle('show-timestamp'));
+        thread.appendChild(message);
+      });
       thread.scrollTop = thread.scrollHeight;
     } catch {
       thread.innerHTML = '<p class="messages-empty">Chưa tải được tin nhắn. Hãy thử lại nhé.</p>';

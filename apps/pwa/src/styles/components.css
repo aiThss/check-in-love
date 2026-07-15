@@ -3249,13 +3249,11 @@ textarea:focus-visible,
 
 /* Card glass của từng memory trong timeline */
 .recent-memory-card {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  border-radius: 22px;
-  box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(24px) saturate(145%);
-  backdrop-filter: blur(24px) saturate(145%);
-  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
   cursor: pointer;
   animation: rmSlideIn 300ms var(--ease) both;
   transition: transform 160ms ease, box-shadow 160ms ease;
@@ -3295,6 +3293,8 @@ textarea:focus-visible,
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
+  border-radius: 22px;
+  box-shadow: var(--shadow);
 }
 
 .rm-photo-wrap img {
@@ -3360,9 +3360,14 @@ textarea:focus-visible,
 
 /* Body phần text của card */
 .rm-body {
+  margin-top: 10px;
   padding: 12px 14px 10px;
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface-solid);
+  box-shadow: var(--shadow);
   gap: 6px;
 }
 
@@ -3371,6 +3376,19 @@ textarea:focus-visible,
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+}
+
+.rm-reaction-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+}
+
+.rm-reaction-badges .reaction-pill {
+  flex: 0 0 auto;
 }
 
 .rm-meta {
@@ -3449,6 +3467,35 @@ textarea:focus-visible,
   cursor: pointer;
   transition: background 160ms ease, transform 160ms ease, border-color 160ms ease;
   -webkit-tap-highlight-color: transparent;
+}
+
+.rm-heart-btn strong {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.rm-reaction-choice {
+  font-size: 12px !important;
+  font-weight: 800;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.choice-reaction-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.choice-reaction-picker button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-solid);
+  font-size: 24px;
 }
 
 .rm-reaction-row > .rm-heart-btn {
@@ -3548,8 +3595,8 @@ textarea:focus-visible,
 
 /* Dark mode cho recent memory card */
 [data-theme='dark'] .recent-memory-card {
-  background: rgba(27, 22, 25, 0.74);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border: 0;
 }
 
 [data-theme='dark'] .recent-memories-open-all {
@@ -3855,6 +3902,17 @@ textarea:focus-visible,
   line-height: 1.45;
 }
 
+.chat-text-message time {
+  display: none;
+  padding: 0 5px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.chat-text-message.show-timestamp time {
+  display: block;
+}
+
 .chat-checkin {
   display: flex;
   flex-direction: column;
@@ -3899,9 +3957,14 @@ textarea:focus-visible,
 
 .chat-checkin time,
 .chat-reply time {
+  display: none;
   padding: 0 5px;
   color: var(--text-secondary);
   font-size: 10px;
+}
+
+.show-timestamp time {
+  display: block;
 }
 
 .chat-reply {

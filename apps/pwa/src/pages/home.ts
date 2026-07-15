@@ -5,6 +5,7 @@ import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { createNav } from '../components/nav';
 import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
+import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -433,6 +434,14 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         topRow.appendChild(meta);
 
+        const reactionBadges = document.createElement('div');
+        reactionBadges.className = 'rm-reaction-badges';
+        const updateReactionBadges = () => {
+          reactionBadges.innerHTML = reactionPillsHtml(item);
+        };
+        updateReactionBadges();
+        topRow.appendChild(reactionBadges);
+
         if (item.mood) {
           const moodStamp = document.createElement('div');
           moodStamp.className = 'rm-mood-stamp';
@@ -468,16 +477,17 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         const updateHeartBtn = () => {
           heartBtn.className = `rm-heart-btn${reacted ? ' reacted' : ''}`;
-          heartBtn.setAttribute('aria-label', reacted ? 'Bỏ tim' : 'Thả tim');
+          heartBtn.setAttribute('aria-label', 'Chọn cảm xúc');
           heartBtn.innerHTML = `
-            <span class="rm-heart-icon" aria-hidden="true">${reacted ? '❤️' : '🤍'}</span>
-            <span>${heartCount > 0 ? heartCount : ''}</span>
+            <span class="rm-heart-icon" aria-hidden="true">☺</span><strong>+</strong>
           `;
         };
         updateHeartBtn();
 
         heartBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
+          openReactionPicker(item, updateReactionBadges);
+          return;
           // Optimistic update
           reacted = !reacted;
           heartCount = reacted ? heartCount + 1 : Math.max(0, heartCount - 1);
@@ -505,8 +515,7 @@ function buildRecentMemoriesSection(): HTMLElement {
         replyForm.className = 'rm-inline-composer';
         replyForm.innerHTML = `
           <input aria-label="Gửi tin nhắn cho ảnh này" maxlength="500" placeholder="Gửi tin nhắn..." />
-          <button type="button" class="rm-quick-react" data-reaction="🔥" aria-label="Thả lửa">🔥</button>
-          <button type="button" class="rm-quick-react" data-reaction="💛" aria-label="Thả tim vàng">💛</button>
+          <button type="button" class="rm-quick-react rm-reaction-choice" aria-label="Chọn cảm xúc">☺+</button>
           <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
         `;
 
@@ -526,18 +535,9 @@ function buildRecentMemoriesSection(): HTMLElement {
           }
         });
 
-        replyForm.querySelectorAll<HTMLButtonElement>('.rm-quick-react').forEach((button) => {
-          button.addEventListener('click', async (event) => {
-            event.stopPropagation();
-            const type = button.dataset.reaction;
-            if (!type) return;
-            try {
-              item.reactions = await addReaction(item.id, type);
-              showToast('Đã thả cảm xúc', 'success');
-            } catch {
-              showToast('Không react được, thử lại nhé', 'error');
-            }
-          });
+        replyForm.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
+          event.stopPropagation();
+          openReactionPicker(item, updateReactionBadges);
         });
 
         reactionRow.appendChild(replyForm);

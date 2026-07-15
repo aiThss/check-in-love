@@ -3,6 +3,7 @@ import { getCheckins, addReaction, addReply } from '../api/checkins';
 import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
+import { openReactionPicker } from '../components/reaction-picker';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
 let cachedMemories: CheckIn[] = [];
@@ -179,8 +180,7 @@ function buildSocialRow(
   form.className = 'rm-inline-composer memory-mini-composer';
   form.innerHTML = `
     <input aria-label="Gửi tin nhắn cho ảnh này" maxlength="500" placeholder="Gửi tin nhắn..." />
-    <button type="button" class="rm-quick-react" data-reaction="🔥" aria-label="Thả lửa">🔥</button>
-    <button type="button" class="rm-quick-react" data-reaction="💛" aria-label="Thả tim vàng">💛</button>
+    <button type="button" class="rm-quick-react rm-reaction-choice" aria-label="Chọn cảm xúc">☺+</button>
     <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
   `;
   const input = form.querySelector<HTMLInputElement>('input');
@@ -196,18 +196,9 @@ function buildSocialRow(
       showToast('Không gửi được tin nhắn', 'error');
     }
   });
-  form.querySelectorAll<HTMLButtonElement>('.rm-quick-react').forEach((button) => {
-    button.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      const type = button.dataset.reaction;
-      if (!type) return;
-      try {
-        item.reactions = await addReaction(item.id, type);
-        showToast('Đã thả cảm xúc', 'success');
-      } catch {
-        showToast('Không gửi được cảm xúc', 'error');
-      }
-    });
+  form.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    openReactionPicker(item);
   });
   row.appendChild(form);
   return row;
@@ -760,8 +751,7 @@ export function renderMemoriesPage(): HTMLElement {
           <div id="reply-list" class="reply-detail-list"></div>
           <form id="reply-form" class="inline-reply-form">
             <input id="reply-input" maxlength="500" placeholder="Viết reply..." />
-            <button type="button" class="memory-quick-reply" data-reaction="🔥" aria-label="Thả lửa">🔥</button>
-            <button type="button" class="memory-quick-reply" data-reaction="💛" aria-label="Thả tim vàng">💛</button>
+            <button type="button" class="memory-quick-reply memory-reaction-choice" aria-label="Chọn cảm xúc">☺+</button>
             <button type="submit">Gửi</button>
           </form>
         </div>
@@ -878,18 +868,8 @@ export function renderMemoriesPage(): HTMLElement {
         }
       });
 
-      detail.querySelectorAll<HTMLButtonElement>('.memory-quick-reply').forEach((button) => {
-        button.addEventListener('click', async () => {
-          const type = button.dataset.reaction;
-          if (!type) return;
-          try {
-            item.reactions = await addReaction(item.id, type);
-            showToast('Đã thả cảm xúc', 'success');
-            renderDetailContent();
-          } catch {
-            showToast('Không gửi được cảm xúc', 'error');
-          }
-        });
+      detail.querySelector<HTMLButtonElement>('.memory-reaction-choice')?.addEventListener('click', () => {
+        openReactionPicker(item, renderDetailContent);
       });
     };
 
