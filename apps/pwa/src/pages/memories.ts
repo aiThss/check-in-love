@@ -169,58 +169,47 @@ function buildReactionPicker(
 
 function buildSocialRow(
   item: CheckIn,
-  onShowPicker: () => void,
-  onShowReactionDetails: () => void,
-  onReply: () => void,
+  _onShowPicker: () => void,
+  _onShowReactionDetails: () => void,
+  _onReply: () => void,
 ): HTMLElement {
   const row = document.createElement('div');
   row.className = 'memory-social-row';
-
-  const activeReactions = item.reactions.filter((reaction) => reaction.count > 0);
-
-  // Nút React — hiển thị chữ "React" (nếu chưa có react) hoặc danh sách reaction pills (nếu đã có react)
-  const reactionBtn = document.createElement('button');
-  reactionBtn.type = 'button';
-  reactionBtn.className = 'memory-reaction-summary';
-
-  if (activeReactions.length === 0) {
-    reactionBtn.textContent = 'React';
-  } else {
-    reactionBtn.classList.add('has-reactions');
-    reactionBtn.innerHTML = activeReactions
-      .map(
-        (reaction) =>
-          `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${escapeHtml(reaction.type)}<strong>${reaction.count}</strong></span>`,
-      )
-      .join('');
-  }
-
-  // Long-press để mở picker (giữ để chọn)
-  attachLongPress(reactionBtn, onShowPicker);
-  // Ngăn chặn click thông thường để không kích hoạt bấm để chọn
-  reactionBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const form = document.createElement('form');
+  form.className = 'rm-inline-composer memory-mini-composer';
+  form.innerHTML = `
+    <input aria-label="Gửi tin nhắn cho ảnh này" maxlength="500" placeholder="Gửi tin nhắn..." />
+    <button type="button" class="rm-quick-react" data-reaction="🔥" aria-label="Thả lửa">🔥</button>
+    <button type="button" class="rm-quick-react" data-reaction="💛" aria-label="Thả tim vàng">💛</button>
+    <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
+  `;
+  const input = form.querySelector<HTMLInputElement>('input');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = input?.value.trim() ?? '';
+    if (!message) return;
+    try {
+      item.replies = await addReply(item.id, message);
+      if (input) input.value = '';
+      showToast('Đã gửi tin nhắn', 'success');
+    } catch {
+      showToast('Không gửi được tin nhắn', 'error');
+    }
   });
-
-  const detailBtn = document.createElement('button');
-  detailBtn.type = 'button';
-  detailBtn.className = 'memory-react-detail-btn';
-  detailBtn.textContent = 'Chi tiết';
-  detailBtn.addEventListener('click', onShowReactionDetails);
-
-  const replyCount = document.createElement('button');
-  replyCount.type = 'button';
-  replyCount.className = 'memory-reply-count';
-  if (item.replies.length === 0) {
-    replyCount.classList.add('empty');
-  }
-  replyCount.textContent = item.replies.length ? `${item.replies.length} reply` : 'No reply';
-  replyCount.addEventListener('click', onReply);
-
-  row.appendChild(reactionBtn);
-  row.appendChild(detailBtn);
-  row.appendChild(replyCount);
+  form.querySelectorAll<HTMLButtonElement>('.rm-quick-react').forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const type = button.dataset.reaction;
+      if (!type) return;
+      try {
+        item.reactions = await addReaction(item.id, type);
+        showToast('Đã thả cảm xúc', 'success');
+      } catch {
+        showToast('Không gửi được cảm xúc', 'error');
+      }
+    });
+  });
+  row.appendChild(form);
   return row;
 }
 

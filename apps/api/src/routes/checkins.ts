@@ -132,6 +132,7 @@ export default async function checkinsRoutes(
         page?: string;
         limit?: string;
         type?: string;
+        after?: string;
       };
 
       const page = Math.max(1, parseInt(query.page ?? '1', 10));
@@ -145,6 +146,13 @@ export default async function checkinsRoutes(
 
       if (query.type) {
         filter.type = query.type;
+      }
+
+      if (query.after) {
+        const after = new Date(query.after);
+        if (!Number.isNaN(after.getTime())) {
+          filter.createdAt = { $gt: after };
+        }
       }
 
       const [checkIns, total] = await Promise.all([

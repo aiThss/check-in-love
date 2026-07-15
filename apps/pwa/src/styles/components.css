@@ -1040,12 +1040,12 @@ textarea.input {
 }
 
 .memory-social-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "react detail"
-    "reply reply";
-  gap: 6px;
+  display: block;
+  width: 100%;
+}
+
+.memory-mini-composer {
+  width: 100%;
 }
 
 .memory-social-row .memory-reaction-summary {

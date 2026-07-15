@@ -4,6 +4,8 @@ import { processImage, revokePreviewUrl } from '../components/camera';
 import { showToast } from '../components/toast';
 import type { CheckIn } from '../api/types';
 
+const MESSAGE_START_KEY = 'lovecheck_messages_started_at_v2';
+
 function escapeHtml(value: string | undefined): string {
   return (value ?? '')
     .replace(/&/g, '&amp;')
@@ -49,6 +51,8 @@ export function renderMessagesPage(): HTMLElement {
   const sendButton = page.querySelector<HTMLButtonElement>('.messages-send')!;
   let selectedPhoto: File | null = null;
   let previewUrl: string | null = null;
+  const messageStartedAt = localStorage.getItem(MESSAGE_START_KEY) ?? new Date().toISOString();
+  localStorage.setItem(MESSAGE_START_KEY, messageStartedAt);
 
   function renderCheckin(item: CheckIn): HTMLElement {
     const group = document.createElement('section');
@@ -84,7 +88,7 @@ export function renderMessagesPage(): HTMLElement {
     thread.innerHTML = '<div class="messages-loading skeleton"></div>';
     try {
       // Load a recent window when opening the tab; older photos stay in Memories.
-      const response = await getCheckins(1, 30);
+      const response = await getCheckins(1, 50, messageStartedAt);
       const messages = response.data.sort(
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
