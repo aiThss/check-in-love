@@ -516,6 +516,15 @@ function buildRecentMemoriesSection(): HTMLElement {
         `;
 
         const replyInput = replyForm.querySelector<HTMLInputElement>('input');
+        const inlineReactionPicker = buildReactionPicker(item, async (type) => {
+          try {
+            item.reactions = await addReaction(item.id, type);
+            updateReactionBadges();
+            inlineReactionPicker.classList.remove('open');
+          } catch {
+            showToast('Không react được, thử lại nhé', 'error');
+          }
+        });
         replyForm.addEventListener('submit', async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -536,11 +545,12 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         replyForm.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
           event.stopPropagation();
-          openReactionPicker(item, updateReactionBadges);
+          inlineReactionPicker.classList.toggle('open');
         });
 
         reactionRow.appendChild(replyForm);
         body.appendChild(reactionRow);
+        body.appendChild(inlineReactionPicker);
 
         // Only the oldest photo is the exit point to the full memory archive.
         if (idx === items.length - 1) {
