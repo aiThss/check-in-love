@@ -3814,7 +3814,9 @@ textarea:focus-visible,
 .messages-page {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   padding: calc(18px + var(--safe-top)) 16px calc(148px + var(--safe-bottom));
 }
 
@@ -4047,6 +4049,7 @@ textarea:focus-visible,
 
 :root.keyboard-open .messages-page > .messages-composer {
   bottom: calc(3px + var(--keyboard-offset));
+  transform: translateZ(0);
 }
 
 :root.keyboard-open .bottom-nav {

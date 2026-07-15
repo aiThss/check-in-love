@@ -120,6 +120,12 @@ export function renderMessagesPage(): HTMLElement {
       }
 
       let previousActivity = 0;
+      const scrollToLatest = () => {
+        requestAnimationFrame(() => {
+          thread.scrollTop = thread.scrollHeight;
+        });
+      };
+
       messages.forEach((item) => {
         const message = renderCheckin(item);
         const activityTime = getLatestActivityTime(item);
@@ -130,7 +136,12 @@ export function renderMessagesPage(): HTMLElement {
         message.addEventListener('click', () => message.classList.toggle('show-timestamp'));
         thread.appendChild(message);
       });
-      thread.scrollTop = thread.scrollHeight;
+      thread.querySelectorAll('img').forEach((image) => {
+        image.addEventListener('load', scrollToLatest, { once: true });
+      });
+      scrollToLatest();
+      window.setTimeout(scrollToLatest, 150);
+      window.setTimeout(scrollToLatest, 500);
     } catch {
       thread.innerHTML = '<p class="messages-empty">Chưa tải được tin nhắn. Hãy thử lại nhé.</p>';
     }
