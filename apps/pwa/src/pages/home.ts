@@ -1,6 +1,6 @@
 import { navigate } from '../router';
 import { store, applyTheme } from '../store/index';
-import { getLatestPartnerCheckin, getCachedLatestPartnerCheckin, addReaction, addReply } from '../api/checkins';
+import { getLatestPartnerCheckin, getCachedLatestPartnerCheckin, getCheckins, addReaction, addReply } from '../api/checkins';
 import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { createNav } from '../components/nav';
 import { showModal } from '../components/modal';
@@ -291,6 +291,259 @@ function buildCheckinCard(
   return wrapper;
 }
 
+const ART_CLASSES = [
+  'rm-photo-art-gradient-1',
+  'rm-photo-art-gradient-2',
+  'rm-photo-art-gradient-3',
+  'rm-photo-art-gradient-4',
+];
+
+const ART_EMOJIS = ['🌸', '💌', '✨', '🌷', '💕', '🥰', '🌙', '🍀'];
+
+type CheckInWithLegacyMedia = CheckIn & {
+  cardUrl?: string;
+  imageUrl?: string;
+};
+
+function getCheckinPhotoUrl(item: CheckIn): string | undefined {
+  const media = item as CheckInWithLegacyMedia;
+  return media.photoUrl || media.cardUrl || media.imageUrl;
+}
+
+function isToday(isoDate: string): boolean {
+  const date = new Date(isoDate);
+  const today = new Date();
+
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
+}
+
+function buildRecentMemoriesSection(): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'recent-memories-section';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'recent-memories-header';
+  header.innerHTML = `
+    <div class="recent-memories-heading">
+      <span class="recent-memories-eyebrow">Hôm nay</span>
+      <span class="recent-memories-title">Ảnh đã gửi</span>
+    </div>
+  `;
+  section.appendChild(header);
+
+  // List placeholder skeleton
+  const list = document.createElement('div');
+  list.className = 'recent-memories-list';
+  list.innerHTML = `
+    <div class="recent-memory-item">
+      <div class="recent-memory-card">
+        <div class="skeleton" style="height:80px;border-radius:0;"></div>
+        <div class="rm-body" style="gap:8px;">
+          <div class="skeleton" style="height:12px;border-radius:6px;width:60%;"></div>
+          <div class="skeleton" style="height:12px;border-radius:6px;width:80%;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="recent-memory-item">
+      <div class="recent-memory-card">
+        <div class="skeleton" style="height:80px;border-radius:0;"></div>
+        <div class="rm-body" style="gap:8px;">
+          <div class="skeleton" style="height:12px;border-radius:6px;width:50%;"></div>
+          <div class="skeleton" style="height:12px;border-radius:6px;width:70%;"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  section.appendChild(list);
+
+  // Load today's photos, newest first.
+  (async () => {
+    try {
+      const res = await getCheckins(1, 50);
+      const items = (res.data || [])
+        .filter((item) => isToday(item.createdAt) && Boolean(getCheckinPhotoUrl(item)))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      list.innerHTML = '';
+
+      if (items.length === 0) {
+        list.innerHTML = `
+          <div style="text-align:center;padding:20px 0;color:var(--text-secondary);font-size:14px;">
+            Hôm nay chưa có ảnh check-in nào. 💕
+          </div>
+        `;
+        return;
+      }
+
+      items.forEach((item, idx) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'recent-memory-item';
+
+        const card = document.createElement('div');
+        card.className = 'recent-memory-card';
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-label', `Kỷ niệm: ${escapeHtml(item.caption || formatTime(item.createdAt))}`);
+
+        // ── Media section ──
+        const photoUrl = getCheckinPhotoUrl(item);
+        const hasPhoto = Boolean(photoUrl);
+
+        if (hasPhoto && photoUrl) {
+          const photoWrap = document.createElement('div');
+          photoWrap.className = 'rm-photo-wrap';
+          photoWrap.innerHTML = `
+            <img src="${escapeHtml(photoUrl)}" alt="Ảnh kỷ niệm" loading="lazy" />
+            <div class="rm-photo-overlay"></div>
+          `;
+          card.appendChild(photoWrap);
+        } else if (item.type === 'mood') {
+          // Mood art placeholder
+          const artDiv = document.createElement('div');
+          artDiv.className = `rm-photo-art ${ART_CLASSES[idx % ART_CLASSES.length]}`;
+          artDiv.innerHTML = `${MOOD_EMOJIS[item.mood || ''] || '😊'}`;
+          card.appendChild(artDiv);
+        } else {
+          // Text art placeholder
+          const artDiv = document.createElement('div');
+          artDiv.className = `rm-photo-art ${ART_CLASSES[idx % ART_CLASSES.length]}`;
+          artDiv.innerHTML = `${ART_EMOJIS[idx % ART_EMOJIS.length]}`;
+          card.appendChild(artDiv);
+        }
+
+        // ── Body ──
+        const body = document.createElement('div');
+        body.className = 'rm-body';
+
+        // Top row: meta + mood stamp
+        const topRow = document.createElement('div');
+        topRow.className = 'rm-top-row';
+
+        const meta = document.createElement('div');
+        meta.className = 'rm-meta';
+        meta.innerHTML = `
+          <span class="rm-owner">${escapeHtml(item.ownerName)}</span>
+          <span class="rm-time">${formatTime(item.createdAt)}</span>
+        `;
+
+        topRow.appendChild(meta);
+
+        if (item.mood) {
+          const moodStamp = document.createElement('div');
+          moodStamp.className = 'rm-mood-stamp';
+          moodStamp.setAttribute('aria-label', item.mood);
+          moodStamp.textContent = MOOD_EMOJIS[item.mood] || '😊';
+          topRow.appendChild(moodStamp);
+        }
+
+        body.appendChild(topRow);
+
+        // Caption
+        if (item.caption) {
+          const caption = document.createElement('p');
+          caption.className = 'rm-caption';
+          caption.textContent = item.caption;
+          body.appendChild(caption);
+        }
+
+        // Reaction row — heart button with optimistic update
+        const reactionRow = document.createElement('div');
+        reactionRow.className = 'rm-reaction-row';
+
+        // Count ❤️ reactions
+        const heartReaction = item.reactions?.find((r) => r.type === '❤️');
+        const hasReacted = heartReaction?.reactedByMe ?? false;
+        let heartCount = heartReaction?.count ?? 0;
+        let reacted = hasReacted;
+
+        const heartBtn = document.createElement('button');
+        heartBtn.type = 'button';
+        heartBtn.className = `rm-heart-btn${reacted ? ' reacted' : ''}`;
+        heartBtn.setAttribute('aria-label', reacted ? 'Bỏ tim' : 'Thả tim');
+
+        const updateHeartBtn = () => {
+          heartBtn.className = `rm-heart-btn${reacted ? ' reacted' : ''}`;
+          heartBtn.setAttribute('aria-label', reacted ? 'Bỏ tim' : 'Thả tim');
+          heartBtn.innerHTML = `
+            <span class="rm-heart-icon" aria-hidden="true">${reacted ? '❤️' : '🤍'}</span>
+            <span>${heartCount > 0 ? heartCount : ''}</span>
+          `;
+        };
+        updateHeartBtn();
+
+        heartBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          // Optimistic update
+          reacted = !reacted;
+          heartCount = reacted ? heartCount + 1 : Math.max(0, heartCount - 1);
+          updateHeartBtn();
+
+          try {
+            const newReactions = await addReaction(item.id, '❤️');
+            item.reactions = newReactions;
+            const updated = newReactions.find((r) => r.type === '❤️');
+            heartCount = updated?.count ?? heartCount;
+            reacted = updated?.reactedByMe ?? reacted;
+            updateHeartBtn();
+          } catch {
+            // Revert optimistic update
+            reacted = !reacted;
+            heartCount = reacted ? heartCount + 1 : Math.max(0, heartCount - 1);
+            updateHeartBtn();
+            showToast('Không react được, thử lại nhé', 'error');
+          }
+        });
+
+        reactionRow.appendChild(heartBtn);
+        body.appendChild(reactionRow);
+
+        // Only the oldest photo is the exit point to the full memory archive.
+        if (idx === items.length - 1) {
+          const viewAllButton = document.createElement('button');
+          viewAllButton.type = 'button';
+          viewAllButton.className = 'recent-memories-open-all';
+          viewAllButton.textContent = 'Xem tất cả kỷ niệm →';
+          viewAllButton.setAttribute('aria-label', 'Mở tất cả kỷ niệm');
+          viewAllButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            navigate('/app/memories');
+          });
+          body.appendChild(viewAllButton);
+        }
+
+        card.appendChild(body);
+
+        // Click card → open memories page (detail view handled there)
+        card.addEventListener('click', () => {
+          navigate('/app/memories');
+        });
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            navigate('/app/memories');
+          }
+        });
+
+        // Stagger animation delay
+        card.style.animationDelay = `${idx * 60}ms`;
+
+        wrapper.appendChild(card);
+        list.appendChild(wrapper);
+      });
+    } catch {
+      list.innerHTML = '';
+      // Fail silently — main content still shows
+    }
+  })();
+
+  return section;
+}
+
 function buildEmptyState(partnerName: string): HTMLElement {
   const el = document.createElement('div');
   el.className = 'empty-state animate-fade-in';
@@ -375,6 +628,11 @@ export function renderHomePage(): HTMLElement {
   contentArea.style.cssText = 'padding:0 16px;';
   contentArea.appendChild(renderSkeleton());
   page.appendChild(contentArea);
+
+  // Recent memories section — "Những điều rất nhỏ"
+  const recentMemoriesSection = buildRecentMemoriesSection();
+  recentMemoriesSection.style.cssText = 'margin-top:28px;padding-bottom:16px;';
+  page.appendChild(recentMemoriesSection);
 
   page.appendChild(createNav('/app/home'));
 

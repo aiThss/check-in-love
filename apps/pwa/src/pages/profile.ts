@@ -137,6 +137,255 @@ async function checkApkUpdate(
   }
 }
 
+/* ============================================================
+   Check-in Reminder — browser-only (tab must be open)
+   For reliable background reminders, a backend push notification
+   scheduler is required (see TODO below).
+   ============================================================ */
+
+const REMINDER_KEY = 'lovecheck_reminder';
+
+interface ReminderSettings {
+  enabled: boolean;
+  time: string; // "HH:MM"
+}
+
+function getReminderSettings(): ReminderSettings {
+  try {
+    const raw = localStorage.getItem(REMINDER_KEY);
+    if (raw) return JSON.parse(raw) as ReminderSettings;
+  } catch { /* ignore */ }
+  return { enabled: false, time: '20:30' };
+}
+
+function saveReminderSettings(settings: ReminderSettings): void {
+  try {
+    localStorage.setItem(REMINDER_KEY, JSON.stringify(settings));
+  } catch { /* ignore */ }
+}
+
+let _reminderTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelReminder(): void {
+  if (_reminderTimer !== null) {
+    clearTimeout(_reminderTimer);
+    _reminderTimer = null;
+  }
+}
+
+function scheduleReminder(timeStr: string): void {
+  cancelReminder();
+
+  const [hStr, mStr] = timeStr.split(':');
+  const h = parseInt(hStr ?? '20', 10);
+  const m = parseInt(mStr ?? '30', 10);
+
+  const now = new Date();
+  const target = new Date();
+  target.setHours(h, m, 0, 0);
+
+  if (target <= now) {
+    // Already past today → schedule for tomorrow
+    target.setDate(target.getDate() + 1);
+  }
+
+  const msUntil = target.getTime() - now.getTime();
+
+  _reminderTimer = setTimeout(() => {
+    _reminderTimer = null;
+    fireReminder();
+    // Re-schedule for the next day
+    scheduleReminder(timeStr);
+  }, msUntil);
+}
+
+function fireReminder(): void {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  // Hiển thị notification ngay từ page nếu SW chưa kiểm soát được
+  if (navigator.serviceWorker?.controller) {
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.showNotification('Check-in Love 💕', {
+        body: 'Hôm nay, bạn muốn gửi một điều nhỏ cho người ấy không?',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/badge.svg',
+        tag: 'lovecheck-reminder',
+        // @ts-ignore — vibrate is valid in Notification options
+        vibrate: [100, 50, 100],
+        data: { url: '/app/checkin' },
+        actions: [
+          { action: 'open', title: 'Check-in ngay 💕' },
+          { action: 'close', title: 'Để sau' },
+        ],
+      });
+    }).catch(() => {
+      // Fallback: plain Notification without SW
+      new Notification('Check-in Love 💕', {
+        body: 'Hôm nay, bạn muốn gửi một điều nhỏ cho người ấy không?',
+        icon: '/icons/icon-192.png',
+      });
+    });
+  } else {
+    new Notification('Check-in Love 💕', {
+      body: 'Hôm nay, bạn muốn gửi một điều nhỏ cho người ấy không?',
+      icon: '/icons/icon-192.png',
+    });
+  }
+}
+
+/** Khôi phục reminder sau khi app reload — gọi khi profile page khởi động */
+export function restoreReminderOnLoad(): void {
+  const settings = getReminderSettings();
+  if (settings.enabled && 'Notification' in window && Notification.permission === 'granted') {
+    scheduleReminder(settings.time);
+  }
+}
+
+function getPermissionStatus(): { label: string; cls: string } {
+  if (!('Notification' in window)) {
+    return { label: 'Trình duyệt không hỗ trợ thông báo', cls: 'denied' };
+  }
+  switch (Notification.permission) {
+    case 'granted': return { label: 'Đã cấp quyền thông báo', cls: 'granted' };
+    case 'denied':  return { label: 'Bị chặn — cần mở lại trong cài đặt trình duyệt', cls: 'denied' };
+    default:        return { label: 'Chưa cấp quyền', cls: 'default' };
+  }
+}
+
+function buildReminderCard(): HTMLElement {
+  const card = document.createElement('div');
+  card.className = 'card-solid reminder-card';
+
+  const settings = getReminderSettings();
+  let permStatus = getPermissionStatus();
+
+  const render = () => {
+    const currentSettings = getReminderSettings();
+    permStatus = getPermissionStatus();
+
+    card.innerHTML = '';
+
+    // Header: icon + copy + toggle
+    const header = document.createElement('div');
+    header.className = 'reminder-card-header';
+    header.innerHTML = `
+      <div class="reminder-card-icon" aria-hidden="true">🔔</div>
+      <div class="reminder-card-copy">
+        <span class="reminder-card-title">Nhắc check-in</span>
+        <span class="reminder-card-subtitle">Nhắc nhở khi app đang mở</span>
+      </div>
+      <div class="reminder-toggle-wrap">
+        <label class="reminder-toggle" aria-label="${currentSettings.enabled ? 'Tắt nhắc check-in' : 'Bật nhắc check-in'}">
+          <input
+            type="checkbox"
+            id="reminder-toggle-input"
+            ${currentSettings.enabled ? 'checked' : ''}
+            aria-checked="${currentSettings.enabled}"
+          />
+          <span class="reminder-toggle-track"></span>
+          <span class="reminder-toggle-thumb"></span>
+        </label>
+      </div>
+    `;
+    card.appendChild(header);
+
+    // Time row
+    const timeRow = document.createElement('div');
+    timeRow.className = `reminder-time-row${currentSettings.enabled ? '' : ' disabled'}`;
+    timeRow.innerHTML = `
+      <span class="reminder-time-label">Giờ nhắc</span>
+      <input
+        type="time"
+        id="reminder-time-input"
+        class="reminder-time-input"
+        value="${currentSettings.time}"
+        aria-label="Chọn giờ nhắc"
+      />
+    `;
+    card.appendChild(timeRow);
+
+    // Permission status
+    const statusRow = document.createElement('div');
+    statusRow.className = 'reminder-status-row';
+    statusRow.innerHTML = `
+      <span class="reminder-status-dot ${permStatus.cls}" aria-hidden="true"></span>
+      <span>${permStatus.label}</span>
+    `;
+    card.appendChild(statusRow);
+
+    // Disclaimer
+    // NOTE: browser timers cannot wake up a closed tab — this is a best-effort reminder only.
+    // TODO: For reliable reminders when the app is closed, implement backend push notifications
+    //       using the Web Push Protocol with a scheduler (e.g., cron job → FCM/VAPID push).
+    const disclaimer = document.createElement('p');
+    disclaimer.className = 'reminder-disclaimer';
+    disclaimer.textContent = '⚠️ Nhắc nhở chỉ hoạt động khi tab/app đang mở. Browser không thể đảm bảo nhắc đúng giờ khi đóng app.';
+    card.appendChild(disclaimer);
+
+    // ── Event handlers ──
+
+    const toggleInput = card.querySelector<HTMLInputElement>('#reminder-toggle-input');
+    const timeInput   = card.querySelector<HTMLInputElement>('#reminder-time-input');
+
+    toggleInput?.addEventListener('change', async () => {
+      const nowEnabled = toggleInput.checked;
+
+      if (nowEnabled) {
+        // Request permission first
+        if (!('Notification' in window)) {
+          showToast('Trình duyệt không hỗ trợ thông báo', 'error');
+          toggleInput.checked = false;
+          return;
+        }
+
+        if (Notification.permission === 'denied') {
+          showToast('Thông báo bị chặn. Vui lòng mở lại trong cài đặt trình duyệt.', 'error');
+          toggleInput.checked = false;
+          return;
+        }
+
+        let permission: NotificationPermission = Notification.permission;
+        if (permission === 'default') {
+          permission = await Notification.requestPermission();
+        }
+
+        if (permission !== 'granted') {
+          showToast('Chưa cấp quyền thông báo', 'error');
+          toggleInput.checked = false;
+          return;
+        }
+
+        const savedTime = timeInput?.value || settings.time;
+        const newSettings: ReminderSettings = { enabled: true, time: savedTime };
+        saveReminderSettings(newSettings);
+        scheduleReminder(savedTime);
+        showToast(`Đã bật nhắc lúc ${savedTime}`, 'success');
+        render();
+      } else {
+        const savedTime = timeInput?.value || settings.time;
+        const newSettings: ReminderSettings = { enabled: false, time: savedTime };
+        saveReminderSettings(newSettings);
+        cancelReminder();
+        showToast('Đã tắt nhắc check-in', 'info');
+        render();
+      }
+    });
+
+    timeInput?.addEventListener('change', () => {
+      const current = getReminderSettings();
+      const newTime = timeInput.value || current.time;
+      saveReminderSettings({ ...current, time: newTime });
+      if (current.enabled) {
+        scheduleReminder(newTime);
+        showToast(`Đã đổi giờ nhắc sang ${newTime}`, 'success');
+      }
+    });
+  };
+
+  render();
+  return card;
+}
+
 export function renderProfilePage(): HTMLElement {
   const root = document.createElement('div');
   root.className = 'page profile-page animate-fade-in';
@@ -444,6 +693,10 @@ export function renderProfilePage(): HTMLElement {
       });
     }
     settingsContainer.appendChild(updateRow);
+
+    // 3b. Check-in Reminder Row
+    const reminderCard = buildReminderCard();
+    settingsContainer.appendChild(reminderCard);
 
     // 4. Logout Row
     const logoutRow = document.createElement('div');

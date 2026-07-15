@@ -2905,8 +2905,8 @@ body::after {
 }
 
 .checkin-card-image {
-  aspect-ratio: 16 / 10;
-  min-height: 142px;
+  aspect-ratio: 1 / 1;
+  min-height: 0;
 }
 
 .checkin-card-image + .checkin-card-overlay {
@@ -3104,6 +3104,592 @@ textarea:focus-visible,
   .glass-card:hover {
     transform: none;
   }
+}
+
+/* ============================================================
+   Recent Memories Section — "Những điều rất nhỏ" (Home Page)
+   ============================================================ */
+
+.recent-memories-section {
+  padding: 0 16px;
+  margin-top: 4px;
+}
+
+.recent-memories-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 0 2px;
+}
+
+.recent-memories-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recent-memories-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.82;
+}
+
+.recent-memories-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.recent-memories-view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 160ms ease, transform 160ms ease;
+  flex-shrink: 0;
+}
+
+.recent-memories-view-all:active {
+  transform: scale(0.96);
+  opacity: 0.9;
+}
+
+.recent-memories-open-all {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 59, 127, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 59, 127, 0.08);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.recent-memories-open-all:active {
+  transform: scale(0.96);
+  background: rgba(255, 59, 127, 0.15);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .recent-memories-view-all:hover {
+    opacity: 0.88;
+  }
+}
+
+/* Timeline list */
+.recent-memories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  padding-left: 20px;
+}
+
+/* Mảnh line dọc hồng nhạt */
+.recent-memories-list::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  background: rgba(255, 59, 127, 0.18);
+  pointer-events: none;
+}
+
+/* Timeline dot cho từng item */
+.recent-memory-item {
+  position: relative;
+}
+
+.recent-memory-item::before {
+  content: '';
+  position: absolute;
+  left: -19px;
+  top: 18px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffc1d8;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.6);
+  z-index: 1;
+}
+
+/* Icon tim cho item đầu tiên */
+.recent-memory-item:first-child::before {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(255, 59, 127, 0.14);
+  width: 9px;
+  height: 9px;
+  left: -20px;
+  top: 17px;
+}
+
+/* Card glass của từng memory trong timeline */
+.recent-memory-card {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+  backdrop-filter: blur(24px) saturate(145%);
+  overflow: hidden;
+  cursor: pointer;
+  animation: rmSlideIn 300ms var(--ease) both;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+@keyframes rmSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recent-memory-card {
+    animation: none;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .recent-memory-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-elevated);
+  }
+}
+
+.recent-memory-card:active {
+  transform: scale(0.97);
+}
+
+/* Photo thumbnail trong timeline card */
+.rm-photo-wrap {
+  position: relative;
+  width: 100%;
+  height: 138px;
+  overflow: hidden;
+}
+
+.rm-photo-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Gradient overlay từ dưới lên */
+.rm-photo-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(29, 12, 21, 0.68) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+/* Light bloom góc phải dưới */
+.rm-photo-overlay::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  width: 64px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 200, 220, 0.38);
+  filter: blur(12px);
+  pointer-events: none;
+}
+
+/* CSS art / gradient placeholder khi không có ảnh thật */
+.rm-photo-art {
+  width: 100%;
+  height: 138px;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.rm-photo-art-gradient-1 {
+  background: linear-gradient(135deg, #ffd6e7 0%, #ffe5ef 50%, #ffc0d6 100%);
+}
+
+.rm-photo-art-gradient-2 {
+  background: linear-gradient(135deg, #ffdee8 0%, #ffd2b7 50%, #ffe5c7 100%);
+}
+
+.rm-photo-art-gradient-3 {
+  background: linear-gradient(135deg, #f8d7ea 0%, #e8d6f8 50%, #d6eaf8 100%);
+}
+
+.rm-photo-art-gradient-4 {
+  background: linear-gradient(135deg, #fff0f5 0%, #ffd6e7 50%, #ffe5ef 100%);
+}
+
+/* Body phần text của card */
+.rm-body {
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rm-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rm-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rm-owner {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rm-time {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Mood stamp — ô vuông bo góc với icon */
+.rm-mood-stamp {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #fff0f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+
+[data-theme='dark'] .rm-mood-stamp {
+  background: rgba(255, 59, 127, 0.14);
+}
+
+.rm-caption {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Reaction row ở cuối card */
+.rm-reaction-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 59, 127, 0.08);
+  margin-top: 2px;
+}
+
+/* Heart button tròn nền hồng nhạt */
+.rm-heart-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 5px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 59, 127, 0.18);
+  background: #fff0f5;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease, border-color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rm-heart-btn:active {
+  transform: scale(0.94);
+}
+
+.rm-heart-btn.reacted {
+  background: rgba(255, 59, 127, 0.12);
+  border-color: var(--accent);
+}
+
+.rm-heart-icon {
+  font-size: 15px;
+  line-height: 1;
+  display: inline-block;
+  transition: transform 200ms var(--ease-spring);
+}
+
+.rm-heart-btn.reacted .rm-heart-icon {
+  transform: scale(1.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-heart-icon {
+    transition: none;
+  }
+}
+
+[data-theme='dark'] .rm-heart-btn {
+  background: rgba(255, 59, 127, 0.1);
+  border-color: rgba(255, 59, 127, 0.2);
+}
+
+[data-theme='dark'] .rm-heart-btn.reacted {
+  background: rgba(255, 59, 127, 0.22);
+}
+
+/* Dark mode cho recent memory card */
+[data-theme='dark'] .recent-memory-card {
+  background: rgba(27, 22, 25, 0.74);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='dark'] .recent-memories-open-all {
+  border-color: rgba(255, 59, 127, 0.32);
+  background: rgba(255, 59, 127, 0.14);
+}
+
+[data-theme='dark'] .recent-memory-item::before {
+  box-shadow: 0 0 0 4px rgba(21, 17, 21, 0.8);
+}
+
+[data-theme='dark'] .recent-memory-item:first-child::before {
+  box-shadow: 0 0 0 4px rgba(255, 59, 127, 0.2);
+}
+
+/* ============================================================
+   Check-in Reminder Card — Profile Page
+   ============================================================ */
+
+.reminder-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reminder-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reminder-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: #fff0f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .reminder-card-icon {
+  background: rgba(255, 59, 127, 0.14);
+}
+
+.reminder-card-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.reminder-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: block;
+}
+
+.reminder-card-subtitle {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: block;
+  margin-top: 2px;
+}
+
+/* iOS-style toggle */
+.reminder-toggle-wrap {
+  flex-shrink: 0;
+}
+
+.reminder-toggle {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.reminder-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.reminder-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.14);
+  transition: background 220ms ease;
+}
+
+.reminder-toggle input:checked ~ .reminder-toggle-track {
+  background: var(--accent);
+}
+
+.reminder-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+  transition: transform 220ms ease;
+}
+
+.reminder-toggle input:checked ~ .reminder-toggle-thumb {
+  transform: translateX(20px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reminder-toggle-track,
+  .reminder-toggle-thumb {
+    transition: none;
+  }
+}
+
+/* Time picker row */
+.reminder-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  transition: opacity 200ms ease;
+}
+
+.reminder-time-row.disabled {
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.reminder-time-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.reminder-time-input {
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background 160ms ease;
+  -webkit-appearance: none;
+}
+
+.reminder-time-input:focus {
+  outline: 2px solid rgba(255, 59, 127, 0.36);
+  outline-offset: 2px;
+}
+
+/* Permission status badge */
+.reminder-status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 0 2px;
+}
+
+.reminder-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.reminder-status-dot.granted {
+  background: #34c759;
+}
+
+.reminder-status-dot.denied {
+  background: #ff3b30;
+}
+
+.reminder-status-dot.default {
+  background: #ff9f0a;
+}
+
+/* Disclaimer note */
+.reminder-disclaimer {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 59, 127, 0.05);
+  border: 1px solid rgba(255, 59, 127, 0.1);
+  opacity: 0.88;
+}
+
+[data-theme='dark'] .reminder-disclaimer {
+  background: rgba(255, 59, 127, 0.08);
+  border-color: rgba(255, 59, 127, 0.15);
 }
 
 

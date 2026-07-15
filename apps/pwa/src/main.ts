@@ -12,6 +12,7 @@ import { renderCheckinPage } from './pages/checkin';
 import { renderMemoriesPage } from './pages/memories';
 import { renderRandomPage } from './pages/random';
 import { renderProfilePage } from './pages/profile';
+import { restoreReminderOnLoad } from './pages/profile';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 
 // ─── Apply Theme ─────────────────────────────────────────────────────────────
@@ -26,6 +27,9 @@ function applyTheme() {
 
 applyTheme();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+
+// Restore check-in reminder timer after reload (browser-only best-effort)
+restoreReminderOnLoad();
 
 // Detect APK wrapper and add helper class to documentElement
 if (navigator.userAgent.includes('LoveCheckAndroidWrapper')) {

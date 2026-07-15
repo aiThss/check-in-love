@@ -229,13 +229,17 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'close') return;
 
-  const targetUrl = event.notification.data?.url || '/app/home';
+  // Reminder notifications always open the check-in page
+  const isReminder = event.notification.tag === 'lovecheck-reminder';
+  const targetUrl = isReminder
+    ? '/app/checkin'
+    : (event.notification.data?.url || '/app/home');
 
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clients) => {
-        // If app is already open, focus it
+        // If app is already open, focus it and navigate
         for (const client of clients) {
           if (client.url.includes(self.location.origin) && 'focus' in client) {
             client.navigate(targetUrl);
