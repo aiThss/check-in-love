@@ -34,6 +34,12 @@ const patchMeSchema = z.object({
     .optional(),
 });
 
+const reminderSchema = z.object({
+  enabled: z.boolean(),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid reminder time'),
+  timezone: z.literal('Asia/Ho_Chi_Minh').default('Asia/Ho_Chi_Minh'),
+});
+
 async function readMultipartBuffer(
   part: MultipartFile,
   maxBytes: number,
@@ -57,6 +63,49 @@ async function readMultipartBuffer(
 }
 
 export default async function meRoutes(app: FastifyInstance): Promise<void> {
+  app.get('/me/reminder', { preHandler: authenticate }, async (request, reply) => {
+    const user = await User.findById(request.user.id).lean();
+    if (!user) {
+      return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    return reply.status(200).send({
+      reminder: user.checkinReminder ?? {
+        enabled: false,
+        time: '20:30',
+        timezone: 'Asia/Ho_Chi_Minh',
+      },
+    });
+  });
+
+  app.patch('/me/reminder', { preHandler: authenticate }, async (request, reply) => {
+    const parsed = reminderSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: parsed.error.errors[0].message,
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      request.user.id,
+      {
+        $set: {
+          'checkinReminder.enabled': parsed.data.enabled,
+          'checkinReminder.time': parsed.data.time,
+          'checkinReminder.timezone': parsed.data.timezone,
+        },
+      },
+      { new: true },
+    ).lean();
+
+    if (!user) {
+      return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    return reply.status(200).send({ reminder: user.checkinReminder });
+  });
+
   /**
    * GET /me — Current user profile + couple + partner info
    */

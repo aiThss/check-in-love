@@ -1,0 +1,148 @@
+import { createCheckin, getCheckins } from '../api/checkins';
+import { createNav } from '../components/nav';
+import { processImage, revokePreviewUrl } from '../components/camera';
+import { showToast } from '../components/toast';
+import type { CheckIn } from '../api/types';
+
+function escapeHtml(value: string | undefined): string {
+  return (value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function formatTime(value: string): string {
+  return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function renderMessagesPage(): HTMLElement {
+  const page = document.createElement('div');
+  page.className = 'page messages-page animate-fade-in';
+
+  page.innerHTML = `
+    <header class="messages-header">
+      <div>
+        <span class="messages-eyebrow">Hai đứa mình</span>
+        <h1>Tin nhắn</h1>
+      </div>
+    </header>
+    <main class="messages-thread" aria-live="polite"></main>
+    <form class="messages-composer">
+      <input id="message-photo" type="file" accept="image/*" hidden />
+      <button class="messages-photo-button" type="button" aria-label="Đính kèm ảnh">+</button>
+      <div class="messages-input-wrap">
+        <img class="messages-photo-preview" alt="Ảnh đã chọn" hidden />
+        <input id="message-input" maxlength="280" placeholder="Gửi tin nhắn..." aria-label="Nội dung tin nhắn" />
+      </div>
+      <button class="messages-send" type="submit" aria-label="Gửi tin nhắn">↑</button>
+    </form>
+  `;
+
+  const thread = page.querySelector<HTMLElement>('.messages-thread')!;
+  const form = page.querySelector<HTMLFormElement>('.messages-composer')!;
+  const messageInput = page.querySelector<HTMLInputElement>('#message-input')!;
+  const photoInput = page.querySelector<HTMLInputElement>('#message-photo')!;
+  const photoButton = page.querySelector<HTMLButtonElement>('.messages-photo-button')!;
+  const preview = page.querySelector<HTMLImageElement>('.messages-photo-preview')!;
+  const sendButton = page.querySelector<HTMLButtonElement>('.messages-send')!;
+  let selectedPhoto: File | null = null;
+  let previewUrl: string | null = null;
+
+  function renderMessage(item: CheckIn): HTMLElement {
+    const message = document.createElement('article');
+    message.className = `chat-message${item.isOwn ? ' own' : ''}`;
+
+    const hasPhoto = Boolean(item.photoUrl);
+    const caption = escapeHtml(item.caption || (item.type === 'mood' ? 'Đang gửi một cảm xúc' : ''));
+    message.innerHTML = `
+      <div class="chat-bubble${hasPhoto ? ' has-photo' : ''}">
+        ${hasPhoto ? `<img src="${escapeHtml(item.photoUrl)}" alt="Ảnh được gửi" loading="lazy" />` : ''}
+        ${caption ? `<p>${caption}</p>` : ''}
+      </div>
+      <time>${formatTime(item.createdAt)}</time>
+    `;
+    return message;
+  }
+
+  async function loadMessages(): Promise<void> {
+    thread.innerHTML = '<div class="messages-loading skeleton"></div>';
+    try {
+      const response = await getCheckins(1, 100);
+      const messages = response.data.sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+      thread.innerHTML = '';
+
+      if (messages.length === 0) {
+        thread.innerHTML = '<p class="messages-empty">Gửi một điều nhỏ đầu tiên cho người ấy nhé.</p>';
+        return;
+      }
+
+      messages.forEach((item) => thread.appendChild(renderMessage(item)));
+      thread.scrollTop = thread.scrollHeight;
+    } catch {
+      thread.innerHTML = '<p class="messages-empty">Chưa tải được tin nhắn. Hãy thử lại nhé.</p>';
+    }
+  }
+
+  function clearSelectedPhoto(): void {
+    selectedPhoto = null;
+    revokePreviewUrl(previewUrl);
+    previewUrl = null;
+    preview.hidden = true;
+    preview.removeAttribute('src');
+    photoInput.value = '';
+  }
+
+  photoButton.addEventListener('click', () => photoInput.click());
+  photoInput.addEventListener('change', async () => {
+    const source = photoInput.files?.[0];
+    if (!source) return;
+
+    try {
+      photoButton.disabled = true;
+      const processed = await processImage(source, { aspectRatio: 1, maxSize: 1600, quality: 0.85 });
+      clearSelectedPhoto();
+      selectedPhoto = processed.file;
+      previewUrl = processed.preview;
+      preview.src = previewUrl;
+      preview.hidden = false;
+    } catch {
+      showToast('Không xử lý được ảnh này, thử ảnh khác nhé', 'error');
+    } finally {
+      photoButton.disabled = false;
+    }
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = messageInput.value.trim();
+    if (!message && !selectedPhoto) return;
+
+    try {
+      sendButton.disabled = true;
+      if (selectedPhoto) {
+        const formData = new FormData();
+        formData.append('type', 'photo');
+        formData.append('file', selectedPhoto, selectedPhoto.name || 'message-photo.jpg');
+        if (message) formData.append('caption', message);
+        await createCheckin(formData);
+      } else {
+        await createCheckin({ type: 'text', caption: message });
+      }
+      messageInput.value = '';
+      clearSelectedPhoto();
+      await loadMessages();
+    } catch {
+      showToast('Không gửi được tin nhắn, thử lại nhé', 'error');
+    } finally {
+      sendButton.disabled = false;
+    }
+  });
+
+  page.appendChild(createNav('/app/messages'));
+  void loadMessages();
+  return page;
+}

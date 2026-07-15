@@ -11,6 +11,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '🏠', label: 'Home', path: '/app/home' },
   { icon: '📸', label: 'Kỷ niệm', path: '/app/memories' },
   { icon: '', label: '', path: '/app/checkin', isCheckin: true },
+  { icon: '💬', label: 'Tin nhắn', path: '/app/messages' },
   { icon: '🎲', label: 'Random', path: '/app/random' },
   { icon: '<img src="/user.png" alt="Profile" style="width:22px;height:22px;object-fit:contain;display:block;" />', label: 'Profile', path: '/app/profile' },
 ];

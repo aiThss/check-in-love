@@ -11,6 +11,13 @@ export interface UserDocument extends Document {
   partnerAvatarUrl?: string;
   trustedDevices: string[];
   fcmTokens?: string[];
+  checkinReminder: {
+    enabled: boolean;
+    time: string;
+    timezone: string;
+    lastSentDate?: string;
+    leaseDate?: string;
+  };
   role: 'user' | 'admin';
   status: 'active' | 'blocked';
   coupleId: Types.ObjectId;
@@ -29,6 +36,13 @@ const UserSchema = new Schema<UserDocument>(
     partnerAvatarUrl: { type: String, required: false },
     trustedDevices: { type: [String], default: [] },
     fcmTokens: { type: [String], default: [] },
+    checkinReminder: {
+      enabled: { type: Boolean, default: false },
+      time: { type: String, default: '20:30' },
+      timezone: { type: String, default: 'Asia/Ho_Chi_Minh' },
+      lastSentDate: { type: String, required: false },
+      leaseDate: { type: String, required: false },
+    },
     role: {
       type: String,
       enum: ['user', 'admin'],

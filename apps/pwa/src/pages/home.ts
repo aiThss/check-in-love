@@ -500,6 +500,47 @@ function buildRecentMemoriesSection(): HTMLElement {
         });
 
         reactionRow.appendChild(heartBtn);
+
+        const replyForm = document.createElement('form');
+        replyForm.className = 'rm-inline-composer';
+        replyForm.innerHTML = `
+          <input aria-label="Gửi tin nhắn cho ảnh này" maxlength="500" placeholder="Gửi tin nhắn..." />
+          <button type="button" class="rm-quick-react" data-reaction="🔥" aria-label="Thả lửa">🔥</button>
+          <button type="button" class="rm-quick-react" data-reaction="💛" aria-label="Thả tim vàng">💛</button>
+          <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
+        `;
+
+        const replyInput = replyForm.querySelector<HTMLInputElement>('input');
+        replyForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const message = replyInput?.value.trim() ?? '';
+          if (!message) return;
+
+          try {
+            item.replies = await addReply(item.id, message);
+            if (replyInput) replyInput.value = '';
+            showToast('Đã gửi tin nhắn', 'success');
+          } catch {
+            showToast('Không gửi được tin nhắn, thử lại nhé', 'error');
+          }
+        });
+
+        replyForm.querySelectorAll<HTMLButtonElement>('.rm-quick-react').forEach((button) => {
+          button.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            const type = button.dataset.reaction;
+            if (!type) return;
+            try {
+              item.reactions = await addReaction(item.id, type);
+              showToast('Đã thả cảm xúc', 'success');
+            } catch {
+              showToast('Không react được, thử lại nhé', 'error');
+            }
+          });
+        });
+
+        reactionRow.appendChild(replyForm);
         body.appendChild(reactionRow);
 
         // Only the oldest photo is the exit point to the full memory archive.

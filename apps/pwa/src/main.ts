@@ -12,6 +12,7 @@ import { renderCheckinPage } from './pages/checkin';
 import { renderMemoriesPage } from './pages/memories';
 import { renderRandomPage } from './pages/random';
 import { renderProfilePage } from './pages/profile';
+import { renderMessagesPage } from './pages/messages';
 import { restoreReminderOnLoad } from './pages/profile';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 
@@ -115,4 +116,5 @@ initRouter({
   '/app/memories':  () => renderMemoriesPage(),
   '/app/random':    () => renderRandomPage(),
   '/app/profile':   () => renderProfilePage(),
+  '/app/messages':  () => renderMessagesPage(),
 });

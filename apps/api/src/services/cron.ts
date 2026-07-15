@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { PushSubscription } from '../db/models/PushSubscription';
 import { CheckIn } from '../db/models/CheckIn';
+import { User } from '../db/models/User';
 import { sendPushToUser } from './push';
 import { storageService } from './storage';
 import { logger } from '../utils/logger';
@@ -27,6 +28,73 @@ const MESSAGES = {
     'Chúc người yêu ngủ thật ngon! ✨',
   ],
 };
+
+function getLocalReminderTime(timezone: string): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+
+  return {
+    date: `${value('year')}-${value('month')}-${value('day')}`,
+    time: `${value('hour')}:${value('minute')}`,
+  };
+}
+
+async function sendScheduledCheckinReminders(): Promise<void> {
+  const users = await User.find({ 'checkinReminder.enabled': true }).lean();
+
+  await Promise.allSettled(users.map(async (user) => {
+    const reminder = user.checkinReminder;
+    if (!reminder?.enabled) return;
+
+    const { date, time } = getLocalReminderTime(reminder.timezone || 'Asia/Ho_Chi_Minh');
+    if (time !== reminder.time || reminder.lastSentDate === date) return;
+
+    // Claim this reminder atomically: multiple API instances cannot send it twice.
+    const claimed = await User.findOneAndUpdate(
+      {
+        _id: user._id,
+        'checkinReminder.enabled': true,
+        'checkinReminder.time': reminder.time,
+        'checkinReminder.lastSentDate': { $ne: date },
+        'checkinReminder.leaseDate': { $ne: date },
+      },
+      { $set: { 'checkinReminder.leaseDate': date } },
+      { new: true },
+    ).lean();
+
+    if (!claimed) return;
+
+    try {
+      await sendPushToUser(user._id.toString(), {
+        title: 'Check-in Love 💕',
+        body: 'Hôm nay, bạn muốn gửi một điều nhỏ cho người ấy không?',
+        actionType: 'reminder',
+        targetUrl: '/app/checkin',
+        tag: `checkin-reminder-${date}`,
+      });
+      await User.updateOne(
+        { _id: user._id, 'checkinReminder.leaseDate': date },
+        { $set: { 'checkinReminder.lastSentDate': date }, $unset: { 'checkinReminder.leaseDate': '' } },
+      );
+    } catch (err) {
+      await User.updateOne(
+        { _id: user._id, 'checkinReminder.leaseDate': date },
+        { $unset: { 'checkinReminder.leaseDate': '' } },
+      );
+      logger.error('[cron] Failed scheduled check-in reminder', err, { userId: user._id.toString() });
+    }
+  }));
+}
 
 function getRandomMessage(timeKey: keyof typeof MESSAGES): string {
   const list = MESSAGES[timeKey];
@@ -90,6 +158,13 @@ async function cleanupDeletedCheckins(): Promise<void> {
 }
 
 export function initCronJobs() {
+  // Dynamic per-user reminder scheduler. The API container must stay running.
+  cron.schedule('* * * * *', () => {
+    sendScheduledCheckinReminders().catch((err) => {
+      logger.error('[cron] Failed to process scheduled check-in reminders', err);
+    });
+  }, { timezone: 'UTC' });
+
   // 7:00 AM
   cron.schedule('0 7 * * *', () => {
     broadcastPush(getRandomMessage('m7'));
