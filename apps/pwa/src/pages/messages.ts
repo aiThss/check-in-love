@@ -50,26 +50,41 @@ export function renderMessagesPage(): HTMLElement {
   let selectedPhoto: File | null = null;
   let previewUrl: string | null = null;
 
-  function renderMessage(item: CheckIn): HTMLElement {
-    const message = document.createElement('article');
-    message.className = `chat-message${item.isOwn ? ' own' : ''}`;
-
+  function renderCheckin(item: CheckIn): HTMLElement {
+    const group = document.createElement('section');
+    group.className = 'chat-checkin-group';
     const hasPhoto = Boolean(item.photoUrl);
     const caption = escapeHtml(item.caption || (item.type === 'mood' ? 'Đang gửi một cảm xúc' : ''));
-    message.innerHTML = `
-      <div class="chat-bubble${hasPhoto ? ' has-photo' : ''}">
-        ${hasPhoto ? `<img src="${escapeHtml(item.photoUrl)}" alt="Ảnh được gửi" loading="lazy" />` : ''}
-        ${caption ? `<p>${caption}</p>` : ''}
-      </div>
-      <time>${formatTime(item.createdAt)}</time>
+    group.innerHTML = `
+      <article class="chat-checkin">
+        <div class="chat-bubble${hasPhoto ? ' has-photo' : ''}">
+          ${hasPhoto ? `<img src="${escapeHtml(item.photoUrl)}" alt="Ảnh check-in" loading="lazy" />` : ''}
+          ${caption ? `<p>${caption}</p>` : ''}
+        </div>
+        <time>${formatTime(item.createdAt)}</time>
+      </article>
     `;
-    return message;
+
+    const replies = [...(item.replies ?? [])].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    replies.forEach((reply) => {
+      const bubble = document.createElement('article');
+      bubble.className = `chat-reply${reply.isOwn ? ' own' : ''}`;
+      bubble.innerHTML = `
+        <div class="chat-reply-bubble"><p>${escapeHtml(reply.message)}</p></div>
+        <time>${formatTime(reply.createdAt)}</time>
+      `;
+      group.appendChild(bubble);
+    });
+    return group;
   }
 
   async function loadMessages(): Promise<void> {
     thread.innerHTML = '<div class="messages-loading skeleton"></div>';
     try {
-      const response = await getCheckins(1, 100);
+      // Load a recent window when opening the tab; older photos stay in Memories.
+      const response = await getCheckins(1, 30);
       const messages = response.data.sort(
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
@@ -80,7 +95,7 @@ export function renderMessagesPage(): HTMLElement {
         return;
       }
 
-      messages.forEach((item) => thread.appendChild(renderMessage(item)));
+      messages.forEach((item) => thread.appendChild(renderCheckin(item)));
       thread.scrollTop = thread.scrollHeight;
     } catch {
       thread.innerHTML = '<p class="messages-empty">Chưa tải được tin nhắn. Hãy thử lại nhé.</p>';

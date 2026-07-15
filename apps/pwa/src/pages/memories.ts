@@ -771,6 +771,8 @@ export function renderMemoriesPage(): HTMLElement {
           <div id="reply-list" class="reply-detail-list"></div>
           <form id="reply-form" class="inline-reply-form">
             <input id="reply-input" maxlength="500" placeholder="Viết reply..." />
+            <button type="button" class="memory-quick-reply" data-reaction="🔥" aria-label="Thả lửa">🔥</button>
+            <button type="button" class="memory-quick-reply" data-reaction="💛" aria-label="Thả tim vàng">💛</button>
             <button type="submit">Gửi</button>
           </form>
         </div>
@@ -885,6 +887,20 @@ export function renderMemoriesPage(): HTMLElement {
         } catch {
           showToast('Không gửi được reply', 'error');
         }
+      });
+
+      detail.querySelectorAll<HTMLButtonElement>('.memory-quick-reply').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const type = button.dataset.reaction;
+          if (!type) return;
+          try {
+            item.reactions = await addReaction(item.id, type);
+            showToast('Đã thả cảm xúc', 'success');
+            renderDetailContent();
+          } catch {
+            showToast('Không gửi được cảm xúc', 'error');
+          }
+        });
       });
     };
 

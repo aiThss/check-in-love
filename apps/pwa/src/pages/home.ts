@@ -499,7 +499,7 @@ function buildRecentMemoriesSection(): HTMLElement {
           }
         });
 
-        reactionRow.appendChild(heartBtn);
+        topRow.appendChild(heartBtn);
 
         const replyForm = document.createElement('form');
         replyForm.className = 'rm-inline-composer';
