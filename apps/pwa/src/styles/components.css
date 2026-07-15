@@ -3961,7 +3961,7 @@ textarea:focus-visible,
 
 .messages-page > .messages-composer {
   position: fixed;
-  inset: auto 14px calc(80px + var(--safe-bottom));
+  inset: auto 14px calc(82px + var(--safe-bottom));
 }
 
 .messages-photo-button,
