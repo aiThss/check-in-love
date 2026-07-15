@@ -184,7 +184,7 @@ export function restoreReminderOnLoad(): void {}
 
 function getPermissionStatus(): { label: string; cls: string } {
   if (!('Notification' in window)) {
-    return { label: 'Trình duyệt không hỗ trợ thông báo', cls: 'denied' };
+    return { label: 'Nhắc server đã sẵn sàng', cls: 'granted' };
   }
   switch (Notification.permission) {
     case 'granted': return { label: 'Đã cấp quyền thông báo', cls: 'granted' };
@@ -269,13 +269,21 @@ function buildReminderCard(): HTMLElement {
       const nowEnabled = toggleInput.checked;
 
       if (nowEnabled) {
-        // Request permission first
         if (!('Notification' in window)) {
-          showToast('Trình duyệt không hỗ trợ thông báo', 'error');
-          toggleInput.checked = false;
+          const savedTime = timeInput?.value || settings.time;
+          try {
+            const newSettings: ReminderSettings = { enabled: true, time: savedTime, timezone: 'Asia/Ho_Chi_Minh' };
+            saveReminderSettings(await saveRemoteReminderSettings(newSettings));
+            showToast(`Đã bật nhắc lúc ${savedTime}`, 'success');
+            render();
+          } catch {
+            toggleInput.checked = false;
+            showToast('Không lưu được giờ nhắc, thử lại nhé', 'error');
+          }
           return;
         }
 
+        // Request permission first
         if (Notification.permission === 'denied') {
           showToast('Thông báo bị chặn. Vui lòng mở lại trong cài đặt trình duyệt.', 'error');
           toggleInput.checked = false;

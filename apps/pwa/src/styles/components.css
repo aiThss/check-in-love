@@ -3428,6 +3428,7 @@ textarea:focus-visible,
 
 /* Heart button tròn nền hồng nhạt */
 .rm-heart-btn {
+  display: none !important;
   display: inline-flex;
   align-items: center;
   gap: 5px;

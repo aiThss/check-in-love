@@ -17,7 +17,7 @@ import type { CheckIn } from '../api/types';
 const PHOTO_ASPECT_RATIO = 1;
 const PHOTO_CSS_RATIO = '1 / 1';
 
-const MOODS = [
+const _MOODS = [
   { value: 'happy', emoji: '😊', label: 'Vui vẻ' },
   { value: 'love', emoji: '🥰', label: 'Đang yêu' },
   { value: 'sad', emoji: '😢', label: 'Buồn' },
@@ -104,7 +104,7 @@ export function renderCheckinPage(): HTMLElement {
   const modes = [
     { id: 'photo', label: '📸 Ảnh' },
     { id: 'text', label: '✍️ Tin nhắn' },
-    { id: 'mood', label: '😊 Cảm xúc' }
+    { id: 'random', label: '🎲 Random' }
   ];
 
   let activeMode = 'photo';
@@ -146,7 +146,6 @@ export function renderCheckinPage(): HTMLElement {
   let selectedPreviewUrl: string | null = null;
   let isProcessingPhoto = false;
   let photoCaption = '';
-  let selectedMood: string | null = null;
   let selectedQuickMsg: string | null = null;
 
   function clearSelectedPhoto(): void {
@@ -451,54 +450,18 @@ export function renderCheckinPage(): HTMLElement {
       });
       contentArea.appendChild(chipsWrapper);
 
-    } else if (activeMode === 'mood') {
-      // Mood Grid selection
-      const label = document.createElement('label');
-      label.className = 'input-label';
-      label.textContent = 'Cảm xúc hiện tại của bạn';
-      contentArea.appendChild(label);
-
-      const grid = document.createElement('div');
-      grid.className = 'mood-grid';
-      grid.style.cssText = 'grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px;width:100%;max-width:100%;';
-      MOODS.forEach(mood => {
-        const btn = document.createElement('button');
-        btn.className = `mood-btn ${selectedMood === mood.value ? 'selected' : ''}`;
-        btn.innerHTML = `
-          <span class="mood-emoji">${mood.emoji}</span>
-          <span class="mood-label">${mood.label}</span>
-        `;
-        btn.style.padding = '12px 8px';
-        btn.style.minWidth = '0';
-        btn.style.borderRadius = '18px';
-        btn.querySelector<HTMLElement>('.mood-emoji')!.style.fontSize = 'clamp(34px, 10vw, 42px)';
-        btn.querySelector<HTMLElement>('.mood-label')!.style.fontSize = '12px';
-        btn.querySelector<HTMLElement>('.mood-label')!.style.lineHeight = '1.2';
-        btn.addEventListener('click', () => {
-          selectedMood = mood.value;
-          // Re-render only mood buttons selection
-          grid.querySelectorAll('.mood-btn').forEach((b, idx) => {
-            const m = MOODS[idx];
-            if (m.value === selectedMood) {
-              b.classList.add('selected');
-            } else {
-              b.classList.remove('selected');
-            }
-          });
-        });
-        grid.appendChild(btn);
-      });
-      contentArea.appendChild(grid);
-
-      // Extra Caption for mood
-      const capGroup = document.createElement('div');
-      capGroup.className = 'input-group';
-      capGroup.innerHTML = `
-        <label class="input-label">Lời nhắn kèm theo (Không bắt buộc)</label>
-        <input type="text" id="caption-input" class="input" placeholder="Tại sao bạn cảm thấy vậy..." maxlength="280" />
+    } else if (activeMode === 'random') {
+      const randomCard = document.createElement('div');
+      randomCard.className = 'card-solid';
+      randomCard.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px 16px;text-align:center;';
+      randomCard.innerHTML = `
+        <div style="font-size:48px;line-height:1">🎲</div>
+        <strong>Random cho hai bạn</strong>
+        <span style="font-size:13px;color:var(--text-secondary)">Bốc câu hỏi, thử thách hoặc một gợi ý bất ngờ.</span>
+        <button type="button" class="btn-primary">Mở Random</button>
       `;
-      compactCaptionGroup(capGroup);
-      contentArea.appendChild(capGroup);
+      randomCard.querySelector('button')?.addEventListener('click', () => navigate('/app/random'));
+      contentArea.appendChild(randomCard);
     }
   }
 
@@ -567,17 +530,8 @@ export function renderCheckinPage(): HTMLElement {
         caption: text
       };
     } else {
-      // mood mode
-      if (!selectedMood) {
-        showToast('Vui lòng chọn cảm xúc của bạn!', 'error');
-        return;
-      }
-      const caption = (root.querySelector('#caption-input') as HTMLInputElement)?.value.trim();
-      payload = {
-        type: 'mood',
-        mood: selectedMood,
-        caption: caption || undefined
-      };
+      navigate('/app/random');
+      return;
     }
 
     sendBtn.disabled = true;
