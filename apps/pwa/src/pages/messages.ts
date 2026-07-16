@@ -28,6 +28,15 @@ export function renderMessagesPage(): HTMLElement {
   const page = document.createElement('div');
   page.className = 'page messages-page animate-fade-in';
 
+  // Android WebView + adjustResize can leave 100dvh stuck at the keyboard-sized
+  // viewport. Use the largest visual viewport measured by keyboard.ts instead.
+  if (document.documentElement.classList.contains('android-wrapper')) {
+    const stableViewportHeight = 'var(--app-viewport-height, 100vh)';
+    page.style.minHeight = stableViewportHeight;
+    page.style.height = stableViewportHeight;
+    page.style.maxHeight = stableViewportHeight;
+  }
+
   page.innerHTML = `
     <header class="messages-header">
       <div>
@@ -122,7 +131,14 @@ export function renderMessagesPage(): HTMLElement {
       let previousActivity = 0;
       const scrollToLatest = () => {
         requestAnimationFrame(() => {
-          thread.scrollTop = thread.scrollHeight;
+          // Do not scroll while WebView is reporting a collapsed flex viewport.
+          // Later image/timer callbacks will retry after layout has recovered.
+          if (thread.clientHeight <= 1) return;
+
+          const previousScrollBehavior = thread.style.scrollBehavior;
+          thread.style.scrollBehavior = 'auto';
+          thread.scrollTop = Math.max(0, thread.scrollHeight - thread.clientHeight);
+          thread.style.scrollBehavior = previousScrollBehavior;
         });
       };
 
