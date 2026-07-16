@@ -4,6 +4,7 @@ export function initKeyboardViewport(): void {
   if (!viewport) return;
 
   let largestViewportHeight = Math.max(window.innerHeight, viewport.height);
+  let lastViewportWidth = viewport.width;
 
   const isTextInputFocused = () => {
     const active = document.activeElement;
@@ -11,18 +12,29 @@ export function initKeyboardViewport(): void {
   };
 
   const update = () => {
-    // Safari may resize window.innerHeight together with the keyboard. Preserve
-    // the largest known viewport so its keyboard height remains measurable.
-    largestViewportHeight = Math.max(largestViewportHeight, viewport.height, window.innerHeight);
+    // A keyboard normally changes only the visual viewport height. A large width
+    // change means the device rotated, so start measuring from the new orientation.
+    if (Math.abs(viewport.width - lastViewportWidth) > 80) {
+      largestViewportHeight = Math.max(window.innerHeight, viewport.height);
+      lastViewportWidth = viewport.width;
+    } else {
+      // Safari and Android WebView may resize window.innerHeight together with the
+      // keyboard. Preserve the largest known height so the layout does not collapse.
+      largestViewportHeight = Math.max(largestViewportHeight, viewport.height, window.innerHeight);
+    }
+
     const keyboardHeight = Math.max(0, largestViewportHeight - viewport.height - viewport.offsetTop);
     const isKeyboardOpen = isTextInputFocused() && keyboardHeight > 80;
-    document.documentElement.style.setProperty('--keyboard-offset', `${isKeyboardOpen ? keyboardHeight : 0}px`);
-    document.documentElement.classList.toggle('keyboard-open', isKeyboardOpen);
+    const root = document.documentElement;
+
+    root.style.setProperty('--app-viewport-height', `${largestViewportHeight}px`);
+    root.style.setProperty('--keyboard-offset', `${isKeyboardOpen ? keyboardHeight : 0}px`);
+    root.classList.toggle('keyboard-open', isKeyboardOpen);
   };
 
   viewport.addEventListener('resize', update);
   viewport.addEventListener('scroll', update);
-  window.addEventListener('orientationchange', update);
+  window.addEventListener('orientationchange', () => window.setTimeout(update, 180));
   document.addEventListener('focusin', () => window.setTimeout(update, 50));
   document.addEventListener('focusout', () => window.setTimeout(update, 120));
   update();
