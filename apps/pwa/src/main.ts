@@ -41,6 +41,33 @@ if (navigator.userAgent.includes('LoveCheckAndroidWrapper')) {
 
 setupAndroidFcm();
 
+// Memories already renders the same inline reaction picker used by Home, but
+// its smile-plus button still opened the legacy modal picker. Intercept only
+// that button and toggle the picker belonging to the current memory tile.
+function initMemoriesInlineReactionPicker(): void {
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const button = target.closest<HTMLButtonElement>('.memory-mini-composer .rm-reaction-choice');
+    if (!button) return;
+
+    const tile = button.closest<HTMLElement>('.memory-tile');
+    const picker = tile?.querySelector<HTMLElement>('.memory-reaction-picker');
+    if (!picker) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    document.querySelectorAll<HTMLElement>('.memory-reaction-picker.open').forEach((openPicker) => {
+      if (openPicker !== picker) openPicker.classList.remove('open');
+    });
+    picker.classList.toggle('open');
+  }, true);
+}
+
+initMemoriesInlineReactionPicker();
+
 // ─── Service Worker ───────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   const isAndroidWrapper = navigator.userAgent.includes('LoveCheckAndroidWrapper');
