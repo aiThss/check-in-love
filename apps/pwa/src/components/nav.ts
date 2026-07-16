@@ -23,6 +23,15 @@ export function createNav(activePage: string): HTMLElement {
   const inner = document.createElement('div');
   inner.className = 'bottom-nav-inner';
 
+  const setActiveState = (path: string) => {
+    inner.querySelectorAll<HTMLButtonElement>('.nav-item').forEach((button) => {
+      const active = button.dataset.path === path;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-current', active ? 'page' : 'false');
+      button.style.background = active ? 'var(--accent-soft)' : '';
+    });
+  };
+
   NAV_ITEMS.forEach((item) => {
     if (item.isCheckin) {
       const btn = document.createElement('button');
@@ -37,13 +46,23 @@ export function createNav(activePage: string): HTMLElement {
     const isActive = activePage === item.path;
     const btn = document.createElement('button');
     btn.className = `nav-item${isActive ? ' active' : ''}`;
+    btn.dataset.path = item.path;
     btn.setAttribute('aria-label', item.label || 'Check-in');
     btn.setAttribute('aria-current', isActive ? 'page' : 'false');
+    btn.style.background = isActive ? 'var(--accent-soft)' : '';
+    // Override the old :active scale animation, which made every tab jump.
+    btn.style.transform = 'none';
+    btn.style.transition = 'background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease)';
     btn.innerHTML = `
       <span class="nav-icon" aria-hidden="true">${item.icon}</span>
       <span class="nav-label">${item.label}</span>
     `;
+
+    // Show the selected bubble immediately instead of waiting for the route DOM
+    // to be rebuilt. This also prevents the old two-tap active-state behaviour.
+    btn.addEventListener('pointerdown', () => setActiveState(item.path));
     btn.addEventListener('click', () => {
+      setActiveState(item.path);
       if (!isActive) navigate(item.path);
     });
     inner.appendChild(btn);
