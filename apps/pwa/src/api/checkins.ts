@@ -7,6 +7,7 @@ import {
   updateMatchingQueries,
 } from './query-cache';
 import { mapChatMessage, type RawMessage } from './messages';
+import { invalidateRoutes } from '../route-invalidation';
 import { store } from '../store/index';
 import type {
   CheckIn,
@@ -189,24 +190,24 @@ export async function getCheckins(
 ): Promise<PaginatedResponse<CheckIn>> {
   const key = `checkins:list:${page}:${limit}:${after ?? ''}:${type ?? ''}`;
   return fetchQuery(key, async () => {
-  const afterQuery = after ? '&after=' + encodeURIComponent(after) : '';
-  const typeQuery = type ? '&type=' + encodeURIComponent(type) : '';
-  const res = await apiFetch<{ checkIns: RawCheckIn[]; pagination: PaginationInfo }>(
-    '/checkins?page=' + page + '&limit=' + limit + afterQuery + typeQuery,
-  );
+    const afterQuery = after ? '&after=' + encodeURIComponent(after) : '';
+    const typeQuery = type ? '&type=' + encodeURIComponent(type) : '';
+    const res = await apiFetch<{ checkIns: RawCheckIn[]; pagination: PaginationInfo }>(
+      '/checkins?page=' + page + '&limit=' + limit + afterQuery + typeQuery,
+    );
 
-  const data = (res.checkIns || []).map(mapCheckin);
-  const total = res.pagination?.total ?? data.length;
-  const totalPages = res.pagination?.totalPages ?? 1;
-  const hasMore = page < totalPages;
+    const data = (res.checkIns || []).map(mapCheckin);
+    const total = res.pagination?.total ?? data.length;
+    const totalPages = res.pagination?.totalPages ?? 1;
+    const hasMore = page < totalPages;
 
-  return {
-    data,
-    total,
-    page,
-    limit,
-    hasMore,
-  };
+    return {
+      data,
+      total,
+      page,
+      limit,
+      hasMore,
+    };
   }, { force: options.force });
 }
 
@@ -217,8 +218,13 @@ export async function createCheckin(
     method: 'POST',
     body: body instanceof FormData ? body : JSON.stringify(body),
   });
-  invalidateQueries('checkins:list:');
-  if (res.chatMessage) invalidateQueries('messages:list:');
+
+  // A photo check-in is represented in Home, Memories, and Messages. Invalidate all
+  // related caches and cached route DOM so the next tab activation cannot show stale data.
+  invalidateQueries('checkins:');
+  invalidateQueries('messages:list:');
+  invalidateRoutes(['/app/home', '/app/memories', '/app/messages']);
+
   return {
     checkIn: mapCheckin(res.checkIn),
     streak: typeof res.streak === 'number' ? res.streak : undefined,
@@ -237,6 +243,7 @@ export async function addReaction(
     });
     const reactions = mapReactionList(res.reactions || []);
     patchCheckinInCachedQueries(checkinId, (checkin) => ({ ...checkin, reactions }));
+    invalidateRoutes(['/app/home', '/app/memories', '/app/messages']);
     return reactions;
   });
 }
@@ -252,15 +259,21 @@ export async function addReply(
     });
     const replies = mapReplies(res.replies || []);
     patchCheckinInCachedQueries(checkinId, (checkin) => ({ ...checkin, replies }));
+
+    // The Messages API lazily bridges legacy CheckIn replies into ChatMessage rows.
+    invalidateQueries('messages:list:');
+    invalidateRoutes(['/app/home', '/app/memories', '/app/messages']);
     return replies;
   });
 }
 
-export function deleteCheckin(checkinId: string): Promise<void> {
-  invalidateQueries('checkins:');
-  return apiFetch<void>(`/checkins/${checkinId}`, {
+export async function deleteCheckin(checkinId: string): Promise<void> {
+  await apiFetch<void>(`/checkins/${checkinId}`, {
     method: 'DELETE',
   });
+  invalidateQueries('checkins:');
+  invalidateQueries('messages:list:');
+  invalidateRoutes(['/app/home', '/app/memories', '/app/messages']);
 }
 
 function patchCheckinInCachedQueries(
