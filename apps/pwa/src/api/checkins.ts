@@ -11,6 +11,7 @@ import type {
   CheckIn,
   CheckInReply,
   CheckInType,
+  MessageReplyReference,
   MoodType,
   PaginatedResponse,
   Reaction,
@@ -47,6 +48,14 @@ export interface RawCheckIn {
   mood?: MoodType;
   reactions?: RawReaction[];
   replies?: RawReply[];
+  replyTo?: {
+    messageId?: string;
+    senderId?: string;
+    senderName?: string;
+    type?: CheckInType;
+    textSnippet?: string;
+    mediaUrl?: string;
+  };
   ownerName: string;
   createdAt: string;
   updatedAt: string;
@@ -109,6 +118,18 @@ function mapReactionList(rawReactions: RawReaction[] = []): Reaction[] {
     }));
 }
 
+function mapReplyReference(raw?: RawCheckIn['replyTo']): MessageReplyReference | undefined {
+  if (!raw?.messageId || !raw.senderId || !raw.senderName || !raw.type) return undefined;
+  return {
+    messageId: String(raw.messageId),
+    senderId: String(raw.senderId),
+    senderName: raw.senderName,
+    type: raw.type,
+    textSnippet: raw.textSnippet,
+    mediaUrl: raw.mediaUrl,
+  };
+}
+
 // Map raw backend check-in format to aligned PWA types
 function mapCheckin(item: RawCheckIn): CheckIn {
   if (!item) return null as unknown as CheckIn;
@@ -126,6 +147,7 @@ function mapCheckin(item: RawCheckIn): CheckIn {
     mood: item.mood,
     reactions: mapReactionList(item.reactions || []),
     replies: mapReplies(item.replies || []),
+    replyTo: mapReplyReference(item.replyTo),
     ownerName: item.ownerName,
     isOwn: currentUserId ? userId === currentUserId : false,
     createdAt: item.createdAt,
@@ -160,6 +182,7 @@ export async function getCheckins(
   limit: number = 20,
   after?: string,
   type?: string,
+  options: { force?: boolean } = {},
 ): Promise<PaginatedResponse<CheckIn>> {
   const key = `checkins:list:${page}:${limit}:${after ?? ''}:${type ?? ''}`;
   return fetchQuery(key, async () => {
@@ -181,7 +204,7 @@ export async function getCheckins(
     limit,
     hasMore,
   };
-  });
+  }, { force: options.force });
 }
 
 export async function createCheckin(

@@ -24,6 +24,15 @@ export interface ReplySubDoc {
   createdAt: Date;
 }
 
+export interface ReplyReferenceSubDoc {
+  messageId: Types.ObjectId;
+  senderId: Types.ObjectId;
+  senderName: string;
+  type: CheckInType;
+  textSnippet?: string;
+  mediaUrl?: string;
+}
+
 export interface CheckInDocument extends Document {
   _id: Types.ObjectId;
   coupleId: Types.ObjectId;
@@ -35,6 +44,8 @@ export interface CheckInDocument extends Document {
   caption?: string;
   mood?: MoodType;
   quickMessage?: string;
+  replyToMessageId?: Types.ObjectId;
+  replyTo?: ReplyReferenceSubDoc;
   reactions: ReactionSubDoc[];
   replies: ReplySubDoc[];
   deletedAt?: Date;
@@ -61,6 +72,18 @@ const ReplySchema = new Schema<ReplySubDoc>(
     userName: { type: String, required: true },
     message: { type: String, required: true, maxlength: 500 },
     createdAt: { type: Date, default: () => new Date() },
+  },
+  { _id: false },
+);
+
+const ReplyReferenceSchema = new Schema<ReplyReferenceSubDoc>(
+  {
+    messageId: { type: Schema.Types.ObjectId, ref: 'CheckIn', required: true },
+    senderId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    senderName: { type: String, required: true, maxlength: 120 },
+    type: { type: String, enum: ['photo', 'text', 'mood'], required: true },
+    textSnippet: { type: String, required: false, maxlength: 160 },
+    mediaUrl: { type: String, required: false, maxlength: 2048 },
   },
   { _id: false },
 );
@@ -92,6 +115,8 @@ const CheckInSchema = new Schema<CheckInDocument>(
       required: false,
     },
     quickMessage: { type: String, required: false, maxlength: 100 },
+    replyToMessageId: { type: Schema.Types.ObjectId, ref: 'CheckIn', required: false },
+    replyTo: { type: ReplyReferenceSchema, required: false },
     reactions: { type: [ReactionSchema], default: [] },
     replies: { type: [ReplySchema], default: [] },
     deletedAt: { type: Date, required: false },

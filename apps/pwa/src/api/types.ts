@@ -40,6 +40,15 @@ export interface CheckInReply {
   createdAt: string;
 }
 
+export interface MessageReplyReference {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  type: CheckInType;
+  textSnippet?: string;
+  mediaUrl?: string;
+}
+
 export interface CheckIn {
   id: string;
   userId: string;
@@ -50,6 +59,7 @@ export interface CheckIn {
   mood?: MoodType;
   reactions: Reaction[];
   replies: CheckInReply[];
+  replyTo?: MessageReplyReference;
   ownerName: string;
   ownerAvatarUrl?: string;
   isOwn: boolean;

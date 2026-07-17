@@ -19,6 +19,7 @@ const createCheckInBodySchema = z.object({
     .enum(['happy', 'miss', 'tired', 'studying', 'out', 'eating', 'needhug'])
     .optional(),
   quickMessage: z.string().max(100).optional(),
+  replyToMessageId: z.string().trim().min(1).optional(),
 });
 
 const addReactionSchema = z.object({
@@ -43,6 +44,13 @@ const legacyReactionMap: Record<string, string> = {
 function normalizeReactionType(type: string): string {
   const trimmed = type.trim();
   return legacyReactionMap[trimmed] ?? trimmed;
+}
+
+function replySnippet(checkIn: { caption?: string; quickMessage?: string; imageUrl?: string }): string {
+  const value = (checkIn.caption ?? checkIn.quickMessage ?? (checkIn.imageUrl ? 'Ảnh' : 'Tin nhắn'))
+    .replace(/\s+/g, ' ')
+    .trim();
+  return value.slice(0, 160) || 'Tin nhắn';
 }
 
 async function readMultipartBuffer(
@@ -197,6 +205,7 @@ export default async function checkinsRoutes(
         caption?: string;
         mood?: string;
         quickMessage?: string;
+        replyToMessageId?: string;
       };
 
       if (contentType.includes('multipart/form-data')) {
@@ -211,6 +220,7 @@ export default async function checkinsRoutes(
         } | null = null;
         let caption: string | undefined;
         let quickMessage: string | undefined;
+        let replyToMessageId: string | undefined;
 
         for await (const part of parts) {
           if (part.type === 'file') {
@@ -224,6 +234,8 @@ export default async function checkinsRoutes(
             if (part.fieldname === 'caption') caption = part.value as string;
             if (part.fieldname === 'quickMessage')
               quickMessage = part.value as string;
+            if (part.fieldname === 'replyToMessageId')
+              replyToMessageId = String(part.value).trim() || undefined;
           }
         }
 
@@ -254,6 +266,7 @@ export default async function checkinsRoutes(
           storagePath: saved.storagePath,
           caption,
           quickMessage,
+          replyToMessageId,
         };
       } else {
         // Text or mood check-in from JSON body
@@ -267,11 +280,45 @@ export default async function checkinsRoutes(
         checkInData = parsed.data;
       }
 
+      let replyTo: {
+        messageId: Types.ObjectId;
+        senderId: Types.ObjectId;
+        senderName: string;
+        type: 'photo' | 'text' | 'mood';
+        textSnippet: string;
+        mediaUrl?: string;
+      } | undefined;
+      if (checkInData.replyToMessageId) {
+        if (!Types.ObjectId.isValid(checkInData.replyToMessageId)) {
+          return reply.status(400).send({ error: 'Invalid reply message id', code: 'VALIDATION_ERROR' });
+        }
+
+        const original = await CheckIn.findOne({
+          _id: new Types.ObjectId(checkInData.replyToMessageId),
+          coupleId: new Types.ObjectId(request.user.coupleId),
+          deletedAt: null,
+        }).lean();
+        if (!original) {
+          return reply.status(404).send({ error: 'Reply target not found', code: 'NOT_FOUND' });
+        }
+
+        replyTo = {
+          messageId: original._id,
+          senderId: original.ownerId,
+          senderName: original.ownerName,
+          type: original.type,
+          textSnippet: replySnippet(original),
+          mediaUrl: original.imageUrl,
+        };
+      }
+
       const checkIn = await CheckIn.create({
         coupleId: new Types.ObjectId(request.user.coupleId),
         ownerId: new Types.ObjectId(request.user.id),
         ownerName: user.displayName,
         ...checkInData,
+        replyToMessageId: replyTo?.messageId,
+        replyTo,
         reactions: [],
         replies: [],
       });
