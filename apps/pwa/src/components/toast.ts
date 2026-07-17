@@ -10,7 +10,7 @@ function getContainer(): HTMLElement {
     toastContainer.className = 'toast-container';
     toastContainer.setAttribute('aria-live', 'polite');
     toastContainer.setAttribute('aria-atomic', 'true');
-    document.body.appendChild(toastContainer);
+    (document.getElementById('toast-root') ?? document.body).appendChild(toastContainer);
   }
   return toastContainer;
 }

@@ -1,5 +1,4 @@
 import { createCheckin, getCheckins } from '../api/checkins';
-import { createNav } from '../components/nav';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
 import { showToast } from '../components/toast';
 import type { CheckIn } from '../api/types';
@@ -225,7 +224,6 @@ export function renderMessagesPage(): HTMLElement {
     }
   });
 
-  page.appendChild(createNav('/app/messages'));
   void loadMessages();
   return page;
 }

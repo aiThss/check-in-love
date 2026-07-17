@@ -1,4 +1,11 @@
 import { apiFetch } from './client';
+import {
+  dedupeMutation,
+  fetchQuery,
+  getCachedQuery,
+  invalidateQueries,
+  updateMatchingQueries,
+} from './query-cache';
 import { store } from '../store/index';
 import type {
   CheckIn,
@@ -126,21 +133,19 @@ function mapCheckin(item: RawCheckIn): CheckIn {
   };
 }
 
-let cachedLatestPartnerCheckin: CheckIn | null = null;
-
 export function getCachedLatestPartnerCheckin(): CheckIn | null {
-  return cachedLatestPartnerCheckin;
+  return getCachedQuery<CheckIn | null>('checkins:latest-partner') ?? null;
 }
 
-export async function getLatestPartnerCheckin(): Promise<CheckIn | null> {
-  try {
-    const res = await apiFetch<{ checkIn: RawCheckIn | null }>('/checkins/latest-partner');
-    const checkin = res && res.checkIn ? mapCheckin(res.checkIn) : null;
-    cachedLatestPartnerCheckin = checkin;
-    return checkin;
-  } catch {
-    return cachedLatestPartnerCheckin;
-  }
+export async function getLatestPartnerCheckin(options: { force?: boolean } = {}): Promise<CheckIn | null> {
+  return fetchQuery(
+    'checkins:latest-partner',
+    async () => {
+      const res = await apiFetch<{ checkIn: RawCheckIn | null }>('/checkins/latest-partner');
+      return res?.checkIn ? mapCheckin(res.checkIn) : null;
+    },
+    { staleTime: 30_000, force: options.force },
+  );
 }
 
 export interface PaginationInfo {
@@ -156,6 +161,8 @@ export async function getCheckins(
   after?: string,
   type?: string,
 ): Promise<PaginatedResponse<CheckIn>> {
+  const key = `checkins:list:${page}:${limit}:${after ?? ''}:${type ?? ''}`;
+  return fetchQuery(key, async () => {
   const afterQuery = after ? '&after=' + encodeURIComponent(after) : '';
   const typeQuery = type ? '&type=' + encodeURIComponent(type) : '';
   const res = await apiFetch<{ checkIns: RawCheckIn[]; pagination: PaginationInfo }>(
@@ -174,6 +181,7 @@ export async function getCheckins(
     limit,
     hasMore,
   };
+  });
 }
 
 export async function createCheckin(
@@ -183,6 +191,7 @@ export async function createCheckin(
     method: 'POST',
     body: body instanceof FormData ? body : JSON.stringify(body),
   });
+  invalidateQueries('checkins:list:');
   return {
     checkIn: mapCheckin(res.checkIn),
     streak: typeof res.streak === 'number' ? res.streak : undefined,
@@ -193,28 +202,57 @@ export async function addReaction(
   checkinId: string,
   type: ReactionType,
 ): Promise<Reaction[]> {
-  const res = await apiFetch<{ reactions: RawReaction[] }>(`/checkins/${checkinId}/reactions`, {
-    method: 'POST',
-    body: JSON.stringify({ type }),
+  return dedupeMutation(`reaction:${checkinId}:${type}`, async () => {
+    const res = await apiFetch<{ reactions: RawReaction[] }>(`/checkins/${checkinId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ type }),
+    });
+    const reactions = mapReactionList(res.reactions || []);
+    patchCheckinInCachedQueries(checkinId, (checkin) => ({ ...checkin, reactions }));
+    return reactions;
   });
-
-  return mapReactionList(res.reactions || []);
 }
 
 export async function addReply(
   checkinId: string,
   message: string,
 ): Promise<CheckInReply[]> {
-  const res = await apiFetch<{ replies: RawReply[] }>(`/checkins/${checkinId}/replies`, {
-    method: 'POST',
-    body: JSON.stringify({ message }),
+  return dedupeMutation(`reply:${checkinId}:${message}`, async () => {
+    const res = await apiFetch<{ replies: RawReply[] }>(`/checkins/${checkinId}/replies`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+    const replies = mapReplies(res.replies || []);
+    patchCheckinInCachedQueries(checkinId, (checkin) => ({ ...checkin, replies }));
+    return replies;
   });
-
-  return mapReplies(res.replies || []);
 }
 
 export function deleteCheckin(checkinId: string): Promise<void> {
+  invalidateQueries('checkins:');
   return apiFetch<void>(`/checkins/${checkinId}`, {
     method: 'DELETE',
   });
+}
+
+function patchCheckinInCachedQueries(
+  checkinId: string,
+  patch: (checkin: CheckIn) => CheckIn,
+): void {
+  updateMatchingQueries('checkins:', (current) => {
+    if (!current) return current;
+    if (isCheckIn(current)) return current.id === checkinId ? patch(current) : current;
+    if (isPaginatedCheckins(current)) {
+      return { ...current, data: current.data.map((item) => item.id === checkinId ? patch(item) : item) };
+    }
+    return current;
+  });
+}
+
+function isCheckIn(value: unknown): value is CheckIn {
+  return typeof value === 'object' && value !== null && 'id' in value && 'reactions' in value;
+}
+
+function isPaginatedCheckins(value: unknown): value is PaginatedResponse<CheckIn> {
+  return typeof value === 'object' && value !== null && 'data' in value && Array.isArray(value.data);
 }

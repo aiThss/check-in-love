@@ -1,90 +1,146 @@
+import { createNav, setActiveNav } from './components/nav';
 import { store } from './store/index';
 import { logger } from './utils/logger';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 type RouteFactory = () => HTMLElement | Promise<HTMLElement>;
 type Routes = Record<string, RouteFactory>;
 
-// ── State ─────────────────────────────────────────────────────────────────────
+interface CachedPage {
+  element: HTMLElement;
+  scrollX: number;
+  scrollY: number;
+}
 
-let _routes: Routes = {};
-let _currentPath = '';
+interface AppShell {
+  pageHost: HTMLElement;
+  navHost: HTMLElement;
+}
 
-// ── Public API ────────────────────────────────────────────────────────────────
+let routes: Routes = {};
+let currentPath = '';
+let currentElement: HTMLElement | null = null;
+let shell: AppShell | null = null;
+let navigationVersion = 0;
+const pageCache = new Map<string, CachedPage>();
 
 export function getCurrentPath(): string {
-  return window.location.pathname;
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 export function navigate(path: string, replace = false): void {
-  if (replace) {
-    history.replaceState({}, '', path);
-  } else {
-    history.pushState({}, '', path);
+  const target = new URL(path, window.location.origin);
+  const nextPath = `${target.pathname}${target.search}`;
+
+  if (nextPath === getCurrentPath()) {
+    void renderRoute(target.pathname);
+    return;
   }
-  renderRoute(path);
+
+  if (replace) {
+    history.replaceState({}, '', nextPath);
+  } else {
+    history.pushState({}, '', nextPath);
+  }
+  void renderRoute(target.pathname);
 }
 
-export function initRouter(routes: Routes): void {
-  _routes = routes;
+/** Removes authenticated DOM and its in-memory UI state. */
+export function clearPageCache(): void {
+  for (const cached of pageCache.values()) {
+    cached.element.remove();
+  }
+  pageCache.clear();
+  if (currentPath.startsWith('/app/')) {
+    currentElement = null;
+  }
+}
 
-  // Handle browser back/forward
+export function initRouter(nextRoutes: Routes): void {
+  routes = nextRoutes;
+  ensureShell();
+
   window.addEventListener('popstate', () => {
-    renderRoute(window.location.pathname);
+    void renderRoute(window.location.pathname);
   });
 
-  // Intercept internal link clicks
-  document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const anchor = target.closest('a');
-    if (!anchor) return;
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a');
+    if (!anchor || anchor.target || anchor.hasAttribute('download')) return;
+
     const href = anchor.getAttribute('href');
-    if (!href || href.startsWith('http') || href.startsWith('//')) return;
-    e.preventDefault();
-    navigate(href);
+    if (!href || href.startsWith('#') || /^(?:https?:|mailto:|tel:|data:)/i.test(href)) return;
+
+    const target = new URL(href, window.location.origin);
+    if (target.origin !== window.location.origin) return;
+
+    event.preventDefault();
+    navigate(`${target.pathname}${target.search}`);
   });
 
-  // Render initial route
-  renderRoute(window.location.pathname);
+  void renderRoute(window.location.pathname);
 }
 
-// ── Route resolution ──────────────────────────────────────────────────────────
+function ensureShell(): AppShell | null {
+  if (shell) return shell;
+
+  const app = document.getElementById('app');
+  if (!app) return null;
+
+  const appShell = document.createElement('div');
+  appShell.className = 'app-shell';
+
+  const pageHost = document.createElement('main');
+  pageHost.id = 'page-host';
+  pageHost.setAttribute('aria-live', 'polite');
+
+  const navHost = document.createElement('div');
+  navHost.id = 'navigation-root';
+  navHost.appendChild(createNav());
+
+  const modalRoot = document.createElement('div');
+  modalRoot.id = 'modal-root';
+
+  const toastRoot = document.createElement('div');
+  toastRoot.id = 'toast-root';
+
+  appShell.append(pageHost, navHost, modalRoot, toastRoot);
+  app.replaceChildren(appShell);
+  shell = { pageHost, navHost };
+  return shell;
+}
 
 function resolveRoute(path: string): string {
-  // Exact match
-  if (_routes[path]) return path;
-
-  // Normalize trailing slash
+  if (routes[path]) return path;
   const normalized = path.endsWith('/') && path !== '/' ? path.slice(0, -1) : path;
-  if (_routes[normalized]) return normalized;
-
-  // Default fallback
-  return '/';
+  return routes[normalized] ? normalized : '/';
 }
 
 function getRedirect(path: string): string | null {
-  const isAuthenticated = store.isAuthenticated();
-  const isAppRoute = path.startsWith('/app/');
-  const isAuthRoute = path === '/onboarding' || path === '/login' || path === '/';
+  const authenticated = store.isAuthenticated();
+  const appRoute = path.startsWith('/app/');
+  const authRoute = path === '/onboarding' || path === '/login' || path === '/';
 
-  // Protect /app/* routes
-  if (isAppRoute && !isAuthenticated) {
-    return '/onboarding';
-  }
-
-  // Redirect authenticated users away from onboarding/root
-  if (isAuthRoute && isAuthenticated) {
-    return '/app/home';
-  }
-
+  if (appRoute && !authenticated) return '/onboarding';
+  if (authRoute && authenticated) return '/app/home';
   return null;
 }
 
-async function renderRoute(path: string): Promise<void> {
-  _currentPath = path;
+function saveCurrentScroll(): void {
+  const cached = pageCache.get(currentPath);
+  if (cached) {
+    cached.scrollX = window.scrollX;
+    cached.scrollY = window.scrollY;
+  }
+}
 
-  // Check redirect
+async function renderRoute(path: string): Promise<void> {
+  const activeShell = ensureShell();
+  if (!activeShell) return;
+
+  const version = ++navigationVersion;
   const redirect = getRedirect(path);
   if (redirect) {
     navigate(redirect, true);
@@ -92,58 +148,79 @@ async function renderRoute(path: string): Promise<void> {
   }
 
   const resolvedPath = resolveRoute(path);
-  const factory = _routes[resolvedPath];
+  const factory = routes[resolvedPath];
   if (!factory) {
-    renderNotFound();
+    renderMessage(activeShell.pageHost, 'Không tìm thấy trang', 'Trang này không tồn tại.');
     return;
   }
 
-  const appEl = document.getElementById('app');
-  if (!appEl) return;
-
-  // Hide instantly to avoid flash of old content
-  appEl.style.transition = 'none';
-  appEl.style.opacity = '0';
+  const isAppRoute = resolvedPath.startsWith('/app/');
+  saveCurrentScroll();
 
   try {
-    const pageEl = await factory();
-    appEl.innerHTML = '';
-    appEl.appendChild(pageEl);
-  } catch (err) {
-    logger.error(`[Router] Failed to render route: ${resolvedPath}`, err);
-    renderError(appEl);
-  }
+    let nextElement: HTMLElement;
+    let restoredScroll: CachedPage | undefined;
 
-  // Fade in quickly
-  requestAnimationFrame(() => {
+    if (isAppRoute) {
+      restoredScroll = pageCache.get(resolvedPath);
+    }
+
+    if (restoredScroll) {
+      nextElement = restoredScroll.element;
+    } else {
+      nextElement = await factory();
+      if (version !== navigationVersion) return;
+
+      if (isAppRoute) {
+        pageCache.set(resolvedPath, { element: nextElement, scrollX: 0, scrollY: 0 });
+      }
+    }
+
+    if (version !== navigationVersion) return;
+
+    if (isAppRoute && currentElement && !currentPath.startsWith('/app/')) {
+      currentElement.remove();
+      currentElement = null;
+    }
+    if (!isAppRoute) {
+      clearPageCache();
+      activeShell.pageHost.replaceChildren();
+    }
+    if (currentElement && currentElement !== nextElement) currentElement.hidden = true;
+
+    activeShell.navHost.hidden = !isAppRoute;
+    if (isAppRoute) setActiveNav(resolvedPath);
+    nextElement.hidden = false;
+    if (!nextElement.isConnected) activeShell.pageHost.appendChild(nextElement);
+    if (!restoredScroll) nextElement.classList.add('page-enter');
+
+    currentPath = resolvedPath;
+    currentElement = nextElement;
+
     requestAnimationFrame(() => {
-      appEl.style.transition = 'opacity 60ms ease-out';
-      appEl.style.opacity = '1';
-      window.scrollTo({ top: 0 });
+      if (version !== navigationVersion) return;
+      window.scrollTo({
+        left: restoredScroll?.scrollX ?? 0,
+        top: restoredScroll?.scrollY ?? 0,
+        behavior: 'auto',
+      });
     });
-  });
+  } catch (error) {
+    if (version !== navigationVersion) return;
+    logger.error(`[Router] Failed to render route: ${resolvedPath}`, error);
+    renderMessage(activeShell.pageHost, 'Có lỗi xảy ra', 'Vui lòng thử lại.');
+  }
 }
 
-function renderNotFound(): void {
-  const appEl = document.getElementById('app');
-  if (!appEl) return;
-  appEl.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;text-align:center;padding:32px">
-      <div style="font-size:64px">🔍</div>
-      <div style="font-size:20px;font-weight:600">Không tìm thấy trang</div>
-      <div style="font-size:15px;color:var(--text-secondary)">Trang này không tồn tại</div>
-      <button class="btn-ghost" onclick="history.back()" style="margin-top:8px">← Quay lại</button>
-    </div>
-  `;
-}
-
-function renderError(container: HTMLElement): void {
-  container.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;text-align:center;padding:32px">
-      <div style="font-size:64px">😢</div>
-      <div style="font-size:20px;font-weight:600">Có lỗi xảy ra</div>
-      <div style="font-size:15px;color:var(--text-secondary)">Vui lòng thử lại</div>
-      <button class="btn-ghost" onclick="window.location.reload()" style="margin-top:8px">Tải lại</button>
-    </div>
-  `;
+function renderMessage(host: HTMLElement, title: string, description: string): void {
+  clearPageCache();
+  const page = document.createElement('div');
+  page.className = 'page page-no-nav route-message';
+  const heading = document.createElement('h1');
+  heading.textContent = title;
+  const copy = document.createElement('p');
+  copy.textContent = description;
+  page.append(heading, copy);
+  host.replaceChildren(page);
+  currentElement = page;
 }

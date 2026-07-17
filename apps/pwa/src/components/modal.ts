@@ -111,7 +111,7 @@ export function showModal(options: ModalOptions): void {
   };
   document.addEventListener('keydown', escHandler);
 
-  document.body.appendChild(overlay);
+  (document.getElementById('modal-root') ?? document.body).appendChild(overlay);
   activeOverlay = overlay;
 
   // Prevent body scroll

@@ -2,37 +2,19 @@ import './styles/tokens.css';
 import './styles/components.css';
 import './styles/animations.css';
 import { store } from './store/index';
-import { initRouter } from './router';
+import { initRouter, navigate } from './router';
+import { clearPrivateClientState } from './session';
 import { logger } from './utils/logger';
 import { initKeyboardViewport } from './utils/keyboard';
-import { renderInstallPage } from './pages/install';
-import { renderLoginPage } from './pages/login';
-import { renderOnboardingPage } from './pages/onboarding';
-import { renderHomePage } from './pages/home';
-import { renderCheckinPage } from './pages/checkin';
-import { renderMemoriesPage } from './pages/memories';
-import { renderRandomPage } from './pages/random';
-import { renderProfilePage } from './pages/profile';
-import { renderMessagesPage } from './pages/messages';
-import { restoreReminderOnLoad } from './pages/profile';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
+import { showModal } from './components/modal';
 
-// ─── Apply Theme ─────────────────────────────────────────────────────────────
-function applyTheme() {
-  const state = store.get();
-  const theme = state.theme;
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-  const useDark = theme === 'dark' || (theme === 'system' && prefersDark);
-  document.documentElement.setAttribute('data-theme', useDark ? 'dark' : 'light');
-}
-
-applyTheme();
+// ─── App-wide state integrations ─────────────────────────────────────────────
+store.initTheme();
 initKeyboardViewport();
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
 // Restore check-in reminder timer after reload (browser-only best-effort)
-restoreReminderOnLoad();
+void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
 
 // Detect APK wrapper and add helper class to documentElement
 if (navigator.userAgent.includes('LoveCheckAndroidWrapper')) {
@@ -62,7 +44,8 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker
         .register('/sw.js')
-        .then(() => {
+        .then((registration) => {
+          watchForServiceWorkerUpdate(registration);
           if (store.isAuthenticated() && 'Notification' in window && Notification.permission === 'granted') {
             ensurePushSubscription(false).catch((err) => {
               logger.warn('Push subscription refresh failed', err);
@@ -74,6 +57,35 @@ if ('serviceWorker' in navigator) {
         });
     });
   }
+}
+
+function watchForServiceWorkerUpdate(registration: ServiceWorkerRegistration): void {
+  const offerUpdate = () => {
+    const waitingWorker = registration.waiting;
+    // A first install has no old app version to replace.
+    if (!waitingWorker || !navigator.serviceWorker.controller) return;
+
+    showModal({
+      title: 'Đã có bản cập nhật mới',
+      content: 'Cập nhật ngay để dùng phiên bản mới nhất? Dữ liệu đang mở sẽ được giữ lại.',
+      confirmText: 'Cập nhật',
+      cancelText: 'Để sau',
+      onConfirm: () => {
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        }, { once: true });
+        waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      },
+    });
+  };
+
+  registration.addEventListener('updatefound', () => {
+    const installing = registration.installing;
+    installing?.addEventListener('statechange', () => {
+      if (installing.state === 'installed') offerUpdate();
+    });
+  });
+  offerUpdate();
 }
 
 // ─── iOS PWA Detection ────────────────────────────────────────────────────────
@@ -96,8 +108,8 @@ function renderBlockedPage(): HTMLElement {
     <button id="blocked-logout" class="btn-primary">Đăng xuất</button>
   `;
   el.querySelector('#blocked-logout')?.addEventListener('click', () => {
-    store.clear();
-    window.location.href = '/onboarding';
+    clearPrivateClientState();
+    navigate('/onboarding', true);
   });
   return el;
 }
@@ -105,18 +117,35 @@ function renderBlockedPage(): HTMLElement {
 // ─── Init Router ──────────────────────────────────────────────────────────────
 initRouter({
   '/':           () => {
-    if (store.isAuthenticated()) return renderHomePage();
-    if (isIOS && !isStandalone) return renderInstallPage();
-    return renderOnboardingPage();
+    if (store.isAuthenticated()) return import('./pages/home').then(({ renderHomePage }) => renderHomePage());
+    if (isIOS && !isStandalone) return import('./pages/install').then(({ renderInstallPage }) => renderInstallPage());
+    return import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage());
   },
-  '/install':    () => renderInstallPage(),
-  '/login':      () => renderLoginPage(),
-  '/onboarding': () => renderOnboardingPage(),
+  '/install':    () => import('./pages/install').then(({ renderInstallPage }) => renderInstallPage()),
+  '/login':      () => import('./pages/login').then(({ renderLoginPage }) => renderLoginPage()),
+  '/onboarding': () => import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage()),
   '/blocked':    () => renderBlockedPage(),
-  '/app/home':      () => renderHomePage(),
-  '/app/checkin':   () => renderCheckinPage(),
-  '/app/memories':  () => renderMemoriesPage(),
-  '/app/random':    () => renderRandomPage(),
-  '/app/profile':   () => renderProfilePage(),
-  '/app/messages':  () => renderMessagesPage(),
+  '/app/home':      () => import('./pages/home').then(({ renderHomePage }) => renderHomePage()),
+  '/app/checkin':   () => import('./pages/checkin').then(({ renderCheckinPage }) => renderCheckinPage()),
+  '/app/memories':  () => import('./pages/memories').then(({ renderMemoriesPage }) => renderMemoriesPage()),
+  '/app/random':    () => import('./pages/random').then(({ renderRandomPage }) => renderRandomPage()),
+  '/app/profile':   () => import('./pages/profile').then(({ renderProfilePage }) => renderProfilePage()),
+  '/app/messages':  () => import('./pages/messages').then(({ renderMessagesPage }) => renderMessagesPage()),
 });
+
+const prefetchCommonRoutes = () => {
+  void Promise.all([
+    import('./pages/memories'),
+    import('./pages/profile'),
+    import('./pages/checkin'),
+  ]);
+};
+
+const idleWindow = window as Window & {
+  requestIdleCallback?: (callback: () => void) => number;
+};
+if (typeof idleWindow.requestIdleCallback === 'function') {
+  idleWindow.requestIdleCallback(prefetchCommonRoutes);
+} else {
+  globalThis.setTimeout(prefetchCommonRoutes, 700);
+}

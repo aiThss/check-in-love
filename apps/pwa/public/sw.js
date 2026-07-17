@@ -1,9 +1,9 @@
 /* ============================================================
    LoveCheck Service Worker
-   Cache name: lovecheck-v1
+   Cache name: lovecheck-v4
    ============================================================ */
 
-const CACHE_NAME = 'lovecheck-v3';
+const CACHE_NAME = 'lovecheck-v4';
 const OFFLINE_URL = '/offline.html';
 
 const SHELL_ASSETS = [
@@ -27,7 +27,7 @@ self.addEventListener('install', (event) => {
       } catch {
         // offline.html is optional
       }
-      await self.skipWaiting();
+      // Keep the old worker active until the app explicitly accepts the update.
     })()
   );
 });
@@ -53,13 +53,14 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests and chrome-extension requests
+  // Skip non-GET requests, external resources, and extension requests.
   if (request.method !== 'GET') return;
   if (!url.protocol.startsWith('http')) return;
+  if (url.origin !== self.location.origin) return;
 
-  // API requests: network-first with 3s timeout, fallback to cache
+  // Never place authenticated API responses in Cache Storage.
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirstWithTimeout(request, 3000));
+    event.respondWith(networkOnly(request));
     return;
   }
 
@@ -75,24 +76,10 @@ self.addEventListener('fetch', (event) => {
 
 // ── Strategies ───────────────────────────────────────────────
 
-async function networkFirstWithTimeout(request, timeoutMs) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
+async function networkOnly(request) {
   try {
-    const networkResponse = await fetch(request, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (networkResponse.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, networkResponse.clone()).catch(() => {});
-    }
-    return networkResponse;
+    return await fetch(request);
   } catch {
-    clearTimeout(timeoutId);
-    const cached = await caches.match(request);
-    if (cached) return cached;
-
     return new Response(
       JSON.stringify({ error: 'Offline', message: 'Không có kết nối mạng' }),
       {
@@ -108,7 +95,7 @@ async function navigationHandler(request) {
     const networkResponse = await fetch(request);
     if (networkResponse.ok) {
       const cache = await caches.open(CACHE_NAME);
-      cache.put(request, networkResponse.clone()).catch(() => {});
+      cache.put('/index.html', networkResponse.clone()).catch(() => {});
     }
     return networkResponse;
   } catch {
@@ -125,6 +112,29 @@ async function navigationHandler(request) {
       })
     );
   }
+}
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
+
+  if (event.data?.type === 'CLEAR_PRIVATE_CACHE') {
+    event.waitUntil(clearPrivateResponses());
+  }
+});
+
+async function clearPrivateResponses() {
+  const cacheNames = await caches.keys();
+  await Promise.all(cacheNames.map(async (cacheName) => {
+    if (!cacheName.startsWith('lovecheck-')) return;
+    const cache = await caches.open(cacheName);
+    const requests = await cache.keys();
+    await Promise.all(requests
+      .filter((request) => new URL(request.url).pathname.startsWith('/api/'))
+      .map((request) => cache.delete(request)));
+  }));
 }
 
 async function cacheFirst(request) {

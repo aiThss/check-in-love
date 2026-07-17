@@ -1,6 +1,4 @@
-import type { User, Couple } from '../api/types';
-
-// ── State shape ───────────────────────────────────────────────────────────────
+import type { Couple, User } from '../api/types';
 
 export interface AppState {
   token: string | null;
@@ -9,6 +7,8 @@ export interface AppState {
   theme: 'light' | 'dark' | 'system';
   hasNewCheckin: boolean;
 }
+
+export type StoreListener = (state: AppState, previousState: AppState) => void;
 
 const STATE_KEY = 'lovecheck_state';
 const TOKEN_KEY = 'lovecheck_token';
@@ -23,8 +23,6 @@ declare global {
   }
 }
 
-// ── Defaults ──────────────────────────────────────────────────────────────────
-
 const defaultState: AppState = {
   token: null,
   user: null,
@@ -33,119 +31,123 @@ const defaultState: AppState = {
   hasNewCheckin: false,
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function readFromStorage(): AppState {
   try {
     const raw = localStorage.getItem(STATE_KEY);
-    if (!raw) return { ...defaultState };
-    const parsed = JSON.parse(raw) as Partial<AppState>;
-    return { ...defaultState, ...parsed };
+    const parsed = raw ? (JSON.parse(raw) as Partial<AppState>) : {};
+    // Preserve sessions written by older clients that only used STATE_KEY.
+    const token = localStorage.getItem(TOKEN_KEY) ?? parsed.token ?? null;
+    return { ...defaultState, ...parsed, token };
   } catch {
     return { ...defaultState };
   }
 }
 
-function writeToStorage(state: AppState): void {
+function writeToStorage(nextState: AppState): void {
   try {
-    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    localStorage.setItem(STATE_KEY, JSON.stringify(nextState));
   } catch {
-    // ignore quota exceeded
+    // Storage can be unavailable or full; the in-memory state remains usable.
   }
 }
 
-function syncAndroidWidget(state: AppState): void {
+function syncAndroidWidget(nextState: AppState): void {
   try {
-    const bridge = window.LoveCheckAndroid;
-    const streak = state.couple?.streak ?? 0;
-    const partnerName = state.user?.partnerName ?? '';
-    bridge?.updateWidget?.(streak, partnerName);
+    window.LoveCheckAndroid?.updateWidget?.(
+      nextState.couple?.streak ?? 0,
+      nextState.user?.partnerName ?? '',
+    );
   } catch {
     // Android bridge is best-effort only.
   }
 }
 
-// ── Apply theme to document ───────────────────────────────────────────────────
-
 export function applyTheme(theme: AppState['theme']): void {
-  const root = document.documentElement;
-  if (theme === 'dark') {
-    root.setAttribute('data-theme', 'dark');
-  } else if (theme === 'light') {
-    root.setAttribute('data-theme', 'light');
-  } else {
-    // system
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-  }
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute(
+    'data-theme',
+    theme === 'dark' || (theme === 'system' && prefersDark) ? 'dark' : 'light',
+  );
 }
 
-// ── Store ─────────────────────────────────────────────────────────────────────
+let state = readFromStorage();
+const listeners = new Set<StoreListener>();
+let themeListenerInstalled = false;
+let storageListenerInstalled = false;
+
+function publish(nextState: AppState, previousState: AppState): void {
+  syncAndroidWidget(nextState);
+  listeners.forEach((listener) => listener(nextState, previousState));
+}
+
+function commit(partial: Partial<AppState>, persist: boolean): void {
+  const previousState = state;
+  state = { ...state, ...partial };
+  if (persist) writeToStorage(state);
+
+  if (partial.token !== undefined) {
+    if (partial.token) localStorage.setItem(TOKEN_KEY, partial.token);
+    else localStorage.removeItem(TOKEN_KEY);
+  }
+  if (partial.theme !== undefined) applyTheme(state.theme);
+  publish(state, previousState);
+}
 
 export const store = {
   get(): AppState {
-    return readFromStorage();
+    return state;
   },
 
   set(partial: Partial<AppState>): void {
-    const current = readFromStorage();
-    const next = { ...current, ...partial };
-    writeToStorage(next);
-    syncAndroidWidget(next);
-
-    // Keep token in sync with dedicated key for apiFetch
-    if (partial.token !== undefined) {
-      if (partial.token) {
-        localStorage.setItem(TOKEN_KEY, partial.token);
-      } else {
-        localStorage.removeItem(TOKEN_KEY);
-      }
-    }
-
-    // Apply theme if changed
-    if (partial.theme !== undefined) {
-      applyTheme(partial.theme);
-    }
+    commit(partial, true);
   },
 
   clear(): void {
+    const previousState = state;
+    state = { ...defaultState };
     localStorage.removeItem(STATE_KEY);
     localStorage.removeItem(TOKEN_KEY);
     document.documentElement.removeAttribute('data-theme');
-    syncAndroidWidget({ ...defaultState });
+    publish(state, previousState);
   },
 
   getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return state.token;
   },
 
   setToken(token: string): void {
-    localStorage.setItem(TOKEN_KEY, token);
-    const current = readFromStorage();
-    const next = { ...current, token };
-    writeToStorage(next);
-    syncAndroidWidget(next);
+    commit({ token }, true);
   },
 
   isAuthenticated(): boolean {
-    const token = localStorage.getItem(TOKEN_KEY);
-    return !!token;
+    return Boolean(state.token);
   },
 
-  /** Initialize theme from stored state on app load */
+  subscribe(listener: StoreListener): () => void {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  },
+
   initTheme(): void {
-    const state = readFromStorage();
     applyTheme(state.theme);
     syncAndroidWidget(state);
 
-    // Listen for system preference changes when theme is "system"
-    window
-      .matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change', () => {
-        const current = store.get();
-        if (current.theme === 'system') {
-          applyTheme('system');
-        }
+    if (!themeListenerInstalled) {
+      themeListenerInstalled = true;
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (state.theme === 'system') applyTheme('system');
       });
+    }
+
+    if (!storageListenerInstalled) {
+      storageListenerInstalled = true;
+      window.addEventListener('storage', (event) => {
+        if (event.key !== STATE_KEY && event.key !== TOKEN_KEY) return;
+        const previousState = state;
+        state = readFromStorage();
+        applyTheme(state.theme);
+        publish(state, previousState);
+      });
+    }
   },
 };

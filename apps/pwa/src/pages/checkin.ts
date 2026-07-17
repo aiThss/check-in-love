@@ -3,7 +3,6 @@ import { createCheckin } from '../api/checkins';
 import { ApiError } from '../api/client';
 import { store } from '../store/index';
 import { logger } from '../utils/logger';
-import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import {
   openCamera,
@@ -642,7 +641,5 @@ export function renderCheckinPage(): HTMLElement {
   }
 
   // Inject Nav
-  root.appendChild(createNav('/app/checkin'));
-
   return root;
 }

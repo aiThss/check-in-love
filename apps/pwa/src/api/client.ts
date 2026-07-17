@@ -1,5 +1,8 @@
 // ── API Base Client ───────────────────────────────────────────────────────────
 
+import { navigate } from '../router';
+import { clearPrivateClientState } from '../session';
+
 declare const __API_URL__: string;
 const API_URL: string =
   (typeof __API_URL__ !== 'undefined' ? __API_URL__ : null) ||
@@ -52,9 +55,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   // Handle 401 → not authenticated
   if (response.status === 401) {
-    localStorage.removeItem('lovecheck_token');
-    localStorage.removeItem('lovecheck_state');
-    window.location.href = '/onboarding';
+    clearPrivateClientState();
+    navigate('/onboarding', true);
     throw new ApiError('Phiên đăng nhập hết hạn', 'UNAUTHORIZED', 401);
   }
 
@@ -67,7 +69,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       // ignore parse errors
     }
     if (errorData.code === 'USER_BLOCKED') {
-      window.location.href = '/blocked';
+      navigate('/blocked', true);
       throw new ApiError('Tài khoản bị khóa', 'USER_BLOCKED', 403);
     }
   }

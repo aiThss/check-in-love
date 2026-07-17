@@ -12,43 +12,46 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '📸', label: 'Kỷ niệm', path: '/app/memories' },
   { icon: '', label: '', path: '/app/checkin', isCheckin: true },
   { icon: '💬', label: 'Tin nhắn', path: '/app/messages' },
-  { icon: '<img src="/user.png" alt="Profile" style="width:22px;height:22px;object-fit:contain;display:block;" />', label: 'Profile', path: '/app/profile' },
+  { icon: '<img src="/user.png" alt="" style="width:22px;height:22px;object-fit:contain;display:block;" />', label: 'Profile', path: '/app/profile' },
 ];
 
-export function createNav(activePage: string): HTMLElement {
-  const nav = document.createElement('nav');
+let nav: HTMLElement | null = null;
+
+export function createNav(): HTMLElement {
+  if (nav) return nav;
+
+  nav = document.createElement('nav');
   nav.className = 'bottom-nav';
   nav.setAttribute('aria-label', 'Điều hướng chính');
 
   const inner = document.createElement('div');
   inner.className = 'bottom-nav-inner';
 
-  NAV_ITEMS.forEach((item) => {
+  for (const item of NAV_ITEMS) {
+    const button = document.createElement('button');
+    button.dataset.route = item.path;
+    button.setAttribute('aria-label', item.isCheckin ? 'Tạo check-in mới' : item.label);
+
     if (item.isCheckin) {
-      const btn = document.createElement('button');
-      btn.className = 'nav-checkin-btn';
-      btn.setAttribute('aria-label', 'Tạo check-in mới');
-      btn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
-      btn.addEventListener('click', () => navigate('/app/checkin'));
-      inner.appendChild(btn);
-      return;
+      button.className = 'nav-checkin-btn';
+      button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>';
+    } else {
+      button.className = 'nav-item';
+      button.innerHTML = `<span class="nav-icon" aria-hidden="true">${item.icon}</span><span class="nav-label">${item.label}</span>`;
     }
 
-    const isActive = activePage === item.path;
-    const btn = document.createElement('button');
-    btn.className = `nav-item${isActive ? ' active' : ''}`;
-    btn.setAttribute('aria-label', item.label || 'Check-in');
-    btn.setAttribute('aria-current', isActive ? 'page' : 'false');
-    btn.innerHTML = `
-      <span class="nav-icon" aria-hidden="true">${item.icon}</span>
-      <span class="nav-label">${item.label}</span>
-    `;
-    btn.addEventListener('click', () => {
-      if (!isActive) navigate(item.path);
-    });
-    inner.appendChild(btn);
-  });
+    button.addEventListener('click', () => navigate(item.path));
+    inner.appendChild(button);
+  }
 
   nav.appendChild(inner);
   return nav;
+}
+
+export function setActiveNav(path: string): void {
+  nav?.querySelectorAll<HTMLButtonElement>('[data-route]').forEach((button) => {
+    const active = button.dataset.route === path;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-current', active ? 'page' : 'false');
+  });
 }

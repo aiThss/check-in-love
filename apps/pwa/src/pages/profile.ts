@@ -1,8 +1,8 @@
 import { navigate } from '../router';
+import { clearPrivateClientState } from '../session';
 import { store, applyTheme } from '../store/index';
 import { updateProfile, uploadAvatar, uploadPartnerAvatar } from '../api/profile';
 import { getMe, MeResponse } from '../api/auth';
-import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { openCamera, openGallery, CameraResult } from '../components/camera';
@@ -713,7 +713,7 @@ export function renderProfilePage(): HTMLElement {
         danger: true,
         center: true,
         onConfirm: () => {
-          store.clear();
+          clearPrivateClientState();
           navigate('/onboarding');
         }
       });
@@ -780,7 +780,5 @@ export function renderProfilePage(): HTMLElement {
   loadProfile();
 
   // Inject Nav
-  root.appendChild(createNav('/app/profile'));
-
   return root;
 }

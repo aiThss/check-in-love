@@ -1,6 +1,5 @@
 import { navigate } from '../router';
 import { getCategories, drawRandom, getHistory } from '../api/random';
-import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import type { RandomCategory, RandomHistoryItem, RandomItem } from '../api/types';
 
@@ -354,7 +353,5 @@ export function renderRandomPage(): HTMLElement {
   loadHistory();
 
   // Inject Nav
-  root.appendChild(createNav('/app/random'));
-
   return root;
 }

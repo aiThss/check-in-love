@@ -2,7 +2,6 @@ import { navigate } from '../router';
 import { store, applyTheme } from '../store/index';
 import { getLatestPartnerCheckin, getCachedLatestPartnerCheckin, getCheckins, addReaction, addReply } from '../api/checkins';
 import { ensurePushSubscription, getPushSetupState } from '../api/push';
-import { createNav } from '../components/nav';
 import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
@@ -242,7 +241,7 @@ function buildCheckinCard(
   checkin: CheckIn,
   onReact: (type: ReactionType) => void,
   onReply: () => void,
-): HTMLElement {
+): CheckinCardView {
   const wrapper = document.createElement('div');
   wrapper.className = 'checkin-wrapper';
 
@@ -284,12 +283,36 @@ function buildCheckinCard(
   attachLongPress(card, showPicker);
   wrapper.appendChild(card);
   wrapper.appendChild(picker);
-  wrapper.appendChild(buildReactionSummary(checkin, showPicker, onReply));
+  let actions = buildReactionSummary(checkin, showPicker, onReply);
+  wrapper.appendChild(actions);
 
-  const replies = buildReplyPreview(checkin.replies);
+  let replies = buildReplyPreview(checkin.replies);
   if (replies) wrapper.appendChild(replies);
 
-  return wrapper;
+  return {
+    element: wrapper,
+    patchInteractions: () => {
+      const nextActions = buildReactionSummary(checkin, showPicker, onReply);
+      actions.replaceWith(nextActions);
+      actions = nextActions;
+
+      picker.querySelectorAll<HTMLButtonElement>('[data-type]').forEach((button) => {
+        const reaction = getReaction(checkin, button.dataset.type ?? '');
+        button.classList.toggle('selected', Boolean(reaction?.reactedByMe));
+      });
+
+      const nextReplies = buildReplyPreview(checkin.replies);
+      if (replies && nextReplies) replies.replaceWith(nextReplies);
+      else if (replies) replies.remove();
+      else if (nextReplies) actions.insertAdjacentElement('afterend', nextReplies);
+      replies = nextReplies;
+    },
+  };
+}
+
+interface CheckinCardView {
+  element: HTMLElement;
+  patchInteractions: () => void;
 }
 
 const ART_CLASSES = [
@@ -365,7 +388,9 @@ function buildRecentMemoriesSection(): HTMLElement {
   // Load today's photos, newest first.
   (async () => {
     try {
-      const res = await getCheckins(1, 50);
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const res = await getCheckins(1, 12, startOfToday.toISOString());
       const items = (res.data || [])
         .filter((item) => isToday(item.createdAt) && Boolean(getCheckinPhotoUrl(item)))
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -461,49 +486,16 @@ function buildRecentMemoriesSection(): HTMLElement {
         const reactionRow = document.createElement('div');
         reactionRow.className = 'rm-reaction-row';
 
-        // Count ❤️ reactions
-        const heartReaction = item.reactions?.find((r) => r.type === '❤️');
-        const hasReacted = heartReaction?.reactedByMe ?? false;
-        let heartCount = heartReaction?.count ?? 0;
-        let reacted = hasReacted;
-
         const heartBtn = document.createElement('button');
         heartBtn.type = 'button';
-        heartBtn.className = `rm-heart-btn${reacted ? ' reacted' : ''}`;
-        heartBtn.setAttribute('aria-label', reacted ? 'Bỏ tim' : 'Thả tim');
+        heartBtn.className = 'rm-heart-btn';
+        heartBtn.setAttribute('aria-label', 'Chọn cảm xúc');
 
-        const updateHeartBtn = () => {
-          heartBtn.className = `rm-heart-btn${reacted ? ' reacted' : ''}`;
-          heartBtn.setAttribute('aria-label', 'Chọn cảm xúc');
-          heartBtn.innerHTML = `
-            <span class="rm-heart-icon" aria-hidden="true">☺</span><strong>+</strong>
-          `;
-        };
-        updateHeartBtn();
+        heartBtn.innerHTML = `<span class="rm-heart-icon" aria-hidden="true">☺</span><strong>+</strong>`;
 
         heartBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           openReactionPicker(item, updateReactionBadges);
-          return;
-          // Optimistic update
-          reacted = !reacted;
-          heartCount = reacted ? heartCount + 1 : Math.max(0, heartCount - 1);
-          updateHeartBtn();
-
-          try {
-            const newReactions = await addReaction(item.id, '❤️');
-            item.reactions = newReactions;
-            const updated = newReactions.find((r) => r.type === '❤️');
-            heartCount = updated?.count ?? heartCount;
-            reacted = updated?.reactedByMe ?? reacted;
-            updateHeartBtn();
-          } catch {
-            // Revert optimistic update
-            reacted = !reacted;
-            heartCount = reacted ? heartCount + 1 : Math.max(0, heartCount - 1);
-            updateHeartBtn();
-            showToast('Không react được, thử lại nhé', 'error');
-          }
         });
 
 
@@ -673,8 +665,6 @@ export function renderHomePage(): HTMLElement {
   recentMemoriesSection.style.cssText = 'margin-top:28px;padding-bottom:16px;';
   page.appendChild(recentMemoriesSection);
 
-  page.appendChild(createNav('/app/home'));
-
   async function renderPushPrompt() {
     if (!store.isAuthenticated()) return;
 
@@ -707,32 +697,47 @@ export function renderHomePage(): HTMLElement {
     pushSlot.appendChild(card);
   }
 
-  function renderLoadedCheckin(checkin: CheckIn) {
-    contentArea.innerHTML = '';
+  let activeCheckin: CheckIn | null = null;
+  let activeCard: CheckinCardView | null = null;
+  let reactionPending = false;
 
-    const render = () => {
-      contentArea.innerHTML = '';
-      const cardEl = buildCheckinCard(
-        checkin,
-        async (type) => {
-          try {
-            checkin.reactions = await addReaction(checkin.id, type);
-            render();
-          } catch {
-            showToast('Không thể react, thử lại nhé', 'error');
-          }
-        },
-        () => {
-          showReplyComposer(checkin, (replies) => {
-            checkin.replies = replies;
-            render();
-          });
-        },
-      );
-      contentArea.appendChild(cardEl);
-    };
+  function renderLoadedCheckin(checkin: CheckIn): void {
+    if (activeCheckin?.id === checkin.id && activeCard?.element.isConnected) {
+      Object.assign(activeCheckin, checkin);
+      activeCard.patchInteractions();
+      return;
+    }
 
-    render();
+    activeCheckin = checkin;
+    const cardView = buildCheckinCard(
+      checkin,
+      async (type) => {
+        if (reactionPending) return;
+        reactionPending = true;
+        const previousReactions = checkin.reactions;
+        checkin.reactions = toggleReactionOptimistically(previousReactions, type);
+        cardView.patchInteractions();
+
+        try {
+          checkin.reactions = await addReaction(checkin.id, type);
+        } catch {
+          checkin.reactions = previousReactions;
+          showToast('Không thể react, thử lại nhé', 'error');
+        } finally {
+          reactionPending = false;
+          cardView.patchInteractions();
+        }
+      },
+      () => {
+        showReplyComposer(checkin, (replies) => {
+          checkin.replies = replies;
+          cardView.patchInteractions();
+        });
+      },
+    );
+
+    activeCard = cardView;
+    contentArea.replaceChildren(cardView.element);
   }
 
   async function loadCheckin(useCache = true) {
@@ -752,11 +757,13 @@ export function renderHomePage(): HTMLElement {
     refreshBtn.classList.add('animate-spin');
 
     try {
-      const checkin = await getLatestPartnerCheckin();
-      contentArea.innerHTML = '';
+      const checkin = await getLatestPartnerCheckin({ force: true });
       refreshBtn.classList.remove('animate-spin');
 
       if (!checkin) {
+        activeCheckin = null;
+        activeCard = null;
+        contentArea.replaceChildren();
         const empty = buildEmptyState(partnerName);
         contentArea.appendChild(empty);
         contentArea.querySelector('#home-checkin-btn')?.addEventListener('click', () => {
@@ -788,6 +795,8 @@ export function renderHomePage(): HTMLElement {
         showToast('Không thể làm mới dữ liệu', 'error');
         return;
       }
+      activeCheckin = null;
+      activeCard = null;
       contentArea.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-emoji">\u{1F622}</div>
@@ -803,4 +812,18 @@ export function renderHomePage(): HTMLElement {
   renderPushPrompt();
   loadCheckin();
   return page;
+}
+
+function toggleReactionOptimistically(reactions: Reaction[], type: ReactionType): Reaction[] {
+  const current = reactions.find((reaction) => reaction.type === type);
+  if (!current) return [...reactions, { type, count: 1, reactedByMe: true }];
+
+  if (current.reactedByMe) {
+    const nextCount = Math.max(0, current.count - 1);
+    return reactions
+      .map((reaction) => reaction.type === type ? { ...reaction, count: nextCount, reactedByMe: false } : reaction)
+      .filter((reaction) => reaction.count > 0);
+  }
+
+  return reactions.map((reaction) => reaction.type === type ? { ...reaction, count: reaction.count + 1, reactedByMe: true } : reaction);
 }

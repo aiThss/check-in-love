@@ -1,6 +1,5 @@
 import { navigate } from '../router';
 import { getCheckins, addReaction, addReply } from '../api/checkins';
-import { createNav } from '../components/nav';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { openReactionPicker } from '../components/reaction-picker';
@@ -906,8 +905,6 @@ export function renderMemoriesPage(): HTMLElement {
       fetchMemories(currentPage + 1, true);
     }
   });
-
-  root.appendChild(createNav('/app/memories'));
 
   return root;
 }
