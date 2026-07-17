@@ -70,6 +70,14 @@ function clampSwipe(distance: number): number {
 export function renderMessagesPage(): RoutePage {
   const page = document.createElement('div');
   page.className = 'page messages-page animate-fade-in';
+  // Android WebView + adjustResize can leave 100dvh stuck at the keyboard-sized
+  // viewport. Use the largest visual viewport measured by keyboard.ts instead.
+  if (document.documentElement.classList.contains('android-wrapper')) {
+    const stableViewportHeight = 'var(--app-viewport-height, 100vh)';
+    page.style.minHeight = stableViewportHeight;
+    page.style.height = stableViewportHeight;
+    page.style.maxHeight = stableViewportHeight;
+  }
   page.innerHTML = `
     <header class="messages-header">
       <div>

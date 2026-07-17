@@ -12,10 +12,21 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '📸', label: 'Kỷ niệm', path: '/app/memories' },
   { icon: '', label: '', path: '/app/checkin', isCheckin: true },
   { icon: '💬', label: 'Tin nhắn', path: '/app/messages' },
-  { icon: '<img src="/user.png" alt="" style="width:22px;height:22px;object-fit:contain;display:block;" />', label: 'Profile', path: '/app/profile' },
+  { icon: '<img src="/user.png" alt="Profile" style="width:22px;height:22px;object-fit:contain;display:block;" />', label: 'Profile', path: '/app/profile' },
 ];
 
 let nav: HTMLElement | null = null;
+
+function applyActiveState(path: string): void {
+  nav?.querySelectorAll<HTMLButtonElement>('[data-route]').forEach((button) => {
+    const active = button.dataset.route === path;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-current', active ? 'page' : 'false');
+    if (!button.classList.contains('nav-checkin-btn')) {
+      button.style.background = active ? 'var(--accent-soft)' : '';
+    }
+  });
+}
 
 export function createNav(): HTMLElement {
   if (nav) return nav;
@@ -34,13 +45,19 @@ export function createNav(): HTMLElement {
 
     if (item.isCheckin) {
       button.className = 'nav-checkin-btn';
-      button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>';
+      button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
     } else {
       button.className = 'nav-item';
+      button.style.transform = 'none';
+      button.style.transition = 'background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease)';
       button.innerHTML = `<span class="nav-icon" aria-hidden="true">${item.icon}</span><span class="nav-label">${item.label}</span>`;
     }
 
-    button.addEventListener('click', () => navigate(item.path));
+    button.addEventListener('pointerdown', () => applyActiveState(item.path));
+    button.addEventListener('click', () => {
+      applyActiveState(item.path);
+      navigate(item.path);
+    });
     inner.appendChild(button);
   }
 
@@ -49,9 +66,5 @@ export function createNav(): HTMLElement {
 }
 
 export function setActiveNav(path: string): void {
-  nav?.querySelectorAll<HTMLButtonElement>('[data-route]').forEach((button) => {
-    const active = button.dataset.route === path;
-    button.classList.toggle('active', active);
-    button.setAttribute('aria-current', active ? 'page' : 'false');
-  });
+  applyActiveState(path);
 }
