@@ -2,6 +2,7 @@ package com.example.lovecheck
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Base64
 import android.view.inputmethod.EditorInfo
@@ -21,6 +22,7 @@ import org.json.JSONObject
 @SuppressLint("ViewConstructor")
 class StickerWebView(context: Context) : WebView(context) {
 
+    @Suppress("DEPRECATION")
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val baseConnection = super.onCreateInputConnection(outAttrs) ?: return null
         EditorInfoCompat.setContentMimeTypes(outAttrs, SUPPORTED_MIME_TYPES)
@@ -61,11 +63,10 @@ class StickerWebView(context: Context) : WebView(context) {
                     return@Thread
                 }
 
-                val fileName = resolveFileName(uri.toString())
                 val payload = JSONObject()
                     .put("base64", Base64.encodeToString(bytes, Base64.NO_WRAP))
                     .put("mimeType", mimeType)
-                    .put("fileName", fileName)
+                    .put("fileName", resolveFileName(uri, mimeType))
 
                 emitSticker(payload)
             } catch (_: Exception) {
@@ -100,8 +101,7 @@ class StickerWebView(context: Context) : WebView(context) {
         return output.toByteArray()
     }
 
-    private fun resolveFileName(uriValue: String): String {
-        val uri = android.net.Uri.parse(uriValue)
+    private fun resolveFileName(uri: Uri, mimeType: String): String {
         try {
             context.contentResolver.query(
                 uri,
@@ -120,7 +120,7 @@ class StickerWebView(context: Context) : WebView(context) {
             // Some keyboard providers do not expose metadata; use a safe fallback.
         }
 
-        return "keyboard-sticker-${System.currentTimeMillis()}.${extensionForMime(uriValue)}"
+        return "keyboard-sticker-${System.currentTimeMillis()}.${extensionForMime(mimeType)}"
     }
 
     private fun extensionForMime(value: String): String {
