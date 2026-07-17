@@ -66,6 +66,28 @@ body {
   overflow-x: hidden;
 }
 
+#app,
+#app-shell {
+  width: 100%;
+  min-height: 100%;
+}
+
+#page-host {
+  width: 100%;
+  min-height: 0;
+}
+
+.route-page {
+  width: 100%;
+  min-height: 0;
+}
+
+/* Cached routes stay mounted, but an inactive route must never participate in layout. */
+.route-page[hidden],
+[data-route-page][hidden] {
+  display: none !important;
+}
+
 img {
   display: block;
   max-width: 100%;

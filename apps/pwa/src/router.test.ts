@@ -27,6 +27,25 @@ function page(id: string): HTMLElement {
   return element;
 }
 
+function routePages(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>('#page-host [data-route-page]'));
+}
+
+function visibleRoutePages(): HTMLElement[] {
+  return routePages().filter((routePage) => !routePage.hidden);
+}
+
+function expectOnlyVisibleRoute(path: string): void {
+  expect(visibleRoutePages()).toHaveLength(1);
+  expect(visibleRoutePages()[0].dataset.routePage).toBe(path);
+  routePages().forEach((routePage) => {
+    const active = routePage.dataset.routePage === path;
+    expect(routePage.hidden).toBe(!active);
+    expect(routePage.getAttribute('aria-hidden')).toBe(active ? 'false' : 'true');
+    expect(routePage.hasAttribute('inert')).toBe(!active);
+  });
+}
+
 beforeAll(async () => {
   document.body.innerHTML = '<div id="app"></div>';
   history.replaceState({}, '', '/app/home');
@@ -82,6 +101,7 @@ describe('persistent router behavior', () => {
     expect(document.querySelector('#memories-stale')).toBeNull();
     expect(document.querySelector('.bottom-nav')).toBe(nav);
     expect(lifecycle.homeDeactivate).toBe(1);
+    expectOnlyVisibleRoute('/app/profile');
   });
 
   it('keeps cached page identity, restores scroll, and avoids duplicate history entries', async () => {
@@ -92,12 +112,15 @@ describe('persistent router behavior', () => {
     window.scrollY = 143;
     router.navigate('/app/messages');
     await flush();
+    expectOnlyVisibleRoute('/app/messages');
     window.scrollY = 12;
 
     router.navigate('/app/home');
     await flush();
     expect(document.querySelector('#home')).toBe(homeElement);
     expect(window.scrollTo).toHaveBeenLastCalledWith({ left: 0, top: 143, behavior: 'auto' });
+    expectOnlyVisibleRoute('/app/home');
+    expect(document.querySelector<HTMLElement>('#messages')?.closest<HTMLElement>('[data-route-page]')?.hidden).toBe(true);
 
     const historyLength = history.length;
     router.navigate('/app/home');
@@ -122,6 +145,7 @@ describe('persistent router behavior', () => {
     history.forward();
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(window.location.pathname).toBe('/app/messages');
+    expectOnlyVisibleRoute('/app/messages');
   });
 
   it('redirects protected routes after authentication is cleared and destroys cached pages', async () => {
@@ -132,6 +156,7 @@ describe('persistent router behavior', () => {
     expect(window.location.pathname).toBe('/onboarding');
     expect(document.querySelector('#onboarding')).not.toBeNull();
     expect(lifecycle.homeDestroy).toBe(1);
+    expectOnlyVisibleRoute('/onboarding');
   });
 
   it('renders an error state instead of leaving the app blank when a route import fails', async () => {
@@ -144,5 +169,6 @@ describe('persistent router behavior', () => {
 
     expect(document.querySelector('.route-message')).not.toBeNull();
     expect(document.querySelector('#page-host')?.childElementCount).toBe(1);
+    expectOnlyVisibleRoute('route-error');
   });
 });

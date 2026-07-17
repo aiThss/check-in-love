@@ -14,6 +14,7 @@ type Routes = Record<string, RouteFactory>;
 
 interface CachedPage {
   page: RoutePage;
+  container: HTMLElement;
   scrollX: number;
   scrollY: number;
 }
@@ -56,7 +57,7 @@ export function navigate(path: string, replace = false): void {
 export function clearPageCache(): void {
   for (const cached of pageCache.values()) {
     cached.page.destroy?.();
-    cached.page.element.remove();
+    cached.container.remove();
   }
   pageCache.clear();
   if (currentPath.startsWith('/app/')) {
@@ -100,6 +101,7 @@ function ensureShell(): AppShell | null {
   if (!app) return null;
 
   const appShell = document.createElement('div');
+  appShell.id = 'app-shell';
   appShell.className = 'app-shell';
 
   const pageHost = document.createElement('main');
@@ -146,6 +148,28 @@ function saveCurrentScroll(): void {
   }
 }
 
+function createPageContainer(path: string, page: RoutePage): HTMLElement {
+  const container = document.createElement('section');
+  container.className = 'route-page';
+  container.dataset.routePage = path;
+  setPageVisibility(container, false);
+  container.appendChild(page.element);
+  return container;
+}
+
+function setPageVisibility(container: HTMLElement, visible: boolean): void {
+  container.hidden = !visible;
+  container.toggleAttribute('inert', !visible);
+  container.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  container.classList.toggle('is-active', visible);
+}
+
+function setOnlyActivePage(host: HTMLElement, activeContainer: HTMLElement): void {
+  host.querySelectorAll<HTMLElement>('[data-route-page]').forEach((container) => {
+    setPageVisibility(container, container === activeContainer);
+  });
+}
+
 async function renderRoute(path: string): Promise<void> {
   const activeShell = ensureShell();
   if (!activeShell) return;
@@ -169,6 +193,7 @@ async function renderRoute(path: string): Promise<void> {
 
   try {
     let nextPage: RoutePage;
+    let nextContainer: HTMLElement;
     let restoredScroll: CachedPage | undefined;
 
     if (isAppRoute) {
@@ -177,12 +202,15 @@ async function renderRoute(path: string): Promise<void> {
 
     if (restoredScroll) {
       nextPage = restoredScroll.page;
+      nextContainer = restoredScroll.container;
     } else {
       nextPage = normalizeRoutePage(await factory());
       if (version !== navigationVersion) return;
 
+      nextContainer = createPageContainer(resolvedPath, nextPage);
+
       if (isAppRoute) {
-        pageCache.set(resolvedPath, { page: nextPage, scrollX: 0, scrollY: 0 });
+        pageCache.set(resolvedPath, { page: nextPage, container: nextContainer, scrollX: 0, scrollY: 0 });
       }
     }
 
@@ -197,16 +225,15 @@ async function renderRoute(path: string): Promise<void> {
       activeShell.pageHost.replaceChildren();
     }
     if (currentPage && currentPage !== nextPage) currentPage.deactivate?.();
-    if (currentElement && currentElement !== nextPage.element) currentElement.hidden = true;
 
     activeShell.navHost.hidden = !isAppRoute;
     if (isAppRoute) setActiveNav(resolvedPath);
-    nextPage.element.hidden = false;
-    if (!nextPage.element.isConnected) activeShell.pageHost.appendChild(nextPage.element);
+    if (!nextContainer.isConnected) activeShell.pageHost.appendChild(nextContainer);
+    setOnlyActivePage(activeShell.pageHost, nextContainer);
     if (!restoredScroll) nextPage.element.classList.add('page-enter');
 
     currentPath = resolvedPath;
-    currentElement = nextPage.element;
+    currentElement = nextContainer;
     currentPage = nextPage;
     nextPage.activate?.();
 
@@ -238,7 +265,9 @@ function renderMessage(host: HTMLElement, title: string, description: string): v
   const copy = document.createElement('p');
   copy.textContent = description;
   page.append(heading, copy);
-  host.replaceChildren(page);
-  currentElement = page;
+  const container = createPageContainer('route-error', { element: page });
+  host.replaceChildren(container);
+  setOnlyActivePage(host, container);
+  currentElement = container;
   currentPage = { element: page };
 }
