@@ -24,9 +24,104 @@
   background: rgba(40, 31, 36, 0.72);
 }
 
+/* Reply mode is a two-row card, not one oversized 999px pill. */
+.messages-composer.has-reply {
+  gap: 2px;
+  padding: 8px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.messages-composer.has-reply .messages-reply-preview {
+  position: relative;
+  min-height: 46px;
+  padding: 7px 40px 7px 12px;
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.messages-composer.has-reply .messages-reply-copy {
+  gap: 2px;
+}
+
+.messages-composer.has-reply .messages-reply-copy strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.messages-composer.has-reply .messages-reply-copy span {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.messages-composer.has-reply .messages-reply-cancel {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+}
+
+.messages-composer.has-reply .messages-composer-row {
+  min-height: 46px;
+  padding-top: 3px;
+}
+
+[data-theme='dark'] .messages-composer.has-reply {
+  background: rgba(40, 31, 36, 0.8);
+}
+
+[data-theme='dark'] .messages-composer.has-reply .messages-reply-preview {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* The reply card makes the composer taller. Give the scroll area matching runway
+ * so the latest bubble can still be moved completely above the fixed controls. */
+.messages-page.has-message-reply .messages-thread {
+  padding-bottom: calc(250px + var(--safe-bottom));
+  scroll-padding-bottom: calc(250px + var(--safe-bottom));
+}
+
+/* Native image dragging can swallow pointer moves in Android WebView. The bubble
+ * remains interactive, while its direct image becomes a visual-only child. */
+.chat-bubble.has-photo > img {
+  pointer-events: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Own messages naturally swipe left. Reveal the same reply affordance on the
+ * opposite side while the gesture bridge translates the bubble leftward. */
+.chat-text-bubble.is-swiping-left::before,
+.chat-bubble.is-swiping-left::before {
+  right: auto;
+  left: calc(100% + 12px);
+}
+
+/* A photo sent as a reply keeps its quoted message readable above the image. */
+.chat-bubble.has-photo > .message-quote {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  right: 8px;
+  left: 8px;
+  width: auto;
+  max-width: none;
+  color: #fff;
+  background: rgba(20, 14, 18, 0.58);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
 /* With the keyboard open the nav is hidden and the composer is lifted by the
  * measured keyboard offset. Keep enough scroll runway beneath the last bubble. */
 :root.keyboard-open .messages-thread {
   padding-bottom: calc(86px + var(--keyboard-offset));
   scroll-padding-bottom: calc(86px + var(--keyboard-offset));
+}
+
+:root.keyboard-open .messages-page.has-message-reply .messages-thread {
+  padding-bottom: calc(146px + var(--keyboard-offset));
+  scroll-padding-bottom: calc(146px + var(--keyboard-offset));
 }
