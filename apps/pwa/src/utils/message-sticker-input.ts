@@ -22,6 +22,20 @@ interface ClipboardItemLike {
   getType(type: string): Promise<Blob>;
 }
 
+interface NativeStickerPayload {
+  base64: string;
+  mimeType?: string;
+  fileName?: string;
+}
+
+declare global {
+  interface Window {
+    onNativeStickerReceived?: (payload: NativeStickerPayload) => void;
+    onNativeStickerError?: (message: string) => void;
+    __pendingNativeStickers?: NativeStickerPayload[];
+  }
+}
+
 let initialized = false;
 let sendingSticker = false;
 let lastStickerSignature = '';
@@ -31,6 +45,12 @@ let styleFrame: number | null = null;
 function isMessageInput(target: EventTarget | null): target is HTMLInputElement {
   return target instanceof HTMLInputElement
     && Boolean(target.closest('.messages-page .messages-input-wrap'));
+}
+
+function getActiveMessageInput(): HTMLInputElement | null {
+  return document.querySelector<HTMLInputElement>(
+    '.route-page.is-active .messages-page #message-input',
+  ) ?? document.querySelector<HTMLInputElement>('.messages-page #message-input');
 }
 
 function extensionFromMime(mime: string): string {
@@ -80,16 +100,38 @@ async function imageFromClipboardApi(): Promise<File | null> {
       return normalizeStickerFile(await item.getType(imageType));
     }
   } catch {
-    // Clipboard read can be denied by the browser. The normal paste payload remains
-    // the primary path and does not require an extra permission prompt.
+    // Clipboard read can be denied by the browser. The native input connection and
+    // normal paste payload remain available without an extra permission prompt.
   }
 
   return null;
 }
 
+function fileFromNativePayload(payload: NativeStickerPayload): File | null {
+  const mimeType = payload.mimeType?.startsWith('image/')
+    ? payload.mimeType
+    : 'image/png';
+
+  try {
+    const binary = window.atob(payload.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    const fallbackName = `keyboard-sticker-${Date.now()}.${extensionFromMime(mimeType)}`;
+    return new File(
+      [bytes],
+      payload.fileName?.trim() || fallbackName,
+      { type: mimeType, lastModified: Date.now() },
+    );
+  } catch {
+    return null;
+  }
+}
+
 function isDuplicateSticker(file: File): boolean {
-  // Android can dispatch both beforeinput and paste for the same keyboard sticker.
-  // Normalization creates a new lastModified value, so dedupe on stable payload data.
+  // Android can dispatch commitContent, beforeinput and paste for the same sticker.
   const signature = `${file.type}:${file.size}`;
   const now = Date.now();
   const duplicate = signature === lastStickerSignature
@@ -104,7 +146,7 @@ function restoreDraftWhenMounted(): void {
   const draft = sessionStorage.getItem(MESSAGE_DRAFT_KEY);
   if (draft === null) return;
 
-  const input = document.querySelector<HTMLInputElement>('.messages-page #message-input');
+  const input = getActiveMessageInput();
   if (!input) return;
 
   input.value = draft;
@@ -140,8 +182,8 @@ async function sendSticker(file: File, input: HTMLInputElement): Promise<void> {
     invalidateQueries('messages:list:');
     invalidateRoutes('/app/messages');
 
-    // Rebuild the active cached route immediately. This keeps the existing Messages
-    // state model authoritative and avoids a second ad-hoc optimistic DOM renderer.
+    // Rebuild the active cached route immediately. This keeps Messages as the single
+    // source of truth and avoids a second optimistic renderer just for stickers.
     navigate('/app/messages');
     window.setTimeout(restoreDraftWhenMounted, 120);
   } catch {
@@ -151,6 +193,32 @@ async function sendSticker(file: File, input: HTMLInputElement): Promise<void> {
     sendingSticker = false;
     form.classList.remove('is-sending-sticker');
   }
+}
+
+function receiveNativeSticker(payload: NativeStickerPayload): void {
+  const input = getActiveMessageInput();
+  if (!input) {
+    showToast('Mở Tin nhắn rồi chọn lại sticker nhé', 'info');
+    return;
+  }
+
+  const file = fileFromNativePayload(payload);
+  if (!file) {
+    showToast('Không đọc được sticker từ bàn phím', 'error');
+    return;
+  }
+
+  void sendSticker(file, input);
+}
+
+function installNativeStickerBridge(): void {
+  window.onNativeStickerReceived = receiveNativeSticker;
+  window.onNativeStickerError = (message: string) => {
+    showToast(message || 'Không đọc được sticker từ bàn phím', 'error');
+  };
+
+  const pending = window.__pendingNativeStickers?.splice(0) ?? [];
+  pending.forEach(receiveNativeSticker);
 }
 
 function enhanceStickerImage(image: HTMLImageElement): void {
@@ -185,7 +253,7 @@ async function syncStickerOwnership(): Promise<void> {
       if (isOwn !== undefined) element.classList.toggle('own', isOwn);
     });
   } catch {
-    // Sticker sizing does not depend on ownership; alignment can wait for the next sync.
+    // Sticker sizing does not depend on ownership; alignment can wait for next sync.
   }
 }
 
@@ -232,8 +300,8 @@ function onInput(event: Event): void {
   if (!isMessageInput(event.target)) return;
   const input = event.target;
 
-  // Some Android keyboards insert an object-replacement character and keep the
-  // actual image in the clipboard rather than exposing it on the paste event.
+  // Some keyboards insert an object-replacement character and leave the actual
+  // image in the clipboard rather than exposing it on the paste event.
   if (!input.value.includes('\uFFFC')) return;
   input.value = input.value.replace(/\uFFFC/g, '');
 
@@ -246,6 +314,7 @@ export function initMessageStickerInput(): void {
   if (initialized) return;
   initialized = true;
 
+  installNativeStickerBridge();
   document.addEventListener('paste', onPaste, true);
   document.addEventListener('beforeinput', onBeforeInput, true);
   document.addEventListener('input', onInput, true);
