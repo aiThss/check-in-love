@@ -12,6 +12,7 @@ import checkinsRoutes from './routes/checkins';
 import healthRoutes from './routes/health';
 import meRoutes from './routes/me';
 import messagesRoutes from './routes/messages';
+import messageStickerRoutes from './routes/message-stickers';
 import pushRoutes from './routes/push';
 import randomRoutes from './routes/random';
 
@@ -94,6 +95,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(meRoutes, { prefix: '/api' });
   await app.register(checkinsRoutes, { prefix: '/api' });
   await app.register(messagesRoutes, { prefix: '/api' });
+  await app.register(messageStickerRoutes, { prefix: '/api' });
   await app.register(randomRoutes, { prefix: '/api' });
   await app.register(pushRoutes, { prefix: '/api' });
   await app.register(adminRoutes, { prefix: '/api' });
