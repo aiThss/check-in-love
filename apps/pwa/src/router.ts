@@ -1,4 +1,5 @@
 import { createNav, setActiveNav } from './components/nav';
+import { consumeRouteInvalidation, clearRouteInvalidations } from './route-invalidation';
 import { store } from './store/index';
 import { logger } from './utils/logger';
 
@@ -17,12 +18,16 @@ interface CachedPage {
   container: HTMLElement;
   scrollX: number;
   scrollY: number;
+  cachedAt: number;
 }
 
 interface AppShell {
   pageHost: HTMLElement;
   navHost: HTMLElement;
 }
+
+const AUTO_REVALIDATE_ROUTES = new Set(['/app/home', '/app/memories']);
+const AUTO_REVALIDATE_AFTER_MS = 15_000;
 
 let routes: Routes = {};
 let currentPath = '';
@@ -60,6 +65,7 @@ export function clearPageCache(): void {
     cached.container.remove();
   }
   pageCache.clear();
+  clearRouteInvalidations();
   if (currentPath.startsWith('/app/')) {
     currentElement = null;
     currentPage = null;
@@ -170,6 +176,22 @@ function setOnlyActivePage(host: HTMLElement, activeContainer: HTMLElement): voi
   });
 }
 
+function shouldRevalidateCachedRoute(path: string, cached: CachedPage): boolean {
+  if (consumeRouteInvalidation(path)) return true;
+  return AUTO_REVALIDATE_ROUTES.has(path) && Date.now() - cached.cachedAt >= AUTO_REVALIDATE_AFTER_MS;
+}
+
+function evictCachedRoute(path: string, cached: CachedPage): void {
+  cached.page.destroy?.();
+  cached.container.remove();
+  pageCache.delete(path);
+
+  if (currentPage === cached.page) {
+    currentPage = null;
+    currentElement = null;
+  }
+}
+
 async function renderRoute(path: string): Promise<void> {
   const activeShell = ensureShell();
   if (!activeShell) return;
@@ -194,15 +216,25 @@ async function renderRoute(path: string): Promise<void> {
   try {
     let nextPage: RoutePage;
     let nextContainer: HTMLElement;
-    let restoredScroll: CachedPage | undefined;
+    let restoredScroll: Pick<CachedPage, 'scrollX' | 'scrollY'> | undefined;
+    let cachedPage: CachedPage | undefined;
 
     if (isAppRoute) {
-      restoredScroll = pageCache.get(resolvedPath);
+      cachedPage = pageCache.get(resolvedPath);
+      if (cachedPage && shouldRevalidateCachedRoute(resolvedPath, cachedPage)) {
+        restoredScroll = { scrollX: cachedPage.scrollX, scrollY: cachedPage.scrollY };
+        evictCachedRoute(resolvedPath, cachedPage);
+        cachedPage = undefined;
+      } else if (!cachedPage) {
+        // Consume an invalidation created before the page was mounted.
+        consumeRouteInvalidation(resolvedPath);
+      }
     }
 
-    if (restoredScroll) {
-      nextPage = restoredScroll.page;
-      nextContainer = restoredScroll.container;
+    if (cachedPage) {
+      nextPage = cachedPage.page;
+      nextContainer = cachedPage.container;
+      restoredScroll = cachedPage;
     } else {
       nextPage = normalizeRoutePage(await factory());
       if (version !== navigationVersion) return;
@@ -210,7 +242,13 @@ async function renderRoute(path: string): Promise<void> {
       nextContainer = createPageContainer(resolvedPath, nextPage);
 
       if (isAppRoute) {
-        pageCache.set(resolvedPath, { page: nextPage, container: nextContainer, scrollX: 0, scrollY: 0 });
+        pageCache.set(resolvedPath, {
+          page: nextPage,
+          container: nextContainer,
+          scrollX: restoredScroll?.scrollX ?? 0,
+          scrollY: restoredScroll?.scrollY ?? 0,
+          cachedAt: Date.now(),
+        });
       }
     }
 
@@ -230,7 +268,7 @@ async function renderRoute(path: string): Promise<void> {
     if (isAppRoute) setActiveNav(resolvedPath);
     if (!nextContainer.isConnected) activeShell.pageHost.appendChild(nextContainer);
     setOnlyActivePage(activeShell.pageHost, nextContainer);
-    if (!restoredScroll) nextPage.element.classList.add('page-enter');
+    if (!cachedPage) nextPage.element.classList.add('page-enter');
 
     currentPath = resolvedPath;
     currentElement = nextContainer;
