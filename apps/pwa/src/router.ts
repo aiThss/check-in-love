@@ -2,11 +2,18 @@ import { createNav, setActiveNav } from './components/nav';
 import { store } from './store/index';
 import { logger } from './utils/logger';
 
-type RouteFactory = () => HTMLElement | Promise<HTMLElement>;
+export interface RoutePage {
+  element: HTMLElement;
+  activate?: () => void;
+  deactivate?: () => void;
+  destroy?: () => void;
+}
+
+type RouteFactory = () => HTMLElement | RoutePage | Promise<HTMLElement | RoutePage>;
 type Routes = Record<string, RouteFactory>;
 
 interface CachedPage {
-  element: HTMLElement;
+  page: RoutePage;
   scrollX: number;
   scrollY: number;
 }
@@ -19,6 +26,7 @@ interface AppShell {
 let routes: Routes = {};
 let currentPath = '';
 let currentElement: HTMLElement | null = null;
+let currentPage: RoutePage | null = null;
 let shell: AppShell | null = null;
 let navigationVersion = 0;
 const pageCache = new Map<string, CachedPage>();
@@ -47,11 +55,13 @@ export function navigate(path: string, replace = false): void {
 /** Removes authenticated DOM and its in-memory UI state. */
 export function clearPageCache(): void {
   for (const cached of pageCache.values()) {
-    cached.element.remove();
+    cached.page.destroy?.();
+    cached.page.element.remove();
   }
   pageCache.clear();
   if (currentPath.startsWith('/app/')) {
     currentElement = null;
+    currentPage = null;
   }
 }
 
@@ -158,7 +168,7 @@ async function renderRoute(path: string): Promise<void> {
   saveCurrentScroll();
 
   try {
-    let nextElement: HTMLElement;
+    let nextPage: RoutePage;
     let restoredScroll: CachedPage | undefined;
 
     if (isAppRoute) {
@@ -166,13 +176,13 @@ async function renderRoute(path: string): Promise<void> {
     }
 
     if (restoredScroll) {
-      nextElement = restoredScroll.element;
+      nextPage = restoredScroll.page;
     } else {
-      nextElement = await factory();
+      nextPage = normalizeRoutePage(await factory());
       if (version !== navigationVersion) return;
 
       if (isAppRoute) {
-        pageCache.set(resolvedPath, { element: nextElement, scrollX: 0, scrollY: 0 });
+        pageCache.set(resolvedPath, { page: nextPage, scrollX: 0, scrollY: 0 });
       }
     }
 
@@ -186,16 +196,19 @@ async function renderRoute(path: string): Promise<void> {
       clearPageCache();
       activeShell.pageHost.replaceChildren();
     }
-    if (currentElement && currentElement !== nextElement) currentElement.hidden = true;
+    if (currentPage && currentPage !== nextPage) currentPage.deactivate?.();
+    if (currentElement && currentElement !== nextPage.element) currentElement.hidden = true;
 
     activeShell.navHost.hidden = !isAppRoute;
     if (isAppRoute) setActiveNav(resolvedPath);
-    nextElement.hidden = false;
-    if (!nextElement.isConnected) activeShell.pageHost.appendChild(nextElement);
-    if (!restoredScroll) nextElement.classList.add('page-enter');
+    nextPage.element.hidden = false;
+    if (!nextPage.element.isConnected) activeShell.pageHost.appendChild(nextPage.element);
+    if (!restoredScroll) nextPage.element.classList.add('page-enter');
 
     currentPath = resolvedPath;
-    currentElement = nextElement;
+    currentElement = nextPage.element;
+    currentPage = nextPage;
+    nextPage.activate?.();
 
     requestAnimationFrame(() => {
       if (version !== navigationVersion) return;
@@ -212,6 +225,10 @@ async function renderRoute(path: string): Promise<void> {
   }
 }
 
+function normalizeRoutePage(result: HTMLElement | RoutePage): RoutePage {
+  return result instanceof HTMLElement ? { element: result } : result;
+}
+
 function renderMessage(host: HTMLElement, title: string, description: string): void {
   clearPageCache();
   const page = document.createElement('div');
@@ -223,4 +240,5 @@ function renderMessage(host: HTMLElement, title: string, description: string): v
   page.append(heading, copy);
   host.replaceChildren(page);
   currentElement = page;
+  currentPage = { element: page };
 }

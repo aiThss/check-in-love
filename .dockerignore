@@ -25,3 +25,5 @@ Thumbs.db
 tmp/
 temp/
 .cache/
+apps/pwa/src/styles/components.css.bak
+apps/pwa/src/styles/components.css.old

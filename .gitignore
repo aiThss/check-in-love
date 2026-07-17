@@ -15,6 +15,8 @@ out/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 
 # Uploads (user content – store in volume, not repo)
 uploads/
@@ -65,6 +67,10 @@ pubspec.lock
 .cache/
 tmp/
 temp/
+
+# Local style backups (keep outside version control)
+apps/pwa/src/styles/components.css.bak
+apps/pwa/src/styles/components.css.old
 
 # Firebase local config
 google-services.json

@@ -144,8 +144,11 @@ const prefetchCommonRoutes = () => {
 const idleWindow = window as Window & {
   requestIdleCallback?: (callback: () => void) => number;
 };
-if (typeof idleWindow.requestIdleCallback === 'function') {
-  idleWindow.requestIdleCallback(prefetchCommonRoutes);
-} else {
-  globalThis.setTimeout(prefetchCommonRoutes, 700);
+const connection = navigator as Navigator & { connection?: { saveData?: boolean } };
+if (!connection.connection?.saveData) {
+  if (typeof idleWindow.requestIdleCallback === 'function') {
+    idleWindow.requestIdleCallback(prefetchCommonRoutes);
+  } else {
+    globalThis.setTimeout(prefetchCommonRoutes, 700);
+  }
 }

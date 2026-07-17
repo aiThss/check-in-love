@@ -6,6 +6,7 @@ export interface QueryOptions {
 interface QueryEntry<T> {
   data?: T;
   updatedAt: number;
+  version: number;
   request?: Promise<T>;
 }
 
@@ -26,11 +27,16 @@ export async function fetchQuery<T>(
   if (!force && isFresh) return existing.data as T;
   if (existing?.request) return existing.request;
 
-  const entry: QueryEntry<T> = existing ?? { updatedAt: 0 };
+  const entry: QueryEntry<T> = existing ?? { updatedAt: 0, version: 0 };
+  const requestVersion = entry.version;
   const request = loader()
     .then((data) => {
-      entry.data = data;
-      entry.updatedAt = Date.now();
+      // An invalidation can start a newer request while this one is in flight.
+      // Never let this older response replace the newer cached value.
+      if (entry.version === requestVersion) {
+        entry.data = data;
+        entry.updatedAt = Date.now();
+      }
       return data;
     })
     .catch((error: unknown) => {
@@ -39,7 +45,7 @@ export async function fetchQuery<T>(
       throw error;
     })
     .finally(() => {
-      entry.request = undefined;
+      if (entry.request === request) entry.request = undefined;
     });
 
   entry.request = request;
@@ -49,7 +55,11 @@ export async function fetchQuery<T>(
 
 export function invalidateQueries(prefix: string): void {
   for (const [key, entry] of queries) {
-    if (key.startsWith(prefix)) entry.updatedAt = 0;
+    if (key.startsWith(prefix)) {
+      entry.updatedAt = 0;
+      entry.version++;
+      entry.request = undefined;
+    }
   }
 }
 
@@ -64,12 +74,12 @@ export function updateCachedQuery<T>(
   if (next === undefined) {
     queries.delete(key);
   } else {
-    queries.set(key, { ...entry, data: next, updatedAt: Date.now() });
+    queries.set(key, { ...entry, version: entry?.version ?? 0, data: next, updatedAt: Date.now() });
   }
 
   return () => {
     if (previous === undefined) queries.delete(key);
-    else queries.set(key, { ...entry, data: previous, updatedAt: Date.now() });
+    else queries.set(key, { ...entry, version: entry?.version ?? 0, data: previous, updatedAt: Date.now() });
   };
 }
 
