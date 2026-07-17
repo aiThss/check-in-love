@@ -4011,6 +4011,43 @@ textarea:focus-visible,
   font-size: 12px;
 }
 
+.message-referenced-checkin {
+  display: flex;
+  width: 100%;
+  min-height: 52px;
+  margin: 0 0 8px;
+  padding: 6px;
+  gap: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 78%, var(--primary) 22%);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.message-referenced-checkin img {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.message-referenced-checkin span {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 2px;
+}
+
+.message-referenced-checkin small {
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .message-highlight .chat-text-bubble,
 .message-highlight .chat-bubble {
   animation: messageHighlight 1.5s ease;

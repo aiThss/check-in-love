@@ -67,6 +67,44 @@ export interface CheckIn {
   updatedAt: string;
 }
 
+export type ChatMessageType = 'text' | 'image';
+
+export interface ChatMessageReplyReference {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  type: ChatMessageType;
+  textSnippet?: string;
+  mediaUrl?: string;
+}
+
+export interface ReferencedCheckin {
+  checkinId: string;
+  ownerId: string;
+  ownerName: string;
+  type: CheckInType;
+  caption?: string;
+  mood?: MoodType;
+  imageUrl?: string;
+  createdAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  coupleId: string;
+  senderId: string;
+  senderName: string;
+  type: ChatMessageType;
+  text?: string;
+  imageUrl?: string;
+  replyTo?: ChatMessageReplyReference;
+  referencedCheckin?: ReferencedCheckin;
+  clientMutationId?: string;
+  isOwn: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;

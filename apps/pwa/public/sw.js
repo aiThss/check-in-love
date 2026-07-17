@@ -193,7 +193,7 @@ self.addEventListener('push', (event) => {
 
   // Normalize fields between legacy and new structure
   const actionType = data.actionType || data.kind || 'reminder';
-  const targetUrl = data.targetUrl || data.url || '/app/home';
+  let targetUrl = data.targetUrl || data.url || '/app/home';
   const senderName = data.senderName || 'Người ấy';
   const senderAvatar = data.senderAvatar || data.icon || '/icons/icon-512.png';
 
@@ -209,6 +209,10 @@ self.addEventListener('push', (event) => {
   } else if (actionType === 'checkin') {
     displayTitle = `${senderName} đã gửi check-in mới! 💕`;
     displayBody = displayBody || 'Mở app xem ngay nhé!';
+  } else if (actionType === 'message') {
+    displayTitle = `${senderName} đã nhắn cho bạn`;
+    displayBody = displayBody || 'Mở app để xem tin nhắn mới';
+    targetUrl = '/app/messages';
   }
 
   const options = {

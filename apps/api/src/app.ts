@@ -11,6 +11,7 @@ import authRoutes from './routes/auth';
 import checkinsRoutes from './routes/checkins';
 import healthRoutes from './routes/health';
 import meRoutes from './routes/me';
+import messagesRoutes from './routes/messages';
 import pushRoutes from './routes/push';
 import randomRoutes from './routes/random';
 
@@ -90,6 +91,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authRoutes, { prefix: '/api' });
   await app.register(meRoutes, { prefix: '/api' });
   await app.register(checkinsRoutes, { prefix: '/api' });
+  await app.register(messagesRoutes, { prefix: '/api' });
   await app.register(randomRoutes, { prefix: '/api' });
   await app.register(pushRoutes, { prefix: '/api' });
   await app.register(adminRoutes, { prefix: '/api' });

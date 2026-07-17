@@ -107,11 +107,11 @@ export interface PushPayload {
   badge?: string;
   url?: string;
   tag?: string;
-  kind?: 'checkin' | 'reaction' | 'reply' | 'reminder';
+  kind?: 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message';
   checkinId?: string;
   senderName?: string;
   senderAvatar?: string;
-  actionType?: 'checkin' | 'reaction' | 'reply' | 'reminder';
+  actionType?: 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message';
   targetUrl?: string;
   photoUrl?: string;
 }

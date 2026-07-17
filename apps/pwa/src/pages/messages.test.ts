@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CheckIn } from '../api/types';
+import type { ChatMessage } from '../api/types';
 
 const mocks = vi.hoisted(() => ({
-  getCheckins: vi.fn(),
-  createCheckin: vi.fn(),
+  getMessages: vi.fn(),
+  createMessage: vi.fn(),
+  getMessageContext: vi.fn(),
   showToast: vi.fn(),
+  navigate: vi.fn(),
 }));
 
-vi.mock('../api/checkins', () => ({
-  getCheckins: mocks.getCheckins,
-  createCheckin: mocks.createCheckin,
+vi.mock('../api/messages', () => ({
+  getMessages: mocks.getMessages,
+  createMessage: mocks.createMessage,
+  getMessageContext: mocks.getMessageContext,
 }));
 vi.mock('../components/camera', () => ({
   openCamera: vi.fn(),
@@ -18,6 +21,7 @@ vi.mock('../components/camera', () => ({
   revokePreviewUrl: vi.fn(),
 }));
 vi.mock('../components/toast', () => ({ showToast: mocks.showToast }));
+vi.mock('../router', () => ({ navigate: mocks.navigate }));
 vi.mock('../store/index', () => ({
   store: {
     get: () => ({
@@ -32,24 +36,22 @@ const flush = async () => {
   await Promise.resolve();
 };
 
-function checkin(id: string, own = false, caption = id): CheckIn {
+function message(id: string, own = false, text = id): ChatMessage {
   return {
     id,
-    userId: own ? 'me' : 'partner',
+    senderId: own ? 'me' : 'partner',
     coupleId: 'couple',
     type: 'text',
-    caption,
-    reactions: [],
-    replies: [],
-    ownerName: own ? 'Me' : 'Partner',
+    text,
+    senderName: own ? 'Me' : 'Partner',
     isOwn: own,
     createdAt: `2026-07-17T10:0${id.length}:00.000Z`,
     updatedAt: `2026-07-17T10:0${id.length}:00.000Z`,
   };
 }
 
-function response(data: CheckIn[], hasMore = false) {
-  return { data, total: data.length, page: 1, limit: 50, hasMore };
+function response(data: ChatMessage[], hasMore = false) {
+  return { data, hasMore, beforeCursor: data[0]?.id ?? null, afterCursor: data.at(-1)?.id ?? null };
 }
 
 function pointer(type: string, x: number, y: number, id = 1): Event {
@@ -78,15 +80,17 @@ describe('Messages scroll and reply behavior', () => {
       value: (callback: FrameRequestCallback) => { callback(0); return 1; },
     });
     Object.defineProperty(window, 'cancelAnimationFrame', { configurable: true, value: vi.fn() });
-    mocks.getCheckins.mockReset();
-    mocks.createCheckin.mockReset();
+    mocks.getMessages.mockReset();
+    mocks.createMessage.mockReset();
+    mocks.getMessageContext.mockReset();
     mocks.showToast.mockReset();
+    mocks.navigate.mockReset();
   });
 
   afterEach(() => vi.useRealTimers());
 
-  async function mount(data: CheckIn[], hasMore = false) {
-    mocks.getCheckins.mockResolvedValue(response(data, hasMore));
+  async function mount(data: ChatMessage[], hasMore = false) {
+    mocks.getMessages.mockResolvedValue(response(data, hasMore));
     const { renderMessagesPage } = await import('./messages');
     const routePage = renderMessagesPage();
     document.body.appendChild(routePage.element);
@@ -104,15 +108,15 @@ describe('Messages scroll and reply behavior', () => {
   }
 
   it('opens at the bottom once, keeps existing bubble identity, and does not pull a reader down for incoming messages', async () => {
-    const first = checkin('first');
+    const first = message('first');
     const routePage = await mount([first]);
     const thread = routePage.element.querySelector<HTMLElement>('.messages-thread')!;
     const original = thread.querySelector<HTMLElement>('[data-message-id="first"]')!;
     setScrollMetrics(thread, 0);
     thread.dispatchEvent(new Event('scroll'));
 
-    const incoming = checkin('incoming');
-    mocks.getCheckins.mockResolvedValue(response([first, incoming]));
+    const incoming = message('incoming');
+    mocks.getMessages.mockResolvedValue(response([first, incoming]));
     await vi.advanceTimersByTimeAsync(10_000);
 
     expect(thread.querySelector('[data-message-id="first"]')).toBe(original);
@@ -127,12 +131,12 @@ describe('Messages scroll and reply behavior', () => {
   });
 
   it('follows incoming messages only while pinned near the bottom and retains inner scroll through route activation', async () => {
-    const first = checkin('first');
+    const first = message('first');
     const routePage = await mount([first]);
     const thread = routePage.element.querySelector<HTMLElement>('.messages-thread')!;
     setScrollMetrics(thread, 760);
     thread.dispatchEvent(new Event('scroll'));
-    mocks.getCheckins.mockResolvedValue(response([first, checkin('incoming')]));
+    mocks.getMessages.mockResolvedValue(response([first, message('incoming')]));
 
     await vi.advanceTimersByTimeAsync(10_000);
     expect(thread.scrollTop).toBe(1000);
@@ -145,9 +149,9 @@ describe('Messages scroll and reply behavior', () => {
   });
 
   it('prepends older messages without moving the reader away from the visible anchor', async () => {
-    const newest = checkin('newest');
-    mocks.getCheckins.mockResolvedValueOnce(response([newest], true))
-      .mockResolvedValueOnce(response([checkin('older')], false));
+    const newest = message('newest');
+    mocks.getMessages.mockResolvedValueOnce(response([newest], true))
+      .mockResolvedValueOnce(response([message('older')], false));
     const { renderMessagesPage } = await import('./messages');
     const routePage = renderMessagesPage();
     document.body.appendChild(routePage.element);
@@ -171,7 +175,7 @@ describe('Messages scroll and reply behavior', () => {
   });
 
   it('only activates reply on a horizontal swipe past the threshold and resets the bubble on cancel', async () => {
-    const routePage = await mount([checkin('first')]);
+    const routePage = await mount([message('first')]);
     const bubble = routePage.element.querySelector<HTMLElement>('.chat-text-bubble')!;
 
     bubble.dispatchEvent(pointer('pointerdown', 80, 100));
@@ -193,7 +197,7 @@ describe('Messages scroll and reply behavior', () => {
   });
 
   it('sends replyToMessageId, renders the quoted optimistic bubble, and lets the user cancel a reply', async () => {
-    const original = checkin('original');
+    const original = message('original');
     const routePage = await mount([original]);
     const replyAction = routePage.element.querySelector<HTMLButtonElement>('.message-reply-action')!;
     replyAction.click();
@@ -201,16 +205,16 @@ describe('Messages scroll and reply behavior', () => {
 
     const input = routePage.element.querySelector<HTMLInputElement>('#message-input')!;
     input.value = 'Đúng rồi';
-    const sent = checkin('sent', true, 'Đúng rồi');
+    const sent = message('sent', true, 'Đúng rồi');
     sent.replyTo = {
       messageId: 'original', senderId: 'partner', senderName: 'Partner', type: 'text', textSnippet: 'original',
     };
-    mocks.createCheckin.mockResolvedValue({ checkIn: sent });
+    mocks.createMessage.mockResolvedValue(sent);
     routePage.element.querySelector<HTMLFormElement>('.messages-composer')!
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await flush();
 
-    expect(mocks.createCheckin).toHaveBeenCalledWith(expect.objectContaining({ replyToMessageId: 'original' }));
+    expect(mocks.createMessage).toHaveBeenCalledWith(expect.objectContaining({ replyToMessageId: 'original' }));
     expect(routePage.element.querySelector('[data-message-id="sent"] .message-quote')).not.toBeNull();
     expect(routePage.element.querySelector('.messages-reply-preview')?.hasAttribute('hidden')).toBe(true);
 
@@ -220,8 +224,8 @@ describe('Messages scroll and reply behavior', () => {
   });
 
   it('scrolls to an already loaded quoted original and cleans polling on destroy', async () => {
-    const original = checkin('original');
-    const reply = checkin('reply', true, 'reply');
+    const original = message('original');
+    const reply = message('reply', true, 'reply');
     reply.replyTo = {
       messageId: 'original', senderId: 'partner', senderName: 'Partner', type: 'text', textSnippet: 'original',
     };
@@ -233,6 +237,19 @@ describe('Messages scroll and reply behavior', () => {
 
     routePage.destroy?.();
     await vi.advanceTimersByTimeAsync(20_000);
-    expect(mocks.getCheckins).toHaveBeenCalledTimes(1);
+    expect(mocks.getMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a referenced memory card and opens Memories when it is selected', async () => {
+    const shared = message('shared');
+    shared.referencedCheckin = {
+      checkinId: 'memory-1', ownerId: 'partner', ownerName: 'Partner', type: 'photo', caption: 'Ngày đầu tiên', imageUrl: '/photo.jpg', createdAt: shared.createdAt,
+    };
+    const routePage = await mount([shared]);
+    const card = routePage.element.querySelector<HTMLButtonElement>('.message-referenced-checkin')!;
+    expect(card.textContent).toContain('Kỷ niệm');
+    expect(card.querySelector('img')?.getAttribute('src')).toBe('/photo.jpg');
+    card.click();
+    expect(mocks.navigate).toHaveBeenCalledWith('/app/memories');
   });
 });

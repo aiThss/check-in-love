@@ -1,11 +1,10 @@
-import { createCheckin, getCheckins } from '../api/checkins';
+import { createMessage, getMessageContext, getMessages } from '../api/messages';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
 import { showToast } from '../components/toast';
-import type { CheckIn } from '../api/types';
-import type { RoutePage } from '../router';
+import type { ChatMessage } from '../api/types';
+import { navigate, type RoutePage } from '../router';
 import { store } from '../store/index';
 
-const MESSAGE_START_KEY = 'lovecheck_messages_started_at_v2';
 const NEAR_BOTTOM_DISTANCE = 80;
 const SWIPE_INTENT_DISTANCE = 10;
 const SWIPE_REPLY_THRESHOLD = 56;
@@ -15,7 +14,7 @@ const POLL_INTERVAL = 10_000;
 interface PendingReply {
   messageId: string;
   senderName: string;
-  type: CheckIn['type'];
+  type: ChatMessage['type'];
   textSnippet?: string;
   mediaThumbnailUrl?: string;
 }
@@ -28,7 +27,7 @@ interface ScrollState {
 }
 
 interface MessageView {
-  item: CheckIn;
+  item: ChatMessage;
   element: HTMLElement;
   bubble: HTMLElement;
   content: HTMLParagraphElement;
@@ -49,13 +48,12 @@ function formatTime(value: string): string {
   return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 
-function getLatestActivityTime(item: CheckIn): number {
-  const replyTimes = (item.replies ?? []).map((reply) => new Date(reply.createdAt).getTime());
-  return Math.max(new Date(item.createdAt).getTime(), ...replyTimes);
+function getLatestActivityTime(item: ChatMessage): number {
+  return new Date(item.createdAt).getTime();
 }
 
-function messageText(item: CheckIn): string {
-  return item.caption || (item.type === 'mood' ? 'Đang gửi một cảm xúc' : '');
+function messageText(item: ChatMessage): string {
+  return item.text ?? '';
 }
 
 function isReducedMotion(): boolean {
@@ -126,19 +124,18 @@ export function renderMessagesPage(): RoutePage {
     isLoadingOlder: false,
   };
   const messageViews = new Map<string, MessageView>();
-  const messages = new Map<string, CheckIn>();
-  const messageStartedAt = localStorage.getItem(MESSAGE_START_KEY) ?? new Date().toISOString();
+  const messages = new Map<string, ChatMessage>();
   let selectedPhoto: File | null = null;
   let previewUrl: string | null = null;
   let pendingReply: PendingReply | null = null;
-  let nextPage = 2;
-  let hasMore = false;
+  let beforeCursor: string | null = null;
+  let afterCursor: string | null = null;
+  let hasMoreOlder = false;
   let active = false;
   let pollTimer: number | null = null;
   let scrollFrame: number | null = null;
   let observer: IntersectionObserver | null = null;
 
-  localStorage.setItem(MESSAGE_START_KEY, messageStartedAt);
 
   function ensureSentinel(): void {
     if (!bottomSentinel.isConnected) thread.appendChild(bottomSentinel);
@@ -172,11 +169,11 @@ export function renderMessagesPage(): RoutePage {
     thread.scrollTo({ top, behavior: 'smooth' });
   }
 
-  function replySummary(item: CheckIn): string {
-    return messageText(item) || (item.photoUrl ? 'Ảnh' : 'Tin nhắn');
+  function replySummary(item: ChatMessage): string {
+    return messageText(item) || (item.imageUrl ? 'Ảnh' : 'Tin nhắn');
   }
 
-  function createQuote(item: CheckIn): HTMLButtonElement | null {
+  function createQuote(item: ChatMessage): HTMLButtonElement | null {
     if (!item.replyTo) return null;
     const quote = document.createElement('button');
     quote.type = 'button';
@@ -187,29 +184,42 @@ export function renderMessagesPage(): RoutePage {
     return quote;
   }
 
-  function appendReplyBubbles(view: MessageView): void {
-    const replies = view.item.replies ?? [];
-    replies.forEach((reply, index) => {
-      const key = `${reply.userId}:${reply.createdAt}:${index}`;
-      if (view.replyKeys.has(key)) return;
-      view.replyKeys.add(key);
-      const bubble = document.createElement('article');
-      bubble.className = `chat-reply${reply.isOwn ? ' own' : ''}`;
-      bubble.dataset.messageId = view.item.id;
-      bubble.innerHTML = `<div class="chat-reply-bubble"><p>${escapeHtml(reply.message)}</p></div><time>${formatTime(reply.createdAt)}</time>`;
-      bubble.addEventListener('click', () => bubble.classList.toggle('show-timestamp'));
-      view.element.appendChild(bubble);
+  function createReferencedCheckin(item: ChatMessage): HTMLButtonElement | null {
+    const reference = item.referencedCheckin;
+    if (!reference) return null;
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'message-referenced-checkin';
+    card.setAttribute('aria-label', 'Mở kỷ niệm được tham chiếu');
+    if (reference.imageUrl) {
+      const image = document.createElement('img');
+      image.src = reference.imageUrl;
+      image.alt = '';
+      image.loading = 'lazy';
+      card.appendChild(image);
+    }
+    const copy = document.createElement('span');
+    const label = document.createElement('strong');
+    label.textContent = 'Kỷ niệm';
+    const detail = document.createElement('small');
+    detail.textContent = `${reference.ownerName} · ${reference.caption || reference.mood || 'Khoảnh khắc đã chia sẻ'}`;
+    copy.append(label, detail);
+    card.appendChild(copy);
+    card.addEventListener('click', (event) => {
+      event.stopPropagation();
+      navigate('/app/memories');
     });
+    return card;
   }
 
-  function patchView(view: MessageView, item: CheckIn): void {
+  function patchView(view: MessageView, item: ChatMessage): void {
     view.item = item;
     view.element.dataset.messageId = item.id;
     view.element.classList.toggle('own', item.isOwn);
     view.content.textContent = messageText(item);
     view.content.hidden = !messageText(item);
     const image = view.bubble.querySelector<HTMLImageElement>('img');
-    if (image && item.photoUrl && image.src !== item.photoUrl) image.src = item.photoUrl;
+    if (image && item.imageUrl && image.src !== item.imageUrl) image.src = item.imageUrl;
 
     const nextQuote = createQuote(item);
     if (view.quote && !nextQuote) {
@@ -222,16 +232,15 @@ export function renderMessagesPage(): RoutePage {
       view.quote.replaceChildren(...Array.from(nextQuote.childNodes));
       view.quote.dataset.replyToMessageId = nextQuote.dataset.replyToMessageId;
     }
-    appendReplyBubbles(view);
   }
 
-  function beginReply(item: CheckIn): void {
+  function beginReply(item: ChatMessage): void {
     pendingReply = {
       messageId: item.id,
-      senderName: item.ownerName,
+      senderName: item.senderName,
       type: item.type,
       textSnippet: replySummary(item),
-      mediaThumbnailUrl: item.photoUrl,
+      mediaThumbnailUrl: item.imageUrl,
     };
     replyPreview.hidden = false;
     replyPreview.innerHTML = `
@@ -306,8 +315,8 @@ export function renderMessagesPage(): RoutePage {
     }, true);
   }
 
-  function createView(item: CheckIn): MessageView {
-    const hasPhoto = Boolean(item.photoUrl);
+  function createView(item: ChatMessage): MessageView {
+    const hasPhoto = Boolean(item.imageUrl);
     const element = document.createElement(hasPhoto ? 'section' : 'article');
     element.className = hasPhoto
       ? 'chat-checkin-group'
@@ -323,10 +332,12 @@ export function renderMessagesPage(): RoutePage {
     bubble.className = hasPhoto ? 'chat-bubble has-photo' : 'chat-text-bubble';
     const quote = createQuote(item);
     if (quote) bubble.appendChild(quote);
+    const referencedCheckin = createReferencedCheckin(item);
+    if (referencedCheckin) bubble.appendChild(referencedCheckin);
     if (hasPhoto) {
       const image = document.createElement('img');
-      image.src = item.photoUrl!;
-      image.alt = 'Ảnh check-in';
+      image.src = item.imageUrl!;
+      image.alt = 'Ảnh tin nhắn';
       image.loading = 'lazy';
       image.addEventListener('load', () => {
         // The fixed aspect ratio prevents layout shift; never force-scroll a reader upward in history.
@@ -347,7 +358,7 @@ export function renderMessagesPage(): RoutePage {
     replyAction.type = 'button';
     replyAction.className = 'message-reply-action';
     replyAction.textContent = '↩';
-    replyAction.setAttribute('aria-label', `Trả lời tin nhắn của ${item.ownerName}`);
+    replyAction.setAttribute('aria-label', `Trả lời tin nhắn của ${item.senderName}`);
     primary.appendChild(replyAction);
 
     const view: MessageView = { item, element, bubble, content, quote, replyKeys: new Set() };
@@ -357,11 +368,10 @@ export function renderMessagesPage(): RoutePage {
     });
     primary.addEventListener('click', () => element.classList.toggle('show-timestamp'));
     installSwipeReply(view);
-    appendReplyBubbles(view);
     return view;
   }
 
-  function insertMessage(item: CheckIn, position: 'append' | 'prepend' = 'append'): MessageView {
+  function insertMessage(item: ChatMessage, position: 'append' | 'prepend' = 'append'): MessageView {
     const view = createView(item);
     messageViews.set(item.id, view);
     messages.set(item.id, item);
@@ -371,7 +381,7 @@ export function renderMessagesPage(): RoutePage {
     return view;
   }
 
-  function replaceTemporaryMessage(tempId: string, item: CheckIn): void {
+  function replaceTemporaryMessage(tempId: string, item: ChatMessage): void {
     const view = messageViews.get(tempId);
     if (!view) {
       insertMessage(item);
@@ -384,7 +394,7 @@ export function renderMessagesPage(): RoutePage {
     patchView(view, item);
   }
 
-  function mergeMessages(incoming: CheckIn[], source: 'initial' | 'refresh' | 'older'): number {
+  function mergeMessages(incoming: ChatMessage[], source: 'initial' | 'refresh' | 'older'): number {
     const wasNearBottom = scrollState.isNearBottom;
     let newIncoming = 0;
     const sorted = [...incoming].sort((a, b) => getLatestActivityTime(a) - getLatestActivityTime(b));
@@ -393,6 +403,13 @@ export function renderMessagesPage(): RoutePage {
       if (existing) {
         patchView(existing, item);
         messages.set(item.id, item);
+        return;
+      }
+      const temporary = item.clientMutationId
+        ? [...messageViews.entries()].find(([id, view]) => id.startsWith('optimistic-') && view.item.clientMutationId === item.clientMutationId)
+        : undefined;
+      if (temporary) {
+        replaceTemporaryMessage(temporary[0], item);
         return;
       }
       insertMessage(item, source === 'older' ? 'prepend' : 'append');
@@ -415,7 +432,7 @@ export function renderMessagesPage(): RoutePage {
     thread.replaceChildren(document.createElement('div'));
     thread.firstElementChild?.classList.add('messages-loading', 'skeleton');
     try {
-      const response = await getCheckins(1, 50, messageStartedAt, undefined, { force: true });
+      const response = await getMessages({ limit: 50, force: true });
       if (!active) return;
       thread.replaceChildren();
       ensureSentinel();
@@ -427,8 +444,9 @@ export function renderMessagesPage(): RoutePage {
       } else {
         mergeMessages(response.data, 'initial');
       }
-      hasMore = response.hasMore;
-      nextPage = 2;
+      beforeCursor = response.beforeCursor;
+      afterCursor = response.afterCursor;
+      hasMoreOlder = response.hasMore;
       scrollState.initialized = true;
     } catch {
       thread.replaceChildren();
@@ -442,24 +460,27 @@ export function renderMessagesPage(): RoutePage {
   async function refreshMessages(): Promise<void> {
     if (!scrollState.initialized || !active) return;
     try {
-      const response = await getCheckins(1, 50, messageStartedAt, undefined, { force: true });
-      if (active) mergeMessages(response.data, 'refresh');
+      const response = await getMessages({ limit: 50, after: afterCursor ?? undefined, force: true });
+      if (active) {
+        mergeMessages(response.data, 'refresh');
+        afterCursor = response.afterCursor ?? afterCursor;
+      }
     } catch {
       // Keep the existing conversation visible while a background refresh fails.
     }
   }
 
   async function loadOlderMessages(): Promise<void> {
-    if (!hasMore || scrollState.isLoadingOlder) return;
+    if (!hasMoreOlder || !beforeCursor || scrollState.isLoadingOlder) return;
     scrollState.isLoadingOlder = true;
     const previousHeight = thread.scrollHeight;
     const previousTop = thread.scrollTop;
     try {
-      const response = await getCheckins(nextPage, 50, messageStartedAt, undefined, { force: true });
+      const response = await getMessages({ limit: 50, before: beforeCursor, force: true });
       mergeMessages(response.data, 'older');
       thread.scrollTop = previousTop + (thread.scrollHeight - previousHeight);
-      nextPage++;
-      hasMore = response.hasMore;
+      beforeCursor = response.beforeCursor ?? beforeCursor;
+      hasMoreOlder = response.hasMore;
     } catch {
       showToast('Chưa tải được tin nhắn cũ', 'error');
     } finally {
@@ -502,22 +523,22 @@ export function renderMessagesPage(): RoutePage {
     if (!text && !selectedPhoto) return;
 
     const replyAtSend = pendingReply;
-    const temporaryId = `optimistic-${crypto.randomUUID?.() ?? Date.now()}`;
+    const clientMutationId = crypto.randomUUID?.() ?? String(Date.now());
+    const temporaryId = `optimistic-${clientMutationId}`;
     const now = new Date().toISOString();
     const currentUser = store.get().user;
-    const optimistic: CheckIn = {
+    const optimistic: ChatMessage = {
       id: temporaryId,
-      userId: currentUser?.id ?? '',
+      senderId: currentUser?.id ?? '',
       coupleId: store.get().couple?.id ?? '',
-      type: selectedPhoto ? 'photo' : 'text',
-      photoUrl: selectedPhoto ? previewUrl ?? undefined : undefined,
-      caption: text,
-      reactions: [],
-      replies: [],
-      ownerName: currentUser?.displayName ?? 'Bạn',
+      type: selectedPhoto ? 'image' : 'text',
+      imageUrl: selectedPhoto ? previewUrl ?? undefined : undefined,
+      text,
+      senderName: currentUser?.displayName ?? 'Bạn',
       isOwn: true,
       createdAt: now,
       updatedAt: now,
+      clientMutationId,
       replyTo: replyAtSend ? {
         messageId: replyAtSend.messageId,
         senderId: '',
@@ -535,19 +556,21 @@ export function renderMessagesPage(): RoutePage {
     try {
       if (selectedPhoto) {
         const formData = new FormData();
-        formData.append('type', 'photo');
+        formData.append('type', 'image');
         formData.append('file', selectedPhoto, selectedPhoto.name || 'message-photo.jpg');
-        if (text) formData.append('caption', text);
+        if (text) formData.append('text', text);
         if (replyAtSend) formData.append('replyToMessageId', replyAtSend.messageId);
-        const result = await createCheckin(formData);
-        replaceTemporaryMessage(temporaryId, result.checkIn);
+        formData.append('clientMutationId', clientMutationId);
+        const result = await createMessage(formData);
+        replaceTemporaryMessage(temporaryId, result);
       } else {
-        const result = await createCheckin({
+        const result = await createMessage({
           type: 'text',
-          caption: text,
+          text,
+          clientMutationId,
           ...(replyAtSend ? { replyToMessageId: replyAtSend.messageId } : {}),
         });
-        replaceTemporaryMessage(temporaryId, result.checkIn);
+        replaceTemporaryMessage(temporaryId, result);
       }
       messageInput.value = '';
       clearSelectedPhoto();
@@ -560,10 +583,19 @@ export function renderMessagesPage(): RoutePage {
     }
   }
 
-  function onQuoteClick(event: MouseEvent): void {
+  async function onQuoteClick(event: MouseEvent): Promise<void> {
     const quote = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-reply-to-message-id]');
     if (!quote) return;
-    const target = messageViews.get(quote.dataset.replyToMessageId ?? '');
+    const replyToMessageId = quote.dataset.replyToMessageId ?? '';
+    let target = messageViews.get(replyToMessageId);
+    if (!target) {
+      try {
+        mergeMessages(await getMessageContext(replyToMessageId), 'older');
+        target = messageViews.get(replyToMessageId);
+      } catch {
+        // Preserve the current thread when a deleted or unavailable context cannot load.
+      }
+    }
     if (!target) {
       showToast('Tin nhắn gốc chưa được tải', 'info');
       return;
@@ -573,8 +605,9 @@ export function renderMessagesPage(): RoutePage {
     window.setTimeout(() => target.element.classList.remove('message-highlight'), 1_500);
   }
 
+  const onThreadClick = (event: MouseEvent) => void onQuoteClick(event);
   thread.addEventListener('scroll', handleScroll, { passive: true });
-  thread.addEventListener('click', onQuoteClick);
+  thread.addEventListener('click', onThreadClick);
   indicator.addEventListener('click', () => {
     scrollState.pendingIncomingCount = 0;
     updateIndicator();
@@ -650,7 +683,7 @@ export function renderMessagesPage(): RoutePage {
       if (scrollFrame !== null) window.cancelAnimationFrame(scrollFrame);
       observer?.disconnect();
       thread.removeEventListener('scroll', handleScroll);
-      thread.removeEventListener('click', onQuoteClick);
+      thread.removeEventListener('click', onThreadClick);
       form.removeEventListener('submit', sendMessage);
       clearSelectedPhoto();
     },

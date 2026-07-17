@@ -1,5 +1,6 @@
 import { navigate } from '../router';
-import { getCheckins, addReaction, addReply } from '../api/checkins';
+import { getCheckins, addReaction } from '../api/checkins';
+import { createMessage } from '../api/messages';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { openReactionPicker } from '../components/reaction-picker';
@@ -183,19 +184,31 @@ function buildSocialRow(
     <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
   `;
   const input = form.querySelector<HTMLInputElement>('input');
+  const submitButton = form.querySelector<HTMLButtonElement>('.rm-send-message');
+  let isSending = false;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const message = input?.value.trim() ?? '';
-    if (!message) return;
+    if (!message || isSending) return;
+    isSending = true;
+    if (submitButton) submitButton.disabled = true;
     try {
-      item.replies = await addReply(item.id, message);
+      await createMessage({
+        type: 'text',
+        text: message,
+        referencedCheckinId: item.id,
+        clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
+      });
       if (input) {
         input.value = '';
         input.placeholder = 'Gửi tin nhắn...';
       }
-      showToast('Đã gửi tin nhắn', 'success');
+      showToast('Đã gửi vào Tin nhắn', 'success');
     } catch {
       showToast('Không gửi được tin nhắn', 'error');
+    } finally {
+      isSending = false;
+      if (submitButton) submitButton.disabled = false;
     }
   });
   form.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
@@ -672,15 +685,6 @@ export function renderMemoriesPage(): HTMLElement {
 
   function showCheckinDetail(item: CheckIn) {
     // ── DEBUG: log để trace lỗi trong WebView Android ──────────────────
-    const resolvedPhotoUrl = getCheckinPhotoUrl(item);
-    console.debug('[Detail] id=%s type=%s photoUrl=%s cardUrl=%s imageUrl=%s resolved=%s',
-      item.id,
-      item.type,
-      (item as any).photoUrl ?? '(none)',
-      (item as any).cardUrl   ?? '(none)',
-      (item as any).imageUrl  ?? '(none)',
-      resolvedPhotoUrl        ?? '(none)',
-    );
     // ───────────────────────────────────────────────────────────────────
 
     const detail = document.createElement('div');
@@ -851,22 +855,29 @@ export function renderMemoriesPage(): HTMLElement {
       }
 
       const replyForm = detail.querySelector<HTMLFormElement>('#reply-form');
+      const replySubmit = replyForm?.querySelector<HTMLButtonElement>('button[type="submit"]');
+      let isReplySending = false;
       replyForm?.addEventListener('submit', async (event) => {
         event.preventDefault();
         const input = detail.querySelector<HTMLInputElement>('#reply-input');
         const message = input?.value.trim() ?? '';
-        if (!message) return;
+        if (!message || isReplySending) return;
+        isReplySending = true;
+        if (replySubmit) replySubmit.disabled = true;
 
         try {
-          const replies = await addReply(item.id, message);
-          const matchedItem = allItems.find((candidate) => candidate.id === item.id);
-          if (matchedItem) matchedItem.replies = replies;
-          item.replies = replies;
+          await createMessage({
+            type: 'text',
+            text: message,
+            referencedCheckinId: item.id,
+            clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
+          });
           if (input) input.value = '';
-          renderDetailContent();
-          applySearch();
         } catch {
           showToast('Không gửi được reply', 'error');
+        } finally {
+          isReplySending = false;
+          if (replySubmit) replySubmit.disabled = false;
         }
       });
 
@@ -876,8 +887,6 @@ export function renderMemoriesPage(): HTMLElement {
     };
 
     renderDetailContent();
-    console.log('[LoveCheck] memories detail layout v4 - sync class injection');
-
     showModal({
       title: 'Chi tiết khoảnh khắc',
       content: detail,
