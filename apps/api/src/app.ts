@@ -88,6 +88,8 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // ─── Routes ──────────────────────────────────────────────────────────────────
   await app.register(healthRoutes, { prefix: '/api' });
+  // Keep a root liveness endpoint for container/platform health probes.
+  await app.register(healthRoutes);
   await app.register(authRoutes, { prefix: '/api' });
   await app.register(meRoutes, { prefix: '/api' });
   await app.register(checkinsRoutes, { prefix: '/api' });

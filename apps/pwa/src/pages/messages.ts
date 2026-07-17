@@ -1,4 +1,5 @@
 import { createMessage, getMessageContext, getMessages } from '../api/messages';
+import { createCheckin } from '../api/checkins';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
 import { showToast } from '../components/toast';
 import type { ChatMessage } from '../api/types';
@@ -186,7 +187,7 @@ export function renderMessagesPage(): RoutePage {
 
   function createReferencedCheckin(item: ChatMessage): HTMLButtonElement | null {
     const reference = item.referencedCheckin;
-    if (!reference) return null;
+    if (!reference || (reference.imageUrl && reference.imageUrl === item.imageUrl)) return null;
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'message-referenced-checkin';
@@ -354,18 +355,7 @@ export function renderMessagesPage(): RoutePage {
     time.textContent = formatTime(item.createdAt);
     primary.appendChild(time);
 
-    const replyAction = document.createElement('button');
-    replyAction.type = 'button';
-    replyAction.className = 'message-reply-action';
-    replyAction.textContent = '↩';
-    replyAction.setAttribute('aria-label', `Trả lời tin nhắn của ${item.senderName}`);
-    primary.appendChild(replyAction);
-
     const view: MessageView = { item, element, bubble, content, quote, replyKeys: new Set() };
-    replyAction.addEventListener('click', (event) => {
-      event.stopPropagation();
-      beginReply(view.item);
-    });
     primary.addEventListener('click', () => element.classList.toggle('show-timestamp'));
     installSwipeReply(view);
     return view;
@@ -556,13 +546,13 @@ export function renderMessagesPage(): RoutePage {
     try {
       if (selectedPhoto) {
         const formData = new FormData();
-        formData.append('type', 'image');
-        formData.append('file', selectedPhoto, selectedPhoto.name || 'message-photo.jpg');
-        if (text) formData.append('text', text);
-        if (replyAtSend) formData.append('replyToMessageId', replyAtSend.messageId);
-        formData.append('clientMutationId', clientMutationId);
-        const result = await createMessage(formData);
-        replaceTemporaryMessage(temporaryId, result);
+        formData.append('type', 'photo');
+        formData.append('file', selectedPhoto, selectedPhoto.name || 'checkin-photo.jpg');
+        if (text) formData.append('caption', text);
+        if (replyAtSend) formData.append('chatReplyToMessageId', replyAtSend.messageId);
+        const result = await createCheckin(formData);
+        if (!result.chatMessage) throw new Error('Photo topic was not created');
+        replaceTemporaryMessage(temporaryId, result.chatMessage);
       } else {
         const result = await createMessage({
           type: 'text',

@@ -7,19 +7,26 @@ const mocks = vi.hoisted(() => ({
   findByIdUser: vi.fn(),
   findByIdCouple: vi.fn(),
   updateStreak: vi.fn().mockResolvedValue(1),
+  chatMessageFindOne: vi.fn(),
+  chatMessageCreate: vi.fn(),
+  storageSave: vi.fn(),
+  sharp: vi.fn(),
 }));
 
 vi.mock('../db/models/CheckIn', () => ({
   CheckIn: { findOne: mocks.findOne, create: mocks.create },
 }));
+vi.mock('../db/models/ChatMessage', () => ({
+  ChatMessage: { findOne: mocks.chatMessageFindOne, create: mocks.chatMessageCreate },
+}));
 vi.mock('../db/models/Couple', () => ({ Couple: { findById: mocks.findByIdCouple } }));
 vi.mock('../db/models/User', () => ({ User: { findById: mocks.findByIdUser } }));
 vi.mock('../middleware/auth', () => ({ authenticate: vi.fn() }));
 vi.mock('../services/push', () => ({ sendPushToUser: vi.fn() }));
-vi.mock('../services/storage', () => ({ storageService: { saveFile: vi.fn() } }));
+vi.mock('../services/storage', () => ({ storageService: { saveFile: mocks.storageSave } }));
 vi.mock('../services/streak', () => ({ updateStreak: mocks.updateStreak }));
 vi.mock('../config/env', () => ({ env: { MAX_UPLOAD_MB: 5 } }));
-vi.mock('sharp', () => ({ default: vi.fn() }));
+vi.mock('sharp', () => ({ default: mocks.sharp }));
 
 type Handler = (request: any, reply: any) => Promise<unknown>;
 
@@ -55,9 +62,15 @@ describe('POST /checkins reply target validation', () => {
     mocks.create.mockReset();
     mocks.findByIdUser.mockReset();
     mocks.findByIdCouple.mockReset();
+    mocks.chatMessageFindOne.mockReset();
+    mocks.chatMessageCreate.mockReset();
+    mocks.storageSave.mockReset();
+    mocks.sharp.mockReset();
     mocks.findByIdUser.mockReturnValue({ lean: vi.fn().mockResolvedValue({ displayName: 'Me' }) });
     mocks.findByIdCouple.mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
     mocks.create.mockResolvedValue({ _id: new Types.ObjectId() });
+    mocks.chatMessageFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
+    mocks.chatMessageCreate.mockResolvedValue({ _id: new Types.ObjectId() });
   });
 
   it('persists a server-derived reply snapshot only for a target in the same couple', async () => {
@@ -121,5 +134,40 @@ describe('POST /checkins reply target validation', () => {
 
     expect(mocks.findOne).not.toHaveBeenCalled();
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ replyTo: undefined }));
+  });
+
+  it('creates one ChatMessage topic for every photo check-in without duplicating the uploaded image', async () => {
+    const createdCheckinId = new Types.ObjectId();
+    const createdAt = new Date();
+    mocks.create.mockImplementation(async (data) => ({
+      _id: createdCheckinId,
+      createdAt,
+      ...data,
+    }));
+    mocks.storageSave.mockResolvedValue({ url: '/uploads/photo.jpg', storagePath: 'photo.jpg' });
+    mocks.sharp.mockReturnValue({
+      rotate: () => ({ resize: () => ({ jpeg: () => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('image')) }) }) }),
+    });
+    const handler = await getCreateHandler();
+
+    await handler({
+      user: { id: userId.toString(), coupleId: coupleId.toString() },
+      headers: { 'content-type': 'multipart/form-data; boundary=test' },
+      parts: async function* () {
+        yield { type: 'field', fieldname: 'caption', value: 'Ảnh cho hai đứa' };
+        yield {
+          type: 'file',
+          mimetype: 'image/jpeg',
+          filename: 'photo.jpg',
+          file: (async function* () { yield Buffer.from('image'); })(),
+        };
+      },
+    }, createReply());
+
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'photo', imageUrl: '/uploads/photo.jpg' }));
+    expect(mocks.chatMessageCreate).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'image', imageUrl: '/uploads/photo.jpg', referencedCheckinId: createdCheckinId,
+      referencedCheckin: expect.objectContaining({ checkinId: createdCheckinId }),
+    }));
   });
 });

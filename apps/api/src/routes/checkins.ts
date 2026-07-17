@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import { z } from 'zod';
 import { env } from '../config/env';
 import { CheckIn, ReactionType } from '../db/models/CheckIn';
+import { ChatMessage } from '../db/models/ChatMessage';
 import { Couple } from '../db/models/Couple';
 import { User } from '../db/models/User';
 import { authenticate } from '../middleware/auth';
@@ -206,6 +207,7 @@ export default async function checkinsRoutes(
         mood?: string;
         quickMessage?: string;
         replyToMessageId?: string;
+        chatReplyToMessageId?: string;
       };
 
       if (contentType.includes('multipart/form-data')) {
@@ -221,6 +223,7 @@ export default async function checkinsRoutes(
         let caption: string | undefined;
         let quickMessage: string | undefined;
         let replyToMessageId: string | undefined;
+        let chatReplyToMessageId: string | undefined;
 
         for await (const part of parts) {
           if (part.type === 'file') {
@@ -236,6 +239,8 @@ export default async function checkinsRoutes(
               quickMessage = part.value as string;
             if (part.fieldname === 'replyToMessageId')
               replyToMessageId = String(part.value).trim() || undefined;
+            if (part.fieldname === 'chatReplyToMessageId')
+              chatReplyToMessageId = String(part.value).trim() || undefined;
           }
         }
 
@@ -267,6 +272,7 @@ export default async function checkinsRoutes(
           caption,
           quickMessage,
           replyToMessageId,
+          chatReplyToMessageId,
         };
       } else {
         // Text or mood check-in from JSON body
@@ -312,6 +318,36 @@ export default async function checkinsRoutes(
         };
       }
 
+      let chatReplyTo: {
+        messageId: Types.ObjectId;
+        senderId: Types.ObjectId;
+        senderName: string;
+        type: 'text' | 'image';
+        textSnippet: string;
+        mediaUrl?: string;
+      } | undefined;
+      if (checkInData.chatReplyToMessageId) {
+        if (!Types.ObjectId.isValid(checkInData.chatReplyToMessageId)) {
+          return reply.status(400).send({ error: 'Invalid chat reply message id', code: 'VALIDATION_ERROR' });
+        }
+        const original = await ChatMessage.findOne({
+          _id: new Types.ObjectId(checkInData.chatReplyToMessageId),
+          coupleId: new Types.ObjectId(request.user.coupleId),
+          deletedAt: null,
+        }).lean();
+        if (!original) {
+          return reply.status(404).send({ error: 'Chat reply target not found', code: 'NOT_FOUND' });
+        }
+        chatReplyTo = {
+          messageId: original._id,
+          senderId: original.senderId,
+          senderName: original.senderName,
+          type: original.type,
+          textSnippet: (original.text?.replace(/\s+/g, ' ').trim() || (original.imageUrl ? 'Ảnh' : 'Tin nhắn')).slice(0, 160),
+          mediaUrl: original.imageUrl,
+        };
+      }
+
       const checkIn = await CheckIn.create({
         coupleId: new Types.ObjectId(request.user.coupleId),
         ownerId: new Types.ObjectId(request.user.id),
@@ -323,29 +359,56 @@ export default async function checkinsRoutes(
         replies: [],
       });
 
+      let chatMessage;
+      if (checkIn.type === 'photo' && checkIn.imageUrl) {
+        chatMessage = await ChatMessage.create({
+          coupleId: checkIn.coupleId,
+          senderId: checkIn.ownerId,
+          senderName: checkIn.ownerName,
+          type: 'image',
+          text: checkIn.caption ?? checkIn.quickMessage,
+          imageUrl: checkIn.imageUrl,
+          storagePath: checkIn.storagePath,
+          replyToMessageId: chatReplyTo?.messageId,
+          replyTo: chatReplyTo,
+          referencedCheckinId: checkIn._id,
+          referencedCheckin: {
+            checkinId: checkIn._id,
+            ownerId: checkIn.ownerId,
+            ownerName: checkIn.ownerName,
+            type: checkIn.type,
+            caption: checkIn.caption ?? checkIn.quickMessage,
+            mood: checkIn.mood,
+            imageUrl: checkIn.imageUrl,
+            createdAt: checkIn.createdAt,
+          },
+        });
+      }
+
       // Update streak
       const newStreak = await updateStreak(request.user.coupleId);
 
       // Notify partner
       const couple = await Couple.findById(request.user.coupleId).lean();
+      const photoTopic = checkIn.type === 'photo';
       if (couple) {
         const partnerId = couple.memberIds.find(
           (id) => id.toString() !== request.user.id,
         );
         if (partnerId) {
           sendPushToUser(partnerId.toString(), {
-            title: `${user.displayName} đã check-in! 💕`,
+            title: photoTopic ? `${user.displayName} đã gửi ảnh mới` : `${user.displayName} đã check-in! 💕`,
             body: checkInData.caption ?? checkInData.quickMessage ?? 'Xem ngay nào!',
             icon: user.avatarUrl,
             badge: '/icons/icon-192.png',
-            url: '/app/home',
+            url: photoTopic ? '/app/messages' : '/app/home',
             tag: `checkin-${checkIn._id.toString()}`,
-            kind: 'checkin',
+            kind: photoTopic ? 'message' : 'checkin',
             checkinId: checkIn._id.toString(),
             senderName: user.displayName,
             senderAvatar: user.avatarUrl,
-            actionType: 'checkin',
-            targetUrl: '/app/home',
+            actionType: photoTopic ? 'message' : 'checkin',
+            targetUrl: photoTopic ? '/app/messages' : '/app/home',
             photoUrl: checkInData.imageUrl || '',
           }).catch((err) => {
             app.log.error({ err }, 'Failed to send push notification');
@@ -353,7 +416,7 @@ export default async function checkinsRoutes(
         }
       }
 
-      return reply.status(201).send({ checkIn, streak: newStreak });
+      return reply.status(201).send({ checkIn, chatMessage, streak: newStreak });
     },
   );
 

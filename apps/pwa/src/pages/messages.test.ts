@@ -5,9 +5,12 @@ import type { ChatMessage } from '../api/types';
 const mocks = vi.hoisted(() => ({
   getMessages: vi.fn(),
   createMessage: vi.fn(),
+  createCheckin: vi.fn(),
   getMessageContext: vi.fn(),
   showToast: vi.fn(),
   navigate: vi.fn(),
+  processImage: vi.fn(),
+  revokePreviewUrl: vi.fn(),
 }));
 
 vi.mock('../api/messages', () => ({
@@ -15,10 +18,11 @@ vi.mock('../api/messages', () => ({
   createMessage: mocks.createMessage,
   getMessageContext: mocks.getMessageContext,
 }));
+vi.mock('../api/checkins', () => ({ createCheckin: mocks.createCheckin }));
 vi.mock('../components/camera', () => ({
   openCamera: vi.fn(),
-  processImage: vi.fn(),
-  revokePreviewUrl: vi.fn(),
+  processImage: mocks.processImage,
+  revokePreviewUrl: mocks.revokePreviewUrl,
 }));
 vi.mock('../components/toast', () => ({ showToast: mocks.showToast }));
 vi.mock('../router', () => ({ navigate: mocks.navigate }));
@@ -82,9 +86,12 @@ describe('Messages scroll and reply behavior', () => {
     Object.defineProperty(window, 'cancelAnimationFrame', { configurable: true, value: vi.fn() });
     mocks.getMessages.mockReset();
     mocks.createMessage.mockReset();
+    mocks.createCheckin.mockReset();
     mocks.getMessageContext.mockReset();
     mocks.showToast.mockReset();
     mocks.navigate.mockReset();
+    mocks.processImage.mockReset();
+    mocks.revokePreviewUrl.mockReset();
   });
 
   afterEach(() => vi.useRealTimers());
@@ -199,8 +206,11 @@ describe('Messages scroll and reply behavior', () => {
   it('sends replyToMessageId, renders the quoted optimistic bubble, and lets the user cancel a reply', async () => {
     const original = message('original');
     const routePage = await mount([original]);
-    const replyAction = routePage.element.querySelector<HTMLButtonElement>('.message-reply-action')!;
-    replyAction.click();
+    const bubble = routePage.element.querySelector<HTMLElement>('.chat-text-bubble')!;
+    expect(routePage.element.querySelector('.message-reply-action')).toBeNull();
+    bubble.dispatchEvent(pointer('pointerdown', 80, 100));
+    bubble.dispatchEvent(pointer('pointermove', 145, 102));
+    bubble.dispatchEvent(pointer('pointerup', 145, 102));
     expect(routePage.element.querySelector('.messages-reply-preview')?.textContent).toContain('Partner');
 
     const input = routePage.element.querySelector<HTMLInputElement>('#message-input')!;
@@ -218,7 +228,9 @@ describe('Messages scroll and reply behavior', () => {
     expect(routePage.element.querySelector('[data-message-id="sent"] .message-quote')).not.toBeNull();
     expect(routePage.element.querySelector('.messages-reply-preview')?.hasAttribute('hidden')).toBe(true);
 
-    replyAction.click();
+    bubble.dispatchEvent(pointer('pointerdown', 80, 100));
+    bubble.dispatchEvent(pointer('pointermove', 145, 102));
+    bubble.dispatchEvent(pointer('pointerup', 145, 102));
     routePage.element.querySelector<HTMLButtonElement>('.messages-reply-cancel')?.click();
     expect(routePage.element.querySelector('.messages-reply-preview')?.hasAttribute('hidden')).toBe(true);
   });
@@ -251,5 +263,34 @@ describe('Messages scroll and reply behavior', () => {
     expect(card.querySelector('img')?.getAttribute('src')).toBe('/photo.jpg');
     card.click();
     expect(mocks.navigate).toHaveBeenCalledWith('/app/memories');
+  });
+
+  it('sends a chat photo through CheckIn so the returned topic appears in both domains', async () => {
+    const routePage = await mount([]);
+    const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' });
+    mocks.processImage.mockResolvedValue({ file, preview: 'blob:photo' });
+    const photoInput = routePage.element.querySelector<HTMLInputElement>('#message-photo')!;
+    Object.defineProperty(photoInput, 'files', { configurable: true, value: [file] });
+    photoInput.dispatchEvent(new Event('change'));
+    await flush();
+
+    const sent = {
+      ...message('photo-topic', true, 'Đi chơi nhé'),
+      type: 'image' as const,
+      imageUrl: '/uploads/photo.jpg',
+      referencedCheckin: {
+        checkinId: 'checkin-photo', ownerId: 'me', ownerName: 'Me', type: 'photo' as const, imageUrl: '/uploads/photo.jpg', createdAt: '2026-07-17T10:00:00.000Z',
+      },
+    };
+    mocks.createCheckin.mockResolvedValue({ checkIn: {}, chatMessage: sent });
+    routePage.element.querySelector<HTMLInputElement>('#message-input')!.value = 'Đi chơi nhé';
+    routePage.element.querySelector<HTMLFormElement>('.messages-composer')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flush();
+
+    const payload = mocks.createCheckin.mock.calls[0][0] as FormData;
+    expect(payload.get('type')).toBe('photo');
+    expect(payload.get('caption')).toBe('Đi chơi nhé');
+    expect(routePage.element.querySelector('[data-message-id="photo-topic"] img')?.getAttribute('src')).toBe('/uploads/photo.jpg');
   });
 });

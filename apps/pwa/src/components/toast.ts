@@ -34,10 +34,10 @@ export function showToast(message: string, type: ToastType = 'info'): void {
 
   container.appendChild(toast);
 
-  // Auto remove after 5s
+  // Auto remove after 3s
   const removeTimeout = setTimeout(() => {
     removeToast(toast);
-  }, 5000);
+  }, 3000);
 
   // Allow tap to dismiss
   toast.addEventListener('click', () => {

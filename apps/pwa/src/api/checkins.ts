@@ -6,6 +6,7 @@ import {
   invalidateQueries,
   updateMatchingQueries,
 } from './query-cache';
+import { mapChatMessage, type RawMessage } from './messages';
 import { store } from '../store/index';
 import type {
   CheckIn,
@@ -16,11 +17,13 @@ import type {
   PaginatedResponse,
   Reaction,
   ReactionType,
+  ChatMessage,
 } from './types';
 
 export interface CreateCheckinResult {
   checkIn: CheckIn;
   streak?: number;
+  chatMessage?: ChatMessage;
 }
 
 export interface RawReply {
@@ -210,14 +213,16 @@ export async function getCheckins(
 export async function createCheckin(
   body: FormData | Record<string, unknown>,
 ): Promise<CreateCheckinResult> {
-  const res = await apiFetch<{ checkIn: RawCheckIn; streak?: number }>('/checkins', {
+  const res = await apiFetch<{ checkIn: RawCheckIn; streak?: number; chatMessage?: RawMessage }>('/checkins', {
     method: 'POST',
     body: body instanceof FormData ? body : JSON.stringify(body),
   });
   invalidateQueries('checkins:list:');
+  if (res.chatMessage) invalidateQueries('messages:list:');
   return {
     checkIn: mapCheckin(res.checkIn),
     streak: typeof res.streak === 'number' ? res.streak : undefined,
+    chatMessage: res.chatMessage ? mapChatMessage(res.chatMessage) : undefined,
   };
 }
 
