@@ -7,11 +7,13 @@ import { initRouter, navigate } from './router';
 import { clearPrivateClientState } from './session';
 import { logger } from './utils/logger';
 import { initKeyboardViewport } from './utils/keyboard';
+import { initMessageReplyGesture } from './utils/message-reply-gesture';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 import { showModal } from './components/modal';
 
 store.initTheme();
 initKeyboardViewport();
+initMessageReplyGesture();
 
 void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
 
