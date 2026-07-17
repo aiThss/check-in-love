@@ -1,5 +1,6 @@
 import { apiFetch } from './client';
 import { fetchQuery, invalidateQueries } from './query-cache';
+import { invalidateRoutes } from '../route-invalidation';
 import { store } from '../store/index';
 import type { ChatMessage, ChatMessageReplyReference, ChatMessageType, ReferencedCheckin } from './types';
 
@@ -50,8 +51,12 @@ export async function getMessages(options: { limit?: number; before?: string; af
 }
 
 export async function createMessage(body: FormData | { type: 'text'; text: string; replyToMessageId?: string; referencedCheckinId?: string; clientMutationId: string }): Promise<ChatMessage> {
-  const response = await apiFetch<{ message: RawMessage }>('/messages', { method: 'POST', body: body instanceof FormData ? body : JSON.stringify(body) });
+  const response = await apiFetch<{ message: RawMessage }>('/messages', {
+    method: 'POST',
+    body: body instanceof FormData ? body : JSON.stringify(body),
+  });
   invalidateQueries('messages:list:');
+  invalidateRoutes('/app/messages');
   return mapChatMessage(response.message);
 }
 
