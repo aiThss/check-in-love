@@ -71,10 +71,10 @@ function invokeExistingReplyHandler(bubble: HTMLElement): void {
     bubble.dispatchEvent(createPointerEvent('pointerup', pointerId, 170, 100));
   } finally {
     if (ownSetCapture) Object.defineProperty(bubble, 'setPointerCapture', ownSetCapture);
-    else delete (bubble as HTMLElement & { setPointerCapture?: unknown }).setPointerCapture;
+    else Reflect.deleteProperty(bubble, 'setPointerCapture');
 
     if (ownReleaseCapture) Object.defineProperty(bubble, 'releasePointerCapture', ownReleaseCapture);
-    else delete (bubble as HTMLElement & { releasePointerCapture?: unknown }).releasePointerCapture;
+    else Reflect.deleteProperty(bubble, 'releasePointerCapture');
 
     dispatchingSyntheticReply = false;
   }
