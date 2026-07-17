@@ -114,6 +114,70 @@
   backdrop-filter: blur(12px);
 }
 
+/* Keyboard stickers are message-only transparent media, not square check-in cards. */
+.chat-checkin-group.chat-sticker-message {
+  width: auto;
+  max-width: min(48vw, 188px);
+  align-self: flex-start;
+}
+
+.chat-checkin-group.chat-sticker-message.own {
+  align-self: flex-end;
+}
+
+.chat-sticker-message .chat-checkin {
+  align-items: flex-start;
+}
+
+.chat-sticker-message.own .chat-checkin {
+  align-items: flex-end;
+}
+
+.chat-sticker-message .chat-bubble.has-photo.is-sticker {
+  width: auto;
+  max-width: min(48vw, 188px);
+  aspect-ratio: auto;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.chat-sticker-message .chat-bubble.has-photo.is-sticker > img {
+  width: auto;
+  height: auto;
+  max-width: min(48vw, 188px);
+  max-height: 188px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 14px rgba(71, 35, 50, 0.14));
+}
+
+.chat-sticker-message .chat-bubble.has-photo.is-sticker > p {
+  display: none !important;
+}
+
+.chat-sticker-message .chat-bubble.has-photo.is-sticker::before {
+  top: 50%;
+}
+
+.messages-composer.is-sending-sticker {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.messages-composer.is-sending-sticker .messages-send {
+  animation: stickerSendingPulse 720ms ease-in-out infinite alternate;
+}
+
+@keyframes stickerSendingPulse {
+  from { transform: scale(0.92); }
+  to { transform: scale(1.04); }
+}
+
 /* With the keyboard open the nav is hidden and the composer is lifted by the
  * measured keyboard offset. Keep enough scroll runway beneath the last bubble. */
 :root.keyboard-open .messages-thread {
@@ -124,4 +188,10 @@
 :root.keyboard-open .messages-page.has-message-reply .messages-thread {
   padding-bottom: calc(146px + var(--keyboard-offset));
   scroll-padding-bottom: calc(146px + var(--keyboard-offset));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .messages-composer.is-sending-sticker .messages-send {
+    animation: none;
+  }
 }
