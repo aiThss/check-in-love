@@ -1,6 +1,7 @@
 import './styles/tokens.css';
 import './styles/components.css';
 import './styles/animations.css';
+import './styles/messages-layout-fix.css';
 import { store } from './store/index';
 import { initRouter, navigate } from './router';
 import { clearPrivateClientState } from './session';
