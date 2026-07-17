@@ -12,27 +12,29 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.webkit.JavascriptInterface
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import com.google.firebase.messaging.FirebaseMessaging
 import java.io.File
 import java.io.IOException
 import java.net.URL
@@ -42,12 +44,6 @@ import java.util.Date
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 import org.json.JSONObject
-import android.os.Build
-import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
-import com.google.firebase.messaging.FirebaseMessaging
-import android.app.NotificationChannel
-import android.app.NotificationManager
 
 private class LoveCheckBridge(private val context: Context) {
     @JavascriptInterface
@@ -56,14 +52,20 @@ private class LoveCheckBridge(private val context: Context) {
     }
 
     @JavascriptInterface
-    fun updatePartnerCheckin(partnerName: String, checkinType: String, text: String, imageUrl: String?, timestamp: String?) {
+    fun updatePartnerCheckin(
+        partnerName: String,
+        checkinType: String,
+        text: String,
+        imageUrl: String?,
+        timestamp: String?,
+    ) {
         LoveCheckQuickWidgetProvider.updatePartnerCheckin(
             context,
             partnerName,
             checkinType,
             text,
             imageUrl,
-            timestamp
+            timestamp,
         )
     }
 
@@ -84,7 +86,13 @@ private class LoveCheckBridge(private val context: Context) {
     }
 
     @JavascriptInterface
-    fun openPhotoViewer(photoUrl: String, caption: String, ownerName: String, dateStr: String, fileName: String) {
+    fun openPhotoViewer(
+        photoUrl: String,
+        caption: String,
+        ownerName: String,
+        dateStr: String,
+        fileName: String,
+    ) {
         try {
             val intent = Intent(context, PhotoViewerActivity::class.java).apply {
                 putExtra("photoUrl", photoUrl)
@@ -107,9 +115,6 @@ class MainActivity : ComponentActivity() {
     private var cameraPhotoUri: Uri? = null
     private var cameraPhotoFile: File? = null
     private var webView: WebView? = null
-    // Holds the FCM token that arrived before the WebView page had finished loading.
-    // Injected into JS inside onPageFinished to avoid the race condition where
-    // window.onFcmTokenReceived is not yet registered.
     private var pendingFcmToken: String? = null
     private var webPageLoaded = false
 
@@ -123,7 +128,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val fileChooserLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
+        ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         val callback = fileUploadCallback
         fileUploadCallback = null
@@ -136,7 +141,9 @@ class MainActivity : ComponentActivity() {
 
         val uris = if (result.resultCode == Activity.RESULT_OK) {
             parseFileChooserResult(result.data)
-        } else null
+        } else {
+            null
+        }
 
         callback.onReceiveValue(uris)
         cameraPhotoUri = null
@@ -155,12 +162,11 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task: com.google.android.gms.tasks.Task<String> ->
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val token = task.result
                     val prefs = getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
                     prefs.edit().putString("fcm_token", token).apply()
-                    // Defer injection until page is loaded
                     runOnUiThread { injectFcmToken(token) }
                 }
             }
@@ -168,10 +174,17 @@ class MainActivity : ComponentActivity() {
             e.printStackTrace()
         }
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                101,
+            )
         }
 
         setupDailyReminders(this)
@@ -179,7 +192,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             AndroidView(
                 factory = { context ->
-                    WebView(context).apply {
+                    StickerWebView(context).apply {
                         webView = this
 
                         settings.javaScriptEnabled = true
@@ -191,36 +204,47 @@ class MainActivity : ComponentActivity() {
                         settings.loadsImagesAutomatically = true
                         settings.javaScriptCanOpenWindowsAutomatically = true
                         settings.setSupportZoom(false)
-                        // Dùng LOAD_DEFAULT để tận dụng HTTP cache bình thường
-                        // (trước đây dùng LOAD_NO_CACHE khiến ảnh tải lại mỗi lần mở app)
                         settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                        val versionName = packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
-                        settings.userAgentString = settings.userAgentString + " LoveCheckAndroidWrapper/$versionName"
-                        addJavascriptInterface(LoveCheckBridge(context.applicationContext), "LoveCheckAndroid")
+
+                        val versionName = packageManager
+                            .getPackageInfo(packageName, 0)
+                            .versionName
+                            ?: "unknown"
+                        settings.userAgentString =
+                            settings.userAgentString + " LoveCheckAndroidWrapper/$versionName"
+
+                        addJavascriptInterface(
+                            LoveCheckBridge(context.applicationContext),
+                            "LoveCheckAndroid",
+                        )
 
                         webViewClient = object : WebViewClient() {
                             override fun onPageFinished(view: WebView, url: String) {
                                 super.onPageFinished(view, url)
                                 webPageLoaded = true
 
-                                // Inject chiều cao status bar thực tế vào CSS variable
-                                // để modal có padding-top chính xác trên mọi thiết bị Android
                                 val insets = ViewCompat.getRootWindowInsets(window.decorView)
-                                val statusBarPx = insets?.getInsets(WindowInsetsCompat.Type.statusBars())?.top ?: 0
-                                val navBarPx = insets?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
+                                val statusBarPx = insets
+                                    ?.getInsets(WindowInsetsCompat.Type.statusBars())
+                                    ?.top
+                                    ?: 0
+                                val navBarPx = insets
+                                    ?.getInsets(WindowInsetsCompat.Type.navigationBars())
+                                    ?.bottom
+                                    ?: 0
                                 val density = resources.displayMetrics.density
                                 val statusBarDp = (statusBarPx.toFloat() / density + 0.5f).toInt()
                                 val navBarDp = (navBarPx.toFloat() / density + 0.5f).toInt()
+
                                 view.evaluateJavascript(
                                     """(function(){
                                         var r=document.documentElement.style;
                                         r.setProperty('--android-status-bar','${statusBarDp}px');
                                         r.setProperty('--android-nav-bar','${navBarDp}px');
-                                    })();""",
-                                    null
+                                    })();""".trimIndent(),
+                                    null,
                                 )
 
-                                // Inject any token that arrived before the page was ready
                                 pendingFcmToken?.let { token ->
                                     pendingFcmToken = null
                                     injectFcmToken(token)
@@ -229,7 +253,7 @@ class MainActivity : ComponentActivity() {
 
                             override fun shouldOverrideUrlLoading(
                                 view: WebView,
-                                request: WebResourceRequest
+                                request: WebResourceRequest,
                             ): Boolean {
                                 if (request.url.scheme == RETRY_SCHEME) {
                                     view.loadUrl(APP_URL)
@@ -243,7 +267,7 @@ class MainActivity : ComponentActivity() {
                                 try {
                                     context.startActivity(Intent(Intent.ACTION_VIEW, request.url))
                                 } catch (_: Exception) {
-                                    // Ignore malformed/unhandled external links.
+                                    // Ignore malformed or unsupported external links.
                                 }
                                 return true
                             }
@@ -251,7 +275,7 @@ class MainActivity : ComponentActivity() {
                             override fun onReceivedError(
                                 view: WebView,
                                 request: WebResourceRequest,
-                                error: WebResourceError
+                                error: WebResourceError,
                             ) {
                                 if (request.isForMainFrame) {
                                     view.loadDataWithBaseURL(
@@ -259,7 +283,7 @@ class MainActivity : ComponentActivity() {
                                         buildErrorHtml(),
                                         "text/html",
                                         "UTF-8",
-                                        null
+                                        null,
                                     )
                                 }
                             }
@@ -269,7 +293,7 @@ class MainActivity : ComponentActivity() {
                             override fun onShowFileChooser(
                                 webView: WebView,
                                 filePathCallback: ValueCallback<Array<Uri>>,
-                                fileChooserParams: FileChooserParams
+                                fileChooserParams: FileChooserParams,
                             ): Boolean {
                                 fileUploadCallback?.onReceiveValue(null)
                                 fileUploadCallback = filePathCallback
@@ -288,7 +312,7 @@ class MainActivity : ComponentActivity() {
                         loadUrl(initialUrlFromIntent(intent))
                     }
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         }
 
@@ -315,11 +339,13 @@ class MainActivity : ComponentActivity() {
             (cameraPhotoFile?.length() ?: 0L) > 0L
         ) {
             arrayOf(cameraPhotoUri!!)
-        } else null
+        } else {
+            null
+        }
     }
 
     private fun buildImagePickIntent(): Intent {
-        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Intent(MediaStore.ACTION_PICK_IMAGES).apply {
                 type = "image/*"
             }
@@ -338,7 +364,7 @@ class MainActivity : ComponentActivity() {
             val uri = FileProvider.getUriForFile(
                 context,
                 "${packageName}.fileprovider",
-                photoFile
+                photoFile,
             )
 
             cameraPhotoFile = photoFile
@@ -346,7 +372,10 @@ class MainActivity : ComponentActivity() {
 
             captureIntent.apply {
                 putExtra(MediaStore.EXTRA_OUTPUT, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
             }
         } catch (_: IOException) {
             cameraPhotoFile = null
@@ -357,7 +386,10 @@ class MainActivity : ComponentActivity() {
 
     @Throws(IOException::class)
     private fun createTempImageFile(): File {
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val timeStamp = SimpleDateFormat(
+            "yyyyMMdd_HHmmss",
+            Locale.getDefault(),
+        ).format(Date())
         val imageFileName = "JPEG_${timeStamp}_"
         val storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
         return File.createTempFile(imageFileName, ".jpg", storageDir)
@@ -368,23 +400,20 @@ class MainActivity : ComponentActivity() {
         return if (isAllowedInWebView(data)) data.toString() else APP_URL
     }
 
-    /**
-     * Injects the FCM token into the WebView JS context.
-     * If the page has not finished loading yet, saves the token as [pendingFcmToken]
-     * so it can be injected inside [WebViewClient.onPageFinished].
-     */
     private fun injectFcmToken(token: String) {
         if (!webPageLoaded) {
             pendingFcmToken = token
             return
         }
+
         val escaped = token.replace("'", "\\'")
         webView?.evaluateJavascript(
             "if (typeof window.onFcmTokenReceived === 'function') { window.onFcmTokenReceived('$escaped'); }",
-            null
+            null,
         )
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView?.canGoBack() == true) {
             webView?.goBack()
@@ -416,13 +445,16 @@ class MainActivity : ComponentActivity() {
                     val response = conn.inputStream.bufferedReader().readText()
                     val json = JSONObject(response)
                     val tagName = json.getString("tag_name")
-
-                    val currentVersion = packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+                    val currentVersion = packageManager
+                        .getPackageInfo(packageName, 0)
+                        .versionName
+                        ?: ""
                     val latestVersion = tagName.removePrefix("v")
 
                     if (compareVersions(latestVersion, currentVersion) > 0) {
                         val assets = json.getJSONArray("assets")
                         var apkUrl: String? = null
+
                         for (i in 0 until assets.length()) {
                             val asset = assets.getJSONObject(i)
                             if (asset.getString("name").endsWith(".apk")) {
@@ -454,7 +486,13 @@ class MainActivity : ComponentActivity() {
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
         val txtMessage = dialogView.findViewById<android.widget.TextView>(R.id.dialog_message)
-        txtMessage.text = "Có phiên bản mới (v$version). Bạn có muốn tải xuống và cập nhật ngay không?"
+        val stickerPatchNote = if (compareVersions(version, STICKER_PATCH_VERSION) >= 0) {
+            "\n\nBản vá này bổ sung gửi sticker trực tiếp từ bàn phím và sửa nhận ảnh clipboard."
+        } else {
+            ""
+        }
+        txtMessage.text =
+            "Có phiên bản mới (v$version). Bạn có muốn tải xuống và cập nhật ngay không?$stickerPatchNote"
 
         val btnCancel = dialogView.findViewById<android.widget.Button>(R.id.btn_cancel)
         val btnUpdate = dialogView.findViewById<android.widget.Button>(R.id.btn_update)
@@ -476,7 +514,10 @@ class MainActivity : ComponentActivity() {
             .setTitle("Check IN Love Update")
             .setDescription("Đang tải xuống phiên bản mới...")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "check-in-love-update.apk")
+            .setDestinationInExternalPublicDir(
+                Environment.DIRECTORY_DOWNLOADS,
+                "check-in-love-update.apk",
+            )
 
         val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val downloadId = downloadManager.enqueue(request)
@@ -489,7 +530,8 @@ class MainActivity : ComponentActivity() {
                     if (uri != null) {
                         val installIntent = Intent(Intent.ACTION_VIEW).apply {
                             setDataAndType(uri, "application/vnd.android.package-archive")
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION
                         }
                         context.startActivity(installIntent)
                     }
@@ -498,22 +540,31 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                receiver,
+                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                Context.RECEIVER_EXPORTED,
+            )
         } else {
-            registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+            registerReceiver(
+                receiver,
+                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            )
         }
     }
 
     companion object {
         private const val APP_URL = "https://couple.babyress.games"
         private const val RETRY_SCHEME = "lovecheck"
+        private const val STICKER_PATCH_VERSION = "1.1.10"
+
         private val allowedHosts = setOf(
             "couple.babyress.games",
             "api.couple.babyress.games",
             "localhost",
             "127.0.0.1",
-            "10.0.2.2"
+            "10.0.2.2",
         )
 
         private fun compareVersions(left: String, right: String): Int {
@@ -563,7 +614,8 @@ class MainActivity : ComponentActivity() {
         """.trimIndent()
 
         fun setupDailyReminders(context: Context) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            val alarmManager =
+                context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             val hours = listOf(7, 12, 18, 23)
 
             for (hour in hours) {
@@ -572,7 +624,7 @@ class MainActivity : ComponentActivity() {
                     context,
                     hour,
                     intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
 
                 val calendar = Calendar.getInstance().apply {
@@ -588,7 +640,7 @@ class MainActivity : ComponentActivity() {
                     android.app.AlarmManager.RTC_WAKEUP,
                     calendar.timeInMillis,
                     android.app.AlarmManager.INTERVAL_DAY,
-                    pendingIntent
+                    pendingIntent,
                 )
             }
         }
