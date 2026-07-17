@@ -88,7 +88,9 @@ async function imageFromClipboardApi(): Promise<File | null> {
 }
 
 function isDuplicateSticker(file: File): boolean {
-  const signature = `${file.type}:${file.size}:${file.lastModified}`;
+  // Android can dispatch both beforeinput and paste for the same keyboard sticker.
+  // Normalization creates a new lastModified value, so dedupe on stable payload data.
+  const signature = `${file.type}:${file.size}`;
   const now = Date.now();
   const duplicate = signature === lastStickerSignature
     && now - lastStickerAcceptedAt < DUPLICATE_WINDOW_MS;
@@ -107,6 +109,11 @@ function restoreDraftWhenMounted(): void {
 
   input.value = draft;
   sessionStorage.removeItem(MESSAGE_DRAFT_KEY);
+  try {
+    input.focus({ preventScroll: true });
+  } catch {
+    input.focus();
+  }
 }
 
 async function sendSticker(file: File, input: HTMLInputElement): Promise<void> {
