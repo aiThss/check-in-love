@@ -230,14 +230,15 @@ function onBeforeInput(event: InputEvent): void {
 
 function onInput(event: Event): void {
   if (!isMessageInput(event.target)) return;
+  const input = event.target;
 
   // Some Android keyboards insert an object-replacement character and keep the
   // actual image in the clipboard rather than exposing it on the paste event.
-  if (!event.target.value.includes('\uFFFC')) return;
-  event.target.value = event.target.value.replace(/\uFFFC/g, '');
+  if (!input.value.includes('\uFFFC')) return;
+  input.value = input.value.replace(/\uFFFC/g, '');
 
   void imageFromClipboardApi().then((image) => {
-    if (image) void sendSticker(image, event.target);
+    if (image) void sendSticker(image, input);
   });
 }
 
