@@ -1,0 +1,78 @@
+.messages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.messages-refresh-button {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-solid);
+  box-shadow: var(--shadow);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+}
+
+.messages-refresh-button:active {
+  transform: scale(0.94);
+}
+
+.messages-refresh-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.messages-refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.messages-refresh-button.is-refreshing span {
+  animation: messagesRefreshSpin 700ms linear infinite;
+}
+
+.messages-time-separator {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  justify-content: center;
+  width: 100%;
+  margin: 7px 0 1px;
+  gap: 9px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  text-align: center;
+}
+
+.messages-time-separator::before,
+.messages-time-separator::after {
+  content: '';
+  width: min(18vw, 72px);
+  height: 1px;
+  background: var(--border);
+}
+
+@keyframes messagesRefreshSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .messages-refresh-button,
+  .messages-refresh-button.is-refreshing span {
+    animation: none;
+    transition: none;
+  }
+}
