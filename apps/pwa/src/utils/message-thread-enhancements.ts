@@ -111,10 +111,10 @@ function ensureRefreshButton(page: HTMLElement): void {
 
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'btn-icon messages-refresh-button';
+  button.className = 'messages-refresh-button';
   button.setAttribute('aria-label', 'Tải lại tin nhắn');
   button.title = 'Tải lại tin nhắn';
-  button.innerHTML = '<span aria-hidden="true">🔄</span>';
+  button.innerHTML = '<span aria-hidden="true">↻</span>';
   button.addEventListener('click', () => refreshMessages(page, button));
   header.appendChild(button);
 }
