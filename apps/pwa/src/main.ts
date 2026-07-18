@@ -11,6 +11,7 @@ import { initKeyboardViewport } from './utils/keyboard';
 import { initMessageReplyGesture } from './utils/message-reply-gesture';
 import { initMessageStickerInput } from './utils/message-sticker-input';
 import { initMessageThreadEnhancements } from './utils/message-thread-enhancements';
+import { initProfileCopyright } from './utils/profile-copyright';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 import { showModal } from './components/modal';
 
@@ -19,6 +20,7 @@ initKeyboardViewport();
 initMessageReplyGesture();
 initMessageStickerInput();
 initMessageThreadEnhancements();
+initProfileCopyright();
 
 void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
 
