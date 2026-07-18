@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { env } from '../config/env';
+import { OtpCode } from '../db/models/OtpCode';
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -18,6 +19,23 @@ function getTransporter(): nodemailer.Transporter {
 
 export async function sendOtpEmail(to: string, code: string): Promise<void> {
   const mailer = getTransporter();
+  const otpRecord = await OtpCode.findOne({
+    email: to.toLowerCase(),
+    code,
+    verified: false,
+    expiresAt: { $gt: new Date() },
+  }).sort({ createdAt: -1 });
+
+  const isLogin = otpRecord?.purpose === 'login';
+  const headerLabel = isLogin
+    ? 'Mã xác thực đăng nhập'
+    : 'Mã xác thực đăng ký tài khoản';
+  const actionCopy = isLogin
+    ? 'đăng nhập vào tài khoản'
+    : 'hoàn tất đăng ký tài khoản';
+  const subject = isLogin
+    ? `${code} – Mã đăng nhập Check IN Love`
+    : `${code} – Mã xác thực đăng ký Check IN Love`;
 
   const html = `
 <!DOCTYPE html>
@@ -37,15 +55,18 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
             <td style="padding:40px 40px 24px;text-align:center;background:linear-gradient(135deg,rgba(255,107,157,0.15),rgba(255,168,107,0.08));">
               <div style="font-size:48px;margin-bottom:12px;">💕</div>
               <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.5px;">Check IN Love</h1>
-              <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.5);">Mã xác thực email của bạn</p>
+              <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.5);">${headerLabel}</p>
             </td>
           </tr>
 
           <!-- Body -->
           <tr>
             <td style="padding:32px 40px;">
+              <p style="margin:0 0 8px;font-size:15px;font-weight:600;color:rgba(255,255,255,0.82);line-height:1.6;">
+                Xin chào!
+              </p>
               <p style="margin:0 0 24px;font-size:15px;color:rgba(255,255,255,0.75);line-height:1.6;">
-                Xin chào! Đây là mã xác thực <strong style="color:#ff6b9d;">6 chữ số</strong> để hoàn tất đăng ký tài khoản Check IN Love của bạn:
+                Đây là mã xác thực <strong style="color:#ff6b9d;">6 chữ số</strong> để ${actionCopy} Check IN Love <span style="white-space:nowrap;">của&nbsp;bạn:</span>
               </p>
 
               <!-- OTP Code Box -->
@@ -56,11 +77,20 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
               </div>
 
               <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:16px 20px;margin-bottom:24px;">
-                <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.5);line-height:1.6;">
-                  ⏰ Mã có hiệu lực trong <strong style="color:rgba(255,255,255,0.8);">10 phút</strong><br/>
-                  🔒 Không chia sẻ mã này với bất kỳ ai<br/>
-                  ❌ Nếu bạn không yêu cầu, hãy bỏ qua email này
-                </p>
+                <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:13px;color:rgba(255,255,255,0.5);line-height:1.6;">
+                  <tr>
+                    <td width="26" valign="top" style="padding:0 8px 2px 0;">⏰</td>
+                    <td valign="top" style="padding:0 0 2px;">Mã có hiệu lực trong <strong style="color:rgba(255,255,255,0.8);">10 phút</strong></td>
+                  </tr>
+                  <tr>
+                    <td width="26" valign="top" style="padding:0 8px 2px 0;">🔒</td>
+                    <td valign="top" style="padding:0 0 2px;">Không chia sẻ mã này với bất kỳ ai</td>
+                  </tr>
+                  <tr>
+                    <td width="26" valign="top" style="padding:0 8px 0 0;">❌</td>
+                    <td valign="top">Nếu bạn không yêu cầu, hãy bỏ qua email này</td>
+                  </tr>
+                </table>
               </div>
             </td>
           </tr>
@@ -85,11 +115,15 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
 </html>
   `.trim();
 
+  const textAction = isLogin
+    ? 'đăng nhập vào tài khoản Check IN Love'
+    : 'hoàn tất đăng ký tài khoản Check IN Love';
+
   await mailer.sendMail({
     from: `"Check IN Love 💕" <${env.GMAIL_USER}>`,
     to,
-    subject: `${code} – Mã xác thực Check IN Love của bạn`,
+    subject,
     html,
-    text: `Mã xác thực Check IN Love của bạn: ${code}\n\nMã có hiệu lực trong 10 phút. Không chia sẻ mã này với ai.\n\nNếu bạn không yêu cầu, hãy bỏ qua email này.`,
+    text: `Xin chào!\n\nĐây là mã xác thực 6 chữ số để ${textAction} của bạn: ${code}\n\nMã có hiệu lực trong 10 phút. Không chia sẻ mã này với ai.\n\nNếu bạn không yêu cầu, hãy bỏ qua email này.`,
   });
 }
