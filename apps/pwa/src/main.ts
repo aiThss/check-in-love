@@ -2,6 +2,7 @@ import './styles/tokens.css';
 import './styles/components.css';
 import './styles/animations.css';
 import './styles/messages-layout-fix.css';
+import './styles/message-thread-enhancements.css';
 import { store } from './store/index';
 import { initRouter, navigate } from './router';
 import { clearPrivateClientState } from './session';
@@ -9,6 +10,7 @@ import { logger } from './utils/logger';
 import { initKeyboardViewport } from './utils/keyboard';
 import { initMessageReplyGesture } from './utils/message-reply-gesture';
 import { initMessageStickerInput } from './utils/message-sticker-input';
+import { initMessageThreadEnhancements } from './utils/message-thread-enhancements';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 import { showModal } from './components/modal';
 
@@ -16,6 +18,7 @@ store.initTheme();
 initKeyboardViewport();
 initMessageReplyGesture();
 initMessageStickerInput();
+initMessageThreadEnhancements();
 
 void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
 
