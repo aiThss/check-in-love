@@ -5,11 +5,20 @@ const AUTH_CONTROL_SELECTOR = [
   '.login-page-pwa textarea',
 ].join(',');
 
+const AUTH_STEP_SELECTOR = '.onboarding-step, .auth-shell';
+const AUTH_STEP_ACTION_SELECTOR = [
+  '.onboarding-step .btn-primary',
+  '.onboarding-step .btn-icon',
+  '.login-page-pwa #back-btn',
+  '.login-page-pwa #go-onboarding-btn',
+  '.login-page-pwa .btn-primary',
+].join(',');
+
 /**
  * Maximum distance an authentication screen may be moved upward after an input
  * receives focus. Change this single value to tune the behaviour on device.
  */
-export const AUTH_FOCUS_SCROLL_MAX_PX = 72;
+export const AUTH_FOCUS_SCROLL_MAX_PX = 40;
 
 interface FocusScrollDebug {
   rawPx: number;
@@ -32,7 +41,8 @@ interface ScrollSnapshot {
 
 let initialized = false;
 let snapshot: ScrollSnapshot | null = null;
-let timers: number[] = [];
+let clampTimers: number[] = [];
+let resetTimers: number[] = [];
 
 function isTextControl(target: EventTarget | null): target is HTMLInputElement | HTMLTextAreaElement {
   if (target instanceof HTMLTextAreaElement) return true;
@@ -100,10 +110,30 @@ function clampFocusedScroll(): void {
 }
 
 function scheduleClamp(): void {
-  timers.forEach((timer) => window.clearTimeout(timer));
-  timers = [0, 80, 180, 320, 520].map((delay) =>
+  clampTimers.forEach((timer) => window.clearTimeout(timer));
+  clampTimers = [0, 80, 180, 320, 520].map((delay) =>
     window.setTimeout(clampFocusedScroll, delay),
   );
+}
+
+function resetAuthScroll(): void {
+  snapshot = null;
+  document.querySelectorAll<HTMLElement>('.page-no-nav').forEach((page) => {
+    if (page.querySelector(AUTH_STEP_SELECTOR)) page.scrollTo({ top: 0, behavior: 'auto' });
+  });
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function scheduleStepReset(): void {
+  resetTimers.forEach((timer) => window.clearTimeout(timer));
+  resetTimers = [0, 60, 160, 320, 520].map((delay) =>
+    window.setTimeout(resetAuthScroll, delay),
+  );
+}
+
+function containsAuthStep(node: Node): boolean {
+  if (!(node instanceof Element)) return false;
+  return node.matches(AUTH_STEP_SELECTOR) || Boolean(node.querySelector(AUTH_STEP_SELECTOR));
 }
 
 export function initAuthFocusScroll(): void {
@@ -125,6 +155,19 @@ export function initAuthFocusScroll(): void {
     }
     scheduleClamp();
   }, true);
+
+  // Reset retained scroll after moving to another onboarding/login task.
+  document.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element)) return;
+    if (event.target.closest(AUTH_STEP_ACTION_SELECTOR)) scheduleStepReset();
+  });
+
+  const observer = new MutationObserver((mutations) => {
+    if (mutations.some((mutation) => Array.from(mutation.addedNodes).some(containsAuthStep))) {
+      scheduleStepReset();
+    }
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 
   window.visualViewport?.addEventListener('resize', scheduleClamp);
   window.visualViewport?.addEventListener('scroll', scheduleClamp);
