@@ -3670,6 +3670,19 @@ textarea:focus-visible,
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The detail modal's generic form button styles would otherwise override smile+. */
+.inline-reply-form .react-button {
+  width: 31px;
+  height: 31px;
+  flex: 0 0 31px;
+  padding: 0;
+  border: 1px solid rgba(127, 127, 127, 0.28);
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.12);
+  color: currentColor;
+  font-weight: inherit;
+}
+
 .react-button:hover {
   background: rgba(127, 127, 127, 0.18);
 }
