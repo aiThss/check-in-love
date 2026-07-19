@@ -151,3 +151,16 @@
     transition: none;
   }
 }
+
+/* Keep the memories search focus on the outer glass pill, not the native field. */
+.memories-search-input,
+.memories-search-input:focus,
+.memories-search-input:focus-visible {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
