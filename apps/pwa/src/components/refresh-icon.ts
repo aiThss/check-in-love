@@ -1,7 +1,9 @@
 export const REFRESH_ICON_ANIMATION_DURATION_MS = 3_000;
 
 export const refreshIconMarkup = `
-  <span class="refresh-icon-static" aria-hidden="true">🔄</span>
+  <span class="refresh-icon-static" aria-hidden="true">
+    <img src="/icons8-refresh-ios7-32.png" alt="" width="32" height="32" />
+  </span>
   <span class="refresh-icon-motion bubble-spinner" aria-hidden="true">
     <span style="--i: 0"></span><span style="--i: 1"></span>
     <span style="--i: 2"></span><span style="--i: 3"></span>
