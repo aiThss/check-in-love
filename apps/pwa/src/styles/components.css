@@ -3678,8 +3678,8 @@ textarea:focus-visible,
 }
 
 .react-plus-icon {
-  --icon-size: 34px;
-  --icon-stroke: 3px;
+  --icon-size: 23px;
+  --icon-stroke: 1.5px;
 
   position: relative;
   width: var(--icon-size);
@@ -3691,13 +3691,13 @@ textarea:focus-visible,
 .react-plus-icon::before {
   content: '';
   position: absolute;
-  inset: 1px;
+  inset: 0.5px;
   border-radius: 50%;
   background: conic-gradient(
     from 0deg,
     currentColor 0deg 16deg,
-    transparent 16deg 38.5deg,
-    currentColor 35deg 360deg
+    transparent 16deg 30deg,
+    currentColor 30deg 360deg
   );
   -webkit-mask: radial-gradient(
     farthest-side,
@@ -3714,10 +3714,10 @@ textarea:focus-visible,
 .react-plus-icon::after {
   content: '';
   position: absolute;
-  top: 3px;
-  right: -1px;
-  width: 13px;
-  height: 13px;
+  top: 2px;
+  right: -0.5px;
+  width: 9px;
+  height: 9px;
   border-radius: 1px;
   background:
     linear-gradient(currentColor, currentColor)
@@ -3728,29 +3728,29 @@ textarea:focus-visible,
 
 .react-plus-icon .eye {
   position: absolute;
-  top: 13px;
-  width: 4px;
-  height: 4px;
+  top: 9px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
   background: currentColor;
 }
 
 .react-plus-icon .eye.left {
-  left: 10px;
+  left: 7px;
 }
 
 .react-plus-icon .eye.right {
-  right: 10px;
+  right: 7px;
 }
 
 .react-plus-icon .smile {
   position: absolute;
   left: 50%;
-  bottom: 7px;
-  width: 14px;
-  height: 7px;
+  bottom: 5px;
+  width: 10px;
+  height: 5px;
   border-bottom: var(--icon-stroke) solid currentColor;
-  border-radius: 0 0 14px 14px;
+  border-radius: 0 0 10px 10px;
   transform: translateX(-50%);
 }
 
