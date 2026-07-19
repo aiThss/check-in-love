@@ -1,5 +1,9 @@
 import { invalidateQueries } from '../api/query-cache';
-import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
+import {
+  REFRESH_ICON_ANIMATION_DURATION_MS,
+  refreshIconMarkup,
+  setRefreshButtonLoading,
+} from '../components/refresh-icon';
 import { showToast } from '../components/toast';
 import { invalidateRoutes } from '../route-invalidation';
 import { navigate } from '../router';
@@ -11,6 +15,7 @@ const REFRESH_DRAFT_KEY = 'lovecheck_message_draft_after_manual_refresh';
 let initialized = false;
 let enhanceFrame: number | null = null;
 let refreshInProgress = false;
+let messageRefreshAnimationEndsAt = 0;
 
 function getActiveMessagesPage(): HTMLElement | null {
   return document.querySelector<HTMLElement>('.route-page.is-active .messages-page')
@@ -93,6 +98,7 @@ function refreshMessages(page: HTMLElement, button: HTMLButtonElement): void {
   sessionStorage.setItem(REFRESH_DRAFT_KEY, draft);
   button.disabled = true;
   setRefreshButtonLoading(button, true);
+  messageRefreshAnimationEndsAt = Date.now() + REFRESH_ICON_ANIMATION_DURATION_MS;
   button.setAttribute('aria-label', 'Đang tải lại tin nhắn');
 
   invalidateQueries('messages:list:');
@@ -119,6 +125,15 @@ function ensureRefreshButton(page: HTMLElement): void {
   button.innerHTML = refreshIconMarkup;
   button.addEventListener('click', () => refreshMessages(page, button));
   header.appendChild(button);
+
+  const remainingAnimationDuration = messageRefreshAnimationEndsAt - Date.now();
+  if (remainingAnimationDuration > 0) {
+    setRefreshButtonLoading(button, true);
+    window.setTimeout(
+      () => setRefreshButtonLoading(button, false, 0),
+      remainingAnimationDuration,
+    );
+  }
 }
 
 function enhanceMessagesPage(): void {
