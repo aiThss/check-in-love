@@ -164,3 +164,17 @@
   appearance: none;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Match the compact Memories react trigger to the one in check-in detail. */
+.memory-mini-composer .rm-reaction-choice {
+  border: 1px solid var(--border) !important;
+  background: var(--surface-solid) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+}
+
+.memory-mini-composer .rm-reaction-choice:active {
+  border-color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
