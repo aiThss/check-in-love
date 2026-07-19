@@ -3653,11 +3653,11 @@ textarea:focus-visible,
 
 /* smile+ — shared reaction icon. Search for `smile+` to update it everywhere. */
 .react-button {
-  width: 58px;
-  height: 58px;
+  width: 31px;
+  height: 31px;
   display: inline-grid;
   place-items: center;
-  flex: 0 0 58px;
+  flex: 0 0 31px;
   padding: 0;
   border: 1px solid rgba(127, 127, 127, 0.28);
   border-radius: 999px;
@@ -3695,9 +3695,9 @@ textarea:focus-visible,
   border-radius: 50%;
   background: conic-gradient(
     from 0deg,
-    currentColor 0deg 16deg,
-    transparent 16deg 30deg,
-    currentColor 30deg 360deg
+    currentColor 0deg 34deg,
+    transparent 34deg 78deg,
+    currentColor 78deg 360deg
   );
   -webkit-mask: radial-gradient(
     farthest-side,
