@@ -1,4 +1,5 @@
 import { invalidateQueries } from '../api/query-cache';
+import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import { showToast } from '../components/toast';
 import { invalidateRoutes } from '../route-invalidation';
 import { navigate } from '../router';
@@ -91,7 +92,7 @@ function refreshMessages(page: HTMLElement, button: HTMLButtonElement): void {
   const draft = page.querySelector<HTMLInputElement>('#message-input')?.value ?? '';
   sessionStorage.setItem(REFRESH_DRAFT_KEY, draft);
   button.disabled = true;
-  button.classList.add('is-refreshing');
+  setRefreshButtonLoading(button, true);
   button.setAttribute('aria-label', 'Đang tải lại tin nhắn');
 
   invalidateQueries('messages:list:');
@@ -101,6 +102,7 @@ function refreshMessages(page: HTMLElement, button: HTMLButtonElement): void {
 
   window.setTimeout(() => {
     refreshInProgress = false;
+    setRefreshButtonLoading(button, false);
     restoreDraft();
   }, 150);
 }
@@ -114,7 +116,7 @@ function ensureRefreshButton(page: HTMLElement): void {
   button.className = 'btn-icon messages-refresh-button';
   button.setAttribute('aria-label', 'Tải lại tin nhắn');
   button.title = 'Tải lại tin nhắn';
-  button.innerHTML = '<span aria-hidden="true">🔄</span>';
+  button.innerHTML = refreshIconMarkup;
   button.addEventListener('click', () => refreshMessages(page, button));
   header.appendChild(button);
 }

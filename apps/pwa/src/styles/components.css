@@ -255,6 +255,31 @@ a {
   transform: scale(0.92);
 }
 
+.refresh-icon-static,
+.refresh-icon-motion {
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.refresh-icon-static {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.refresh-icon-motion {
+  display: none;
+}
+
+.is-refreshing .refresh-icon-static {
+  display: none;
+}
+
+.is-refreshing .refresh-icon-motion {
+  display: block;
+}
+
 /* ── Bottom Navigation ──────────────────────────────────────── */
 .bottom-nav {
   position: fixed;

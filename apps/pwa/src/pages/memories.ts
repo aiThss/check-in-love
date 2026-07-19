@@ -4,6 +4,7 @@ import { createMessage } from '../api/messages';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { openReactionPicker } from '../components/reaction-picker';
+import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
 let cachedMemories: CheckIn[] = [];
@@ -276,7 +277,7 @@ export function renderMemoriesPage(): HTMLElement {
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
       </button>
-      <button id="refresh-btn" class="mem-icon-btn" aria-label="Làm mới">\u{1F504}</button>
+      <button id="refresh-btn" class="mem-icon-btn" aria-label="Làm mới">${refreshIconMarkup}</button>
     </div>
   `;
   root.appendChild(header);
@@ -539,8 +540,8 @@ export function renderMemoriesPage(): HTMLElement {
     if (isLoading) return;
     isLoading = true;
 
-    const refreshBtn = header.querySelector('#refresh-btn');
-    if (refreshBtn) refreshBtn.classList.add('animate-spin');
+    const refreshBtn = header.querySelector<HTMLButtonElement>('#refresh-btn');
+    if (refreshBtn) setRefreshButtonLoading(refreshBtn, true);
 
     if (page === 1 && !append && cachedMemories.length === 0) {
       grid.innerHTML = `
@@ -554,8 +555,8 @@ export function renderMemoriesPage(): HTMLElement {
     try {
         const res = await getCheckins(page, 14, undefined, 'photo');
       isLoading = false;
-      const refreshBtn = header.querySelector('#refresh-btn');
-      if (refreshBtn) refreshBtn.classList.remove('animate-spin');
+      const refreshBtn = header.querySelector<HTMLButtonElement>('#refresh-btn');
+      if (refreshBtn) setRefreshButtonLoading(refreshBtn, false);
 
       const items = res.data || [];
       currentPage = res.page;
@@ -580,8 +581,8 @@ export function renderMemoriesPage(): HTMLElement {
     } catch (err) {
       const error = err as Error;
       isLoading = false;
-      const refreshBtn = header.querySelector('#refresh-btn');
-      if (refreshBtn) refreshBtn.classList.remove('animate-spin');
+      const refreshBtn = header.querySelector<HTMLButtonElement>('#refresh-btn');
+      if (refreshBtn) setRefreshButtonLoading(refreshBtn, false);
       showToast('Không thể tải kỷ niệm: ' + error.message, 'error');
     }
   }

@@ -14,10 +14,6 @@
   opacity: 0.72;
 }
 
-.messages-refresh-button.is-refreshing span {
-  animation: messagesRefreshSpin 700ms linear infinite;
-}
-
 .messages-time-separator {
   display: flex;
   align-items: center;
@@ -39,16 +35,4 @@
   width: min(18vw, 72px);
   height: 1px;
   background: var(--border);
-}
-
-@keyframes messagesRefreshSpin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .messages-refresh-button,
-  .messages-refresh-button.is-refreshing span {
-    animation: none;
-    transition: none;
-  }
 }

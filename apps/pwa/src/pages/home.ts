@@ -5,6 +5,7 @@ import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
+import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -633,7 +634,7 @@ export function renderHomePage(): HTMLElement {
   const refreshBtn = document.createElement('button');
   refreshBtn.className = 'btn-icon';
   refreshBtn.setAttribute('aria-label', 'Làm mới');
-  refreshBtn.textContent = '\u{1F504}';
+  refreshBtn.innerHTML = refreshIconMarkup;
   refreshBtn.addEventListener('click', () => loadCheckin());
 
   rightActions.appendChild(themeBtn);
@@ -754,11 +755,11 @@ export function renderHomePage(): HTMLElement {
       contentArea.appendChild(renderSkeleton());
     }
 
-    refreshBtn.classList.add('animate-spin');
+    setRefreshButtonLoading(refreshBtn, true);
 
     try {
       const checkin = await getLatestPartnerCheckin({ force: true });
-      refreshBtn.classList.remove('animate-spin');
+      setRefreshButtonLoading(refreshBtn, false);
 
       if (!checkin) {
         activeCheckin = null;
@@ -790,7 +791,7 @@ export function renderHomePage(): HTMLElement {
         // ignore
       }
     } catch {
-      refreshBtn.classList.remove('animate-spin');
+      setRefreshButtonLoading(refreshBtn, false);
       if (getCachedLatestPartnerCheckin()) {
         showToast('Không thể làm mới dữ liệu', 'error');
         return;
