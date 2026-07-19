@@ -268,7 +268,7 @@ a {
   justify-content: center;
 }
 
-.refresh-icon-static img {
+.refresh-icon-static svg {
   display: block;
   width: 100%;
   height: 100%;
