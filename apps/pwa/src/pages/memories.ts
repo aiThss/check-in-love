@@ -858,6 +858,11 @@ export function renderMemoriesPage(): HTMLElement {
 
       const replyForm = detail.querySelector<HTMLFormElement>('#reply-form');
       const replySubmit = replyForm?.querySelector<HTMLButtonElement>('button[type="submit"]');
+      const detailReactionPicker = buildReactionPicker(item, (type) => {
+        void reactToItem(item, type, renderDetailContent);
+      });
+      detailReactionPicker.classList.add('detail-reaction-picker');
+      replyForm?.before(detailReactionPicker);
       let isReplySending = false;
       replyForm?.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -884,7 +889,7 @@ export function renderMemoriesPage(): HTMLElement {
       });
 
       detail.querySelector<HTMLButtonElement>('.memory-reaction-choice')?.addEventListener('click', () => {
-        openReactionPicker(item, renderDetailContent);
+        detailReactionPicker.classList.toggle('open');
       });
     };
 
