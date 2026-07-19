@@ -5,6 +5,7 @@ import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { openReactionPicker } from '../components/reaction-picker';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
+import { smilePlusIconMarkup } from '../components/smile-plus-icon';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
 let cachedMemories: CheckIn[] = [];
@@ -181,7 +182,7 @@ function buildSocialRow(
   form.className = 'rm-inline-composer memory-mini-composer';
   form.innerHTML = `
     <input aria-label="Gửi tin nhắn cho ảnh này" maxlength="500" placeholder="Gửi tin nhắn..." />
-    <button type="button" class="rm-quick-react rm-reaction-choice" aria-label="Chọn cảm xúc">☺+</button>
+    <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
     <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
   `;
   const input = form.querySelector<HTMLInputElement>('input');
@@ -758,7 +759,7 @@ export function renderMemoriesPage(): HTMLElement {
           <div id="reply-list" class="reply-detail-list"></div>
           <form id="reply-form" class="inline-reply-form">
             <input id="reply-input" maxlength="500" placeholder="Viết reply..." />
-            <button type="button" class="memory-quick-reply memory-reaction-choice" aria-label="Chọn cảm xúc">☺+</button>
+            <button type="button" class="memory-quick-reply memory-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
             <button type="submit">Gửi</button>
           </form>
         </div>

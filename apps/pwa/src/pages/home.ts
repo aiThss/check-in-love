@@ -6,6 +6,7 @@ import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
+import { smilePlusIconMarkup } from '../components/smile-plus-icon';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -489,10 +490,11 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         const heartBtn = document.createElement('button');
         heartBtn.type = 'button';
-        heartBtn.className = 'rm-heart-btn';
+        heartBtn.className = 'rm-heart-btn react-button';
+        heartBtn.dataset.icon = 'smile+';
         heartBtn.setAttribute('aria-label', 'Chọn cảm xúc');
 
-        heartBtn.innerHTML = `<span class="rm-heart-icon" aria-hidden="true">☺</span><strong>+</strong>`;
+        heartBtn.innerHTML = smilePlusIconMarkup;
 
         heartBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
@@ -504,7 +506,7 @@ function buildRecentMemoriesSection(): HTMLElement {
         replyForm.className = 'rm-inline-composer';
         replyForm.innerHTML = `
           <input aria-label="Gửi tin nhắn cho ảnh này" maxlength="500" placeholder="Gửi tin nhắn..." />
-          <button type="button" class="rm-quick-react rm-reaction-choice" aria-label="Chọn cảm xúc">☺+</button>
+          <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
           <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
         `;
 

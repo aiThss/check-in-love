@@ -3651,6 +3651,109 @@ textarea:focus-visible,
   transform: scale(1.18);
 }
 
+/* smile+ — shared reaction icon. Search for `smile+` to update it everywhere. */
+.react-button {
+  width: 58px;
+  height: 58px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 58px;
+  padding: 0;
+  border: 1px solid rgba(127, 127, 127, 0.28);
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.12);
+  color: currentColor;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.react-button:hover {
+  background: rgba(127, 127, 127, 0.18);
+}
+
+.react-button:active {
+  transform: scale(0.92);
+}
+
+.react-plus-icon {
+  --icon-size: 34px;
+  --icon-stroke: 3px;
+
+  position: relative;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  color: currentColor;
+  flex: 0 0 auto;
+}
+
+.react-plus-icon::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    currentColor 0deg 16deg,
+    transparent 16deg 38.5deg,
+    currentColor 35deg 360deg
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--icon-stroke)),
+    #000 0
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--icon-stroke)),
+    #000 0
+  );
+}
+
+.react-plus-icon::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: -1px;
+  width: 13px;
+  height: 13px;
+  border-radius: 1px;
+  background:
+    linear-gradient(currentColor, currentColor)
+      center / 100% var(--icon-stroke) no-repeat,
+    linear-gradient(currentColor, currentColor)
+      center / var(--icon-stroke) 100% no-repeat;
+}
+
+.react-plus-icon .eye {
+  position: absolute;
+  top: 13px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.react-plus-icon .eye.left {
+  left: 10px;
+}
+
+.react-plus-icon .eye.right {
+  right: 10px;
+}
+
+.react-plus-icon .smile {
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  width: 14px;
+  height: 7px;
+  border-bottom: var(--icon-stroke) solid currentColor;
+  border-radius: 0 0 14px 14px;
+  transform: translateX(-50%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rm-heart-icon {
     transition: none;
