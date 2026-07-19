@@ -277,7 +277,32 @@ a {
 }
 
 .is-refreshing .refresh-icon-motion {
-  display: block;
+  display: inline-block;
+}
+
+.bubble-spinner {
+  position: relative;
+  animation: bubble-spin 3s linear infinite;
+}
+
+.bubble-spinner span {
+  --angle: calc(var(--i) * 45deg);
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-10px) scale(calc(.45 + var(--i) * .07));
+  opacity: calc(.3 + var(--i) * .09);
+}
+
+@keyframes bubble-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Bottom Navigation ──────────────────────────────────────── */

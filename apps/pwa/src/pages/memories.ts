@@ -277,7 +277,7 @@ export function renderMemoriesPage(): HTMLElement {
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
       </button>
-      <button id="refresh-btn" class="mem-icon-btn" aria-label="Làm mới">${refreshIconMarkup}</button>
+      <button id="refresh-btn" class="btn-icon" aria-label="Làm mới">${refreshIconMarkup}</button>
     </div>
   `;
   root.appendChild(header);
