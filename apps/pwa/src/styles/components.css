@@ -3763,13 +3763,27 @@ textarea:focus-visible,
 .react-plus-icon .smile {
   position: absolute;
   left: 50%;
-  bottom: 5px;
+  bottom: 4px;
   width: 10px;
   height: 5px;
-  border-bottom: var(--detail-stroke) solid currentColor;
-  border-radius: 0 0 10px 10px;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
   opacity: 0.94;
   transform: translateX(-50%) translateZ(0);
+}
+
+/* A clipped circle keeps the smile stroke uniform with clean, flat ends. */
+.react-plus-icon .smile::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: var(--detail-stroke) solid currentColor;
+  border-radius: 50%;
 }
 
 @media (prefers-reduced-motion: reduce) {
