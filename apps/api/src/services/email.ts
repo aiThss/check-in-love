@@ -98,11 +98,10 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
           <!-- Footer -->
           <tr>
             <td style="padding:0 40px 32px;text-align:center;">
-              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);line-height:1.6;">
-                Email được gửi từ <strong>Check IN Love</strong><br/>
-                Ứng dụng check-in riêng tư cho cặp đôi 💕<br/>
-                <a href="https://couple.babyress.games" style="color:rgba(255,255,255,0.4);text-decoration:none;">https://couple.babyress.games</a><br/>
-                &copy; aiThs
+              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.42);line-height:1.6;">
+                &copy; 2026 &bull; Made by <strong style="color:rgba(255,255,255,0.68);">aiThs</strong><br/>
+                Contact for work<br/>
+                <a href="mailto:danhthai4560@gmail.com" style="color:rgba(255,255,255,0.58);text-decoration:none;">danhthai4560@gmail.com</a>
               </p>
             </td>
           </tr>
@@ -124,6 +123,6 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
     to,
     subject,
     html,
-    text: `Xin chào!\n\nĐây là mã xác thực 6 chữ số để ${textAction} của bạn: ${code}\n\nMã có hiệu lực trong 10 phút. Không chia sẻ mã này với ai.\n\nNếu bạn không yêu cầu, hãy bỏ qua email này.`,
+    text: `Xin chào!\n\nĐây là mã xác thực 6 chữ số để ${textAction} của bạn: ${code}\n\nMã có hiệu lực trong 10 phút. Không chia sẻ mã này với ai.\n\nNếu bạn không yêu cầu, hãy bỏ qua email này.\n\n© 2026 • Made by aiThs\nContact for work: danhthai4560@gmail.com`,
   });
 }
