@@ -3667,6 +3667,7 @@ textarea:focus-visible,
   transition:
     transform 160ms ease,
     background 160ms ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .react-button:hover {
@@ -3679,35 +3680,37 @@ textarea:focus-visible,
 
 .react-plus-icon {
   --icon-size: 23px;
-  --icon-stroke: 1.5px;
+  --ring-stroke: 1.5px;
+  --detail-stroke: 2px;
 
   position: relative;
   width: var(--icon-size);
   height: var(--icon-size);
-  color: currentColor;
   flex: 0 0 auto;
+  color: currentColor;
+  isolation: isolate;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .react-plus-icon::before {
   content: '';
   position: absolute;
   inset: 0.5px;
+  border: var(--ring-stroke) solid currentColor;
   border-radius: 50%;
-  background: conic-gradient(
+  -webkit-mask: conic-gradient(
     from 0deg,
-    currentColor 0deg 34deg,
+    #000 0deg 34deg,
     transparent 34deg 78deg,
-    currentColor 78deg 360deg
+    #000 78deg 360deg
   );
-  -webkit-mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - var(--icon-stroke)),
-    #000 0
-  );
-  mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - var(--icon-stroke)),
-    #000 0
+  mask: conic-gradient(
+    from 0deg,
+    #000 0deg 34deg,
+    transparent 34deg 78deg,
+    #000 78deg 360deg
   );
 }
 
@@ -3715,15 +3718,16 @@ textarea:focus-visible,
   content: '';
   position: absolute;
   top: 2px;
-  right: -0.5px;
+  right: 0;
   width: 9px;
   height: 9px;
   border-radius: 1px;
   background:
     linear-gradient(currentColor, currentColor)
-      center / 100% var(--icon-stroke) no-repeat,
+      center / 100% var(--detail-stroke) no-repeat,
     linear-gradient(currentColor, currentColor)
-      center / var(--icon-stroke) 100% no-repeat;
+      center / var(--detail-stroke) 100% no-repeat;
+  opacity: 0.94;
 }
 
 .react-plus-icon .eye {
@@ -3749,9 +3753,10 @@ textarea:focus-visible,
   bottom: 5px;
   width: 10px;
   height: 5px;
-  border-bottom: var(--icon-stroke) solid currentColor;
+  border-bottom: var(--detail-stroke) solid currentColor;
   border-radius: 0 0 10px 10px;
-  transform: translateX(-50%);
+  opacity: 0.94;
+  transform: translateX(-50%) translateZ(0);
 }
 
 @media (prefers-reduced-motion: reduce) {
