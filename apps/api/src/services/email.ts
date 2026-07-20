@@ -27,15 +27,22 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
   }).sort({ createdAt: -1 });
 
   const isLogin = otpRecord?.purpose === 'login';
-  const headerLabel = isLogin
-    ? 'Mã xác thực đăng nhập'
-    : 'Mã xác thực đăng ký tài khoản';
-  const actionCopy = isLogin
-    ? 'đăng nhập vào tài khoản'
-    : 'hoàn tất đăng ký tài khoản';
-  const subject = isLogin
-    ? `${code} – Mã đăng nhập Check IN Love`
-    : `${code} – Mã xác thực đăng ký Check IN Love`;
+  const isPasswordReset = otpRecord?.purpose === 'password-reset';
+  const headerLabel = isPasswordReset
+    ? 'Mã đặt lại mật khẩu'
+    : isLogin
+      ? 'Mã xác thực đăng nhập'
+      : 'Mã xác thực đăng ký tài khoản';
+  const actionCopy = isPasswordReset
+    ? 'đặt lại mật khẩu'
+    : isLogin
+      ? 'đăng nhập vào tài khoản'
+      : 'hoàn tất đăng ký tài khoản';
+  const subject = isPasswordReset
+    ? `${code} – Mã đặt lại mật khẩu Check IN Love`
+    : isLogin
+      ? `${code} – Mã đăng nhập Check IN Love`
+      : `${code} – Mã xác thực đăng ký Check IN Love`;
 
   const html = `
 <!DOCTYPE html>
@@ -114,9 +121,11 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
 </html>
   `.trim();
 
-  const textAction = isLogin
-    ? 'đăng nhập vào tài khoản Check IN Love'
-    : 'hoàn tất đăng ký tài khoản Check IN Love';
+  const textAction = isPasswordReset
+    ? 'đặt lại mật khẩu Check IN Love'
+    : isLogin
+      ? 'đăng nhập vào tài khoản Check IN Love'
+      : 'hoàn tất đăng ký tài khoản Check IN Love';
 
   await mailer.sendMail({
     from: `"Check IN Love 💕" <${env.GMAIL_USER}>`,

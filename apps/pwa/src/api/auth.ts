@@ -39,6 +39,10 @@ export interface VerifyOtpResponse {
   message: string;
 }
 
+export interface PasswordResetResponse {
+  message: string;
+}
+
 export function startOnboarding(payload: StartOnboardingPayload): Promise<AuthResponse> {
   return apiFetch<AuthResponse>('/auth/start', {
     method: 'POST',
@@ -60,6 +64,24 @@ export function sendLoginOtp(
   return apiFetch<SendOtpResponse>('/auth/login/send-otp', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  });
+}
+
+export function requestPasswordReset(email: string): Promise<SendOtpResponse> {
+  return apiFetch<SendOtpResponse>('/auth/password-reset/send-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function confirmPasswordReset(
+  email: string,
+  otpCode: string,
+  newPassword: string,
+): Promise<PasswordResetResponse> {
+  return apiFetch<PasswordResetResponse>('/auth/password-reset/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ email, otpCode, newPassword }),
   });
 }
 
