@@ -827,7 +827,7 @@ export function renderHomePage(): HTMLElement {
   }
 
   renderPushPrompt();
-  loadCheckin();
+  setTimeout(() => loadCheckin(), 5000);
   return page;
 }
 
