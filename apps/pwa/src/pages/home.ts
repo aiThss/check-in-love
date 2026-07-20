@@ -651,7 +651,10 @@ export function renderHomePage(): HTMLElement {
   refreshBtn.className = 'btn-icon';
   refreshBtn.setAttribute('aria-label', 'Làm mới');
   refreshBtn.innerHTML = refreshIconMarkup;
-  refreshBtn.addEventListener('click', () => loadCheckin());
+  refreshBtn.addEventListener('click', () => {
+    showToast('Đang tải lại check-in...', 'loading-spark');
+    loadCheckin();
+  });
 
   rightActions.appendChild(themeBtn);
   rightActions.appendChild(refreshBtn);

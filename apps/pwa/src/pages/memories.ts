@@ -824,7 +824,7 @@ export function renderMemoriesPage(): HTMLElement {
             if (isAndroidWrapper && (window as any).LoveCheckAndroid && typeof (window as any).LoveCheckAndroid.downloadFile === 'function') {
               try {
                 (window as any).LoveCheckAndroid.downloadFile(downloadUrl, fileName);
-                showToast('Đang tải ảnh xuống...', 'info');
+                showToast('Đang tải ảnh xuống...', 'loading-spark');
               } catch (e) {
                 window.open(downloadUrl, '_blank', 'noopener,noreferrer');
               } finally {
@@ -939,7 +939,7 @@ export function renderMemoriesPage(): HTMLElement {
     displayedLimit = 14;
     currentPage = 1;
     fetchMemories(1);
-    showToast('Đang tải lại kỷ niệm...', 'info');
+    showToast('Đang tải lại kỷ niệm...', 'loading-spark');
   });
 
   loadMoreBtn.addEventListener('click', () => {
