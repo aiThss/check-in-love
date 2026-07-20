@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface OtpCodeDocument extends Document {
   email: string;
   code: string;
-  purpose: 'signup' | 'login';
+  purpose: 'signup' | 'login' | 'password-reset';
   expiresAt: Date;
   verified: boolean;
   createdAt: Date;
@@ -15,7 +15,7 @@ const OtpCodeSchema = new Schema<OtpCodeDocument>(
     code: { type: String, required: true },
     purpose: {
       type: String,
-      enum: ['signup', 'login'],
+      enum: ['signup', 'login', 'password-reset'],
       default: 'signup',
       required: true,
     },
