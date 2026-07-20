@@ -17,9 +17,58 @@ function getContainer(): HTMLElement {
   return toastContainer;
 }
 
+const errorHeartMarkup = `<svg class="toast-error-heart" width="34" height="34" viewBox="-4 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="error">
+  <style>
+    .toast-error-heart {
+      cursor: pointer;
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: toast-error-crazy-shake 3s ease-in-out infinite;
+      filter: drop-shadow(0 6px 18px rgba(216, 15, 69, 0.75))
+              drop-shadow(0 2px 8px rgba(255, 46, 95, 0.6));
+    }
+
+    @keyframes toast-error-crazy-shake {
+      0%     { transform: translate(0, 0) rotate(0deg); }
+      8%     { transform: translate(-5.5px, 3.2px) rotate(-6.5deg); }
+      16%    { transform: translate(5.5px, -3.2px) rotate(6.5deg); }
+      24%    { transform: translate(-6px, 3.5px) rotate(-7deg); }
+      32%    { transform: translate(6px, -3.5px) rotate(7deg); }
+      50%    { transform: translate(0, 0) rotate(0deg); }
+      58%    { transform: translate(-5.5px, 3.2px) rotate(-6.5deg); }
+      66%    { transform: translate(5.5px, -3.2px) rotate(6.5deg); }
+      74%    { transform: translate(-6px, 3.4px) rotate(-6.8deg); }
+      82%    { transform: translate(6px, -3.4px) rotate(6.8deg); }
+      100%   { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .toast-error-heart { animation: none; }
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="toastErrorRoseGrad" x1="12" y1="4" x2="12" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FF738F"/>
+      <stop offset="50%" stop-color="#FF2E5F"/>
+      <stop offset="100%" stop-color="#D80F45"/>
+    </linearGradient>
+  </defs>
+
+  <path
+    d="M12 21.35L10.55 20.03C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5C22 12.28 18.6 15.36 13.45 20.03L12 21.35Z"
+    fill="url(#toastErrorRoseGrad)"
+    stroke="#C80A3F"
+    stroke-width="1.8"
+  />
+
+  <path d="M12 8.5V13.5" stroke="#FFFD9F" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="12" cy="16.5" r="1.2" fill="#FFFD9F"/>
+</svg>`;
+
 const ICONS: Record<ToastType, string> = {
   success: `<lottie-player src="/icons8-correct.json" background="transparent" speed="1.2" style="width: 28px; height: 28px;" autoplay></lottie-player>`,
-  error: `<img src="/icons8-error.gif" style="width: 28px; height: 28px; object-fit: contain;" alt="error" />`,
+  error: errorHeartMarkup,
   info: `<img src="/icons8-waiting.png" style="width: 28px; height: 28px; object-fit: contain;" alt="info" />`,
   'loading-spark': loveSparkLoaderMarkup,
   loading: `<svg class="loveChat" viewBox="0 0 100 100" width="112" height="112" xmlns="http://www.w3.org/2000/svg" aria-label="love chat loader">
