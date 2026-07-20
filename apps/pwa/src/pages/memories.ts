@@ -245,7 +245,7 @@ function renderReplies(container: HTMLElement, replies: CheckInReply[]): void {
 }
 
 function renderMemoriesPolaroidSkeleton(): string {
-  const rotations = ['-4deg', '3deg', '2deg', '-3deg'];
+  const rotations = ['-4deg', '3deg', '2deg', '-3deg', '4deg', '-2deg', '-5deg', '1deg'];
   return rotations.map((deg) => `
     <div style="border-radius:20px;aspect-ratio:1;background:var(--surface);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);">
       <span style="display:flex;transform:rotate(${deg});filter:drop-shadow(0 4px 14px rgba(115,44,68,0.15));">${loveSparkLoaderMarkup}</span>
