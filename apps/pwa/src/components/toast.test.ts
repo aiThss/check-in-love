@@ -22,6 +22,31 @@ describe('toast status duration', () => {
     expect(toast.classList.contains('toast-exit')).toBe(true);
   });
 
+  it('uses the animated heart checkmark for success toasts', async () => {
+    const { showToast } = await import('./toast');
+    showToast('Thay đổi thành công', 'success');
+
+    const icon = document.querySelector<SVGElement>('.toast-success .toast-success-heart');
+    const checkmark = icon?.querySelector<SVGPathElement>('.toast-success-checkmark');
+    expect(icon).not.toBeNull();
+    expect(icon?.getAttribute('width')).toBe('40');
+    expect(checkmark).not.toBeNull();
+    expect(document.querySelector('lottie-player[src="/icons8-correct.json"]')).toBeNull();
+  });
+
+  it('uses unique gradient IDs when multiple success toasts are visible', async () => {
+    const { showToast } = await import('./toast');
+    showToast('Đã gửi thành công', 'success');
+    showToast('Đã thay đổi thành công', 'success');
+
+    const gradients = Array.from(
+      document.querySelectorAll<SVGLinearGradientElement>('.toast-success-heart linearGradient'),
+    ).map((gradient) => gradient.id);
+
+    expect(gradients).toHaveLength(2);
+    expect(new Set(gradients).size).toBe(2);
+  });
+
   it('uses the animated heart icon for error toasts', async () => {
     const { showToast } = await import('./toast');
     showToast('Vui lòng nhập email', 'error');
@@ -47,5 +72,4 @@ describe('toast status duration', () => {
     const loader = document.querySelector<SVGElement>('.toast-loading-spark .loveSpark');
     expect(loader?.getAttribute('aria-label')).toBe('love spark loader');
   });
-
 });
