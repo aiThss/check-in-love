@@ -21,4 +21,13 @@ describe('toast status duration', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(toast.classList.contains('toast-exit')).toBe(true);
   });
+
+  it('uses the animated love chat loader for info toasts', async () => {
+    const { showToast } = await import('./toast');
+    showToast('Äang táº£i láº¡i tin nháº¯n...', 'info');
+
+    const loader = document.querySelector<SVGElement>('.toast-info .loveChat');
+    expect(loader).not.toBeNull();
+    expect(loader?.getAttribute('aria-label')).toBe('love chat loader');
+  });
 });

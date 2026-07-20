@@ -627,12 +627,9 @@ textarea.input {
   flex-shrink: 0;
 }
 
-/* White circular background for info toast loading/waiting icon in dark mode */
-[data-theme='dark'] .toast-info .toast-icon img,
-:root:not([data-theme='light']) .toast-info .toast-icon img {
-  background: #ffffff;
-  border-radius: 50%;
-  padding: 1px;
+.toast-icon .loveChat {
+  width: 28px;
+  height: 28px;
 }
 
 .toast-exit {

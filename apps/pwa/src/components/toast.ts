@@ -18,7 +18,45 @@ function getContainer(): HTMLElement {
 const ICONS: Record<ToastType, string> = {
   success: `<lottie-player src="/icons8-correct.json" background="transparent" speed="1.2" style="width: 28px; height: 28px;" autoplay></lottie-player>`,
   error: `<img src="/icons8-error.gif" style="width: 28px; height: 28px; object-fit: contain;" alt="error" />`,
-  info: `<img src="/icons8-waiting.png" style="width: 28px; height: 28px; object-fit: contain;" alt="info" />`,
+  info: `<svg class="loveChat" viewBox="0 0 100 100" width="112" height="112" xmlns="http://www.w3.org/2000/svg" aria-label="love chat loader">
+    <style>
+      .loveChat .b1,
+      .loveChat .b2 {
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+
+      .loveChat .b1 {
+        animation: lc-left 3s ease-in-out infinite;
+      }
+
+      .loveChat .b2 {
+        animation: lc-right 3s ease-in-out infinite;
+      }
+
+      @keyframes lc-left {
+        0%,100% { transform: translate(-5px, 5px) scale(.88); opacity: .55; }
+        50% { transform: translate(2px, -4px) scale(1); opacity: 1; }
+      }
+
+      @keyframes lc-right {
+        0%,100% { transform: translate(5px, -4px) scale(.88); opacity: .55; }
+        50% { transform: translate(-2px, 5px) scale(1); opacity: 1; }
+      }
+    </style>
+
+    <g class="b1">
+      <path d="M14 24h48a10 10 0 0 1 10 10v20a10 10 0 0 1-10 10H36L24 76V64H14A10 10 0 0 1 4 54V34a10 10 0 0 1 10-10Z"
+        fill="#ff6fae" opacity=".9"/>
+      <path d="M38 53c-10-7-13-11-13-16 0-5 3-8 8-8 3 0 6 2 7 5 2-3 4-5 8-5 4 0 8 3 8 8 0 5-4 9-18 16Z"
+        fill="#fff"/>
+    </g>
+
+    <g class="b2">
+      <path d="M45 46h41a9 9 0 0 1 9 9v17a9 9 0 0 1-9 9H67L57 89v-8H45a9 9 0 0 1-9-9V55a9 9 0 0 1 9-9Z"
+        fill="#b69cff" opacity=".92"/>
+    </g>
+  </svg>`,
 };
 
 export function showToast(message: string, type: ToastType = 'info'): void {
