@@ -76,7 +76,21 @@ function renderSkeleton(): HTMLElement {
   wrapper.style.cssText = 'padding:0 16px;display:flex;flex-direction:column;gap:16px;';
   wrapper.innerHTML = `
     <div class="skeleton" style="height:48px;border-radius:12px;"></div>
-    <div class="skeleton" style="height:300px;border-radius:28px;"></div>
+    <div style="height:300px;border-radius:28px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;box-shadow:var(--shadow);">
+      <svg viewBox="0 0 64 76" width="158" height="188" class="l-polaroid" aria-hidden="true">
+        <defs>
+          <linearGradient id="skelPolGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffb3cc"/>
+            <stop offset="55%" stop-color="#ff85a1"/>
+            <stop offset="100%" stop-color="#c0456c"/>
+          </linearGradient>
+        </defs>
+        <rect width="64" height="76" rx="4" fill="#fff4f7"/>
+        <rect class="l-polaroid__photo" x="6" y="6" width="52" height="52" rx="2" fill="url(#skelPolGrad)"/>
+        <rect x="10" y="66" width="26" height="3" rx="1.5" fill="#c0456c" opacity=".4"/>
+      </svg>
+      <span style="font-size:13px;color:var(--text-secondary);letter-spacing:.01em;">Đang tải check-in của người ấy...</span>
+    </div>
     <div class="skeleton" style="height:56px;border-radius:20px;"></div>
   `;
   return wrapper;

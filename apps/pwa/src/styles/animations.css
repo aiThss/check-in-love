@@ -272,6 +272,25 @@
   }
 }
 
+/* ── Polaroid Develop ────────────────────────────────────────── */
+@keyframes photoDevelop {
+  0%   { filter: grayscale(1) brightness(1.6); opacity: .25; }
+  60%  { filter: grayscale(.2) brightness(1.05); opacity: .9; }
+  100% { filter: grayscale(0) brightness(1); opacity: 1; }
+}
+
+.l-polaroid {
+  transform: rotate(-3deg);
+  filter: drop-shadow(0 6px 20px rgba(115, 44, 68, 0.18));
+  overflow: visible;
+}
+
+.l-polaroid__photo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: photoDevelop 2.4s ease-in-out infinite;
+}
+
 /* ── Reduced motion ──────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,
