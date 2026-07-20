@@ -103,7 +103,7 @@ function refreshMessages(page: HTMLElement, button: HTMLButtonElement): void {
 
   invalidateQueries('messages:list:');
   invalidateRoutes('/app/messages');
-  showToast('Đang tải lại tin nhắn...', 'info');
+  showToast('Đang tải lại tin nhắn...', 'loading');
   navigate('/app/messages');
 
   window.setTimeout(() => {

@@ -22,11 +22,11 @@ describe('toast status duration', () => {
     expect(toast.classList.contains('toast-exit')).toBe(true);
   });
 
-  it('uses the animated love chat loader for info toasts', async () => {
+  it('uses the animated love chat loader for loading toasts', async () => {
     const { showToast } = await import('./toast');
-    showToast('Äang táº£i láº¡i tin nháº¯n...', 'info');
+    showToast('Loading messages...', 'loading');
 
-    const loader = document.querySelector<SVGElement>('.toast-info .loveChat');
+    const loader = document.querySelector<SVGElement>('.toast-loading .loveChat');
     expect(loader).not.toBeNull();
     expect(loader?.getAttribute('aria-label')).toBe('love chat loader');
   });
