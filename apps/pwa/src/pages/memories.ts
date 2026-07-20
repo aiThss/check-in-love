@@ -243,6 +243,26 @@ function renderReplies(container: HTMLElement, replies: CheckInReply[]): void {
   });
 }
 
+function renderMemoriesPolaroidSkeleton(): string {
+  const rotations = ['-4deg', '3deg', '2deg', '-3deg'];
+  return rotations.map((deg, i) => `
+    <div style="border-radius:20px;aspect-ratio:1;background:var(--surface);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);">
+      <svg viewBox="0 0 64 76" width="86" height="102" style="transform:rotate(${deg});filter:drop-shadow(0 4px 14px rgba(115,44,68,0.15));overflow:visible;" aria-hidden="true">
+        <defs>
+          <linearGradient id="memPolGrad${i}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffb3cc"/>
+            <stop offset="55%" stop-color="#ff85a1"/>
+            <stop offset="100%" stop-color="#c0456c"/>
+          </linearGradient>
+        </defs>
+        <rect width="64" height="76" rx="4" fill="#fff4f7"/>
+        <rect class="l-polaroid__photo" x="6" y="6" width="52" height="52" rx="2" fill="url(#memPolGrad${i})"/>
+        <rect x="10" y="66" width="26" height="3" rx="1.5" fill="#c0456c" opacity=".4"/>
+      </svg>
+    </div>
+  `).join('');
+}
+
 export function renderMemoriesPage(): HTMLElement {
   const root = document.createElement('div');
   root.className = 'page memories-page animate-fade-in';
@@ -320,6 +340,7 @@ export function renderMemoriesPage(): HTMLElement {
   let displayedLimit = 14;
   let totalPages = cachedTotalPages;
   let isLoading = false;
+  let skeletonActive = false;
   let allItems: CheckIn[] = [...cachedMemories];
 
   const loadMoreBtn = document.createElement('button');
@@ -329,9 +350,8 @@ export function renderMemoriesPage(): HTMLElement {
   content.appendChild(loadMoreBtn);
 
   if (cachedMemories.length > 0) {
-    // Render cache immediately
-    applySearch();
-    // Fetch all in background to sync latest memories
+    // Do NOT render cache immediately — polaroid skeleton will show first.
+    // Background sync will apply after skeleton clears.
     loadAllMemories();
   }
 
@@ -461,6 +481,7 @@ export function renderMemoriesPage(): HTMLElement {
   }
 
   function applySearch() {
+    if (skeletonActive) return; // Skeleton is active — defer render until it completes
     const filtered = searchQuery ? allItems.filter((item) => matchesSearch(item, searchQuery)) : allItems;
     const toRender = searchQuery ? filtered : filtered.slice(0, displayedLimit);
     renderGrid(toRender, Boolean(searchQuery));
@@ -544,17 +565,25 @@ export function renderMemoriesPage(): HTMLElement {
     const refreshBtn = header.querySelector<HTMLButtonElement>('#refresh-btn');
     if (refreshBtn) setRefreshButtonLoading(refreshBtn, true);
 
-    if (page === 1 && !append && cachedMemories.length === 0) {
-      grid.innerHTML = `
-        <div class="skeleton" style="height:170px;border-radius:20px;"></div>
-        <div class="skeleton" style="height:170px;border-radius:20px;"></div>
-        <div class="skeleton" style="height:170px;border-radius:20px;"></div>
-        <div class="skeleton" style="height:170px;border-radius:20px;"></div>
-      `;
+    // Polaroid skeleton — every initial visit, min 3s (5s if network is slow)
+    let minWaitPromise: Promise<void> = Promise.resolve();
+    if (page === 1 && !append) {
+      skeletonActive = true;
+      grid.style.display = 'grid';
+      grid.innerHTML = renderMemoriesPolaroidSkeleton();
+
+      const conn = (navigator as any).connection;
+      const isSlowNetwork = conn?.effectiveType === '2g' || conn?.effectiveType === 'slow-2g';
+      const minWaitMs = isSlowNetwork ? 5000 : 3000;
+      minWaitPromise = new Promise<void>(resolve => setTimeout(resolve, minWaitMs));
     }
 
     try {
-        const res = await getCheckins(page, 14, undefined, 'photo');
+      const [res] = await Promise.all([
+        getCheckins(page, 14, undefined, 'photo'),
+        minWaitPromise,
+      ]);
+      skeletonActive = false;
       isLoading = false;
       const refreshBtn = header.querySelector<HTMLButtonElement>('#refresh-btn');
       if (refreshBtn) setRefreshButtonLoading(refreshBtn, false);
