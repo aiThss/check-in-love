@@ -13,6 +13,7 @@ import healthRoutes from './routes/health';
 import meRoutes from './routes/me';
 import messagesRoutes from './routes/messages';
 import messageStickerRoutes from './routes/message-stickers';
+import passwordResetRoutes from './routes/password-reset';
 import pushRoutes from './routes/push';
 import randomRoutes from './routes/random';
 
@@ -92,6 +93,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Keep a root liveness endpoint for container/platform health probes.
   await app.register(healthRoutes);
   await app.register(authRoutes, { prefix: '/api' });
+  await app.register(passwordResetRoutes, { prefix: '/api' });
   await app.register(meRoutes, { prefix: '/api' });
   await app.register(checkinsRoutes, { prefix: '/api' });
   await app.register(messagesRoutes, { prefix: '/api' });
