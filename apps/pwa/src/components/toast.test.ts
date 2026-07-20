@@ -22,6 +22,15 @@ describe('toast status duration', () => {
     expect(toast.classList.contains('toast-exit')).toBe(true);
   });
 
+  it('uses the animated heart icon for error toasts', async () => {
+    const { showToast } = await import('./toast');
+    showToast('Vui lòng nhập email', 'error');
+
+    const icon = document.querySelector<SVGElement>('.toast-error .toast-error-heart');
+    expect(icon).not.toBeNull();
+    expect(document.querySelector('img[src="/icons8-error.gif"]')).toBeNull();
+  });
+
   it('uses the animated love chat loader for loading toasts', async () => {
     const { showToast } = await import('./toast');
     showToast('Loading messages...', 'loading');
