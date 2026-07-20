@@ -2,7 +2,6 @@ import { navigate } from '../router';
 import { getCheckins, addReaction } from '../api/checkins';
 import { createMessage } from '../api/messages';
 import { showToast } from '../components/toast';
-import { loveSparkLoaderMarkup } from '../components/love-spark-loader';
 import { showModal } from '../components/modal';
 import { openReactionPicker } from '../components/reaction-picker';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
@@ -246,9 +245,20 @@ function renderReplies(container: HTMLElement, replies: CheckInReply[]): void {
 
 function renderMemoriesPolaroidSkeleton(): string {
   const rotations = ['-4deg', '3deg', '2deg', '-3deg', '4deg', '-2deg', '-5deg', '1deg'];
-  return rotations.map((deg) => `
+  return rotations.map((deg, i) => `
     <div style="border-radius:20px;aspect-ratio:1;background:var(--surface);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);">
-      <span style="display:flex;transform:rotate(${deg});filter:drop-shadow(0 4px 14px rgba(115,44,68,0.15));">${loveSparkLoaderMarkup}</span>
+      <svg viewBox="0 0 64 76" width="86" height="102" style="transform:rotate(${deg});filter:drop-shadow(0 4px 14px rgba(115,44,68,0.15));overflow:visible;" aria-hidden="true">
+        <defs>
+          <linearGradient id="memPolGrad${i}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffb3cc"/>
+            <stop offset="55%" stop-color="#ff85a1"/>
+            <stop offset="100%" stop-color="#c0456c"/>
+          </linearGradient>
+        </defs>
+        <rect width="64" height="76" rx="4" fill="#fff4f7"/>
+        <rect class="l-polaroid__photo" x="6" y="6" width="52" height="52" rx="2" fill="url(#memPolGrad${i})"/>
+        <rect x="10" y="66" width="26" height="3" rx="1.5" fill="#c0456c" opacity=".4"/>
+      </svg>
     </div>
   `).join('');
 }
@@ -814,7 +824,7 @@ export function renderMemoriesPage(): HTMLElement {
             if (isAndroidWrapper && (window as any).LoveCheckAndroid && typeof (window as any).LoveCheckAndroid.downloadFile === 'function') {
               try {
                 (window as any).LoveCheckAndroid.downloadFile(downloadUrl, fileName);
-                showToast('Đang tải ảnh xuống...', 'loading-spark');
+                showToast('Đang tải ảnh xuống...', 'info');
               } catch (e) {
                 window.open(downloadUrl, '_blank', 'noopener,noreferrer');
               } finally {
@@ -929,7 +939,7 @@ export function renderMemoriesPage(): HTMLElement {
     displayedLimit = 14;
     currentPage = 1;
     fetchMemories(1);
-    showToast('Đang tải lại kỷ niệm...', 'loading-spark');
+    showToast('Đang tải lại kỷ niệm...', 'info');
   });
 
   loadMoreBtn.addEventListener('click', () => {

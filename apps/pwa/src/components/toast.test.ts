@@ -31,12 +31,4 @@ describe('toast status duration', () => {
     expect(loader?.getAttribute('aria-label')).toBe('love chat loader');
   });
 
-  it('uses the animated love spark loader for home and memories loading toasts', async () => {
-    const { showToast } = await import('./toast');
-    showToast('Loading memories...', 'loading-spark');
-
-    const loader = document.querySelector<SVGElement>('.toast-loading-spark .loveSpark');
-    expect(loader).not.toBeNull();
-    expect(loader?.getAttribute('aria-label')).toBe('love spark loader');
-  });
 });

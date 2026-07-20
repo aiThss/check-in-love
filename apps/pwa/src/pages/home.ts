@@ -4,7 +4,6 @@ import { getLatestPartnerCheckin, getCachedLatestPartnerCheckin, getCheckins, ad
 import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
-import { loveSparkLoaderMarkup } from '../components/love-spark-loader';
 import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import { smilePlusIconMarkup } from '../components/smile-plus-icon';
@@ -94,10 +93,6 @@ function renderSkeleton(): HTMLElement {
     </div>
     <div class="skeleton" style="height:56px;border-radius:20px;"></div>
   `;
-  const loaderTemplate = document.createElement('template');
-  loaderTemplate.innerHTML = loveSparkLoaderMarkup;
-  wrapper.querySelector('.l-polaroid')?.replaceWith(loaderTemplate.content.firstElementChild!);
-
   return wrapper;
 }
 
@@ -656,10 +651,7 @@ export function renderHomePage(): HTMLElement {
   refreshBtn.className = 'btn-icon';
   refreshBtn.setAttribute('aria-label', 'Làm mới');
   refreshBtn.innerHTML = refreshIconMarkup;
-  refreshBtn.addEventListener('click', () => {
-    showToast('Đang tải lại check-in...', 'loading-spark');
-    loadCheckin();
-  });
+  refreshBtn.addEventListener('click', () => loadCheckin());
 
   rightActions.appendChild(themeBtn);
   rightActions.appendChild(refreshBtn);

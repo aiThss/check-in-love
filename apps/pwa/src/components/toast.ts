@@ -1,8 +1,6 @@
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
-import { loveSparkLoaderMarkup } from './love-spark-loader';
-
-type ToastType = 'success' | 'error' | 'info' | 'loading' | 'loading-spark';
+type ToastType = 'success' | 'error' | 'info' | 'loading';
 
 let toastContainer: HTMLElement | null = null;
 
@@ -21,7 +19,6 @@ const ICONS: Record<ToastType, string> = {
   success: `<lottie-player src="/icons8-correct.json" background="transparent" speed="1.2" style="width: 28px; height: 28px;" autoplay></lottie-player>`,
   error: `<img src="/icons8-error.gif" style="width: 28px; height: 28px; object-fit: contain;" alt="error" />`,
   info: `<img src="/icons8-waiting.png" style="width: 28px; height: 28px; object-fit: contain;" alt="info" />`,
-  'loading-spark': loveSparkLoaderMarkup,
   loading: `<svg class="loveChat" viewBox="0 0 100 100" width="112" height="112" xmlns="http://www.w3.org/2000/svg" aria-label="love chat loader">
     <style>
       .loveChat .b1,
