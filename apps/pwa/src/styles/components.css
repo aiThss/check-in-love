@@ -385,37 +385,70 @@ a {
 
 .nav-checkin-btn {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   background: var(--accent);
   color: #ffffff;
-  border: none;
-  box-shadow: 0 4px 16px var(--accent-glow);
-  margin: 6px 8px;
+  border: 3px solid var(--bg);
+  box-shadow: 0 8px 24px rgba(255, 59, 127, 0.35);
+  margin-top: -30px;
   cursor: pointer;
   flex-shrink: 0;
-  overflow: hidden;
+  position: relative;
+  z-index: 101;
   transition: transform var(--duration-fast) var(--ease-spring),
     box-shadow var(--duration-fast) var(--ease);
 }
 
 .nav-checkin-btn:hover {
   transform: scale(1.08);
-  box-shadow: 0 6px 24px var(--accent-glow);
+  box-shadow: 0 10px 30px rgba(255, 59, 127, 0.45);
 }
 
 .nav-checkin-btn:active {
-  transform: scale(0.93);
+  transform: scale(0.92) translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 59, 127, 0.2);
 }
 
-.nav-checkin-btn .nav-icon {
-  font-size: 24px;
-  color: #ffffff;
+.nav-checkin-btn svg {
+  transition: transform var(--duration-normal) var(--ease);
+  stroke: #ffffff;
 }
+
+.nav-checkin-btn.active svg {
+  transform: rotate(135deg);
+}
+
+/* Wrapper + pulsing glow ring (ported from locket) */
+.nav-checkin-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-checkin-glow {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.28;
+  margin-top: -30px;
+  pointer-events: none;
+  z-index: 100;
+  animation: navGlowPulse 2.5s infinite ease-in-out;
+}
+
+@keyframes navGlowPulse {
+  0%   { transform: scale(1);    opacity: 0.3; }
+  50%  { transform: scale(1.28); opacity: 0;   }
+  100% { transform: scale(1);    opacity: 0.3; }
+}
+
 
 /* ── Check-in Card ──────────────────────────────────────────── */
 .checkin-card {
@@ -3123,10 +3156,10 @@ body::after {
 }
 
 .nav-checkin-btn {
-  width: 56px;
-  height: 56px;
-  margin: -13px 8px 0;
-  box-shadow: 0 14px 28px rgba(255, 59, 127, 0.35);
+  width: 58px;
+  height: 58px;
+  margin-top: -30px;
+  box-shadow: 0 8px 24px rgba(255, 59, 127, 0.35);
 }
 
 button:focus-visible,

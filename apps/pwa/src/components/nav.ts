@@ -46,6 +46,26 @@ export function createNav(): HTMLElement {
     if (item.isCheckin) {
       button.className = 'nav-checkin-btn';
       button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+
+      // Wrap in relative container with glow ring (ported from locket)
+      const wrapper = document.createElement('div');
+      wrapper.className = 'nav-checkin-wrapper';
+
+      const glow = document.createElement('div');
+      glow.className = 'nav-checkin-glow';
+
+      wrapper.appendChild(glow);
+      wrapper.appendChild(button);
+
+      button.addEventListener('click', () => {
+        const isActive = button.classList.toggle('active');
+        navigate(item.path);
+        // Reset active state after navigation
+        setTimeout(() => button.classList.remove('active'), 400);
+      });
+
+      inner.appendChild(wrapper);
+      continue;
     } else {
       button.className = 'nav-item';
       button.style.transform = 'none';
