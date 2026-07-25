@@ -16,6 +16,7 @@ import messageStickerRoutes from './routes/message-stickers';
 import passwordResetRoutes from './routes/password-reset';
 import pushRoutes from './routes/push';
 import randomRoutes from './routes/random';
+import { installCheckinReplyMessageSync } from './services/checkin-reply-message-sync';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -87,6 +88,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     prefix: '/uploads/',
     decorateReply: false,
   });
+
+  // Keep CheckIn replies and the Messages collection synchronized immediately.
+  installCheckinReplyMessageSync(app);
 
   // ─── Routes ──────────────────────────────────────────────────────────────────
   await app.register(healthRoutes, { prefix: '/api' });
