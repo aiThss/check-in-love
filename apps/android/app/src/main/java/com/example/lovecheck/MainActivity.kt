@@ -24,6 +24,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
@@ -316,7 +317,28 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        installBackHandler()
         checkUpdate()
+    }
+
+    private fun installBackHandler() {
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    val currentWebView = webView ?: return
+
+                    // Route every system/predictive Back gesture through the web history.
+                    // This lets the PWA close its active modal/history layer or restore
+                    // the previous tab. At the app root history.back() is a no-op, so
+                    // MainActivity stays open instead of being finished by Android.
+                    currentWebView.evaluateJavascript(
+                        "window.history.back();",
+                        null,
+                    )
+                }
+            },
+        )
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -411,15 +433,6 @@ class MainActivity : ComponentActivity() {
             "if (typeof window.onFcmTokenReceived === 'function') { window.onFcmTokenReceived('$escaped'); }",
             null,
         )
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (webView?.canGoBack() == true) {
-            webView?.goBack()
-        } else {
-            super.onBackPressed()
-        }
     }
 
     override fun onDestroy() {
