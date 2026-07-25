@@ -1,0 +1,59 @@
+name: Run native back fix on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.head_ref == 'agent/native-back-history'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: agent/native-back-history
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Extract and run source patch
+        shell: bash
+        run: |
+          awk '
+            /node <<'"'"'NODE'"'"'/ { capture=1; next }
+            capture && /^          NODE$/ { capture=0; exit }
+            capture { sub(/^          /, ""); print }
+          ' .github/workflows/agent-native-back-history.yml > /tmp/apply-native-back-history.cjs
+          node /tmp/apply-native-back-history.cjs
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build PWA
+        run: npm run build --workspace=apps/pwa
+
+      - name: Test router history
+        run: npm test -- apps/pwa/src/router.test.ts
+
+      - name: Commit applied fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/agent-native-back-history.yml \
+                 .github/workflows/agent-native-back-history-pr.yml
+          git add apps/pwa/src/pages/home.ts \
+                  apps/pwa/src/pages/memories.ts \
+                  apps/pwa/src/router.ts \
+                  apps/pwa/src/router.test.ts \
+                  apps/pwa/src/components/modal.ts
+          git commit -m "fix(pwa): preserve native-style back history"
+          git push origin HEAD:agent/native-back-history
