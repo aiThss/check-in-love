@@ -6,6 +6,7 @@ import { showModal } from '../components/modal';
 import { openReactionPicker } from '../components/reaction-picker';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import { smilePlusIconMarkup } from '../components/smile-plus-icon';
+import { openPolaroidCoverModal } from '../components/polaroid-cover';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
 let cachedMemories: CheckIn[] = [];
@@ -734,6 +735,9 @@ export function renderMemoriesPage(): HTMLElement {
               alt="Ảnh check-in"
               loading="eager"
             />
+            <button type="button" class="btn-polaroid-scratch-trigger">
+              📸 Trải nghiệm Polaroid Scratch Cover
+            </button>
           </div>
           ${item.caption ? `<p class="checkin-detail-caption">${escapeHtml(item.caption)}</p>` : ''}
         `;
@@ -915,6 +919,17 @@ export function renderMemoriesPage(): HTMLElement {
 
       detail.querySelector<HTMLButtonElement>('.memory-reaction-choice')?.addEventListener('click', () => {
         detailReactionPicker.classList.toggle('open');
+      });
+
+      detail.querySelector<HTMLButtonElement>('.btn-polaroid-scratch-trigger')?.addEventListener('click', () => {
+        const photoUrl = getCheckinPhotoUrl(item);
+        if (!photoUrl) return;
+        openPolaroidCoverModal({
+          imageUrl: photoUrl,
+          title: item.caption || 'Kỷ niệm yêu thương 💖',
+          dateText: formatTime(item.createdAt),
+          timerSeconds: 5,
+        });
       });
     };
 
