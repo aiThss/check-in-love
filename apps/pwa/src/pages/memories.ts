@@ -565,17 +565,13 @@ export function renderMemoriesPage(): HTMLElement {
     const refreshBtn = header.querySelector<HTMLButtonElement>('#refresh-btn');
     if (refreshBtn) setRefreshButtonLoading(refreshBtn, true);
 
-    // Polaroid skeleton — every initial visit, min 3s (5s if network is slow)
+    // Polaroid skeleton — every initial visit, fixed 2s.
     let minWaitPromise: Promise<void> = Promise.resolve();
     if (page === 1 && !append) {
       skeletonActive = true;
       grid.style.display = 'grid';
       grid.innerHTML = renderMemoriesPolaroidSkeleton();
-
-      const conn = (navigator as any).connection;
-      const isSlowNetwork = conn?.effectiveType === '2g' || conn?.effectiveType === 'slow-2g';
-      const minWaitMs = isSlowNetwork ? 5000 : 3000;
-      minWaitPromise = new Promise<void>(resolve => setTimeout(resolve, minWaitMs));
+      minWaitPromise = new Promise<void>((resolve) => setTimeout(resolve, 2000));
     }
 
     try {
