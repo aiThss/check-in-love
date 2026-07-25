@@ -349,3 +349,49 @@
   line-height: 1;
   font-weight: 900;
 }
+
+/* Android WebView occasionally resolves vh to zero for a newly mounted fixed modal.
+   Pin the container to the real native insets and avoid the transformed/backdrop-filter
+   compositor layer that collapses the child into a horizontal line. */
+html.android-wrapper .polaroid-modal-backdrop {
+  padding: 0;
+  animation: polaroidAndroidFade 180ms ease-out both;
+  transform: none !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html.android-wrapper .polaroid-modal-container {
+  position: absolute;
+  top: calc(var(--android-status-bar, 0px) + 16px);
+  right: 16px;
+  bottom: calc(var(--android-nav-bar, 0px) + 16px);
+  left: 16px;
+  width: auto;
+  height: auto;
+  min-height: 280px;
+  max-width: 640px;
+  max-height: none;
+  margin: 0 auto;
+  isolation: isolate;
+}
+
+html.android-wrapper .polaroid-stage-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+html.android-wrapper .polaroid-stage-intro,
+html.android-wrapper .polaroid-hud,
+html.android-wrapper .polaroid-success,
+html.android-wrapper .polaroid-scratch-pill {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@keyframes polaroidAndroidFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
