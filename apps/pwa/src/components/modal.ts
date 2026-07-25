@@ -1,3 +1,5 @@
+import { closeHistoryLayer, openHistoryLayer } from '../router';
+
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
 export interface ModalOptions {
@@ -16,10 +18,22 @@ export interface ModalOptions {
 }
 
 let activeOverlay: HTMLElement | null = null;
+let activeHistoryLayerId: string | null = null;
+let activeEscHandler: ((event: KeyboardEvent) => void) | null = null;
+
+function removeOverlay(overlay: HTMLElement, escHandler: (event: KeyboardEvent) => void): void {
+  document.removeEventListener('keydown', escHandler);
+  overlay.remove();
+
+  if (activeOverlay === overlay) {
+    activeOverlay = null;
+    activeHistoryLayerId = null;
+    activeEscHandler = null;
+  }
+  if (!activeOverlay) document.body.style.overflow = '';
+}
 
 export function showModal(options: ModalOptions): void {
-  // Remove any existing modal
-  closeModal();
 
   const overlay = document.createElement('div');
   const overlayClasses = ['modal-overlay'];
@@ -111,17 +125,26 @@ export function showModal(options: ModalOptions): void {
   };
   document.addEventListener('keydown', escHandler);
 
+  const historyLayerId = openHistoryLayer((reason) => {
+    if (reason === 'back') options.onCancel?.();
+    removeOverlay(overlay, escHandler);
+  });
+
   (document.getElementById('modal-root') ?? document.body).appendChild(overlay);
   activeOverlay = overlay;
+  activeHistoryLayerId = historyLayerId;
+  activeEscHandler = escHandler;
 
   // Prevent body scroll
   document.body.style.overflow = 'hidden';
 }
 
 export function closeModal(): void {
-  if (activeOverlay) {
-    activeOverlay.remove();
-    activeOverlay = null;
-    document.body.style.overflow = '';
-  }
+  const overlay = activeOverlay;
+  const historyLayerId = activeHistoryLayerId;
+  const escHandler = activeEscHandler;
+  if (!overlay || !escHandler) return;
+
+  removeOverlay(overlay, escHandler);
+  if (historyLayerId) closeHistoryLayer(historyLayerId);
 }

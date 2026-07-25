@@ -28,6 +28,22 @@ interface AppShell {
 
 const AUTO_REVALIDATE_ROUTES = new Set(['/app/home', '/app/memories']);
 const AUTO_REVALIDATE_AFTER_MS = 15_000;
+const APP_HISTORY_STATE_KEY = '__checkInLoveAppHistory';
+
+type AppHistoryKind = 'boundary' | 'route' | 'layer';
+export type HistoryLayerCloseReason = 'back' | 'replace' | 'navigation';
+
+interface AppHistoryState {
+  app: true;
+  kind: AppHistoryKind;
+  path: string;
+  layerId?: string;
+}
+
+interface HistoryLayer {
+  id: string;
+  close: (reason: HistoryLayerCloseReason) => void;
+}
 
 let routes: Routes = {};
 let currentPath = '';
@@ -36,25 +52,130 @@ let currentPage: RoutePage | null = null;
 let shell: AppShell | null = null;
 let navigationVersion = 0;
 const pageCache = new Map<string, CachedPage>();
+let currentHistoryState: AppHistoryState | null = null;
+let activeHistoryLayer: HistoryLayer | null = null;
+let appBoundarySeeded = false;
+let historyLayerSequence = 0;
 
 export function getCurrentPath(): string {
   return `${window.location.pathname}${window.location.search}`;
+}
+
+function readAppHistoryState(value: unknown = history.state): AppHistoryState | null {
+  if (!value || typeof value !== 'object') return null;
+  const wrapped = (value as Record<string, unknown>)[APP_HISTORY_STATE_KEY];
+  if (!wrapped || typeof wrapped !== 'object') return null;
+
+  const candidate = wrapped as Partial<AppHistoryState>;
+  if (candidate.app !== true || typeof candidate.path !== 'string') return null;
+  if (candidate.kind !== 'boundary' && candidate.kind !== 'route' && candidate.kind !== 'layer') return null;
+  if (candidate.kind === 'layer' && typeof candidate.layerId !== 'string') return null;
+  return candidate as AppHistoryState;
+}
+
+function withoutAppHistoryState(value: unknown = history.state): Record<string, unknown> {
+  if (!value || typeof value !== 'object') return {};
+  const next = { ...(value as Record<string, unknown>) };
+  delete next[APP_HISTORY_STATE_KEY];
+  return next;
+}
+
+function createAppHistoryState(kind: AppHistoryKind, path: string, layerId?: string): AppHistoryState {
+  return { app: true, kind, path, ...(layerId ? { layerId } : {}) };
+}
+
+function writeAppHistoryState(
+  method: 'push' | 'replace',
+  state: AppHistoryState,
+  url = state.path,
+): void {
+  const next = withoutAppHistoryState();
+  next[APP_HISTORY_STATE_KEY] = state;
+  if (method === 'replace') history.replaceState(next, '', url);
+  else history.pushState(next, '', url);
+  currentHistoryState = state;
+}
+
+function writeRouteHistory(path: string, replace: boolean): void {
+  const target = new URL(path, window.location.origin);
+  const nextPath = target.pathname + target.search;
+  const state = withoutAppHistoryState();
+  const appRoute = target.pathname.startsWith('/app/');
+  const appState = appRoute && appBoundarySeeded
+    ? createAppHistoryState('route', nextPath)
+    : null;
+
+  if (appState) state[APP_HISTORY_STATE_KEY] = appState;
+  if (replace) history.replaceState(state, '', nextPath);
+  else history.pushState(state, '', nextPath);
+  currentHistoryState = appState;
+}
+
+function ensureAppHistoryBoundary(path: string): void {
+  const target = new URL(path, window.location.origin);
+  if (!store.isAuthenticated() || !target.pathname.startsWith('/app/')) return;
+
+  const nextPath = target.pathname + target.search;
+  if (appBoundarySeeded) {
+    const existing = readAppHistoryState();
+    if (!existing || existing.kind === 'boundary') {
+      writeAppHistoryState('replace', createAppHistoryState('route', nextPath), nextPath);
+    } else {
+      currentHistoryState = existing;
+    }
+    return;
+  }
+
+  appBoundarySeeded = true;
+  writeAppHistoryState('replace', createAppHistoryState('boundary', nextPath), nextPath);
+  writeAppHistoryState('push', createAppHistoryState('route', nextPath), nextPath);
+}
+
+function closeActiveHistoryLayerForNavigation(): void {
+  const layer = activeHistoryLayer;
+  if (!layer) return;
+  activeHistoryLayer = null;
+  layer.close('navigation');
+  writeRouteHistory(getCurrentPath(), true);
+}
+
+export function openHistoryLayer(close: (reason: HistoryLayerCloseReason) => void): string {
+  const path = getCurrentPath();
+  ensureAppHistoryBoundary(path);
+  const id = 'layer-' + Date.now() + '-' + (++historyLayerSequence);
+
+  if (activeHistoryLayer) {
+    const previous = activeHistoryLayer;
+    activeHistoryLayer = null;
+    previous.close('replace');
+    writeAppHistoryState('replace', createAppHistoryState('layer', path, id), path);
+  } else {
+    writeAppHistoryState('push', createAppHistoryState('layer', path, id), path);
+  }
+
+  activeHistoryLayer = { id, close };
+  return id;
+}
+
+export function closeHistoryLayer(id: string): void {
+  if (activeHistoryLayer?.id !== id) return;
+  activeHistoryLayer = null;
+  const state = readAppHistoryState();
+  if (state?.kind === 'layer' && state.layerId === id) history.back();
 }
 
 export function navigate(path: string, replace = false): void {
   const target = new URL(path, window.location.origin);
   const nextPath = `${target.pathname}${target.search}`;
 
+  closeActiveHistoryLayerForNavigation();
+
   if (nextPath === getCurrentPath()) {
     void renderRoute(target.pathname);
     return;
   }
 
-  if (replace) {
-    history.replaceState({}, '', nextPath);
-  } else {
-    history.pushState({}, '', nextPath);
-  }
+  writeRouteHistory(nextPath, replace);
   void renderRoute(target.pathname);
 }
 
@@ -75,8 +196,41 @@ export function clearPageCache(): void {
 export function initRouter(nextRoutes: Routes): void {
   routes = nextRoutes;
   ensureShell();
+  currentHistoryState = readAppHistoryState();
+  ensureAppHistoryBoundary(getCurrentPath());
 
-  window.addEventListener('popstate', () => {
+  window.addEventListener('popstate', (event) => {
+    const previousState = currentHistoryState;
+    let nextState = readAppHistoryState(event.state);
+    currentHistoryState = nextState;
+
+    if (previousState?.kind === 'layer') {
+      const layer = activeHistoryLayer;
+      activeHistoryLayer = null;
+      if (layer && layer.id === previousState.layerId) layer.close('back');
+    }
+
+    if (nextState?.kind === 'layer' && activeHistoryLayer?.id !== nextState.layerId) {
+      writeRouteHistory(getCurrentPath(), true);
+      nextState = currentHistoryState;
+    }
+
+    if (
+      nextState?.kind === 'boundary'
+      && store.isAuthenticated()
+      && window.location.pathname.startsWith('/app/')
+    ) {
+      const fallbackPath = previousState?.path?.startsWith('/app/')
+        ? previousState.path
+        : '/app/home';
+      const fallback = new URL(fallbackPath, window.location.origin);
+      const normalized = fallback.pathname + fallback.search;
+      writeAppHistoryState('replace', createAppHistoryState('boundary', normalized), normalized);
+      writeAppHistoryState('push', createAppHistoryState('route', normalized), normalized);
+      void renderRoute(fallback.pathname);
+      return;
+    }
+
     void renderRoute(window.location.pathname);
   });
 
@@ -204,6 +358,7 @@ async function renderRoute(path: string): Promise<void> {
   }
 
   const resolvedPath = resolveRoute(path);
+  if (resolvedPath.startsWith('/app/')) ensureAppHistoryBoundary(getCurrentPath());
   const factory = routes[resolvedPath];
   if (!factory) {
     renderMessage(activeShell.pageHost, 'Không tìm thấy trang', 'Trang này không tồn tại.');

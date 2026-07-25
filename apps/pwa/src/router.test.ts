@@ -148,6 +148,23 @@ describe('persistent router behavior', () => {
     expectOnlyVisibleRoute('/app/messages');
   });
 
+  it('dismisses a UI layer before navigating away from the current tab', async () => {
+    router.navigate('/app/home');
+    await flush();
+    const onClose = vi.fn();
+
+    router.openHistoryLayer(onClose);
+    expect((history.state as any).__checkInLoveAppHistory?.kind).toBe('layer');
+
+    history.back();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledWith('back');
+    expect(window.location.pathname).toBe('/app/home');
+    expectOnlyVisibleRoute('/app/home');
+  });
+
   it('redirects protected routes after authentication is cleared and destroys cached pages', async () => {
     store.clear();
     router.navigate('/app/home');
