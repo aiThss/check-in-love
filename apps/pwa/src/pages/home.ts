@@ -7,6 +7,7 @@ import { showToast } from '../components/toast';
 import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import { smilePlusIconMarkup } from '../components/smile-plus-icon';
+import { openPolaroidCoverModal } from '../components/polaroid-cover';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -436,10 +437,21 @@ function buildRecentMemoriesSection(): HTMLElement {
         if (hasPhoto && photoUrl) {
           const photoWrap = document.createElement('div');
           photoWrap.className = 'rm-photo-wrap';
+          photoWrap.style.cursor = 'pointer';
           photoWrap.innerHTML = `
             <img src="${escapeHtml(photoUrl)}" alt="Ảnh kỷ niệm" loading="lazy" />
             <div class="rm-photo-overlay"></div>
+            <span class="polaroid-scratch-pill">✨ Polaroid Cover</span>
           `;
+          photoWrap.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openPolaroidCoverModal({
+              imageUrl: photoUrl,
+              title: item.caption || `Kỷ niệm của ${item.ownerName} 💖`,
+              dateText: formatTime(item.createdAt),
+              timerSeconds: 5,
+            });
+          });
           card.appendChild(photoWrap);
         } else if (item.type === 'mood') {
           // Mood art placeholder

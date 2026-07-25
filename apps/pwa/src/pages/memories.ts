@@ -654,10 +654,11 @@ export function renderMemoriesPage(): HTMLElement {
       const card = document.createElement('div');
       card.className = 'memory-item';
 
-      if (item.type === 'photo') {
-        card.style.cssText = 'position:relative;border-radius:20px;overflow:hidden;aspect-ratio:1;';
+      if (item.type === 'photo' || (item as any).photoUrl) {
+        card.style.cssText = 'position:relative;border-radius:20px;overflow:hidden;aspect-ratio:1;cursor:pointer;';
         card.innerHTML = `
-          <img src="${escapeHtml(item.photoUrl)}" style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
+          <img src="${escapeHtml((item as any).photoUrl)}" style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
+          <span class="polaroid-scratch-pill">✨ Polaroid Cover</span>
           <div class="memory-item-info">
             <span style="font-size:11px;opacity:0.9;color:#fff;">${escapeHtml(item.ownerName)}</span>
             <span class="memory-item-info-text" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -694,7 +695,17 @@ export function renderMemoriesPage(): HTMLElement {
 
       card.addEventListener('click', () => {
         if (consumeLongPress()) return;
-        showCheckinDetail(item);
+        const photoUrl = getCheckinPhotoUrl(item);
+        if (photoUrl) {
+          openPolaroidCoverModal({
+            imageUrl: photoUrl,
+            title: item.caption || `Kỷ niệm của ${item.ownerName} 💖`,
+            dateText: formatTime(item.createdAt),
+            timerSeconds: 5,
+          });
+        } else {
+          showCheckinDetail(item);
+        }
       });
 
       tile.appendChild(card);
