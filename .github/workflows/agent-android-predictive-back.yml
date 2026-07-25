@@ -101,8 +101,8 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git rm .github/workflows/agent-android-predictive-back.yml
             git add apps/android/app/src/main/java/com/example/lovecheck/MainActivity.kt \
-                    apps/android/app/build.gradle.kts \
-                    app-release.apk
+                    apps/android/app/build.gradle.kts
+            git add -f app-release.apk
             git status --short
             git commit -m "fix(android): handle predictive back through web history"
             git push origin HEAD:agent/android-predictive-back
