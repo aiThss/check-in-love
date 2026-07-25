@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   apply-fix:
@@ -88,14 +89,37 @@ jobs:
           ./gradlew :app:assembleRelease --no-daemon
 
       - name: Publish source and APK to branch
+        id: publish
+        continue-on-error: true
         shell: bash
         run: |
-          cp apps/android/app/build/outputs/apk/release/app-release.apk app-release.apk
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/agent-android-predictive-back.yml
-          git add apps/android/app/src/main/java/com/example/lovecheck/MainActivity.kt \
-                  apps/android/app/build.gradle.kts \
-                  app-release.apk
-          git commit -m "fix(android): handle predictive back through web history"
-          git push origin HEAD:agent/android-predictive-back
+          set -o pipefail
+          {
+            cp apps/android/app/build/outputs/apk/release/app-release.apk app-release.apk
+            ls -lh app-release.apk
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git rm .github/workflows/agent-android-predictive-back.yml
+            git add apps/android/app/src/main/java/com/example/lovecheck/MainActivity.kt \
+                    apps/android/app/build.gradle.kts \
+                    app-release.apk
+            git status --short
+            git commit -m "fix(android): handle predictive back through web history"
+            git push origin HEAD:agent/android-predictive-back
+          } 2>&1 | tee /tmp/android-publish.log
+
+      - name: Report publish diagnostics
+        if: steps.publish.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo 'Android publish diagnostics:'
+            echo
+            echo '```text'
+            tail -n 120 /tmp/android-publish.log
+            echo '```'
+          } > /tmp/android-publish-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/android-publish-comment.md
+          exit 1
