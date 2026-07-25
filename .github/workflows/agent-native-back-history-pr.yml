@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   apply-fix:
@@ -38,7 +39,26 @@ jobs:
         run: npm ci
 
       - name: Build PWA
-        run: npm run build --workspace=apps/pwa
+        id: build
+        continue-on-error: true
+        shell: bash
+        run: npm run build --workspace=apps/pwa 2>&1 | tee /tmp/pwa-build.log
+
+      - name: Report build diagnostics
+        if: steps.build.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo 'Build diagnostics from the native-back workflow:'
+            echo
+            echo '```text'
+            tail -n 100 /tmp/pwa-build.log
+            echo '```'
+          } > /tmp/build-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/build-comment.md
+          exit 1
 
       - name: Test router history
         run: npm test -- apps/pwa/src/router.test.ts
