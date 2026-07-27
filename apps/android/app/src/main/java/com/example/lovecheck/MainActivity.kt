@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -118,6 +119,10 @@ class MainActivity : ComponentActivity() {
     private var webView: WebView? = null
     private var pendingFcmToken: String? = null
     private var webPageLoaded = false
+    private val updateCheckLock = Any()
+    private var updateCheckRunning = false
+    private var lastUpdateCheckAt = 0L
+    private var updateDialog: AlertDialog? = null
 
     private val fcmReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -318,6 +323,10 @@ class MainActivity : ComponentActivity() {
         }
 
         installBackHandler()
+    }
+
+    override fun onResume() {
+        super.onResume()
         checkUpdate()
     }
 
@@ -445,6 +454,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkUpdate() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        synchronized(updateCheckLock) {
+            if (updateCheckRunning || updateDialog?.isShowing == true) return
+            if (now - lastUpdateCheckAt < UPDATE_CHECK_INTERVAL_MS) return
+            updateCheckRunning = true
+            lastUpdateCheckAt = now
+        }
+
         Thread {
             try {
                 val url = URL("https://api.github.com/repos/aiThss/check-in-love/releases/latest")
@@ -453,6 +470,8 @@ class MainActivity : ComponentActivity() {
                 conn.readTimeout = 7000
                 conn.requestMethod = "GET"
                 conn.setRequestProperty("User-Agent", "LoveCheckUpdater")
+                conn.setRequestProperty("Cache-Control", "no-cache")
+                conn.setRequestProperty("Accept", "application/vnd.github+json")
 
                 if (conn.responseCode == 200) {
                     val response = conn.inputStream.bufferedReader().readText()
@@ -470,7 +489,7 @@ class MainActivity : ComponentActivity() {
 
                         for (i in 0 until assets.length()) {
                             val asset = assets.getJSONObject(i)
-                            if (asset.getString("name").endsWith(".apk")) {
+                            if (asset.getString("name").endsWith(".apk", ignoreCase = true)) {
                                 apkUrl = asset.getString("browser_download_url")
                                 break
                             }
@@ -486,15 +505,26 @@ class MainActivity : ComponentActivity() {
                 conn.disconnect()
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                synchronized(updateCheckLock) {
+                    updateCheckRunning = false
+                }
             }
         }.start()
     }
 
     private fun showUpdateDialog(version: String, url: String) {
+        if (isFinishing || isDestroyed || updateDialog?.isShowing == true) return
+
         val dialogView = layoutInflater.inflate(R.layout.dialog_update, null)
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .create()
+
+        updateDialog = dialog
+        dialog.setOnDismissListener {
+            if (updateDialog === dialog) updateDialog = null
+        }
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
@@ -523,6 +553,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun downloadAndInstallApk(apkUrl: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !packageManager.canRequestPackageInstalls()
+        ) {
+            synchronized(updateCheckLock) {
+                lastUpdateCheckAt = 0L
+            }
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+            return
+        }
+
         val request = DownloadManager.Request(Uri.parse(apkUrl))
             .setTitle("Check IN Love Update")
             .setDescription("Đang tải xuống phiên bản mới...")
@@ -571,6 +616,7 @@ class MainActivity : ComponentActivity() {
         private const val APP_URL = "https://couple.babyress.games"
         private const val RETRY_SCHEME = "lovecheck"
         private const val STICKER_PATCH_VERSION = "1.1.10"
+        private const val UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000L
 
         private val allowedHosts = setOf(
             "couple.babyress.games",
