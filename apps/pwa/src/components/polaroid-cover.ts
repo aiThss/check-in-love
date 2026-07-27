@@ -312,7 +312,7 @@ function drawLoveFoil(
   ctx.fillText('LOVE NOTE', width / 2, height / 2 - 8);
   ctx.globalAlpha = 0.82;
   ctx.font = "700 11px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText('CÀO 75% ĐỂ MỞ', width / 2, height / 2 + 20);
+  ctx.fillText('CÀO ĐỂ MỞ', width / 2, height / 2 + 20);
   ctx.restore();
   ctx.restore();
 }
@@ -406,8 +406,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   hud.className = `polaroid-hud${revealed ? ' hidden' : ''}`;
   hud.innerHTML = `
     <span class="polaroid-hud-text">Cào để mở</span>
-    <div class="polaroid-hud-progress"><div class="polaroid-hud-bar"></div></div>
-    <span class="polaroid-hud-pct">0% / ${Math.round(revealThreshold * 100)}%</span>
+    <div class="polaroid-hud-progress" role="progressbar" aria-label="Tiến độ cào ảnh" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="polaroid-hud-bar"></div></div>
   `;
 
   const success = document.createElement('div');
@@ -443,15 +442,14 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
   const ctx = context;
   const progressBar = hud.querySelector<HTMLElement>('.polaroid-hud-bar');
-  const progressText = hud.querySelector<HTMLElement>('.polaroid-hud-pct');
-  const revealPercentage = Math.round(revealThreshold * 100);
+  const progressTrack = hud.querySelector<HTMLElement>('.polaroid-hud-progress');
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const pointer = { lastX: 0, lastY: 0 };
 
   function updateProgress(ratio: number): void {
     const percentage = Math.min(100, Math.round(ratio * 100));
     if (progressBar) progressBar.style.width = `${percentage}%`;
-    if (progressText) progressText.textContent = `${percentage}% / ${revealPercentage}%`;
+    if (progressTrack) progressTrack.setAttribute('aria-valuenow', String(percentage));
   }
 
   function resize(): void {

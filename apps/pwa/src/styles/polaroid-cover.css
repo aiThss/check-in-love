@@ -111,7 +111,7 @@
   left: 14px;
   z-index: 20;
   display: grid;
-  grid-template-columns: auto minmax(72px, 1fr) auto;
+  grid-template-columns: auto minmax(96px, 1fr);
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
@@ -137,7 +137,7 @@
 }
 
 .polaroid-hud-progress {
-  height: 6px;
+  height: 5px;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.24);
@@ -149,14 +149,6 @@
   border-radius: inherit;
   background: linear-gradient(90deg, #ffd2e2, #fff, #dfcbff);
   transition: width 130ms linear;
-}
-
-.polaroid-hud-pct {
-  min-width: 58px;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  text-align: right;
 }
 
 .polaroid-success {
@@ -394,7 +386,7 @@ html.android-wrapper .polaroid-modal-container {
   }
 
   .polaroid-hud {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .polaroid-hud-text {
