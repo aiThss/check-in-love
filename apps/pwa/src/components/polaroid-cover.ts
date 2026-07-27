@@ -4,394 +4,575 @@ export interface PolaroidCoverOptions {
   imageUrl: string;
   title?: string;
   dateText?: string;
+  /** Kept for backward compatibility with the previous cover API. */
   timerSeconds?: number;
   revealThreshold?: number;
   brushRadius?: number;
+  /** Kept for backward compatibility with the previous cover API. */
   textColumns?: string[];
+  forceScratch?: boolean;
   onRevealed?: () => void;
 }
 
-const DEFAULT_POETRY = [
-  "春江潮水连海平海上明月共潮生滟滟随波千万里何处春江无月明",
-  "江流宛转绕芳甸月照花林皆似霰空里流霜不觉飞汀上白沙看不见",
-  "江天一色无纤尘皎皎空中孤月轮江畔何人初见月江月何年初照人",
-  "人生代代无穷已江月年年只相似不知江月待何人but见长江送流水",
-  "白云一片去悠悠青枫浦上不胜愁谁家今夜扁舟子何处相思明月楼",
-];
+const DEFAULT_REVEAL_THRESHOLD = 0.75;
+const STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
+const GLOBAL_INSTALL_KEY = '__loveCheckLoveFoilInstalled';
 
-class WaterCharNode {
-  char: string;
-  colIndex: number;
-  rowIndex: number;
-  x0 = 0;
-  y0 = 0;
-  x = 0;
-  y = 0;
-  vx = 0;
-  vy = 0;
-  phaseX: number;
-  phaseY: number;
+type LoveFoilWindow = Window & {
+  [GLOBAL_INSTALL_KEY]?: boolean;
+};
 
-  constructor(char: string, colIndex: number, rowIndex: number) {
-    this.char = char;
-    this.colIndex = colIndex;
-    this.rowIndex = rowIndex;
-    this.phaseX = colIndex * 0.4 + rowIndex * 0.25;
-    this.phaseY = colIndex * 0.3 + rowIndex * 0.35;
+function normalizeImageUrl(value: string): string {
+  try {
+    return new URL(value, window.location.href).href;
+  } catch {
+    return value;
+  }
+}
+
+function hashString(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function getRevealStorageKey(imageUrl: string): string {
+  return `${STORAGE_PREFIX}${hashString(normalizeImageUrl(imageUrl))}`;
+}
+
+function readRevealState(imageUrl: string): boolean {
+  try {
+    return localStorage.getItem(getRevealStorageKey(imageUrl)) === 'opened';
+  } catch {
+    return false;
+  }
+}
+
+function saveRevealState(imageUrl: string): void {
+  try {
+    localStorage.setItem(getRevealStorageKey(imageUrl), 'opened');
+  } catch {
+    // Storage may be unavailable in private mode. The reveal still works in-memory.
+  }
+}
+
+function isElementVisible(element: Element): boolean {
+  return !element.closest('[hidden], [aria-hidden="true"], [inert]');
+}
+
+function isMemorySearchActive(): boolean {
+  const input = document.querySelector<HTMLInputElement>('.memories-search-input');
+  return Boolean(input?.value.trim());
+}
+
+function getLatestImageCandidates(): HTMLImageElement[] {
+  const candidates: Array<HTMLImageElement | null> = [
+    document.querySelector<HTMLImageElement>('.checkin-card .checkin-card-image'),
+    document.querySelector<HTMLImageElement>(
+      '.recent-memories-list .recent-memory-item:first-child .rm-photo-wrap img',
+    ),
+  ];
+
+  if (!isMemorySearchActive()) {
+    candidates.push(
+      document.querySelector<HTMLImageElement>(
+        '.memory-grid .memory-tile:first-child .memory-item img',
+      ),
+    );
   }
 
-  updateBase(centerX: number, centerY: number, fontSize: number, colSpacing: number, lineSpacing: number, totalCols: number) {
-    const totalWidth = (totalCols - 1) * colSpacing;
-    const colX = centerX + totalWidth / 2 - this.colIndex * colSpacing;
-    const rowY = centerY - 140 + this.rowIndex * lineSpacing;
+  return candidates.filter(
+    (candidate): candidate is HTMLImageElement => Boolean(candidate && isElementVisible(candidate)),
+  );
+}
 
-    this.x0 = colX;
-    this.y0 = rowY;
-    if (this.x === 0 && this.y === 0) {
-      this.x = colX;
-      this.y = rowY;
+function isLatestSurpriseImage(imageUrl: string): boolean {
+  const normalizedTarget = normalizeImageUrl(imageUrl);
+  return getLatestImageCandidates().some((image) => {
+    const source = image.currentSrc || image.src;
+    return normalizeImageUrl(source) === normalizedTarget;
+  });
+}
+
+function getPillImage(pill: Element): HTMLImageElement | null {
+  const surface = pill.closest('.checkin-card, .rm-photo-wrap, .memory-item');
+  return surface?.querySelector<HTMLImageElement>('img') ?? null;
+}
+
+function isLatestPill(pill: Element): boolean {
+  if (pill.closest('.checkin-card')) return true;
+
+  const recentItem = pill.closest('.recent-memory-item');
+  if (recentItem) return recentItem.parentElement?.firstElementChild === recentItem;
+
+  const memoryTile = pill.closest('.memory-tile');
+  if (memoryTile) {
+    return !isMemorySearchActive() && memoryTile.parentElement?.firstElementChild === memoryTile;
+  }
+
+  return false;
+}
+
+function getSurfaceCopy(pill: Element): { title: string; dateText: string } {
+  const checkinCard = pill.closest('.checkin-card');
+  if (checkinCard) {
+    return {
+      title:
+        checkinCard.querySelector<HTMLElement>('.checkin-card-overlay-text')?.textContent?.trim() ||
+        'Bất ngờ mới dành cho bạn 💖',
+      dateText:
+        checkinCard.querySelector<HTMLElement>('.checkin-card-overlay-meta')?.textContent?.trim() ||
+        'Check-in mới nhất',
+    };
+  }
+
+  const recentCard = pill.closest('.recent-memory-card');
+  if (recentCard) {
+    return {
+      title:
+        recentCard.querySelector<HTMLElement>('.rm-caption')?.textContent?.trim() ||
+        'Bất ngờ mới dành cho bạn 💖',
+      dateText:
+        recentCard.querySelector<HTMLElement>('.rm-time')?.textContent?.trim() ||
+        'Check-in mới nhất',
+    };
+  }
+
+  const memoryItem = pill.closest('.memory-item');
+  return {
+    title:
+      memoryItem?.querySelector<HTMLElement>('.memory-item-info-text')?.textContent?.trim() ||
+      'Bất ngờ mới dành cho bạn 💖',
+    dateText: 'Check-in mới nhất',
+  };
+}
+
+function syncScratchPills(): void {
+  const searchActive = isMemorySearchActive();
+  document.documentElement.classList.toggle('love-foil-search-active', searchActive);
+
+  document.querySelectorAll<HTMLElement>('.polaroid-scratch-pill').forEach((pill) => {
+    const image = getPillImage(pill);
+    const latest = Boolean(image && isLatestPill(pill));
+
+    pill.hidden = !latest;
+    pill.setAttribute('aria-hidden', latest ? 'false' : 'true');
+    pill.classList.toggle('is-opened', Boolean(image && readRevealState(image.currentSrc || image.src)));
+
+    if (latest) {
+      pill.setAttribute('role', 'button');
+      pill.setAttribute('aria-label', 'Mở bất ngờ Love Foil');
+      pill.tabIndex = 0;
+    } else {
+      pill.removeAttribute('role');
+      pill.tabIndex = -1;
     }
-  }
+  });
+}
 
-  step(timeSec: number, pointer: { x: number; y: number; active: boolean }) {
-    const waveX = Math.cos(timeSec * 1.6 + this.phaseX) * 3.5;
-    const waveY = Math.sin(timeSec * 1.6 + this.phaseY) * 8;
+function injectLatestCheckinPill(): void {
+  document.querySelectorAll<HTMLElement>('.checkin-card').forEach((card) => {
+    if (!card.querySelector('.checkin-card-image') || card.querySelector('.polaroid-scratch-pill')) return;
 
-    const targetX = this.x0 + waveX;
-    const targetY = this.y0 + waveY;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'polaroid-scratch-pill polaroid-scratch-pill--latest';
+    button.setAttribute('aria-label', 'Mở bất ngờ Love Foil');
+    button.addEventListener('pointerdown', (event) => event.stopPropagation());
+    card.appendChild(button);
+  });
+}
 
-    const ax = (targetX - this.x) * 0.15;
-    const ay = (targetY - this.y) * 0.15;
+let syncFrame: number | null = null;
 
-    this.vx = (this.vx + ax) * 0.92;
-    this.vy = (this.vy + ay) * 0.92;
+function schedulePillSync(): void {
+  if (syncFrame !== null) return;
+  syncFrame = requestAnimationFrame(() => {
+    syncFrame = null;
+    injectLatestCheckinPill();
+    syncScratchPills();
+  });
+}
 
-    if (pointer.active) {
-      const dx = this.x - pointer.x;
-      const dy = this.y - pointer.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 110 && dist > 0.001) {
-        const force = (1 - dist / 110) * 10;
-        this.vx += (dx / dist) * force;
-        this.vy += (dy / dist) * force;
-      }
+function openPillSurprise(pill: Element): void {
+  const image = getPillImage(pill);
+  if (!image) return;
+
+  const copy = getSurfaceCopy(pill);
+  openPolaroidCoverModal({
+    imageUrl: image.currentSrc || image.src,
+    title: copy.title,
+    dateText: copy.dateText,
+    forceScratch: true,
+  });
+}
+
+function installLatestCheckinLoveFoil(): void {
+  const appWindow = window as LoveFoilWindow;
+  if (appWindow[GLOBAL_INSTALL_KEY]) return;
+  appWindow[GLOBAL_INSTALL_KEY] = true;
+
+  document.addEventListener(
+    'click',
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const pill = target.closest('.polaroid-scratch-pill');
+      if (!pill || (pill as HTMLElement).hidden) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openPillSurprise(pill);
+    },
+    true,
+  );
+
+  document.addEventListener(
+    'keydown',
+    (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const pill = target.closest('.polaroid-scratch-pill');
+      if (!pill || (pill as HTMLElement).hidden) return;
+
+      event.preventDefault();
+      openPillSurprise(pill);
+    },
+    true,
+  );
+
+  document.addEventListener('input', (event) => {
+    if (event.target instanceof Element && event.target.matches('.memories-search-input')) {
+      schedulePillSync();
     }
+  });
 
-    this.x += this.vx;
-    this.y += this.vy;
+  const observer = new MutationObserver(schedulePillSync);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  schedulePillSync();
+}
+
+function drawLoveFoil(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): void {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, width, height);
+
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, '#ff2f7d');
+  gradient.addColorStop(0.34, '#ff82af');
+  gradient.addColorStop(0.66, '#b65cff');
+  gradient.addColorStop(1, '#6f5cff');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  for (let x = -height; x < width + height; x += 18) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x - height, height);
+    ctx.stroke();
   }
+  ctx.restore();
+
+  const hearts = [
+    [0.16, 0.2, 22],
+    [0.82, 0.18, 16],
+    [0.73, 0.76, 24],
+    [0.2, 0.8, 14],
+  ] as const;
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  hearts.forEach(([x, y, size]) => {
+    ctx.save();
+    ctx.globalAlpha = 0.34;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `${size}px serif`;
+    ctx.fillText('♥', width * x, height * y);
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = "800 18px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText('LOVE NOTE', width / 2, height / 2 - 8);
+  ctx.globalAlpha = 0.82;
+  ctx.font = "700 11px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText('CÀO 75% ĐỂ MỞ', width / 2, height / 2 + 20);
+  ctx.restore();
+  ctx.restore();
 }
 
 export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: () => void } {
   const {
     imageUrl,
-    title = 'Kỷ niệm ngọt ngào 💖',
-    dateText = new Date().toLocaleDateString('vi-VN'),
-    timerSeconds = 5,
-    revealThreshold = 0.65,
-    brushRadius = 45,
-    textColumns = DEFAULT_POETRY,
+    title = 'Bất ngờ mới dành cho bạn 💖',
+    dateText = 'Check-in mới nhất',
+    revealThreshold = DEFAULT_REVEAL_THRESHOLD,
+    brushRadius,
+    forceScratch,
     onRevealed,
   } = options;
 
-  let timerLeft = timerSeconds;
-  let timerInterval: number | null = null;
-  let animFrameId: number | null = null;
-  let isScratching = false;
-  let scratchedRatio = 0;
-  let isRevealed = false;
-
-  const backdrop = document.createElement('div');
-  backdrop.className = 'polaroid-modal-backdrop';
-
-  backdrop.innerHTML = `
-    <div class="polaroid-modal-container">
-      <button class="polaroid-modal-close" aria-label="Đóng">✕</button>
-
-      <div class="polaroid-stage-view">
-        <img class="polaroid-stage-photo" src="${imageUrl}" alt="Memory Photo" />
-        <canvas class="polaroid-stage-canvas"></canvas>
-
-        <div class="polaroid-stage-intro">
-          <div class="polaroid-card-box">
-            <div class="polaroid-card-thumb">
-              <img src="${imageUrl}" alt="Polaroid Thumbnail" />
-              <div class="polaroid-card-badge">
-                <span class="polaroid-timer-num">${timerLeft}s</span>
-                <span style="font-size: 11px; opacity: 0.9;">Chuẩn bị màn che chữ...</span>
-              </div>
-            </div>
-            <div class="polaroid-card-footer">
-              <span class="polaroid-card-title">${title}</span>
-              <span class="polaroid-card-date">${dateText}</span>
-            </div>
-          </div>
-          <button class="polaroid-intro-btn">✍️ Chuyển sang cào màn che chữ</button>
-        </div>
-
-        <div class="polaroid-hud hidden">
-          <span class="polaroid-hud-text">✨ Vuốt màn hình để tẩy lớp chữ thuỷ ấn!</span>
-          <div class="polaroid-hud-progress"><div class="polaroid-hud-bar"></div></div>
-          <span class="polaroid-hud-pct">0%</span>
-        </div>
-
-        <div class="polaroid-success hidden">
-          <span>🎉</span>
-          <div>
-            <h4>Đã mở khóa bức ảnh!</h4>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(backdrop);
-
-  const container = backdrop.querySelector('.polaroid-stage-view') as HTMLElement;
-  const canvas = backdrop.querySelector('.polaroid-stage-canvas') as HTMLCanvasElement;
-  const ctx = canvas.getContext('2d')!;
-
-  const introCard = backdrop.querySelector('.polaroid-stage-intro') as HTMLElement;
-  const introBtn = backdrop.querySelector('.polaroid-intro-btn') as HTMLElement;
-  const closeBtn = backdrop.querySelector('.polaroid-modal-close') as HTMLElement;
-  const timerNum = backdrop.querySelector('.polaroid-timer-num') as HTMLElement;
-  const hud = backdrop.querySelector('.polaroid-hud') as HTMLElement;
-  const hudBar = backdrop.querySelector('.polaroid-hud-bar') as HTMLElement;
-  const hudPct = backdrop.querySelector('.polaroid-hud-pct') as HTMLElement;
-  const successBanner = backdrop.querySelector('.polaroid-success') as HTMLElement;
-
-  const maskCanvas = document.createElement('canvas');
-  const maskCtx = maskCanvas.getContext('2d')!;
-
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const latestImage = isLatestSurpriseImage(imageUrl);
+  const scratchEligible = forceScratch ?? latestImage;
+  const alreadyOpened = readRevealState(imageUrl);
+  let revealed = !scratchEligible || alreadyOpened;
+  let scratching = false;
+  let ratioFrame: number | null = null;
   let width = 0;
   let height = 0;
 
-  const pointer = { x: -1000, y: -1000, lastX: -1000, lastY: -1000, active: false };
-  const nodes: WaterCharNode[] = [];
+  const backdrop = document.createElement('div');
+  backdrop.className = 'polaroid-modal-backdrop love-foil-modal';
 
-  for (let c = 0; c < textColumns.length; c++) {
-    const colStr = textColumns[c];
-    for (let r = 0; r < colStr.length; r++) {
-      nodes.push(new WaterCharNode(colStr[r], c, r));
-    }
+  const modal = document.createElement('div');
+  modal.className = 'polaroid-modal-container';
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'polaroid-modal-close';
+  closeButton.setAttribute('aria-label', 'Đóng');
+  closeButton.textContent = '✕';
+
+  const stage = document.createElement('div');
+  stage.className = 'polaroid-stage-view';
+  stage.classList.toggle('is-revealed', revealed);
+
+  const image = document.createElement('img');
+  image.className = 'polaroid-stage-photo';
+  image.src = imageUrl;
+  image.alt = title;
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'polaroid-stage-canvas';
+  canvas.setAttribute('aria-label', 'Cào lớp Love Foil để mở ảnh');
+
+  const hud = document.createElement('div');
+  hud.className = `polaroid-hud${revealed ? ' hidden' : ''}`;
+  hud.innerHTML = `
+    <span class="polaroid-hud-text">Cào để mở bất ngờ</span>
+    <div class="polaroid-hud-progress"><div class="polaroid-hud-bar"></div></div>
+    <span class="polaroid-hud-pct">0%</span>
+  `;
+
+  const success = document.createElement('div');
+  success.className = 'polaroid-success hidden';
+  success.innerHTML = '<span>♥</span><strong>Đã mở khóa!</strong>';
+
+  const footer = document.createElement('div');
+  footer.className = 'polaroid-love-foil-footer';
+
+  const copy = document.createElement('div');
+  const heading = document.createElement('strong');
+  heading.textContent = title;
+  const meta = document.createElement('span');
+  meta.textContent = dateText;
+  copy.append(heading, meta);
+
+  const status = document.createElement('span');
+  status.className = `polaroid-love-foil-status${alreadyOpened ? ' is-opened' : ''}`;
+  status.textContent = alreadyOpened ? 'Đã mở' : scratchEligible ? 'Bất ngờ mới' : 'Kỷ niệm';
+
+  footer.append(copy, status);
+  stage.append(image, canvas, hud, success);
+  modal.append(closeButton, stage, footer);
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) {
+    canvas.remove();
+    revealed = true;
+    stage.classList.add('is-revealed');
   }
 
-  function resize() {
-    const rect = container.getBoundingClientRect();
+  const ctx = context;
+  const progressBar = hud.querySelector<HTMLElement>('.polaroid-hud-bar');
+  const progressText = hud.querySelector<HTMLElement>('.polaroid-hud-pct');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const pointer = { lastX: 0, lastY: 0 };
+
+  function updateProgress(ratio: number): void {
+    const percentage = Math.min(100, Math.round(ratio * 100));
+    if (progressBar) progressBar.style.width = `${percentage}%`;
+    if (progressText) progressText.textContent = `${percentage}%`;
+  }
+
+  function resize(): void {
+    if (!ctx) return;
+    const rect = stage.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
     width = rect.width;
     height = rect.height;
-
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    maskCanvas.width = Math.round(width * dpr);
-    maskCanvas.height = Math.round(height * dpr);
-    maskCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    resetMask();
-
-    const fontSize = Math.min(Math.max(width / 22, 16), 26);
-    const colSpacing = fontSize * 2.0;
-    const lineSpacing = fontSize * 1.3;
-    const centerX = width / 2;
-    const centerY = height / 2;
-
-    for (let i = 0; i < nodes.length; i++) {
-      nodes[i].updateBase(centerX, centerY, fontSize, colSpacing, lineSpacing, textColumns.length);
+    if (!revealed) {
+      drawLoveFoil(ctx, width, height);
+      updateProgress(0);
     }
   }
 
-  function resetMask() {
-    maskCtx.save();
-    maskCtx.setTransform(1, 0, 0, 1, 0, 0);
-    maskCtx.fillStyle = '#ffffff';
-    maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-    maskCtx.restore();
-    scratchedRatio = 0;
-    updateHUD();
+  function getClearedRatio(): number {
+    if (!ctx || canvas.width === 0 || canvas.height === 0) return 0;
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const stride = 4 * 24;
+    let cleared = 0;
+    let sampled = 0;
+
+    for (let index = 3; index < pixels.length; index += stride) {
+      sampled += 1;
+      if (pixels[index] < 32) cleared += 1;
+    }
+
+    return sampled > 0 ? cleared / sampled : 0;
   }
 
-  function updateTimer() {
-    timerNum.textContent = `${timerLeft}s`;
-  }
-
-  function transitionToScratch() {
-    if (timerInterval) clearInterval(timerInterval);
-    introCard.classList.add('hidden');
-    hud.classList.remove('hidden');
-    resetMask();
-  }
-
-  function triggerReveal() {
-    if (isRevealed) return;
-    isRevealed = true;
+  function reveal(): void {
+    if (revealed) return;
+    revealed = true;
+    scratching = false;
+    updateProgress(1);
+    saveRevealState(imageUrl);
+    stage.classList.add('is-revealed');
     hud.classList.add('hidden');
-    successBanner.classList.remove('hidden');
-    canvas.classList.add('fading');
-    if (onRevealed) onRevealed();
+    success.classList.remove('hidden');
+    status.classList.add('is-opened');
+    status.textContent = 'Đã mở';
+    syncScratchPills();
+    onRevealed?.();
   }
 
-  function scratchAt(x: number, y: number) {
-    if (isRevealed) return;
+  function scheduleRatioCheck(): void {
+    if (!ctx || revealed || ratioFrame !== null) return;
+    ratioFrame = requestAnimationFrame(() => {
+      ratioFrame = null;
+      const ratio = getClearedRatio();
+      updateProgress(ratio);
+      if (ratio >= revealThreshold) reveal();
+    });
+  }
 
-    maskCtx.save();
-    maskCtx.globalCompositeOperation = 'destination-out';
-    maskCtx.beginPath();
-    maskCtx.arc(x, y, brushRadius, 0, Math.PI * 2);
-    maskCtx.fill();
+  function getPoint(event: PointerEvent): { x: number; y: number } {
+    const rect = canvas.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
 
-    if (pointer.lastX > 0 && pointer.lastY > 0) {
-      const dist = Math.hypot(x - pointer.lastX, y - pointer.lastY);
-      const steps = Math.ceil(dist / 8);
-      for (let i = 0; i < steps; i++) {
-        const ix = pointer.lastX + (x - pointer.lastX) * (i / steps);
-        const iy = pointer.lastY + (y - pointer.lastY) * (i / steps);
-        maskCtx.beginPath();
-        maskCtx.arc(ix, iy, brushRadius, 0, Math.PI * 2);
-        maskCtx.fill();
-      }
-    }
-    maskCtx.restore();
+  function scratchAt(x: number, y: number): void {
+    if (!ctx || revealed || width <= 0 || height <= 0) return;
+
+    const radius = brushRadius ?? Math.max(25, Math.min(width, height) * 0.09);
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = radius * 1.8;
+    ctx.beginPath();
+    ctx.moveTo(pointer.lastX, pointer.lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
     pointer.lastX = x;
     pointer.lastY = y;
-    calcRatio();
+    scheduleRatioCheck();
   }
 
-  function calcRatio() {
-    const imgData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
-    const data = imgData.data;
-    let cleared = 0;
-    const step = 4 * 16;
-    for (let i = 3; i < data.length; i += step) {
-      if (data[i] === 0) cleared++;
+  const onPointerDown = (event: PointerEvent): void => {
+    if (revealed || !ctx) return;
+    event.preventDefault();
+    const point = getPoint(event);
+    scratching = true;
+    pointer.lastX = point.x;
+    pointer.lastY = point.y;
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is optional in older WebViews.
     }
-    scratchedRatio = cleared / (data.length / step);
-    updateHUD();
-
-    if (scratchedRatio >= revealThreshold) {
-      triggerReveal();
-    }
-  }
-
-  function updateHUD() {
-    const pct = Math.round(scratchedRatio * 100);
-    hudBar.style.width = `${pct}%`;
-    hudPct.textContent = `${pct}%`;
-  }
-
-  // Event Listeners
-  const getCoords = (e: MouseEvent | Touch) => {
-    const r = canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    scratchAt(point.x, point.y);
   };
 
-  const onDown = (e: MouseEvent | Touch) => {
-    isScratching = true;
-    const c = getCoords(e);
-    pointer.x = c.x;
-    pointer.y = c.y;
-    pointer.lastX = c.x;
-    pointer.lastY = c.y;
-    pointer.active = true;
-    scratchAt(c.x, c.y);
+  const onPointerMove = (event: PointerEvent): void => {
+    if (!scratching || revealed) return;
+    event.preventDefault();
+    const point = getPoint(event);
+    scratchAt(point.x, point.y);
   };
 
-  const onMove = (e: MouseEvent | Touch) => {
-    const c = getCoords(e);
-    pointer.x = c.x;
-    pointer.y = c.y;
-    pointer.active = true;
-    if (isScratching) scratchAt(c.x, c.y);
-  };
-
-  const onUp = () => {
-    isScratching = false;
-    pointer.lastX = -1000;
-    pointer.lastY = -1000;
-  };
-
-  canvas.addEventListener('mousedown', (e) => onDown(e));
-  canvas.addEventListener('mousemove', (e) => onMove(e));
-  window.addEventListener('mouseup', onUp);
-
-  canvas.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 0) onDown(e.touches[0]);
-  }, { passive: true });
-
-  canvas.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 0) onMove(e.touches[0]);
-  }, { passive: true });
-
-  window.addEventListener('touchend', onUp);
-
-  introBtn.addEventListener('click', transitionToScratch);
-  closeBtn.addEventListener('click', destroy);
-
-  // Timer interval
-  timerInterval = window.setInterval(() => {
-    timerLeft--;
-    updateTimer();
-    if (timerLeft <= 0) {
-      transitionToScratch();
+  const onPointerUp = (event: PointerEvent): void => {
+    scratching = false;
+    try {
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is optional in older WebViews.
     }
-  }, 1000);
+    scheduleRatioCheck();
+  };
 
-  // Animation Loop
-  let timeSec = 0;
-  function loop() {
-    timeSec += 0.016;
-    ctx.clearRect(0, 0, width, height);
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerUp);
+  canvas.addEventListener('pointerleave', onPointerUp);
 
-    if (!isRevealed) {
-      // Dark Water background
-      const grad = ctx.createLinearGradient(0, 0, 0, height);
-      grad.addColorStop(0, '#060d1a');
-      grad.addColorStop(1, '#051120');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, width, height);
-
-      // Render Text Nodes
-      const fontSize = Math.min(Math.max(width / 22, 16), 26);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = `600 ${fontSize}px "Noto Serif SC", serif`;
-
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        n.step(timeSec, pointer);
-        ctx.save();
-        ctx.translate(n.x, n.y);
-        ctx.shadowColor = 'rgba(125, 211, 252, 0.5)';
-        ctx.shadowBlur = 8;
-        ctx.fillStyle = 'rgba(240, 249, 255, 0.9)';
-        ctx.fillText(n.char, 0, 0);
-        ctx.restore();
-      }
-
-      // Clip mask
-      ctx.globalCompositeOperation = 'destination-in';
-      ctx.drawImage(maskCanvas, 0, 0, width, height);
-      ctx.globalCompositeOperation = 'source-over';
-    }
-
-    animFrameId = requestAnimationFrame(loop);
-  }
-
-  resize();
+  const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
+  resizeObserver?.observe(stage);
   window.addEventListener('resize', resize);
-  animFrameId = requestAnimationFrame(loop);
 
-  function destroy() {
-    if (timerInterval) clearInterval(timerInterval);
-    if (animFrameId) cancelAnimationFrame(animFrameId);
+  const onEscape = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') destroy();
+  };
+
+  function destroy(): void {
+    if (ratioFrame !== null) cancelAnimationFrame(ratioFrame);
+    resizeObserver?.disconnect();
     window.removeEventListener('resize', resize);
-    window.removeEventListener('mouseup', onUp);
-    window.removeEventListener('touchend', onUp);
+    window.removeEventListener('keydown', onEscape);
+    canvas.removeEventListener('pointerdown', onPointerDown);
+    canvas.removeEventListener('pointermove', onPointerMove);
+    canvas.removeEventListener('pointerup', onPointerUp);
+    canvas.removeEventListener('pointercancel', onPointerUp);
+    canvas.removeEventListener('pointerleave', onPointerUp);
     backdrop.remove();
   }
 
+  closeButton.addEventListener('click', destroy);
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) destroy();
+  });
+  window.addEventListener('keydown', onEscape);
+
+  if (revealed) {
+    canvas.classList.add('fading');
+  } else {
+    requestAnimationFrame(resize);
+  }
+
   return { close: destroy };
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  installLatestCheckinLoveFoil();
 }
