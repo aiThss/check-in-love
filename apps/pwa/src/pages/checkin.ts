@@ -146,6 +146,7 @@ export function renderCheckinPage(): HTMLElement {
   let selectedPreviewUrl: string | null = null;
   let isProcessingPhoto = false;
   let photoCaption = '';
+  let photoSurpriseText = '';
   let selectedQuickMsg: string | null = null;
 
   function clearSelectedPhoto(): void {
@@ -195,6 +196,9 @@ export function renderCheckinPage(): HTMLElement {
     fd.append('file', file, file.name || 'checkin-photo.jpg');
     if (caption) {
       fd.append('caption', caption);
+    }
+    if (photoSurpriseText.trim()) {
+      fd.append('surpriseText', photoSurpriseText.trim());
     }
     return fd;
   }
@@ -374,6 +378,22 @@ export function renderCheckinPage(): HTMLElement {
       });
     }
     contentArea.appendChild(capGroup);
+
+    const surpriseTextGroup = document.createElement('div');
+    surpriseTextGroup.className = 'input-group';
+    surpriseTextGroup.innerHTML = `
+      <label class="input-label">Lời nhắn trên lớp cào (tuỳ chọn)</label>
+      <input type="text" id="surprise-text-input" class="input" placeholder="Unbox quà ngày mới nào" maxlength="120" />
+    `;
+    compactCaptionGroup(surpriseTextGroup);
+    const surpriseTextInput = surpriseTextGroup.querySelector<HTMLInputElement>('#surprise-text-input');
+    if (surpriseTextInput) {
+      surpriseTextInput.value = photoSurpriseText;
+      surpriseTextInput.addEventListener('input', () => {
+        photoSurpriseText = surpriseTextInput.value;
+      });
+    }
+    contentArea.appendChild(surpriseTextGroup);
 
     const quickHeader = document.createElement('label');
     quickHeader.className = 'input-label';
@@ -576,6 +596,7 @@ export function renderCheckinPage(): HTMLElement {
       if (activeMode === 'photo') {
         clearSelectedPhoto();
         photoCaption = '';
+        photoSurpriseText = '';
         selectedQuickMsg = null;
         renderContentForm();
       }

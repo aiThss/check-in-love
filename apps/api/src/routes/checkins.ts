@@ -16,6 +16,7 @@ import { updateStreak } from '../services/streak';
 const createCheckInBodySchema = z.object({
   type: z.enum(['text', 'mood']),
   caption: z.string().max(280).optional(),
+  surpriseText: z.string().trim().max(120).optional(),
   mood: z
     .enum(['happy', 'miss', 'tired', 'studying', 'out', 'eating', 'needhug'])
     .optional(),
@@ -205,6 +206,7 @@ export default async function checkinsRoutes(
         imageUrl?: string;
         storagePath?: string;
         caption?: string;
+        surpriseText?: string;
         mood?: string;
         quickMessage?: string;
         clientMutationId?: string;
@@ -223,6 +225,7 @@ export default async function checkinsRoutes(
           filename: string;
         } | null = null;
         let caption: string | undefined;
+        let surpriseText: string | undefined;
         let quickMessage: string | undefined;
         let clientMutationId: string | undefined;
         let replyToMessageId: string | undefined;
@@ -238,6 +241,7 @@ export default async function checkinsRoutes(
             imageFile = await readMultipartBuffer(part, maxBytes);
           } else if (part.type === 'field') {
             if (part.fieldname === 'caption') caption = part.value as string;
+            if (part.fieldname === 'surpriseText') surpriseText = String(part.value).trim() || undefined;
             if (part.fieldname === 'quickMessage')
               quickMessage = part.value as string;
             if (part.fieldname === 'clientMutationId')
@@ -275,6 +279,7 @@ export default async function checkinsRoutes(
           imageUrl: saved.url,
           storagePath: saved.storagePath,
           caption,
+          surpriseText,
           quickMessage,
           clientMutationId,
           replyToMessageId,

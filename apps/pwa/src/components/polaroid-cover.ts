@@ -11,12 +11,14 @@ export interface PolaroidCoverOptions {
   /** Kept for backward compatibility with the previous cover API. */
   textColumns?: string[];
   forceScratch?: boolean;
+  coverText?: string;
   /** Starts a fresh scratch session even if this image was opened before. */
   restartScratch?: boolean;
   onRevealed?: () => void;
 }
 
 const DEFAULT_REVEAL_THRESHOLD = 0.8;
+const DEFAULT_COVER_TEXT = 'Unbox quà ngày mới nào';
 const STAGE_CORNER_RADIUS = 28;
 const STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
 const HOME_AUTO_OPEN_PREFIX = 'lovecheck:daily-surprise:auto-open:v1:';
@@ -223,6 +225,7 @@ function autoOpenLatestHomeSurprise(): void {
     title: copy.title,
     dateText: copy.dateText,
     forceScratch: true,
+    coverText: image.dataset.surpriseText,
   });
 }
 
@@ -248,6 +251,7 @@ function openPillSurprise(pill: Element): void {
     title: copy.title,
     dateText: copy.dateText,
     forceScratch: true,
+    coverText: image.dataset.surpriseText,
     restartScratch: true,
   });
 }
@@ -302,6 +306,7 @@ function drawLoveFoil(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
+  coverText: string,
 ): void {
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
@@ -349,11 +354,31 @@ function drawLoveFoil(
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  const message = coverText.trim() || DEFAULT_COVER_TEXT;
+  const words = message.split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+  const maxWidth = width * 0.74;
   ctx.font = "800 18px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText('LOVE NOTE', width / 2, height / 2 - 8);
+  words.forEach((word) => {
+    const candidate = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(candidate).width > maxWidth && lines.length === 0) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
+    }
+  });
+  if (line) lines.push(line);
+  const visibleLines = lines.slice(0, 2);
+  const lineHeight = 24;
+  const titleStart = height / 2 - 8 - ((visibleLines.length - 1) * lineHeight) / 2;
+  visibleLines.forEach((text, index) => {
+    ctx.fillText(text, width / 2, titleStart + index * lineHeight);
+  });
   ctx.globalAlpha = 0.82;
   ctx.font = "700 11px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText('CÀO ĐỂ MỞ', width / 2, height / 2 + 20);
+  ctx.fillText('CÀO ĐỂ MỞ', width / 2, titleStart + visibleLines.length * lineHeight + 5);
   ctx.restore();
   ctx.restore();
 }
@@ -428,6 +453,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     revealThreshold = DEFAULT_REVEAL_THRESHOLD,
     brushRadius,
     forceScratch,
+    coverText = DEFAULT_COVER_TEXT,
     restartScratch = false,
     onRevealed,
   } = options;
@@ -438,6 +464,8 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   let revealed = !scratchEligible || (alreadyOpened && !restartScratch);
   let scratching = false;
   let ratioFrame: number | null = null;
+  let ratioTimer: number | null = null;
+  let lastRatioCheckAt = 0;
   let width = 0;
   let height = 0;
 
@@ -534,7 +562,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     if (!revealed) {
       ctx.save();
       clipToStage(ctx, width, height);
-      drawLoveFoil(ctx, width, height);
+      drawLoveFoil(ctx, width, height, coverText);
       ctx.restore();
       updateProgress(0);
     }
@@ -575,14 +603,24 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     onRevealed?.();
   }
 
-  function scheduleRatioCheck(): void {
+  function scheduleRatioCheck(immediate = false): void {
     if (!ctx || revealed || ratioFrame !== null) return;
-    ratioFrame = requestAnimationFrame(() => {
-      ratioFrame = null;
-      const ratio = getClearedRatio();
-      updateProgress(ratio);
-      if (ratio >= revealThreshold) reveal();
-    });
+    if (immediate && ratioTimer !== null) {
+      clearTimeout(ratioTimer);
+      ratioTimer = null;
+    }
+    if (ratioTimer !== null) return;
+    const delay = immediate ? 0 : Math.max(0, 90 - (performance.now() - lastRatioCheckAt));
+    ratioTimer = window.setTimeout(() => {
+      ratioTimer = null;
+      ratioFrame = requestAnimationFrame(() => {
+        ratioFrame = null;
+        lastRatioCheckAt = performance.now();
+        const ratio = getClearedRatio();
+        updateProgress(ratio);
+        if (ratio >= revealThreshold) reveal();
+      });
+    }, delay);
   }
 
   function getPoint(event: PointerEvent): { x: number; y: number } {
@@ -643,7 +681,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     } catch {
       // Pointer capture is optional in older WebViews.
     }
-    scheduleRatioCheck();
+    scheduleRatioCheck(true);
   };
 
   canvas.addEventListener('pointerdown', onPointerDown);
@@ -662,6 +700,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
   function destroy(): void {
     if (ratioFrame !== null) cancelAnimationFrame(ratioFrame);
+    if (ratioTimer !== null) clearTimeout(ratioTimer);
     resizeObserver?.disconnect();
     window.removeEventListener('resize', resize);
     window.removeEventListener('keydown', onEscape);

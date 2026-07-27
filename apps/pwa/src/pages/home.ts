@@ -271,6 +271,7 @@ function buildCheckinCard(
         class="checkin-card-image"
         src="${escapeHtml(checkin.photoUrl)}"
         alt="Ảnh check-in"
+        data-surprise-text="${escapeHtml(checkin.surpriseText || '')}"
         loading="lazy"
       />
       <div class="checkin-card-overlay">
@@ -439,7 +440,7 @@ function buildRecentMemoriesSection(): HTMLElement {
           photoWrap.className = 'rm-photo-wrap';
           photoWrap.style.cursor = 'pointer';
           photoWrap.innerHTML = `
-            <img src="${escapeHtml(photoUrl)}" alt="Ảnh kỷ niệm" loading="lazy" />
+            <img src="${escapeHtml(photoUrl)}" alt="Ảnh kỷ niệm" loading="lazy" data-surprise-text="${escapeHtml(item.surpriseText || '')}" />
             <div class="rm-photo-overlay"></div>
             <span class="polaroid-scratch-pill">✨ Polaroid Cover</span>
           `;
@@ -449,6 +450,7 @@ function buildRecentMemoriesSection(): HTMLElement {
               imageUrl: photoUrl,
               title: item.caption || `Kỷ niệm của ${item.ownerName} 💖`,
               dateText: formatTime(item.createdAt),
+              coverText: item.surpriseText,
               timerSeconds: 5,
             });
           });

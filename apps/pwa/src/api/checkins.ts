@@ -49,6 +49,7 @@ export interface RawCheckIn {
   imageUrl?: string;
   photoUrl?: string;
   caption?: string;
+  surpriseText?: string;
   mood?: MoodType;
   reactions?: RawReaction[];
   replies?: RawReply[];
@@ -148,6 +149,7 @@ function mapCheckin(item: RawCheckIn): CheckIn {
     type: item.type,
     photoUrl: item.imageUrl || item.photoUrl,
     caption: item.caption,
+    surpriseText: item.surpriseText,
     mood: item.mood,
     reactions: mapReactionList(item.reactions || []),
     replies: mapReplies(item.replies || []),

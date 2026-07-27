@@ -42,6 +42,7 @@ export interface CheckInDocument extends Document {
   imageUrl?: string;
   storagePath?: string;
   caption?: string;
+  surpriseText?: string;
   mood?: MoodType;
   quickMessage?: string;
   clientMutationId?: string;
@@ -110,6 +111,7 @@ const CheckInSchema = new Schema<CheckInDocument>(
     imageUrl: { type: String, required: false },
     storagePath: { type: String, required: false },
     caption: { type: String, required: false, maxlength: 280 },
+    surpriseText: { type: String, required: false, maxlength: 120 },
     mood: {
       type: String,
       enum: ['happy', 'miss', 'tired', 'studying', 'out', 'eating', 'needhug'],
