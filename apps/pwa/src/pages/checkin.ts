@@ -187,9 +187,10 @@ export function renderCheckinPage(): HTMLElement {
     });
   }
 
-  function buildPhotoPayload(file: File, caption: string): FormData {
+  function buildPhotoPayload(file: File, caption: string, clientMutationId: string): FormData {
     const fd = new FormData();
     fd.append('type', 'photo');
+    fd.append('clientMutationId', clientMutationId);
     fd.append('file', file, file.name || 'checkin-photo.jpg');
     if (caption) {
       fd.append('caption', caption);
@@ -197,13 +198,13 @@ export function renderCheckinPage(): HTMLElement {
     return fd;
   }
 
-  async function createPhotoCheckinWithRetry(caption: string) {
+  async function createPhotoCheckinWithRetry(caption: string, clientMutationId: string) {
     if (!selectedFile) {
       throw new Error('NO_PHOTO');
     }
 
     try {
-      return await createCheckin(buildPhotoPayload(selectedFile, caption));
+      return await createCheckin(buildPhotoPayload(selectedFile, caption, clientMutationId));
     } catch (err) {
       if (
         !(err instanceof ApiError) ||
@@ -225,7 +226,7 @@ export function renderCheckinPage(): HTMLElement {
       selectedPreviewUrl = fallback.preview;
       renderContentForm();
 
-      return createCheckin(buildPhotoPayload(fallback.file, caption));
+      return createCheckin(buildPhotoPayload(fallback.file, caption, clientMutationId));
     }
   }
 
@@ -518,6 +519,7 @@ export function renderCheckinPage(): HTMLElement {
   // Send Action handler
   sendBtn.addEventListener('click', async () => {
     let payload: FormData | Record<string, any>;
+    const clientMutationId = `checkin:${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
     
     if (activeMode === 'photo') {
       if (isProcessingPhoto) {
@@ -530,7 +532,7 @@ export function renderCheckinPage(): HTMLElement {
       }
       const caption = (root.querySelector('#caption-input') as HTMLInputElement)?.value.trim();
       photoCaption = caption ?? '';
-      payload = buildPhotoPayload(selectedFile, photoCaption);
+      payload = buildPhotoPayload(selectedFile, photoCaption, clientMutationId);
     } else if (activeMode === 'text') {
       const text = (root.querySelector('#text-input') as HTMLTextAreaElement)?.value.trim();
       if (!text) {
@@ -539,7 +541,8 @@ export function renderCheckinPage(): HTMLElement {
       }
       payload = {
         type: 'text',
-        caption: text
+        caption: text,
+        clientMutationId,
       };
     } else {
       navigate('/app/random');
@@ -549,33 +552,10 @@ export function renderCheckinPage(): HTMLElement {
     sendBtn.disabled = true;
     sendBtn.innerHTML = `<span class="spinner" style="width:20px;height:20px;border-width:2px;border-color:#fff transparent transparent transparent;"></span> Đang gửi...`;
 
-    // For photo mode: navigate home immediately after validation so UX feels instant.
-    // The upload continues in the background and updates the store on success.
-    if (activeMode === 'photo') {
-      showHeartBurstEffect();
-      showToast('Đang gửi ảnh... 💕', 'info');
-      navigate('/app/home');
-
-      // Fire-and-forget background upload
-      createPhotoCheckinWithRetry(photoCaption)
-        .then((result) => {
-          if (typeof result.streak === 'number') {
-            const current = store.get();
-            if (current.couple) {
-              store.set({ couple: { ...current.couple, streak: result.streak } });
-            }
-          }
-          showToast('Gửi check-in thành công! 💕', 'success');
-        })
-        .catch((err: unknown) => {
-          logger.error('Background photo upload failed', err);
-          showToast('Gửi ảnh thất bại, thử lại nhé.', 'error');
-        });
-      return;
-    }
-
     try {
-      const result = await createCheckin(payload);
+      const result = activeMode === 'photo'
+        ? await createPhotoCheckinWithRetry(photoCaption, clientMutationId)
+        : await createCheckin(payload);
       if (typeof result.streak === 'number') {
         const current = store.get();
         if (current.couple) {
@@ -586,10 +566,17 @@ export function renderCheckinPage(): HTMLElement {
       // Success Heart Burst animation
       showHeartBurstEffect();
       showToast('Gửi check-in thành công!', 'success');
+
+      if (activeMode === 'photo') {
+        clearSelectedPhoto();
+        photoCaption = '';
+        selectedQuickMsg = null;
+        renderContentForm();
+      }
       
       setTimeout(() => {
         navigate('/app/home');
-      }, 1200);
+      }, 700);
 
     } catch (err) {
       logger.error('Failed to submit check-in', err);

@@ -20,6 +20,7 @@ const createCheckInBodySchema = z.object({
     .enum(['happy', 'miss', 'tired', 'studying', 'out', 'eating', 'needhug'])
     .optional(),
   quickMessage: z.string().max(100).optional(),
+  clientMutationId: z.string().trim().min(1).max(100).optional(),
   replyToMessageId: z.string().trim().min(1).optional(),
 });
 
@@ -206,6 +207,7 @@ export default async function checkinsRoutes(
         caption?: string;
         mood?: string;
         quickMessage?: string;
+        clientMutationId?: string;
         replyToMessageId?: string;
         chatReplyToMessageId?: string;
       };
@@ -222,6 +224,7 @@ export default async function checkinsRoutes(
         } | null = null;
         let caption: string | undefined;
         let quickMessage: string | undefined;
+        let clientMutationId: string | undefined;
         let replyToMessageId: string | undefined;
         let chatReplyToMessageId: string | undefined;
 
@@ -237,6 +240,8 @@ export default async function checkinsRoutes(
             if (part.fieldname === 'caption') caption = part.value as string;
             if (part.fieldname === 'quickMessage')
               quickMessage = part.value as string;
+            if (part.fieldname === 'clientMutationId')
+              clientMutationId = String(part.value).trim() || undefined;
             if (part.fieldname === 'replyToMessageId')
               replyToMessageId = String(part.value).trim() || undefined;
             if (part.fieldname === 'chatReplyToMessageId')
@@ -271,6 +276,7 @@ export default async function checkinsRoutes(
           storagePath: saved.storagePath,
           caption,
           quickMessage,
+          clientMutationId,
           replyToMessageId,
           chatReplyToMessageId,
         };
@@ -284,6 +290,24 @@ export default async function checkinsRoutes(
           });
         }
         checkInData = parsed.data;
+      }
+
+      const coupleId = new Types.ObjectId(request.user.coupleId);
+      if (checkInData.clientMutationId) {
+        const duplicate = await CheckIn.findOne({
+          coupleId,
+          clientMutationId: checkInData.clientMutationId,
+        }).lean();
+        if (duplicate) {
+          const chatMessage = duplicate.type === 'photo'
+            ? await ChatMessage.findOne({ referencedCheckinId: duplicate._id }).lean()
+            : undefined;
+          return reply.status(200).send({
+            checkIn: duplicate,
+            chatMessage,
+            duplicate: true,
+          });
+        }
       }
 
       let replyTo: {
@@ -349,7 +373,7 @@ export default async function checkinsRoutes(
       }
 
       const checkIn = await CheckIn.create({
-        coupleId: new Types.ObjectId(request.user.coupleId),
+        coupleId,
         ownerId: new Types.ObjectId(request.user.id),
         ownerName: user.displayName,
         ...checkInData,

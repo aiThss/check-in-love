@@ -44,6 +44,7 @@ export interface CheckInDocument extends Document {
   caption?: string;
   mood?: MoodType;
   quickMessage?: string;
+  clientMutationId?: string;
   replyToMessageId?: Types.ObjectId;
   replyTo?: ReplyReferenceSubDoc;
   reactions: ReactionSubDoc[];
@@ -115,6 +116,7 @@ const CheckInSchema = new Schema<CheckInDocument>(
       required: false,
     },
     quickMessage: { type: String, required: false, maxlength: 100 },
+    clientMutationId: { type: String, required: false, maxlength: 100 },
     replyToMessageId: { type: Schema.Types.ObjectId, ref: 'CheckIn', required: false },
     replyTo: { type: ReplyReferenceSchema, required: false },
     reactions: { type: [ReactionSchema], default: [] },
@@ -126,5 +128,6 @@ const CheckInSchema = new Schema<CheckInDocument>(
 
 CheckInSchema.index({ coupleId: 1, createdAt: -1 });
 CheckInSchema.index({ ownerId: 1, createdAt: -1 });
+CheckInSchema.index({ coupleId: 1, clientMutationId: 1 }, { unique: true, sparse: true });
 
 export const CheckIn = mongoose.model<CheckInDocument>('CheckIn', CheckInSchema);
