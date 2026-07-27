@@ -80,6 +80,12 @@ const ChatMessageSchema = new Schema<ChatMessageDocument>({
 ChatMessageSchema.index({ coupleId: 1, _id: -1 });
 ChatMessageSchema.index({ senderId: 1, createdAt: -1 });
 ChatMessageSchema.index({ coupleId: 1, referencedCheckinId: 1 });
-ChatMessageSchema.index({ coupleId: 1, clientMutationId: 1 }, { unique: true, sparse: true });
+ChatMessageSchema.index(
+  { coupleId: 1, clientMutationId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientMutationId: { $type: 'string' } },
+  },
+);
 
 export const ChatMessage = mongoose.model<ChatMessageDocument>('ChatMessage', ChatMessageSchema);

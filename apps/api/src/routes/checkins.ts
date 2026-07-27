@@ -302,6 +302,36 @@ export default async function checkinsRoutes(
           const chatMessage = duplicate.type === 'photo'
             ? await ChatMessage.findOne({ referencedCheckinId: duplicate._id }).lean()
             : undefined;
+          // A network interruption can happen after CheckIn is saved but before its
+          // paired chat message is written. Repair that partial write on retry.
+          if (!chatMessage && duplicate.type === 'photo' && duplicate.imageUrl) {
+            const repairedChatMessage = await ChatMessage.create({
+              coupleId: duplicate.coupleId,
+              senderId: duplicate.ownerId,
+              senderName: duplicate.ownerName,
+              type: 'image',
+              text: duplicate.caption ?? duplicate.quickMessage,
+              imageUrl: duplicate.imageUrl,
+              storagePath: duplicate.storagePath,
+              referencedCheckinId: duplicate._id,
+              referencedCheckin: {
+                checkinId: duplicate._id,
+                ownerId: duplicate.ownerId,
+                ownerName: duplicate.ownerName,
+                type: duplicate.type,
+                caption: duplicate.caption ?? duplicate.quickMessage,
+                mood: duplicate.mood,
+                imageUrl: duplicate.imageUrl,
+                createdAt: duplicate.createdAt,
+              },
+              clientMutationId: `checkin-photo:${duplicate._id.toString()}`,
+            });
+            return reply.status(200).send({
+              checkIn: duplicate,
+              chatMessage: repairedChatMessage,
+              duplicate: true,
+            });
+          }
           return reply.status(200).send({
             checkIn: duplicate,
             chatMessage,
@@ -406,6 +436,7 @@ export default async function checkinsRoutes(
             imageUrl: checkIn.imageUrl,
             createdAt: checkIn.createdAt,
           },
+          clientMutationId: `checkin-photo:${checkIn._id.toString()}`,
         });
       }
 

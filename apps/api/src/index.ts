@@ -1,11 +1,44 @@
 import { buildApp } from './app';
 import { env } from './config/env';
 import { connectDB } from './db/connection';
+import { ChatMessage } from './db/models/ChatMessage';
 import { logger } from './utils/logger';
+
+const CHAT_MESSAGE_MUTATION_INDEX = 'coupleId_1_clientMutationId_1';
+
+async function ensureChatMessageMutationIndex(): Promise<void> {
+  const indexes = await ChatMessage.collection.indexes();
+  const current = indexes.find((index) => index.name === CHAT_MESSAGE_MUTATION_INDEX);
+  const partial = current?.partialFilterExpression as
+    | { clientMutationId?: { $type?: string } }
+    | undefined;
+  const isCurrent = current?.unique === true && partial?.clientMutationId?.$type === 'string';
+
+  if (isCurrent) return;
+
+  if (current) {
+    await ChatMessage.collection.dropIndex(CHAT_MESSAGE_MUTATION_INDEX);
+  }
+
+  await ChatMessage.collection.updateMany(
+    { clientMutationId: null },
+    { $unset: { clientMutationId: '' } },
+  );
+  await ChatMessage.collection.createIndex(
+    { coupleId: 1, clientMutationId: 1 },
+    {
+      name: CHAT_MESSAGE_MUTATION_INDEX,
+      unique: true,
+      partialFilterExpression: { clientMutationId: { $type: 'string' } },
+    },
+  );
+  logger.info('[Migration] Rebuilt ChatMessage client mutation index.');
+}
 
 async function main(): Promise<void> {
   // 1. Connect to MongoDB
   await connectDB();
+  await ensureChatMessageMutationIndex();
 
   // One-time migration to update user email to new primary and add old email as alias
   try {
