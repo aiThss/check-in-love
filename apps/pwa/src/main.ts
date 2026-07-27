@@ -129,6 +129,7 @@ initRouter({
   '/login': () => import('./pages/login').then(({ renderLoginPage }) => renderLoginPage()),
   '/onboarding': () => import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage()),
   '/blocked': () => renderBlockedPage(),
+  '/demo/scratch-cards': () => import('./pages/scratch-card-demos').then(({ renderScratchCardDemosPage }) => renderScratchCardDemosPage()),
   '/app/home': () => import('./pages/home').then(({ renderHomePage }) => renderHomePage()),
   '/app/checkin': () => import('./pages/checkin').then(({ renderCheckinPage }) => renderCheckinPage()),
   '/app/memories': () => import('./pages/memories').then(({ renderMemoriesPage }) => renderMemoriesPage()),
