@@ -20,7 +20,6 @@
   position: relative;
   width: calc(100vw - 32px);
   max-width: 480px;
-  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -55,6 +54,7 @@
 
 .polaroid-stage-view {
   position: relative;
+  flex: 0 0 auto;
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
