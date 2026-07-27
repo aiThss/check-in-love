@@ -15,6 +15,7 @@ export interface PolaroidCoverOptions {
 }
 
 const DEFAULT_REVEAL_THRESHOLD = 0.75;
+const STAGE_CORNER_RADIUS = 28;
 const STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
 const GLOBAL_INSTALL_KEY = '__loveCheckLoveFoilInstalled';
 
@@ -316,6 +317,46 @@ function drawLoveFoil(
   ctx.restore();
 }
 
+function getStageCornerRadius(width: number, height: number): number {
+  return Math.min(STAGE_CORNER_RADIUS, width / 2, height / 2);
+}
+
+function clipToStage(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): void {
+  const radius = getStageCornerRadius(width, height);
+  ctx.beginPath();
+  ctx.moveTo(radius, 0);
+  ctx.lineTo(width - radius, 0);
+  ctx.quadraticCurveTo(width, 0, width, radius);
+  ctx.lineTo(width, height - radius);
+  ctx.quadraticCurveTo(width, height, width - radius, height);
+  ctx.lineTo(radius, height);
+  ctx.quadraticCurveTo(0, height, 0, height - radius);
+  ctx.lineTo(0, radius);
+  ctx.quadraticCurveTo(0, 0, radius, 0);
+  ctx.closePath();
+  ctx.clip();
+}
+
+function isInsideRoundedStage(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): boolean {
+  if (x < 0 || y < 0 || x > width || y > height) return false;
+  if (x >= radius && x <= width - radius) return true;
+  if (y >= radius && y <= height - radius) return true;
+
+  const cornerX = x < radius ? radius : width - radius;
+  const cornerY = y < radius ? radius : height - radius;
+  return (x - cornerX) ** 2 + (y - cornerY) ** 2 <= radius ** 2;
+}
+
 export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: () => void } {
   const {
     imageUrl,
@@ -426,7 +467,10 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (!revealed) {
+      ctx.save();
+      clipToStage(ctx, width, height);
       drawLoveFoil(ctx, width, height);
+      ctx.restore();
       updateProgress(0);
     }
   }
@@ -438,7 +482,12 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     let cleared = 0;
     let sampled = 0;
 
+    const radius = Math.min(STAGE_CORNER_RADIUS * dpr, canvas.width / 2, canvas.height / 2);
     for (let index = 3; index < pixels.length; index += stride) {
+      const pixel = (index - 3) / 4;
+      const x = pixel % canvas.width;
+      const y = Math.floor(pixel / canvas.width);
+      if (!isInsideRoundedStage(x, y, canvas.width, canvas.height, radius)) continue;
       sampled += 1;
       if (pixels[index] < 32) cleared += 1;
     }
@@ -481,6 +530,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
     const radius = brushRadius ?? Math.max(25, Math.min(width, height) * 0.09);
     ctx.save();
+    clipToStage(ctx, width, height);
     ctx.globalCompositeOperation = 'destination-out';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
