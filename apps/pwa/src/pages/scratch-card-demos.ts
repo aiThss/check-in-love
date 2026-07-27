@@ -1,7 +1,7 @@
 import type { RoutePage } from '../router';
 import '../styles/scratch-card-demos.css';
 
-type ScratchTheme = 'love-foil' | 'midnight-stars' | 'date-ticket' | 'secret-note' | 'memory-bloom';
+type ScratchTheme = 'love-foil' | 'midnight-stars' | 'secret-note' | 'memory-bloom';
 
 interface ScratchDemoConfig {
   id: ScratchTheme;
@@ -16,6 +16,8 @@ interface ScratchDemoConfig {
   threshold: number;
 }
 
+const REVEAL_THRESHOLD = 0.75;
+
 const SCRATCH_DEMOS: ScratchDemoConfig[] = [
   {
     id: 'love-foil',
@@ -27,7 +29,7 @@ const SCRATCH_DEMOS: ScratchDemoConfig[] = [
     revealTitle: 'Hai đứa là điều dễ thương nhất 💞',
     revealText: 'Một tấm thẻ mềm, nổi bật và khớp accent hồng hiện tại của LoveCheck.',
     revealIcon: '💗',
-    threshold: 0.54,
+    threshold: REVEAL_THRESHOLD,
   },
   {
     id: 'midnight-stars',
@@ -39,23 +41,11 @@ const SCRATCH_DEMOS: ScratchDemoConfig[] = [
     revealTitle: 'Ước gì tối nay dài thêm một chút ✨',
     revealText: 'Tông tối giúp ảnh và nội dung sau khi mở khóa có cảm giác điện ảnh hơn.',
     revealIcon: '🌙',
-    threshold: 0.5,
-  },
-  {
-    id: 'date-ticket',
-    order: '03',
-    name: 'Date Ticket',
-    description: 'Vé hẹn hò vui nhộn, có tem, số vé và đường xé mô phỏng.',
-    badge: 'Playful',
-    revealEyebrow: 'Date pass đã mở',
-    revealTitle: 'Một buổi hẹn bất ngờ đang chờ hai đứa 🎟️',
-    revealText: 'Phù hợp mini game, random date hoặc phần thưởng sau chuỗi check-in.',
-    revealIcon: '🎫',
-    threshold: 0.58,
+    threshold: REVEAL_THRESHOLD,
   },
   {
     id: 'secret-note',
-    order: '04',
+    order: '03',
     name: 'Secret Note',
     description: 'Mảnh giấy viết tay nhẹ nhàng, giống một lời nhắn giấu kín.',
     badge: 'Message',
@@ -63,11 +53,11 @@ const SCRATCH_DEMOS: ScratchDemoConfig[] = [
     revealTitle: 'Cảm ơn vì vẫn luôn ở đây cùng mình 💌',
     revealText: 'Hợp với tin nhắn yêu thương, anniversary note hoặc lời xin lỗi nhỏ.',
     revealIcon: '✉️',
-    threshold: 0.52,
+    threshold: REVEAL_THRESHOLD,
   },
   {
     id: 'memory-bloom',
-    order: '05',
+    order: '04',
     name: 'Memory Bloom',
     description: 'Cánh hoa trong suốt, glassmorphism và màu pastel dịu.',
     badge: 'Premium',
@@ -75,7 +65,7 @@ const SCRATCH_DEMOS: ScratchDemoConfig[] = [
     revealTitle: 'Khoảnh khắc nhỏ, nhưng mình muốn nhớ thật lâu 🌸',
     revealText: 'Concept tinh tế nhất để dùng cho Memories hoặc ảnh milestone đặc biệt.',
     revealIcon: '🌷',
-    threshold: 0.56,
+    threshold: REVEAL_THRESHOLD,
   },
 ];
 
@@ -90,11 +80,11 @@ export function renderScratchCardDemosPage(): RoutePage {
   root.innerHTML = `
     <header class="scratch-demos-hero">
       <div class="scratch-demos-kicker"><span></span> LoveCheck interaction lab</div>
-      <h1>5 demo scratch card</h1>
+      <h1>4 demo scratch card</h1>
       <p>Cào trực tiếp từng mẫu để so sánh cảm giác, độ rõ và phong cách trước khi gắn vào Home hoặc Memories.</p>
       <div class="scratch-demos-tip">
         <span class="scratch-demos-tip-icon">↗</span>
-        <span>Dùng chuột hoặc ngón tay. Cào khoảng một nửa diện tích để mở khóa.</span>
+        <span>Dùng chuột hoặc ngón tay. Cào ít nhất 75% diện tích để mở khóa.</span>
       </div>
     </header>
 
@@ -181,8 +171,8 @@ function mountScratchSurface(params: {
   const { stage, canvas, progress, progressText, config } = params;
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) return { reset: () => undefined, destroy: () => undefined };
-  const ctx: CanvasRenderingContext2D = context;
 
+  const ctx: CanvasRenderingContext2D = context;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const pointer = { active: false, lastX: 0, lastY: 0 };
   let width = 0;
@@ -190,7 +180,7 @@ function mountScratchSurface(params: {
   let revealed = false;
   let ratioFrame: number | null = null;
 
-  const resizeObserver = new ResizeObserver(() => resize());
+  const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(stage);
 
   function resize(): void {
@@ -351,9 +341,6 @@ function drawCover(ctx: CanvasRenderingContext2D, theme: ScratchTheme, width: nu
     case 'midnight-stars':
       drawMidnightStars(ctx, width, height);
       break;
-    case 'date-ticket':
-      drawDateTicket(ctx, width, height);
-      break;
     case 'secret-note':
       drawSecretNote(ctx, width, height);
       break;
@@ -434,45 +421,6 @@ function drawMidnightStars(ctx: CanvasRenderingContext2D, width: number, height:
   ctx.globalCompositeOperation = 'source-over';
 
   drawCenteredCoverLabel(ctx, width, height, 'MIDNIGHT MEMORY', 'VUỐT QUA BẦU TRỜI', '#f8f7ff');
-}
-
-function drawDateTicket(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-  const gradient = ctx.createLinearGradient(0, 0, width, 0);
-  gradient.addColorStop(0, '#22d3ee');
-  gradient.addColorStop(0.5, '#5eead4');
-  gradient.addColorStop(1, '#a78bfa');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.globalAlpha = 0.18;
-  ctx.fillStyle = '#083344';
-  for (let x = 10; x < width; x += 16) {
-    for (let y = 10; y < height; y += 16) {
-      ctx.beginPath();
-      ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  ctx.globalAlpha = 0.7;
-  ctx.strokeStyle = '#0f3950';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([7, 7]);
-  ctx.beginPath();
-  ctx.moveTo(width * 0.72, 20);
-  ctx.lineTo(width * 0.72, height - 20);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.globalAlpha = 0.78;
-  ctx.fillStyle = '#0b3144';
-  ctx.font = "800 13px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.textAlign = 'center';
-  ctx.fillText('DATE', width * 0.84, height * 0.42);
-  ctx.font = "900 24px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText('02', width * 0.84, height * 0.55);
-
-  drawCenteredCoverLabel(ctx, width * 0.72, height, 'LOVE DATE PASS', 'CÀO PHẦN VÉ', '#073447');
 }
 
 function drawSecretNote(ctx: CanvasRenderingContext2D, width: number, height: number): void {
