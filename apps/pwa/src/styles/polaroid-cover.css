@@ -1,389 +1,344 @@
-/* Polaroid Scratch Cover Modal & Component Styling */
+/* Latest check-in Love Foil surprise */
 .polaroid-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 99999;
-  background: rgba(6, 12, 22, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  animation: fadeInModal 0.4s ease-out forwards;
+  padding:
+    calc(16px + env(safe-area-inset-top, 0px))
+    16px
+    calc(16px + env(safe-area-inset-bottom, 0px));
+  background: rgba(20, 10, 18, 0.86);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  animation: loveFoilBackdropIn 220ms ease-out both;
 }
 
 .polaroid-modal-container {
   position: relative;
-  width: 100%;
-  max-width: 640px;
-  height: 82vh;
-  max-height: 720px;
-  background: #020617;
-  border-radius: 24px;
+  width: min(100%, 480px);
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow: hidden;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.12);
-  display: flex;
-  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 28px;
+  background: var(--surface-solid, #211a1e);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.52);
+  animation: loveFoilModalIn 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .polaroid-modal-close {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 99;
+  top: 12px;
+  right: 12px;
+  z-index: 50;
   width: 38px;
   height: 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(24, 12, 24, 0.62);
   color: #fff;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 17px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform 180ms ease, background 180ms ease;
 }
 
 .polaroid-modal-close:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.08);
+  transform: scale(1.06);
+  background: rgba(24, 12, 24, 0.82);
 }
 
 .polaroid-stage-view {
   position: relative;
-  flex: 1;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #241522;
+  isolation: isolate;
 }
 
-/* Underlying target photo */
 .polaroid-stage-photo {
   position: absolute;
   inset: 0;
+  z-index: 1;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  z-index: 1;
 }
 
-/* Kinetic Scratch Canvas */
 .polaroid-stage-canvas {
   position: absolute;
   inset: 0;
+  z-index: 10;
   width: 100%;
   height: 100%;
-  z-index: 10;
   cursor: crosshair;
   touch-action: none;
-  transition: opacity 0.5s ease;
+  transition: opacity 520ms ease, transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.polaroid-stage-canvas.fading {
+.polaroid-stage-canvas.fading,
+.polaroid-stage-view.is-revealed .polaroid-stage-canvas {
   opacity: 0;
+  transform: scale(1.025);
   pointer-events: none;
 }
 
-/* Polaroid Intro Card Overlay */
-.polaroid-stage-intro {
+.polaroid-stage-view::after {
+  content: '';
   position: absolute;
   inset: 0;
-  z-index: 20;
-  background: rgba(6, 12, 22, 0.78);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.polaroid-stage-intro.hidden {
-  opacity: 0;
+  z-index: 2;
   pointer-events: none;
-  transform: scale(0.9) translateY(20px);
+  background: linear-gradient(180deg, transparent 62%, rgba(17, 7, 15, 0.22));
 }
 
-/* Polaroid Card */
-.polaroid-card-box {
-  background: #fdfbf7;
-  padding: 16px 16px 22px 16px;
-  border-radius: 4px;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
-  transform: rotate(-2deg);
-  max-width: 380px;
-  width: 100%;
-  transition: transform 0.3s ease;
-}
-
-.polaroid-card-box:hover {
-  transform: rotate(0deg) scale(1.02);
-}
-
-.polaroid-card-thumb {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  border-radius: 2px;
-  background: #0f172a;
-}
-
-.polaroid-card-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.polaroid-card-badge {
-  position: absolute;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.72);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: #fff;
-}
-
-.polaroid-timer-num {
-  font-size: 22px;
-  font-weight: 700;
-  color: #38bdf8;
-}
-
-.polaroid-card-footer {
-  margin-top: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.polaroid-card-title {
-  font-family: 'Caveat', cursive, serif;
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.polaroid-card-date {
-  font-size: 11px;
-  color: #64748b;
-  font-weight: 600;
-}
-
-.polaroid-intro-btn {
-  margin-top: 20px;
-  background: linear-gradient(135deg, #0ea5e9, #0284c7);
-  color: #fff;
-  border: none;
-  padding: 10px 22px;
-  border-radius: 999px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4);
-}
-
-/* Scratch HUD */
 .polaroid-hud {
   position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  display: flex;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto minmax(72px, 1fr) auto;
   align-items: center;
   gap: 10px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  padding: 8px 16px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  transition: all 0.4s ease;
+  background: rgba(49, 20, 50, 0.66);
+  color: #fff;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: opacity 240ms ease, transform 240ms ease;
 }
 
 .polaroid-hud.hidden {
   opacity: 0;
+  transform: translateY(12px);
   pointer-events: none;
-  transform: translate(-50%, 20px);
 }
 
 .polaroid-hud-text {
-  font-size: 12px;
-  color: #e2e8f0;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
 }
 
 .polaroid-hud-progress {
-  width: 60px;
-  height: 5px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
+  height: 6px;
   overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .polaroid-hud-bar {
+  width: 0;
   height: 100%;
-  background: #38bdf8;
-  width: 0%;
-  transition: width 0.2s ease;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffd2e2, #fff, #dfcbff);
+  transition: width 130ms linear;
 }
 
 .polaroid-hud-pct {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #38bdf8;
+  min-width: 30px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: right;
 }
 
-/* Success Banner */
 .polaroid-success {
   position: absolute;
-  top: 20px;
+  top: 16px;
   left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
+  z-index: 30;
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: rgba(15, 23, 42, 0.9);
-  backdrop-filter: blur(14px);
-  padding: 10px 18px;
-  border-radius: 12px;
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-  transition: all 0.4s ease;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 198, 222, 0.56);
+  border-radius: 999px;
+  background: rgba(67, 24, 54, 0.78);
+  color: #fff;
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: loveFoilSuccessIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.polaroid-success > span {
+  color: #ff8fbc;
+}
+
+.polaroid-success strong {
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .polaroid-success.hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, -20px);
+  display: none;
 }
 
-.polaroid-success h4 {
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-}
-
-@keyframes fadeInModal {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.btn-polaroid-scratch-trigger {
-  margin-top: 10px;
-  width: 100%;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, #0284c7, #38bdf8);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
-  transition: all 0.25s ease;
+.polaroid-love-foil-footer {
+  min-height: 76px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px 15px;
+  background: var(--surface-solid, #211a1e);
 }
 
-.btn-polaroid-scratch-trigger:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.45);
+.polaroid-love-foil-footer > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.polaroid-love-foil-footer strong {
+  overflow: hidden;
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  font-weight: 720;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.polaroid-love-foil-footer span {
+  color: var(--text-secondary, #b6afb4);
+  font-size: 11px;
+}
+
+.polaroid-love-foil-status {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 59, 127, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 59, 127, 0.12);
+  color: var(--accent, #ff3b7f) !important;
+  font-size: 10px !important;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.polaroid-love-foil-status.is-opened {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary, #b6afb4) !important;
+}
+
+/* star+ belongs only to the latest visible check-in */
+.checkin-card {
+  position: relative;
 }
 
 .polaroid-scratch-pill {
+  appearance: none;
   position: absolute;
   top: 10px;
   right: 10px;
   z-index: 15;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   display: grid;
   place-items: center;
   overflow: visible;
-  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 47, 125, 0.94), rgba(111, 92, 255, 0.94));
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(177, 55, 139, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  font-size: 0;
+  cursor: pointer;
+  pointer-events: auto;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: #7dd3fc;
-  border: 1px solid rgba(125, 211, 252, 0.42);
-  border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.38);
-  font-size: 0;
-  pointer-events: none;
+  transition: transform 180ms ease, opacity 180ms ease, filter 180ms ease;
+}
+
+.polaroid-scratch-pill:hover {
+  transform: scale(1.07) rotate(4deg);
+}
+
+.polaroid-scratch-pill:focus-visible {
+  outline: 3px solid rgba(255, 210, 229, 0.7);
+  outline-offset: 2px;
+}
+
+.polaroid-scratch-pill[hidden] {
+  display: none !important;
 }
 
 .polaroid-scratch-pill::before {
   content: '✦';
-  font-size: 19px;
+  font-size: 20px;
   line-height: 1;
   transform: translate(-1px, 1px);
-  text-shadow: 0 0 10px rgba(56, 189, 248, 0.55);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.66);
 }
 
 .polaroid-scratch-pill::after {
   content: '+';
   position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 13px;
-  height: 13px;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
   display: grid;
   place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.86);
   border-radius: 50%;
-  background: #7dd3fc;
-  color: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+  background: #fff;
+  color: #9b397f;
+  box-shadow: 0 2px 6px rgba(41, 15, 37, 0.34);
   font-size: 10px;
-  line-height: 1;
   font-weight: 900;
+  line-height: 1;
 }
 
-/* Android WebView occasionally resolves vh to zero for a newly mounted fixed modal.
-   Pin the container to the real native insets and avoid the transformed/backdrop-filter
-   compositor layer that collapses the child into a horizontal line. */
-html.android-wrapper .polaroid-modal-backdrop {
-  padding: 0;
-  animation: polaroidAndroidFade 180ms ease-out both;
-  transform: none !important;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+.polaroid-scratch-pill.is-opened {
+  opacity: 0.74;
+  filter: saturate(0.7);
 }
 
-html.android-wrapper .polaroid-modal-container {
-  position: absolute;
-  top: calc(var(--android-status-bar, 0px) + 16px);
-  right: 16px;
-  bottom: calc(var(--android-nav-bar, 0px) + 16px);
-  left: 16px;
-  width: auto;
-  height: auto;
-  min-height: 280px;
-  max-width: 640px;
-  max-height: none;
-  margin: 0 auto;
-  isolation: isolate;
+.polaroid-scratch-pill.is-opened::after {
+  content: '✓';
+  color: #6f3f75;
+  font-size: 9px;
 }
 
-html.android-wrapper .polaroid-stage-view {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: auto;
-  overflow: hidden;
+/* Fallback before the DOM observer finishes syncing. */
+.recent-memories-list .recent-memory-item:not(:first-child) .polaroid-scratch-pill,
+.memory-grid .memory-tile:not(:first-child) .polaroid-scratch-pill,
+.love-foil-search-active .memory-grid .polaroid-scratch-pill {
+  display: none !important;
 }
 
-html.android-wrapper .polaroid-stage-intro,
+.btn-polaroid-scratch-trigger {
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 59, 127, 0.26);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 47, 125, 0.14), rgba(111, 92, 255, 0.14));
+  color: var(--accent, #ff3b7f);
+  font-size: 13px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+html.android-wrapper .polaroid-modal-backdrop,
+html.android-wrapper .polaroid-modal-close,
 html.android-wrapper .polaroid-hud,
 html.android-wrapper .polaroid-success,
 html.android-wrapper .polaroid-scratch-pill {
@@ -391,7 +346,47 @@ html.android-wrapper .polaroid-scratch-pill {
   -webkit-backdrop-filter: none;
 }
 
-@keyframes polaroidAndroidFade {
+@keyframes loveFoilBackdropIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes loveFoilModalIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes loveFoilSuccessIn {
+  from { opacity: 0; transform: translate(-50%, -8px) scale(0.92); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@media (max-width: 420px) {
+  .polaroid-modal-backdrop {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .polaroid-modal-container {
+    border-radius: 24px;
+  }
+
+  .polaroid-hud {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .polaroid-hud-text {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .polaroid-modal-backdrop,
+  .polaroid-modal-container,
+  .polaroid-success,
+  .polaroid-stage-canvas,
+  .polaroid-scratch-pill {
+    animation: none;
+    transition: none;
+  }
 }
