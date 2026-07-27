@@ -14,7 +14,7 @@ export interface PolaroidCoverOptions {
   onRevealed?: () => void;
 }
 
-const DEFAULT_REVEAL_THRESHOLD = 0.75;
+const DEFAULT_REVEAL_THRESHOLD = 0.8;
 const STAGE_CORNER_RADIUS = 28;
 const STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
 const GLOBAL_INSTALL_KEY = '__loveCheckLoveFoilInstalled';
@@ -405,9 +405,9 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   const hud = document.createElement('div');
   hud.className = `polaroid-hud${revealed ? ' hidden' : ''}`;
   hud.innerHTML = `
-    <span class="polaroid-hud-text">Cào để mở bất ngờ</span>
+    <span class="polaroid-hud-text">Cào để mở</span>
     <div class="polaroid-hud-progress"><div class="polaroid-hud-bar"></div></div>
-    <span class="polaroid-hud-pct">0%</span>
+    <span class="polaroid-hud-pct">0% / ${Math.round(revealThreshold * 100)}%</span>
   `;
 
   const success = document.createElement('div');
@@ -444,13 +444,14 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   const ctx = context;
   const progressBar = hud.querySelector<HTMLElement>('.polaroid-hud-bar');
   const progressText = hud.querySelector<HTMLElement>('.polaroid-hud-pct');
+  const revealPercentage = Math.round(revealThreshold * 100);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const pointer = { lastX: 0, lastY: 0 };
 
   function updateProgress(ratio: number): void {
     const percentage = Math.min(100, Math.round(ratio * 100));
     if (progressBar) progressBar.style.width = `${percentage}%`;
-    if (progressText) progressText.textContent = `${percentage}%`;
+    if (progressText) progressText.textContent = `${percentage}% / ${revealPercentage}%`;
   }
 
   function resize(): void {
