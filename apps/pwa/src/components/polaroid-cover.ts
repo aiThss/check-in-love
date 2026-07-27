@@ -518,15 +518,17 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
   function resize(): void {
     if (!ctx) return;
-    const rect = stage.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
+    // offset dimensions intentionally ignore the modal's entrance transform.
+    // getBoundingClientRect() is smaller while the scale animation runs, which
+    // previously left a visible strip of the photo along the canvas edge.
+    const stageWidth = stage.offsetWidth;
+    const stageHeight = stage.offsetHeight;
+    if (stageWidth <= 0 || stageHeight <= 0) return;
 
-    width = rect.width;
-    height = rect.height;
+    width = stageWidth;
+    height = stageHeight;
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (!revealed) {
