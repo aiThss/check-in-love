@@ -1,4 +1,5 @@
 import { navigate } from '../router';
+import { invalidateRoutes } from '../route-invalidation';
 import { createCheckin } from '../api/checkins';
 import { ApiError } from '../api/client';
 import { store } from '../store/index';
@@ -516,6 +517,11 @@ export function renderCheckinPage(): HTMLElement {
   sendBtn.innerHTML = `Gửi ngay 💕`;
   root.appendChild(sendBtn);
 
+  function resetSendButton(): void {
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = `Gửi ngay 💕`;
+  }
+
   // Send Action handler
   sendBtn.addEventListener('click', async () => {
     let payload: FormData | Record<string, any>;
@@ -573,6 +579,10 @@ export function renderCheckinPage(): HTMLElement {
         selectedQuickMsg = null;
         renderContentForm();
       }
+      resetSendButton();
+      // Check-in pages are cached by the router. Never restore the previous
+      // in-flight button state after a completed submission.
+      invalidateRoutes('/app/checkin');
       
       setTimeout(() => {
         navigate('/app/home');
@@ -581,8 +591,7 @@ export function renderCheckinPage(): HTMLElement {
     } catch (err) {
       logger.error('Failed to submit check-in', err);
       showToast((err as Error).message || 'Gửi check-in thất bại!', 'error');
-      sendBtn.disabled = false;
-      sendBtn.innerHTML = `Gửi ngay 💕`;
+      resetSendButton();
     }
   });
 
