@@ -16,6 +16,8 @@ export interface User {
   email_aliases?: string[];
   avatarUrl?: string;
   partnerAvatarUrl?: string;
+  birthday?: string;
+  partnerBirthday?: string;
   role: UserRole;
   status: UserStatus;
   coupleId: string;
@@ -151,7 +153,7 @@ export interface AuthResponse {
   couple: Couple;
 }
 
-// ─── Admin ───────────────────────────────────────────────────────────────────
+// ─── Admin ────────────────────────────────────────────────────────────────────
 
 export interface AdminSummary {
   totalUsers: number;
