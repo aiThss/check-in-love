@@ -1,4 +1,5 @@
 import { apiFetch } from './client';
+import { store } from '../store/index';
 
 export interface StartOnboardingPayload {
   deviceId: string;
@@ -85,8 +86,10 @@ export function confirmPasswordReset(
   });
 }
 
-export function getMe(): Promise<MeResponse> {
-  return apiFetch<MeResponse>('/me');
+export async function getMe(): Promise<MeResponse> {
+  const response = await apiFetch<MeResponse>('/me');
+  store.set({ user: response.user, couple: response.couple });
+  return response;
 }
 
 export function sendOtp(email: string): Promise<SendOtpResponse> {
