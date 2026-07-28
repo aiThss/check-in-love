@@ -15,6 +15,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '<img src="/user.png" alt="Profile" style="width:22px;height:22px;object-fit:contain;display:block;" />', label: 'Profile', path: '/app/profile' },
 ];
 
+const SUPPORTS_HOVER = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 let nav: HTMLElement | null = null;
 
 function applyActiveState(path: string): void {
@@ -22,9 +23,18 @@ function applyActiveState(path: string): void {
     const active = button.dataset.route === path;
     button.classList.toggle('active', active);
     button.setAttribute('aria-current', active ? 'page' : 'false');
+
     if (!button.classList.contains('nav-checkin-btn')) {
-      button.style.background = active ? 'var(--accent-soft)' : '';
+      // Touch browsers can keep :hover stuck after tapping. Keep inactive tabs
+      // explicitly transparent there so browser back never leaves two highlights.
+      button.style.background = active
+        ? 'var(--accent-soft)'
+        : SUPPORTS_HOVER
+          ? ''
+          : 'transparent';
     }
+
+    if (!active && document.activeElement === button) button.blur();
   });
 }
 
@@ -58,10 +68,8 @@ export function createNav(): HTMLElement {
       wrapper.appendChild(button);
 
       button.addEventListener('click', () => {
-        const isActive = button.classList.toggle('active');
+        applyActiveState(item.path);
         navigate(item.path);
-        // Reset active state after navigation
-        setTimeout(() => button.classList.remove('active'), 400);
       });
 
       inner.appendChild(wrapper);
