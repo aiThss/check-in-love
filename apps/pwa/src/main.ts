@@ -14,6 +14,7 @@ import { initMessageReplyGesture } from './utils/message-reply-gesture';
 import { initMessageStickerInput } from './utils/message-sticker-input';
 import { initMessageThreadEnhancements } from './utils/message-thread-enhancements';
 import { initProfileCopyright } from './utils/profile-copyright';
+import { initProfileUiCleanup } from './utils/profile-ui-cleanup';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 import { showModal } from './components/modal';
 
@@ -24,6 +25,7 @@ initMessageReplyGesture();
 initMessageStickerInput();
 initMessageThreadEnhancements();
 initProfileCopyright();
+initProfileUiCleanup();
 
 void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
 
