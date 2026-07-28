@@ -7,6 +7,7 @@ import { Couple } from '../db/models/Couple';
 import { User } from '../db/models/User';
 import { authenticate } from '../middleware/auth';
 import { storageService } from '../services/storage';
+import { recalculateStreak } from '../services/streak';
 
 function toSafeUser(user: InstanceType<typeof User>) {
   return {
@@ -120,6 +121,9 @@ export default async function meRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'Couple not found', code: 'NOT_FOUND' });
     }
 
+    // Rebuild from actual check-in dates so old cached/stuck counters repair themselves.
+    const streakSnapshot = await recalculateStreak(couple._id.toString());
+
     // Find partner: the other member of couple
     const partnerMemberId = couple.memberIds.find(
       (id) => id.toString() !== user._id.toString(),
@@ -140,8 +144,8 @@ export default async function meRoutes(app: FastifyInstance): Promise<void> {
         code: couple.code,
         loveStartDate: couple.loveStartDate,
         memberIds: couple.memberIds.map((id) => id.toString()),
-        streak: couple.streak,
-        lastCheckinDate: couple.lastCheckinDate,
+        streak: streakSnapshot.streak,
+        lastCheckinDate: streakSnapshot.lastCheckinDate,
       },
       partnerUser,
     });
