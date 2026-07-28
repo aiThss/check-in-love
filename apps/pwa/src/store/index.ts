@@ -62,6 +62,16 @@ function syncAndroidWidget(nextState: AppState): void {
   }
 }
 
+function syncMountedStreakBadges(nextState: AppState): void {
+  const streak = Math.max(0, Math.trunc(nextState.couple?.streak ?? 0));
+
+  document.querySelectorAll<HTMLElement>('.streak-banner').forEach((badge) => {
+    const suffix = badge.closest('.profile-page') ? ' ngày streak' : ' ngày';
+    const text = `🔥 ${streak}${suffix}`;
+    if (badge.textContent?.trim() !== text) badge.textContent = text;
+  });
+}
+
 export function applyTheme(theme: AppState['theme']): void {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   document.documentElement.setAttribute(
@@ -76,6 +86,7 @@ let themeListenerInstalled = false;
 let storageListenerInstalled = false;
 
 function publish(nextState: AppState, previousState: AppState): void {
+  syncMountedStreakBadges(nextState);
   syncAndroidWidget(nextState);
   listeners.forEach((listener) => listener(nextState, previousState));
 }
