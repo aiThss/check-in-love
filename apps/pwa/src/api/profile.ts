@@ -5,10 +5,12 @@ export interface UpdateProfilePayload {
   displayName?: string;
   partnerName?: string;
   loveStartDate?: string;
+  birthday?: string | null;
+  partnerBirthday?: string | null;
 }
 
-export function updateProfile(data: UpdateProfilePayload): Promise<User> {
-  return apiFetch<User>('/me', {
+export function updateProfile(data: UpdateProfilePayload): Promise<{ user: User }> {
+  return apiFetch<{ user: User }>('/me', {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
