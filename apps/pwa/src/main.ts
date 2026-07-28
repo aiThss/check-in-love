@@ -15,6 +15,7 @@ import { initMessageStickerInput } from './utils/message-sticker-input';
 import { initMessageThreadEnhancements } from './utils/message-thread-enhancements';
 import { initProfileCopyright } from './utils/profile-copyright';
 import { initProfileUiCleanup } from './utils/profile-ui-cleanup';
+import { initAnniversaryCards } from './utils/anniversary-cards';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 import { showModal } from './components/modal';
 
@@ -26,6 +27,7 @@ initMessageStickerInput();
 initMessageThreadEnhancements();
 initProfileCopyright();
 initProfileUiCleanup();
+initAnniversaryCards();
 
 void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
 
