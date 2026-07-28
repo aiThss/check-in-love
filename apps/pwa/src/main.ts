@@ -110,6 +110,7 @@ function watchForServiceWorkerUpdate(registration: ServiceWorkerRegistration): v
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as Window & { MSStream?: unknown }).MSStream;
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+const isCardPreviewHost = window.location.hostname === 'preview.babyress.games';
 
 function renderBlockedPage(): HTMLElement {
   const el = document.createElement('div');
@@ -125,10 +126,12 @@ function renderBlockedPage(): HTMLElement {
 
 initRouter({
   '/': () => {
+    if (isCardPreviewHost) return import('./pages/card-preview').then(({ renderCardPreviewPage }) => renderCardPreviewPage());
     if (store.isAuthenticated()) return import('./pages/home').then(({ renderHomePage }) => renderHomePage());
     if (isIOS && !isStandalone) return import('./pages/install').then(({ renderInstallPage }) => renderInstallPage());
     return import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage());
   },
+  '/preview/cards': () => import('./pages/card-preview').then(({ renderCardPreviewPage }) => renderCardPreviewPage()),
   '/install': () => import('./pages/install').then(({ renderInstallPage }) => renderInstallPage()),
   '/login': () => import('./pages/login').then(({ renderLoginPage }) => renderLoginPage()),
   '/onboarding': () => import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage()),
@@ -146,7 +149,7 @@ const prefetchCommonRoutes = () => {
 };
 const idleWindow = window as Window & { requestIdleCallback?: (callback: () => void) => number };
 const connection = navigator as Navigator & { connection?: { saveData?: boolean } };
-if (!connection.connection?.saveData) {
+if (!connection.connection?.saveData && !isCardPreviewHost) {
   if (typeof idleWindow.requestIdleCallback === 'function') idleWindow.requestIdleCallback(prefetchCommonRoutes);
   else globalThis.setTimeout(prefetchCommonRoutes, 700);
 }
