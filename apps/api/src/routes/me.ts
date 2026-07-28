@@ -18,6 +18,8 @@ function toSafeUser(user: InstanceType<typeof User>) {
     email_aliases: user.email_aliases || [],
     avatarUrl: user.avatarUrl,
     partnerAvatarUrl: user.partnerAvatarUrl,
+    birthday: user.birthday,
+    partnerBirthday: user.partnerBirthday,
     role: user.role,
     status: user.status,
     coupleId: user.coupleId.toString(),
@@ -26,6 +28,11 @@ function toSafeUser(user: InstanceType<typeof User>) {
   };
 }
 
+const nullableDateSchema = z
+  .string()
+  .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid date' })
+  .nullable();
+
 const patchMeSchema = z.object({
   displayName: z.string().min(1).optional(),
   partnerName: z.string().min(1).optional(),
@@ -33,6 +40,8 @@ const patchMeSchema = z.object({
     .string()
     .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid date' })
     .optional(),
+  birthday: nullableDateSchema.optional(),
+  partnerBirthday: nullableDateSchema.optional(),
 });
 
 const reminderSchema = z.object({
@@ -162,7 +171,7 @@ export default async function meRoutes(app: FastifyInstance): Promise<void> {
         .send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
     }
 
-    const { displayName, partnerName, loveStartDate } = parsed.data;
+    const { displayName, partnerName, loveStartDate, birthday, partnerBirthday } = parsed.data;
 
     const user = await User.findById(request.user.id);
     if (!user) {
@@ -171,6 +180,10 @@ export default async function meRoutes(app: FastifyInstance): Promise<void> {
 
     if (displayName !== undefined) user.displayName = displayName;
     if (partnerName !== undefined) user.partnerName = partnerName;
+    if (birthday !== undefined) user.birthday = birthday ? new Date(birthday) : undefined;
+    if (partnerBirthday !== undefined) {
+      user.partnerBirthday = partnerBirthday ? new Date(partnerBirthday) : undefined;
+    }
     await user.save();
 
     if (loveStartDate !== undefined) {
