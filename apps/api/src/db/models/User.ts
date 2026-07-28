@@ -9,6 +9,8 @@ export interface UserDocument extends Document {
   passwordHash?: string;
   avatarUrl?: string;
   partnerAvatarUrl?: string;
+  birthday?: Date;
+  partnerBirthday?: Date;
   trustedDevices: string[];
   fcmTokens?: string[];
   checkinReminder: {
@@ -34,6 +36,8 @@ const UserSchema = new Schema<UserDocument>(
     passwordHash: { type: String, required: false },
     avatarUrl: { type: String, required: false },
     partnerAvatarUrl: { type: String, required: false },
+    birthday: { type: Date, required: false },
+    partnerBirthday: { type: Date, required: false },
     trustedDevices: { type: [String], default: [] },
     fcmTokens: { type: [String], default: [] },
     checkinReminder: {
