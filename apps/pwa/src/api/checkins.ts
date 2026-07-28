@@ -7,6 +7,7 @@ import {
   updateMatchingQueries,
 } from './query-cache';
 import { mapChatMessage, type RawMessage } from './messages';
+import { getMe } from './auth';
 import { invalidateRoutes } from '../route-invalidation';
 import { store } from '../store/index';
 import type {
@@ -169,7 +170,12 @@ export async function getLatestPartnerCheckin(options: { force?: boolean } = {})
   return fetchQuery(
     'checkins:latest-partner',
     async () => {
-      const res = await apiFetch<{ checkIn: RawCheckIn | null }>('/checkins/latest-partner');
+      // Refresh the couple snapshot alongside the card so the streak badge and
+      // Android widget cannot keep an older value than Profile.
+      const [res] = await Promise.all([
+        apiFetch<{ checkIn: RawCheckIn | null }>('/checkins/latest-partner'),
+        getMe().catch(() => null),
+      ]);
       return res?.checkIn ? mapCheckin(res.checkIn) : null;
     },
     { staleTime: 30_000, force: options.force },
