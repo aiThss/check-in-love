@@ -508,13 +508,23 @@ function ensureStyles(): void {
     .occasion-scratch.revealed { opacity: 0; pointer-events: none; }
     .occasion-hint {
       position: absolute; z-index: 5; left: 50%; bottom: 20px; transform: translateX(-50%);
-      padding: 9px 16px; border-radius: 999px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 8px 7px 14px; border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.28);
       background: var(--hint-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       box-shadow: 0 14px 30px rgba(21, 7, 20, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
       font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10.5px; font-weight: 800;
       letter-spacing: 0.12em; color: rgba(255, 255, 255, 0.92); pointer-events: none; transition: opacity 0.2s ease;
     }
+    .occasion-quick-reveal {
+      flex: 0 0 auto; padding: 7px 10px; border: 1px solid rgba(255, 255, 255, 0.32);
+      border-radius: 999px; background: rgba(255, 255, 255, 0.95); color: #4c213e;
+      font: 800 10px/1 'Plus Jakarta Sans', sans-serif; letter-spacing: 0.02em;
+      cursor: pointer; pointer-events: auto; transition: transform 160ms ease, background 160ms ease;
+    }
+    .occasion-quick-reveal:hover { background: #fff; transform: translateY(-1px); }
+    .occasion-quick-reveal:active { transform: scale(0.95); }
+    .occasion-quick-reveal:focus-visible { outline: 2px solid rgba(255, 224, 238, 0.9); outline-offset: 2px; }
     .occasion-shell.is-revealed .occasion-hint { opacity: 0; }
 
     .occasion-preview-button { position: fixed; right: 16px; bottom: calc(var(--safe-bottom, 0px) + 92px); z-index: 4500; width: 52px; height: 52px; border: 0; border-radius: 18px; background: linear-gradient(145deg, #ff7ca8, #9c5bda); color: #fff; font-size: 24px; box-shadow: 0 12px 30px rgba(118, 58, 126, 0.35); cursor: pointer; }
@@ -545,6 +555,8 @@ function ensureStyles(): void {
       .occasion-paper { padding-left: 20px; padding-right: 20px; }
       .occasion-title { font-size: 24px; }
       .occasion-message { font-size: 18px; }
+      .occasion-hint { gap: 6px; padding: 7px 7px 7px 10px; font-size: 9px; letter-spacing: 0.08em; }
+      .occasion-quick-reveal { padding: 7px 8px; font-size: 9px; }
       .birthday-settings-grid { grid-template-columns: 1fr; }
     }
     @keyframes occasionFade { from { opacity: 0; } to { opacity: 1; } }
@@ -1099,7 +1111,10 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
         </div>
       </article>
       <canvas class="occasion-scratch" aria-label="Lớp phủ cào để mở thiệp"></canvas>
-      <div class="occasion-hint">✦ CÀO ĐỂ MỞ BÍ MẬT ✦</div>
+      <div class="occasion-hint">
+        <span>✦ CÀO ĐỂ MỞ BÍ MẬT ✦</span>
+        <button class="occasion-quick-reveal" type="button">Cào nhanh</button>
+      </div>
     </section>
   `;
   document.body.appendChild(overlay);
@@ -1123,6 +1138,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   if (!canvas || !shell) return;
   let ctx = drawScratchCover(canvas, card);
   if (!ctx) return;
+  const quickRevealButton = overlay.querySelector<HTMLButtonElement>('.occasion-quick-reveal');
   let drawing = false;
   let lastPoint: { x: number; y: number } | null = null;
   let checkTimer: number | null = null;
@@ -1135,6 +1151,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     shell.classList.add('is-revealed');
     onRevealed?.();
   };
+  quickRevealButton?.addEventListener('click', reveal);
   const check = () => {
     if (checkTimer !== null || revealed) return;
     checkTimer = window.setTimeout(() => {
