@@ -350,57 +350,137 @@ function ensureStyles(): void {
     }
     .occasion-close:active { transform: scale(0.92); }
 
-    /* Revealed Card Paper Background */
+    /* Revealed card: a theme-led paper surface with a calmer text panel. */
     .occasion-paper {
-      position: relative; min-height: 540px; padding: 60px 28px 36px;
+      --paper-start: #fffdf9;
+      --paper-mid: #fff2ec;
+      --paper-end: #f3dfe4;
+      --paper-ink: #3d2634;
+      --paper-strong: #602947;
+      --paper-accent: #ad5278;
+      --paper-glow: rgba(255, 133, 177, 0.25);
+      --paper-glow-2: rgba(196, 124, 206, 0.17);
+      --paper-line: rgba(161, 76, 115, 0.26);
+      --panel: rgba(255, 255, 255, 0.58);
+      --hint-bg: rgba(39, 17, 38, 0.74);
+      position: relative; min-height: 540px; padding: 46px 24px 28px;
       overflow: hidden; border-radius: 30px;
-      background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.98), rgba(255, 248, 242, 0.96) 55%, #f6e3db 100%),
-                  linear-gradient(145deg, #fffcf8 0%, #fff0e6 48%, #f4ded5 100%);
-      color: #3b2533;
-      box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.42),
-                  inset 0 0 0 6px rgba(255, 255, 255, 0.85),
-                  inset 0 0 0 8px rgba(212, 175, 55, 0.32);
+      background:
+        radial-gradient(circle at 84% 8%, var(--paper-glow), transparent 28%),
+        radial-gradient(circle at 10% 94%, var(--paper-glow-2), transparent 31%),
+        repeating-linear-gradient(116deg, transparent 0 24px, rgba(255, 255, 255, 0.12) 25px 26px),
+        linear-gradient(150deg, var(--paper-start), var(--paper-mid) 48%, var(--paper-end));
+      color: var(--paper-ink);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.88),
+                  inset 0 0 0 6px rgba(255, 255, 255, 0.46),
+                  inset 0 0 0 8px var(--paper-line),
+                  0 22px 70px rgba(32, 11, 27, 0.22);
+      isolation: isolate;
+    }
+    .occasion-paper::before,
+    .occasion-paper::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+    }
+    .occasion-paper::before {
+      z-index: 0; inset: -22%;
+      background:
+        radial-gradient(ellipse at 72% 18%, var(--paper-glow) 0 7%, transparent 22%),
+        radial-gradient(ellipse at 18% 82%, var(--paper-glow-2) 0 6%, transparent 22%);
+      filter: blur(18px); transform: rotate(-9deg);
+    }
+    .occasion-paper::after {
+      z-index: 3; opacity: 0.2; mix-blend-mode: multiply;
+      background-image: radial-gradient(rgba(76, 31, 58, 0.22) 0.55px, transparent 0.7px);
+      background-size: 6px 6px;
+    }
+    .occasion-paper[data-pattern='confetti'] {
+      --paper-start: #fffdf1; --paper-mid: #fff0c9; --paper-end: #ffd8c9;
+      --paper-strong: #8c3d42; --paper-accent: #d46657;
+      --paper-glow: rgba(255, 195, 67, 0.28); --paper-glow-2: rgba(255, 117, 130, 0.18);
+      --paper-line: rgba(208, 105, 79, 0.3);
+    }
+    .occasion-paper[data-pattern='stars'] {
+      --paper-start: #f8fdff; --paper-mid: #e7f1ff; --paper-end: #d8dcfa;
+      --paper-ink: #263352; --paper-strong: #334184; --paper-accent: #5267c3;
+      --paper-glow: rgba(86, 187, 255, 0.24); --paper-glow-2: rgba(117, 105, 235, 0.18);
+      --paper-line: rgba(74, 93, 181, 0.28);
+    }
+    .occasion-paper[data-card-id='new-year'] {
+      --paper-start: #fff9e9; --paper-mid: #ffedbf; --paper-end: #f7d3c3;
+      --paper-strong: #743849; --paper-accent: #bd6a45;
+      --paper-glow: rgba(255, 201, 67, 0.3); --paper-glow-2: rgba(216, 83, 91, 0.16);
+    }
+    .occasion-paper[data-pattern='snow'] {
+      --paper-start: #f5fffd; --paper-mid: #dcf4ef; --paper-end: #c8e5df;
+      --paper-ink: #244745; --paper-strong: #1c5c58; --paper-accent: #2f8d83;
+      --paper-glow: rgba(255, 255, 255, 0.72); --paper-glow-2: rgba(82, 177, 164, 0.18);
+      --paper-line: rgba(38, 126, 117, 0.28);
+    }
+    .occasion-paper[data-pattern='ribbons'] {
+      --paper-start: #fffaff; --paper-mid: #f3e8ff; --paper-end: #dfd1f3;
+      --paper-strong: #59397f; --paper-accent: #815ab0;
+      --paper-glow: rgba(215, 173, 255, 0.3); --paper-glow-2: rgba(134, 104, 223, 0.16);
+      --paper-line: rgba(112, 78, 162, 0.26);
+    }
+    .occasion-paper[data-pattern='candy'] {
+      --paper-start: #f8fffe; --paper-mid: #dcfbf5; --paper-end: #d6e5ff;
+      --paper-ink: #224250; --paper-strong: #355488; --paper-accent: #4c90bd;
+      --paper-glow: rgba(106, 229, 215, 0.3); --paper-glow-2: rgba(112, 157, 255, 0.18);
+      --paper-line: rgba(69, 132, 180, 0.25);
     }
     .occasion-border-frame {
-      position: absolute; inset: 12px; pointer-events: none;
-      border: 1px solid rgba(195, 145, 60, 0.35); border-radius: 22px;
+      position: absolute; inset: 12px; z-index: 1; pointer-events: none;
+      border: 1px solid var(--paper-line); border-radius: 22px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
     }
     .occasion-corner {
-      position: absolute; z-index: 2; font-size: 11px; color: rgba(195, 145, 60, 0.65);
-      pointer-events: none; line-height: 1;
+      position: absolute; z-index: 2; width: 24px; height: 24px;
+      color: transparent; font-size: 0; pointer-events: none; line-height: 1;
     }
+    .occasion-corner.top-left { border-top: 1px solid var(--paper-accent); border-left: 1px solid var(--paper-accent); }
+    .occasion-corner.top-right { border-top: 1px solid var(--paper-accent); border-right: 1px solid var(--paper-accent); }
+    .occasion-corner.bottom-left { border-bottom: 1px solid var(--paper-accent); border-left: 1px solid var(--paper-accent); }
+    .occasion-corner.bottom-right { border-bottom: 1px solid var(--paper-accent); border-right: 1px solid var(--paper-accent); }
     .occasion-corner.top-left { top: 16px; left: 16px; }
     .occasion-corner.top-right { top: 16px; right: 16px; }
     .occasion-corner.bottom-left { bottom: 16px; left: 16px; }
     .occasion-corner.bottom-right { bottom: 16px; right: 16px; }
 
-    .occasion-inner { position: relative; z-index: 2; text-align: center; }
-    .occasion-icon-wrap {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 66px; height: 66px; margin-bottom: 12px; border-radius: 999px;
-      background: radial-gradient(circle, rgba(255, 255, 255, 0.92), rgba(255, 240, 245, 0.6));
-      box-shadow: 0 10px 24px rgba(160, 70, 110, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+    .occasion-inner {
+      position: relative; z-index: 2; padding: 18px 18px 20px; text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.68); border-radius: 25px;
+      background: linear-gradient(145deg, var(--panel), rgba(255, 255, 255, 0.24));
+      box-shadow: 0 14px 32px rgba(72, 26, 59, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+      -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
     }
-    .occasion-icon { font-size: 38px; filter: drop-shadow(0 4px 8px rgba(80, 20, 50, 0.18)); }
+    .occasion-art-wrap {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 78px; height: 78px; margin-bottom: 13px; border-radius: 25px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.3));
+      box-shadow: 0 14px 28px rgba(78, 32, 70, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+      transform: rotate(-3deg); transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .occasion-art-wrap:hover { transform: rotate(2deg) translateY(-2px); }
+    .occasion-art { display: block; width: 78px; height: 78px; }
     .occasion-eyebrow {
       font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
       font-size: 11px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
-      color: var(--occasion-b, #b35279); margin-bottom: 8px; opacity: 0.9;
+      color: var(--paper-accent); margin-bottom: 8px; opacity: 0.9;
     }
     .occasion-title {
       font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
-      font-size: 27px; font-weight: 700; line-height: 1.25; color: #5a223f;
+      font-size: 27px; font-weight: 700; line-height: 1.25; color: var(--paper-strong);
       margin: 0 0 16px; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
     }
     .occasion-divider {
       display: flex; align-items: center; justify-content: center; gap: 12px;
       width: 140px; margin: 0 auto 18px;
     }
-    .divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--occasion-b, #c47192), transparent); }
-    .divider-heart { font-size: 12px; color: var(--occasion-b, #c47192); opacity: 0.8; }
+    .divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--paper-accent), transparent); }
+    .divider-heart { font-size: 12px; color: var(--paper-accent); opacity: 0.8; }
     .occasion-message {
       font-family: 'Cormorant Garamond', Georgia, serif;
-      font-size: 19.5px; font-weight: 600; line-height: 1.72; color: #3e2634; margin: 0;
+      font-size: 19.5px; font-weight: 600; line-height: 1.72; color: var(--paper-ink); margin: 0;
       letter-spacing: 0.01em;
     }
     .occasion-signature-wrap {
@@ -409,12 +489,14 @@ function ensureStyles(): void {
     }
     .occasion-signature {
       font-family: 'Dancing Script', cursive; font-size: 23px; font-weight: 700;
-      color: var(--occasion-b, #933860); margin: 0; transform: rotate(-3deg);
+      color: var(--paper-accent); margin: 0; transform: rotate(-3deg);
     }
     .occasion-stamp {
       font-family: 'Plus Jakarta Sans', sans-serif; font-size: 9px; font-weight: 800;
-      letter-spacing: 0.15em; color: rgba(160, 80, 110, 0.5);
+      letter-spacing: 0.15em; color: rgba(160, 80, 110, 0.65);
       border: 1.5px solid rgba(160, 80, 110, 0.35); padding: 4px 8px; border-radius: 6px;
+      color: color-mix(in srgb, var(--paper-accent) 68%, transparent);
+      border-color: color-mix(in srgb, var(--paper-accent) 38%, transparent);
       transform: rotate(6deg); text-transform: uppercase;
     }
 
@@ -427,10 +509,11 @@ function ensureStyles(): void {
     .occasion-hint {
       position: absolute; z-index: 5; left: 50%; bottom: 20px; transform: translateX(-50%);
       padding: 9px 16px; border-radius: 999px;
-      background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(8px);
-      box-shadow: 0 10px 28px rgba(35, 12, 25, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background: var(--hint-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 14px 30px rgba(21, 7, 20, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
       font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10.5px; font-weight: 800;
-      letter-spacing: 0.12em; color: #4e293a; pointer-events: none; transition: opacity 0.2s ease;
+      letter-spacing: 0.12em; color: rgba(255, 255, 255, 0.92); pointer-events: none; transition: opacity 0.2s ease;
     }
     .occasion-shell.is-revealed .occasion-hint { opacity: 0; }
 
@@ -492,6 +575,214 @@ function drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: nu
   ctx.bezierCurveTo(16, 0, 22, 2, 22, 7);
   ctx.bezierCurveTo(22, 13, 14, 18, 12, 21);
   ctx.fill();
+  ctx.restore();
+}
+
+function roundedRectAt(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+function hexToRgba(value: string, alpha: number): string {
+  const hex = value.replace('#', '');
+  const normalized = hex.length === 3 ? hex.split('').map((part) => part + part).join('') : hex;
+  const number = Number.parseInt(normalized, 16);
+  if (!Number.isFinite(number)) return `rgba(255, 255, 255, ${alpha})`;
+  return `rgba(${(number >> 16) & 255}, ${(number >> 8) & 255}, ${number & 255}, ${alpha})`;
+}
+
+function drawStarMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  ctx.beginPath();
+  for (let point = 0; point < 10; point += 1) {
+    const radius = point % 2 ? size * 0.38 : size;
+    const angle = -Math.PI / 2 + point * Math.PI / 5;
+    const px = x + Math.cos(angle) * radius;
+    const py = y + Math.sin(angle) * radius;
+    if (point === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawFlowerMark(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  petalColor: string,
+  centerColor: string,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = petalColor;
+  for (let petal = 0; petal < 5; petal += 1) {
+    ctx.save();
+    ctx.rotate((petal * Math.PI * 2) / 5);
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.45, size * 0.23, size * 0.52, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = centerColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawThemeIllustration(
+  ctx: CanvasRenderingContext2D,
+  card: OccasionCard,
+  x: number,
+  y: number,
+  scale: number,
+  light = false,
+): void {
+  const ink = light ? 'rgba(255, 255, 255, 0.96)' : card.colors[2];
+  const accent = light ? 'rgba(255, 222, 238, 0.98)' : card.colors[1];
+  const soft = light ? 'rgba(255, 255, 255, 0.38)' : hexToRgba(card.colors[0], 0.54);
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 2.3;
+  ctx.shadowColor = light ? 'rgba(28, 8, 26, 0.18)' : 'rgba(61, 22, 58, 0.12)';
+  ctx.shadowBlur = light ? 7 : 4;
+
+  ctx.fillStyle = light ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.54)';
+  ctx.beginPath();
+  ctx.arc(0, 0, 34, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (card.id === 'birthday') {
+    ctx.fillStyle = soft;
+    roundedRectAt(ctx, -27, -5, 54, 25, 7);
+    ctx.fill();
+    ctx.fillStyle = accent;
+    roundedRectAt(ctx, -30, -14, 60, 11, 5);
+    ctx.fill();
+    ctx.stroke();
+    [-17, 0, 17].forEach((candleX) => {
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(candleX, -17); ctx.lineTo(candleX, -24); ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.moveTo(candleX, -27); ctx.bezierCurveTo(candleX - 4, -23, candleX + 4, -23, candleX, -17);
+      ctx.fill();
+    });
+  } else if (card.id === 'christmas') {
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.moveTo(0, -28); ctx.lineTo(-24, 8); ctx.lineTo(24, 8); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0, -11); ctx.lineTo(-30, 21); ctx.lineTo(30, 21); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = soft;
+    roundedRectAt(ctx, -5, 19, 10, 10, 3); ctx.fill();
+    ctx.fillStyle = ink;
+    drawStarMark(ctx, 0, -30, 5);
+    ctx.fillStyle = light ? 'rgba(255,255,255,.9)' : card.colors[0];
+    [[-15, 11], [13, 5], [-10, 23], [16, 20]].forEach(([dotX, dotY]) => {
+      ctx.beginPath(); ctx.arc(dotX, dotY, 2.3, 0, Math.PI * 2); ctx.fill();
+    });
+  } else if (card.id === 'valentine') {
+    ctx.fillStyle = light ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.65)';
+    roundedRectAt(ctx, -30, -16, 60, 40, 8); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-27, -12); ctx.lineTo(0, 8); ctx.lineTo(27, -12); ctx.stroke();
+    ctx.fillStyle = accent;
+    drawHeart(ctx, 0, 6, 18);
+  } else if (card.id === 'day-500') {
+    ctx.fillStyle = soft;
+    roundedRectAt(ctx, -24, -3, 48, 27, 5); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = accent;
+    roundedRectAt(ctx, -28, -12, 56, 12, 4); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(0, 24); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-27, -6); ctx.bezierCurveTo(-42, -17, -40, -26, -29, -22); ctx.bezierCurveTo(-19, -18, -17, -9, 0, -7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(27, -6); ctx.bezierCurveTo(42, -17, 40, -26, 29, -22); ctx.bezierCurveTo(19, -18, 17, -9, 0, -7); ctx.stroke();
+  } else if (card.id === 'new-year') {
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 1.8;
+    [[-18, -14, 12], [20, -4, 9], [2, 15, 13]].forEach(([burstX, burstY, radius]) => {
+      for (let ray = 0; ray < 8; ray += 1) {
+        const angle = (ray * Math.PI) / 4;
+        ctx.beginPath();
+        ctx.moveTo(burstX + Math.cos(angle) * (radius * 0.45), burstY + Math.sin(angle) * (radius * 0.45));
+        ctx.lineTo(burstX + Math.cos(angle) * radius, burstY + Math.sin(angle) * radius);
+        ctx.stroke();
+      }
+    });
+    ctx.fillStyle = accent;
+    [[-18, -14, 3], [20, -4, 2.6], [2, 15, 3]].forEach(([dotX, dotY, radius]) => {
+      ctx.beginPath(); ctx.arc(dotX, dotY, radius, 0, Math.PI * 2); ctx.fill();
+    });
+  } else if (card.id === 'day-1000') {
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, 0, 30, 11, -0.25, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, 0, 30, 11, Math.PI / 2 - 0.25, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = accent;
+    drawStarMark(ctx, -1, -1, 7);
+    ctx.fillStyle = light ? '#fff' : card.colors[0];
+    ctx.beginPath(); ctx.arc(-26, -10, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(25, 13, 2.5, 0, Math.PI * 2); ctx.fill();
+  } else if (card.id === 'anniversary') {
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(-9, 1, 14, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(9, 1, 14, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = accent;
+    drawFlowerMark(ctx, -18, -20, 10, accent, ink);
+    drawFlowerMark(ctx, 17, -20, 10, soft, ink);
+  } else if (card.id === 'womens-day' || card.id === 'vietnamese-womens-day') {
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(0, 27); ctx.bezierCurveTo(-4, 11, -5, 4, -2, -8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-3, 14); ctx.bezierCurveTo(-20, 11, -20, 3, -7, 7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-2, 18); ctx.bezierCurveTo(15, 14, 19, 7, 9, 8); ctx.stroke();
+    drawFlowerMark(ctx, -10, -10, 17, accent, ink);
+    drawFlowerMark(ctx, 10, -15, 15, soft, ink);
+    drawFlowerMark(ctx, 0, -25, 15, accent, ink);
+  } else if (card.id === 'childrens-day') {
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, 28); ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(0, -13, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = light ? 'rgba(255,255,255,.85)' : card.colors[2];
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, -13, 9, -0.8, 1.4); ctx.stroke();
+    ctx.fillStyle = soft;
+    ctx.beginPath(); ctx.arc(0, -13, 4, 0, Math.PI * 2); ctx.fill();
+  } else {
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(0, 27); ctx.bezierCurveTo(-4, 11, -2, 3, 0, -7); ctx.stroke();
+    ctx.fillStyle = accent;
+    drawHeart(ctx, -12, -8, 21);
+    ctx.fillStyle = soft;
+    drawHeart(ctx, 13, -1, 17);
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.arc(0, -16, 3, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -562,11 +853,14 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, rect.width, rect.height);
 
   const drawCoverImage = (img: HTMLImageElement) => {
     ctx.save();
     roundedPath(ctx, rect.width, rect.height, 30);
     ctx.clip();
+    ctx.globalAlpha = 0.16;
+    ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(img, 0, 0, rect.width, rect.height);
     ctx.restore();
   };
@@ -579,17 +873,55 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   ctx.fillStyle = gradient;
   ctx.fill();
 
+  // Soft colour blooms make the cover feel like a small illustrated object,
+  // while the deterministic seed keeps every redraw stable during resize.
+  ctx.save();
+  roundedPath(ctx, rect.width, rect.height, 30);
+  ctx.clip();
+  const blooms = [
+    [rect.width * 0.08, rect.height * 0.12, rect.width * 0.52, card.colors[0], 0.48],
+    [rect.width * 0.92, rect.height * 0.24, rect.width * 0.44, card.colors[1], 0.34],
+    [rect.width * 0.72, rect.height * 0.96, rect.width * 0.62, card.colors[2], 0.3],
+  ] as const;
+  blooms.forEach(([x, y, radius, color, alpha]) => {
+    const bloom = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    bloom.addColorStop(0, hexToRgba(color, alpha));
+    bloom.addColorStop(1, hexToRgba(color, 0));
+    ctx.fillStyle = bloom;
+    ctx.fillRect(0, 0, rect.width, rect.height);
+  });
+  ctx.globalAlpha = 0.13;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 0.8;
+  for (let index = 0; index < 120; index += 1) {
+    const x = seeded(index * 5 + 5) * rect.width;
+    const y = seeded(index * 5 + 6) * rect.height;
+    const length = 7 + seeded(index * 5 + 7) * 18;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + length, y - length * 0.18);
+    ctx.stroke();
+  }
+  ctx.restore();
+
   ctx.save();
   roundedPath(ctx, rect.width, rect.height, 30);
   ctx.clip();
   drawPattern(ctx, rect.width, rect.height, card.pattern);
 
-  // Outer Golden Filigree Frame
-  ctx.strokeStyle = 'rgba(255, 225, 160, 0.42)';
-  ctx.lineWidth = 2;
+  // Layered frame and gloss keep the scratch surface tactile instead of flat.
+  ctx.strokeStyle = hexToRgba('#fff5cf', 0.44);
+  ctx.lineWidth = 1.6;
   ctx.save();
   ctx.translate(14, 14);
   roundedPath(ctx, rect.width - 28, rect.height - 28, 22);
+  ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  ctx.lineWidth = 1;
+  ctx.save();
+  ctx.translate(21, 21);
+  roundedPath(ctx, rect.width - 42, rect.height - 42, 17);
   ctx.stroke();
   ctx.restore();
 
@@ -604,41 +936,52 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   ctx.fillRect(0, 0, rect.width, rect.height);
   ctx.restore();
 
-  // Centered 3D Wax Seal Badge behind Icon
+  // A hand-drawn theme illustration replaces the generic emoji badge.
   ctx.save();
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
-  ctx.shadowBlur = 16;
-  ctx.shadowOffsetY = 6;
+  ctx.fillStyle = 'rgba(24, 8, 26, 0.2)';
+  ctx.shadowColor = 'rgba(18, 4, 22, 0.32)';
+  ctx.shadowBlur = 24;
   ctx.beginPath();
-  ctx.arc(rect.width / 2, rect.height / 2 - 58, 44, 0, Math.PI * 2);
-  const sealGrad = ctx.createRadialGradient(
-    rect.width / 2 - 10, rect.height / 2 - 68, 4,
-    rect.width / 2, rect.height / 2 - 58, 44
-  );
-  sealGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-  sealGrad.addColorStop(0.7, 'rgba(255, 240, 246, 0.85)');
-  sealGrad.addColorStop(1, 'rgba(250, 215, 230, 0.72)');
-  ctx.fillStyle = sealGrad;
+  ctx.ellipse(rect.width / 2, rect.height / 2 - 58, 58, 46, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.lineWidth = 2.5;
+  ctx.restore();
+
+  ctx.save();
+  const artHalo = ctx.createRadialGradient(
+    rect.width / 2 - 12, rect.height / 2 - 70, 2,
+    rect.width / 2, rect.height / 2 - 58, 54,
+  );
+  artHalo.addColorStop(0, 'rgba(255, 255, 255, 0.72)');
+  artHalo.addColorStop(0.66, 'rgba(255, 231, 244, 0.2)');
+  artHalo.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = artHalo;
+  ctx.beginPath();
+  ctx.arc(rect.width / 2, rect.height / 2 - 58, 54, 0, Math.PI * 2);
+  ctx.fill();
+  drawThemeIllustration(ctx, card, rect.width / 2, rect.height / 2 - 58, 1.02, true);
+  ctx.restore();
+
+  // Keep the existing cover copy verbatim, but give it a soft reading plate.
+  ctx.save();
+  roundedRectAt(ctx, rect.width * 0.09, rect.height / 2 - 4, rect.width * 0.82, 116, 22);
+  const copyPlate = ctx.createLinearGradient(0, rect.height / 2 - 4, 0, rect.height / 2 + 112);
+  copyPlate.addColorStop(0, 'rgba(26, 8, 28, 0.28)');
+  copyPlate.addColorStop(1, 'rgba(26, 8, 28, 0.56)');
+  ctx.fillStyle = copyPlate;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+  ctx.lineWidth = 1;
   ctx.stroke();
   ctx.restore();
 
-  // Render Icon
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '700 40px "Segoe UI Emoji", sans-serif';
-  ctx.fillText(card.icon, rect.width / 2, rect.height / 2 - 57);
-
-  // Cover Text
   ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-  ctx.shadowBlur = 8;
-  ctx.font = '800 17.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
+  ctx.shadowBlur = 10;
+  ctx.font = '800 16.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
   wrapCanvasText(ctx, card.coverText, rect.width / 2, rect.height / 2 + 18, rect.width * 0.76, 24);
 
-  // Action Badge Prompt
   ctx.shadowBlur = 0;
   ctx.globalAlpha = 0.92;
   ctx.font = '800 10.5px "Plus Jakarta Sans", Inter, sans-serif';
@@ -681,6 +1024,34 @@ function wrapCanvasText(
   lines.slice(0, 3).forEach((current, index) => ctx.fillText(current, x, startY + index * lineHeight));
 }
 
+function drawOccasionArtwork(canvas: HTMLCanvasElement, card: OccasionCard): void {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(1, Math.round(rect.width * dpr));
+  const height = Math.max(1, Math.round(rect.height * dpr));
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, rect.width, rect.height);
+
+  const wash = ctx.createRadialGradient(
+    rect.width * 0.28, rect.height * 0.18, 2,
+    rect.width * 0.52, rect.height * 0.48, rect.width * 0.72,
+  );
+  wash.addColorStop(0, hexToRgba(card.colors[0], 0.42));
+  wash.addColorStop(1, hexToRgba(card.colors[1], 0.06));
+  roundedRectAt(ctx, 1, 1, rect.width - 2, rect.height - 2, 24);
+  ctx.fillStyle = wash;
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(card.colors[2], 0.18);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  drawThemeIllustration(ctx, card, rect.width / 2, rect.height / 2 + 1, 0.88);
+}
+
 function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): number {
   const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
   const step = Math.max(4, Math.floor((window.devicePixelRatio || 1) * 7));
@@ -703,15 +1074,15 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   overlay.innerHTML = `
     <section class="occasion-shell" role="dialog" aria-modal="true" aria-label="${escapeHtml(card.title)}" style="--occasion-a:${card.colors[0]};--occasion-b:${card.colors[1]}">
       <button class="occasion-close" type="button" aria-label="Đóng">×</button>
-      <article class="occasion-paper">
+      <article class="occasion-paper" data-pattern="${card.pattern}" data-card-id="${card.id}">
         <div class="occasion-border-frame"></div>
         <div class="occasion-corner top-left">✦</div>
         <div class="occasion-corner top-right">✦</div>
         <div class="occasion-corner bottom-left">✦</div>
         <div class="occasion-corner bottom-right">✦</div>
         <div class="occasion-inner">
-          <div class="occasion-icon-wrap">
-            <span class="occasion-icon">${card.icon}</span>
+          <div class="occasion-art-wrap">
+            <canvas class="occasion-art" aria-hidden="true"></canvas>
           </div>
           <div class="occasion-eyebrow"><span>◆ ${escapeHtml(card.eyebrow)} ◆</span></div>
           <h2 class="occasion-title">${escapeHtml(card.title)}</h2>
@@ -732,6 +1103,8 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     </section>
   `;
   document.body.appendChild(overlay);
+  const artCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-art');
+  if (artCanvas) drawOccasionArtwork(artCanvas, card);
   const shell = overlay.querySelector<HTMLElement>('.occasion-shell');
   const canvas = overlay.querySelector<HTMLCanvasElement>('.occasion-scratch');
   let cleanup = () => {};
