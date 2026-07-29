@@ -540,6 +540,7 @@ function ensureStyles(): void {
     .occasion-quick-reveal:hover { background: #fff; transform: translateY(-1px); }
     .occasion-quick-reveal:active { transform: scale(0.95); }
     .occasion-quick-reveal:focus-visible { outline: 2px solid rgba(255, 224, 238, 0.9); outline-offset: 2px; }
+    .occasion-quick-reveal[hidden] { display: none; }
     .occasion-shell.is-revealed .occasion-hint { opacity: 0; }
 
     .occasion-preview-button { position: fixed; right: 16px; bottom: calc(var(--safe-bottom, 0px) + 92px); z-index: 4500; width: 52px; height: 52px; border: 0; border-radius: 18px; background: linear-gradient(145deg, #ff7ca8, #9c5bda); color: #fff; font-size: 24px; box-shadow: 0 12px 30px rgba(118, 58, 126, 0.35); cursor: pointer; }
@@ -965,37 +966,44 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   ctx.fillRect(0, 0, rect.width, rect.height);
   ctx.restore();
 
-  // A hand-drawn theme illustration replaces the generic emoji badge.
-  ctx.save();
-  ctx.fillStyle = 'rgba(24, 8, 26, 0.2)';
-  ctx.shadowColor = 'rgba(18, 4, 22, 0.32)';
-  ctx.shadowBlur = 24;
-  ctx.beginPath();
-  ctx.ellipse(rect.width / 2, rect.height / 2 - 58, 58, 46, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  // The 100-day cover stays intentionally open in the middle. Its reference
+  // artwork contains a faded flower there, so do not place either that asset
+  // or another central badge on this milestone's scratch surface.
+  if (card.id !== 'day-100') {
+    ctx.save();
+    ctx.fillStyle = 'rgba(24, 8, 26, 0.2)';
+    ctx.shadowColor = 'rgba(18, 4, 22, 0.32)';
+    ctx.shadowBlur = 24;
+    ctx.beginPath();
+    ctx.ellipse(rect.width / 2, rect.height / 2 - 58, 58, 46, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
-  ctx.save();
-  const artHalo = ctx.createRadialGradient(
-    rect.width / 2 - 12, rect.height / 2 - 70, 2,
-    rect.width / 2, rect.height / 2 - 58, 54,
-  );
-  artHalo.addColorStop(0, 'rgba(255, 255, 255, 0.72)');
-  artHalo.addColorStop(0.66, 'rgba(255, 231, 244, 0.2)');
-  artHalo.addColorStop(1, 'rgba(255, 255, 255, 0)');
-  ctx.fillStyle = artHalo;
-  ctx.beginPath();
-  ctx.arc(rect.width / 2, rect.height / 2 - 58, 54, 0, Math.PI * 2);
-  ctx.fill();
-  drawThemeIllustration(ctx, card, rect.width / 2, rect.height / 2 - 58, 1.02, true);
-  ctx.restore();
+    ctx.save();
+    const artHalo = ctx.createRadialGradient(
+      rect.width / 2 - 12, rect.height / 2 - 70, 2,
+      rect.width / 2, rect.height / 2 - 58, 54,
+    );
+    artHalo.addColorStop(0, 'rgba(255, 255, 255, 0.72)');
+    artHalo.addColorStop(0.66, 'rgba(255, 231, 244, 0.2)');
+    artHalo.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = artHalo;
+    ctx.beginPath();
+    ctx.arc(rect.width / 2, rect.height / 2 - 58, 54, 0, Math.PI * 2);
+    ctx.fill();
+    drawThemeIllustration(ctx, card, rect.width / 2, rect.height / 2 - 58, 1.02, true);
+    ctx.restore();
+  }
 
   // Keep the existing cover copy verbatim, but give it a soft reading plate.
+  const isHundredDay = card.id === 'day-100';
+  const copyTop = isHundredDay ? rect.height / 2 + 4 : rect.height / 2 - 4;
+  const copyHeight = isHundredDay ? 92 : 116;
   ctx.save();
-  roundedRectAt(ctx, rect.width * 0.09, rect.height / 2 - 4, rect.width * 0.82, 116, 22);
-  const copyPlate = ctx.createLinearGradient(0, rect.height / 2 - 4, 0, rect.height / 2 + 112);
+  roundedRectAt(ctx, rect.width * (isHundredDay ? 0.14 : 0.09), copyTop, rect.width * (isHundredDay ? 0.72 : 0.82), copyHeight, 22);
+  const copyPlate = ctx.createLinearGradient(0, copyTop, 0, copyTop + copyHeight);
   copyPlate.addColorStop(0, 'rgba(26, 8, 28, 0.28)');
-  copyPlate.addColorStop(1, 'rgba(26, 8, 28, 0.56)');
+  copyPlate.addColorStop(1, isHundredDay ? 'rgba(26, 8, 28, 0.48)' : 'rgba(26, 8, 28, 0.56)');
   ctx.fillStyle = copyPlate;
   ctx.fill();
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
@@ -1007,17 +1015,26 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-  ctx.shadowBlur = 10;
-  ctx.font = '800 16.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
-  wrapCanvasText(ctx, card.coverText, rect.width / 2, rect.height / 2 + 18, rect.width * 0.76, 24);
+  ctx.shadowBlur = isHundredDay ? 7 : 10;
+  ctx.font = isHundredDay
+    ? '700 21px "Dancing Script", "Brush Script MT", cursive'
+    : '800 16.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
+  wrapCanvasText(
+    ctx,
+    card.coverText,
+    rect.width / 2,
+    isHundredDay ? rect.height / 2 + 42 : rect.height / 2 + 18,
+    rect.width * (isHundredDay ? 0.66 : 0.76),
+    isHundredDay ? 26 : 24,
+  );
 
   ctx.shadowBlur = 0;
   ctx.globalAlpha = 0.92;
   ctx.font = '800 10.5px "Plus Jakarta Sans", Inter, sans-serif';
-  ctx.fillText('✦ DÙNG TAY CÀO ĐỂ MỞ BÍ MẬT ✦', rect.width / 2, rect.height / 2 + 82);
+  if (!isHundredDay) ctx.fillText('✦ DÙNG TAY CÀO ĐỂ MỞ BÍ MẬT ✦', rect.width / 2, rect.height / 2 + 82);
   ctx.globalAlpha = 1;
 
-  if (card.coverImage) {
+  if (card.coverImage && card.id !== 'day-100') {
     const img = new Image();
     img.src = card.coverImage;
     if (img.complete && img.naturalWidth > 0) {
@@ -1205,6 +1222,7 @@ function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement):
 
 function openCard(card: OccasionCard, onRevealed?: () => void): void {
   ensureStyles();
+  const showQuickReveal = isCardPreviewMode();
   document.querySelector('.occasion-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.className = 'occasion-overlay';
@@ -1241,7 +1259,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
       <canvas class="occasion-scratch" aria-label="Lớp phủ cào để mở thiệp"></canvas>
       <div class="occasion-hint">
         <span>✦ CÀO ĐỂ MỞ BÍ MẬT ✦</span>
-        <button class="occasion-quick-reveal" type="button">Cào nhanh</button>
+        <button class="occasion-quick-reveal" type="button"${showQuickReveal ? '' : ' hidden'}>Cào nhanh</button>
       </div>
     </section>
   `;
@@ -1371,6 +1389,12 @@ function seenKey(card: OccasionCard, context: OccasionContext, userId: string): 
 
 function isPreviewEnabled(): boolean {
   return new URLSearchParams(window.location.search).get(PREVIEW_QUERY) === '1';
+}
+
+function isCardPreviewMode(): boolean {
+  return window.location.pathname === '/preview/cards'
+    || window.location.hostname === 'preview.babyress.games'
+    || isPreviewEnabled();
 }
 
 function mountPreviewButton(getLatestMe: () => MeResponse | undefined): void {
