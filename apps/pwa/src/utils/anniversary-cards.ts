@@ -50,6 +50,7 @@ export interface OccasionCard {
   icon: string;
   pattern: Pattern;
   colors: [string, string, string];
+  coverImage?: string;
 }
 
 interface CardDefinition {
@@ -62,6 +63,7 @@ interface CardDefinition {
   icon: string;
   pattern: Pattern;
   colors: [string, string, string];
+  coverImage?: string;
 }
 
 const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
@@ -76,6 +78,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     icon: '💯',
     pattern: 'hearts',
     colors: ['#ff8fb1', '#ff5f8f', '#9f3564'],
+    coverImage: '/design/100day.png',
   },
   'day-500': {
     id: 'day-500',
@@ -88,6 +91,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     icon: '🎀',
     pattern: 'ribbons',
     colors: ['#d7a8ff', '#9c66db', '#5b338d'],
+    coverImage: '/design/500-1day.webp',
   },
   'day-1000': {
     id: 'day-1000',
@@ -276,6 +280,7 @@ function buildCard(id: OccasionCardId, context: OccasionContext): OccasionCard {
     icon: definition.icon,
     pattern: definition.pattern,
     colors: definition.colors,
+    coverImage: definition.coverImage,
   };
 }
 
@@ -428,6 +433,15 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const drawCoverImage = (img: HTMLImageElement) => {
+    ctx.save();
+    roundedPath(ctx, rect.width, rect.height, 30);
+    ctx.clip();
+    ctx.drawImage(img, 0, 0, rect.width, rect.height);
+    ctx.restore();
+  };
+
   const gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
   gradient.addColorStop(0, card.colors[0]);
   gradient.addColorStop(0.52, card.colors[1]);
@@ -457,6 +471,17 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   ctx.font = '800 11px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   ctx.fillText('DÙNG TAY CÀO ĐỂ MỞ', rect.width / 2, rect.height / 2 + 70);
   ctx.globalAlpha = 1;
+
+  if (card.coverImage) {
+    const img = new Image();
+    img.src = card.coverImage;
+    if (img.complete && img.naturalWidth > 0) {
+      drawCoverImage(img);
+    } else {
+      img.onload = () => drawCoverImage(img);
+    }
+  }
+
   return ctx;
 }
 
