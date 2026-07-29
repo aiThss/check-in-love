@@ -170,7 +170,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     icon: '💯',
     pattern: 'hearts',
     colors: ['#ff8fb1', '#ff5f8f', '#9f3564'],
-    coverImage: '/design/100day.png',
+    coverImage: '/design/100-1day.png',
   },
   'day-500': {
     id: 'day-500',
@@ -988,6 +988,21 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     ctx.restore();
   };
 
+  const drawFullCoverImage = (img: HTMLImageElement) => {
+    ctx.save();
+    roundedPath(ctx, rect.width, rect.height, 30);
+    ctx.clip();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    const imageWidth = img.naturalWidth || img.width;
+    const imageHeight = img.naturalHeight || img.height;
+    const scale = Math.max(rect.width / imageWidth, rect.height / imageHeight);
+    const drawWidth = imageWidth * scale;
+    const drawHeight = imageHeight * scale;
+    ctx.drawImage(img, (rect.width - drawWidth) / 2, (rect.height - drawHeight) / 2, drawWidth, drawHeight);
+    ctx.restore();
+  };
+
   const gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
   gradient.addColorStop(0, card.colors[0]);
   gradient.addColorStop(0.52, card.colors[1]);
@@ -995,6 +1010,14 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   roundedPath(ctx, rect.width, rect.height, 30);
   ctx.fillStyle = gradient;
   ctx.fill();
+
+  if (card.id === 'day-100' && card.coverImage) {
+    const img = new Image();
+    img.src = card.coverImage;
+    if (img.complete && img.naturalWidth > 0) drawFullCoverImage(img);
+    else img.onload = () => drawFullCoverImage(img);
+    return ctx;
+  }
 
   // Soft colour blooms make the cover feel like a small illustrated object,
   // while the deterministic seed keeps every redraw stable during resize.
