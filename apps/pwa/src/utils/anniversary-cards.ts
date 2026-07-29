@@ -9,6 +9,98 @@ const PREVIEW_QUERY = 'cardPreview';
 const SCRATCH_THRESHOLD = 0.88;
 let birthdaySettingsLoading = false;
 
+const OCCASION_ART_SVG = `
+<svg class="occasion-art" viewBox="0 0 130 155" width="160" height="185" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="occasionStemG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1b4332"/><stop offset="50%" stop-color="#40916c"/><stop offset="100%" stop-color="#1b4332"/>
+    </linearGradient>
+    <linearGradient id="occasionLeafGradL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#95d5b2"/><stop offset="45%" stop-color="#40916c"/><stop offset="100%" stop-color="#1b4332"/>
+    </linearGradient>
+    <linearGradient id="occasionLeafGradR" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#74c69d"/><stop offset="50%" stop-color="#2d6a4f"/><stop offset="100%" stop-color="#081c15"/>
+    </linearGradient>
+    <radialGradient id="occasionHp" cx="35%" cy="20%" r="70%">
+      <stop offset="0%" stop-color="#ffd6e0" stop-opacity=".95"/><stop offset="40%" stop-color="#ff6b8a" stop-opacity=".85"/><stop offset="100%" stop-color="#a4133c" stop-opacity=".7"/>
+    </radialGradient>
+    <radialGradient id="occasionHp2" cx="35%" cy="20%" r="70%">
+      <stop offset="0%" stop-color="#ffe5ec" stop-opacity=".9"/><stop offset="45%" stop-color="#ff85a1" stop-opacity=".8"/><stop offset="100%" stop-color="#c9184a" stop-opacity=".65"/>
+    </radialGradient>
+    <radialGradient id="occasionHi" cx="40%" cy="25%" r="65%">
+      <stop offset="0%" stop-color="#fff0f5" stop-opacity=".9"/><stop offset="50%" stop-color="#ffb3c6" stop-opacity=".7"/><stop offset="100%" stop-color="#ff4d6d" stop-opacity=".45"/>
+    </radialGradient>
+    <radialGradient id="occasionCosmic" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#c77dff"/><stop offset="40%" stop-color="#7b2cbf"/><stop offset="100%" stop-color="#10002b"/>
+    </radialGradient>
+    <filter id="occasionDs"><feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#800f2f" flood-opacity=".3"/></filter>
+    <filter id="occasionGlow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="occasionSg"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="occasionLeafSh"><feDropShadow dx="0" dy="1.5" stdDeviation="1.2" flood-color="#081c15" flood-opacity=".35"/></filter>
+  </defs>
+  <style>
+    .occasion-fl{transform-origin:65px 135px;animation:occasionSway 4s ease-in-out infinite}
+    .occasion-core{animation:occasionPulse 2.4s ease-in-out infinite;transform-origin:65px 60px}
+    .occasion-dot{animation:occasionTw 1.8s ease-in-out infinite}
+    .occasion-d1{animation-delay:0s}.occasion-d2{animation-delay:.4s}.occasion-d3{animation-delay:.8s}.occasion-d4{animation-delay:1.2s}
+    .occasion-petal{transform-origin:65px 60px;animation:occasionBloomPetal 4.2s ease-in-out infinite}
+    .occasion-p0{animation-delay:0s}.occasion-p1{animation-delay:.35s}.occasion-p2{animation-delay:.7s}
+    .occasion-p3{animation-delay:1.05s}.occasion-p4{animation-delay:1.4s}.occasion-p5{animation-delay:1.75s}
+    .occasion-petal-in{transform-origin:65px 60px;animation:occasionBloomInner 4.2s ease-in-out infinite}
+    .occasion-i0{animation-delay:.15s}.occasion-i1{animation-delay:.5s}.occasion-i2{animation-delay:.85s}
+    .occasion-i3{animation-delay:1.2s}.occasion-i4{animation-delay:1.55s}.occasion-i5{animation-delay:1.9s}
+    .occasion-leaf-l{transform-origin:58px 132px;animation:occasionLeafL 3.6s ease-in-out infinite}
+    .occasion-leaf-r{transform-origin:72px 134px;animation:occasionLeafR 3.6s ease-in-out infinite;animation-delay:.5s}
+    @keyframes occasionSway{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+    @keyframes occasionPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+    @keyframes occasionTw{0%,100%{opacity:.3}50%{opacity:1}}
+    @keyframes occasionBloomPetal{0%{transform:scale(.4);opacity:.4}18%{transform:scale(1);opacity:.9}72%{transform:scale(1);opacity:.9}100%{transform:scale(.4);opacity:.4}}
+    @keyframes occasionBloomInner{0%{transform:scale(.35);opacity:.25}22%{transform:scale(.72);opacity:.75}68%{transform:scale(.72);opacity:.75}100%{transform:scale(.35);opacity:.25}}
+    @keyframes occasionLeafL{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(10deg)}}
+    @keyframes occasionLeafR{0%,100%{transform:rotate(4deg)}50%{transform:rotate(-10deg)}}
+  </style>
+  <g class="occasion-fl">
+    <path d="M65 140 Q62 105 65 68" stroke="url(#occasionStemG)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    <g class="occasion-leaf-l" filter="url(#occasionLeafSh)">
+      <path d="M58 132 C48 128 36 122 32 116 C28 110 34 104 42 108 C50 112 56 122 58 132Z" fill="url(#occasionLeafGradL)"/>
+      <path d="M56 130 Q48 122 40 116" stroke="#1b4332" stroke-width="1.1" fill="none" opacity=".55" stroke-linecap="round"/>
+      <path d="M52 126 Q46 122 42 120" stroke="#2d6a4f" stroke-width=".7" fill="none" opacity=".45"/>
+      <path d="M54 129 Q50 126 46 124" stroke="#2d6a4f" stroke-width=".7" fill="none" opacity=".4"/>
+      <path d="M56 130 C48 126 38 120 34 116" stroke="#95d5b2" stroke-width="1" fill="none" opacity=".35" stroke-linecap="round"/>
+    </g>
+    <g class="occasion-leaf-r" filter="url(#occasionLeafSh)">
+      <path d="M72 134 C82 131 96 126 100 120 C104 114 98 108 90 112 C82 116 76 126 72 134Z" fill="url(#occasionLeafGradR)"/>
+      <path d="M74 132 Q82 125 92 118" stroke="#081c15" stroke-width="1.1" fill="none" opacity=".5" stroke-linecap="round"/>
+      <path d="M78 128 Q84 124 88 122" stroke="#1b4332" stroke-width=".7" fill="none" opacity=".4"/>
+      <path d="M76 131 Q80 128 84 126" stroke="#1b4332" stroke-width=".7" fill="none" opacity=".35"/>
+      <path d="M74 132 C82 129 94 124 98 120" stroke="#74c69d" stroke-width="1" fill="none" opacity=".3" stroke-linecap="round"/>
+    </g>
+    <g filter="url(#occasionDs)">
+      <g transform="rotate(0 65 60)"><g class="occasion-petal occasion-p0"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#occasionHp)" transform="translate(-23 10)" filter="url(#occasionGlow)" opacity=".88"/></g></g>
+      <g transform="rotate(60 65 60)"><g class="occasion-petal occasion-p1"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#occasionHp2)" transform="translate(-23 10)" opacity=".85"/></g></g>
+      <g transform="rotate(120 65 60)"><g class="occasion-petal occasion-p2"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#occasionHp)" transform="translate(-23 10)" opacity=".88"/></g></g>
+      <g transform="rotate(180 65 60)"><g class="occasion-petal occasion-p3"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#occasionHp2)" transform="translate(-23 10)" opacity=".85"/></g></g>
+      <g transform="rotate(240 65 60)"><g class="occasion-petal occasion-p4"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#occasionHp)" transform="translate(-23 10)" opacity=".88"/></g></g>
+      <g transform="rotate(300 65 60)"><g class="occasion-petal occasion-p5"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#occasionHp2)" transform="translate(-23 10)" opacity=".85"/></g></g>
+      <g transform="rotate(0 65 60)"><g class="occasion-petal-in occasion-i0"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#occasionHi)" transform="translate(-13 7)" opacity=".7"/></g></g>
+      <g transform="rotate(60 65 60)"><g class="occasion-petal-in occasion-i1"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#occasionHi)" transform="translate(-13 7)" opacity=".65"/></g></g>
+      <g transform="rotate(120 65 60)"><g class="occasion-petal-in occasion-i2"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#occasionHi)" transform="translate(-13 7)" opacity=".7"/></g></g>
+      <g transform="rotate(180 65 60)"><g class="occasion-petal-in occasion-i3"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#occasionHi)" transform="translate(-13 7)" opacity=".65"/></g></g>
+      <g transform="rotate(240 65 60)"><g class="occasion-petal-in occasion-i4"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#occasionHi)" transform="translate(-13 7)" opacity=".7"/></g></g>
+      <g transform="rotate(300 65 60)"><g class="occasion-petal-in occasion-i5"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#occasionHi)" transform="translate(-13 7)" opacity=".65"/></g></g>
+    </g>
+    <g class="occasion-core">
+      <circle cx="65" cy="60" r="14.5" fill="url(#occasionCosmic)" filter="url(#occasionSg)"/>
+      <path d="M65 47 L68 56.5 L78 56.5 L70 62.5 L73 72 L65 66 L57 72 L60 62.5 L52 56.5 L62 56.5 Z" fill="#e0aaff" filter="url(#occasionSg)"/>
+      <circle cx="65" cy="60" r="3" fill="#f8f7ff"/>
+      <circle class="occasion-dot occasion-d1" cx="57" cy="52" r="1.4" fill="#c77dff"/>
+      <circle class="occasion-dot occasion-d2" cx="73" cy="52" r="1.3" fill="#e0aaff"/>
+      <circle class="occasion-dot occasion-d3" cx="74" cy="68" r="1.4" fill="#c77dff"/>
+      <circle class="occasion-dot occasion-d4" cx="56" cy="68" r="1.2" fill="#fff"/>
+    </g>
+  </g>
+</svg>`;
+
 export type OccasionCardId =
   | 'day-100'
   | 'day-500'
@@ -455,13 +547,14 @@ function ensureStyles(): void {
     }
     .occasion-art-wrap {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 78px; height: 78px; margin-bottom: 13px; border-radius: 25px;
+      width: 92px; height: 98px; margin-bottom: 13px; border-radius: 25px;
       background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.3));
       box-shadow: 0 14px 28px rgba(78, 32, 70, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
       transform: rotate(-3deg); transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: visible;
     }
     .occasion-art-wrap:hover { transform: rotate(2deg) translateY(-2px); }
-    .occasion-art { display: block; width: 78px; height: 78px; }
+    .occasion-art { display: block; width: 100%; height: 100%; overflow: visible; }
     .occasion-eyebrow {
       font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
       font-size: 11px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
@@ -1070,34 +1163,6 @@ function wrapCanvasText(
   lines.slice(0, 3).forEach((current, index) => ctx.fillText(current, x, startY + index * lineHeight));
 }
 
-function drawOccasionArtwork(canvas: HTMLCanvasElement, card: OccasionCard): void {
-  const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const width = Math.max(1, Math.round(rect.width * dpr));
-  const height = Math.max(1, Math.round(rect.height * dpr));
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, rect.width, rect.height);
-
-  const wash = ctx.createRadialGradient(
-    rect.width * 0.28, rect.height * 0.18, 2,
-    rect.width * 0.52, rect.height * 0.48, rect.width * 0.72,
-  );
-  wash.addColorStop(0, hexToRgba(card.colors[0], 0.42));
-  wash.addColorStop(1, hexToRgba(card.colors[1], 0.06));
-  roundedRectAt(ctx, 1, 1, rect.width - 2, rect.height - 2, 24);
-  ctx.fillStyle = wash;
-  ctx.fill();
-  ctx.strokeStyle = hexToRgba(card.colors[2], 0.18);
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  drawThemeIllustration(ctx, card, rect.width / 2, rect.height / 2 + 1, 0.88);
-}
-
 function fitOccasionTitleToLine(title: HTMLElement): void {
   title.style.whiteSpace = 'nowrap';
   let fontSize = 27;
@@ -1237,7 +1302,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
         <div class="occasion-corner bottom-right">✦</div>
         <div class="occasion-inner">
           <div class="occasion-art-wrap">
-            <canvas class="occasion-art" aria-hidden="true"></canvas>
+            ${OCCASION_ART_SVG}
           </div>
           <div class="occasion-eyebrow"><span>◆ ${escapeHtml(card.eyebrow)} ◆</span></div>
           <h2 class="occasion-title">${escapeHtml(card.title)}</h2>
@@ -1264,8 +1329,6 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     </section>
   `;
   document.body.appendChild(overlay);
-  const artCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-art');
-  if (artCanvas) drawOccasionArtwork(artCanvas, card);
   const title = overlay.querySelector<HTMLElement>('.occasion-title');
   if (title) {
     const fitTitle = () => {
