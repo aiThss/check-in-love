@@ -470,7 +470,8 @@ function ensureStyles(): void {
     .occasion-title {
       font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
       font-size: 27px; font-weight: 700; line-height: 1.25; color: var(--paper-strong);
-      margin: 0 0 16px; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
+      max-width: 100%; margin: 0 0 16px; white-space: nowrap;
+      letter-spacing: -0.035em; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
     }
     .occasion-divider {
       display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -484,12 +485,17 @@ function ensureStyles(): void {
       letter-spacing: 0.01em;
     }
     .occasion-signature-wrap {
-      margin-top: 26px; display: flex; align-items: center; justify-content: space-between;
+      margin-top: 26px; display: flex; align-items: flex-end; justify-content: space-between; gap: 14px;
       padding-top: 14px; border-top: 1px dashed rgba(180, 120, 145, 0.28);
     }
     .occasion-signature {
+      flex: 1 1 auto; min-width: 0; max-width: 210px; margin: 0;
       font-family: 'Dancing Script', cursive; font-size: 23px; font-weight: 700;
-      color: var(--paper-accent); margin: 0; transform: rotate(-3deg);
+      line-height: 1.08; text-align: left; color: var(--paper-accent);
+    }
+    .occasion-signature--birthday { max-width: 178px; }
+    .occasion-stamp-wrap {
+      position: relative; flex: 0 0 auto; transform: rotate(6deg);
     }
     .occasion-stamp {
       font-family: 'Plus Jakarta Sans', sans-serif; font-size: 9px; font-weight: 800;
@@ -497,7 +503,16 @@ function ensureStyles(): void {
       border: 1.5px solid rgba(160, 80, 110, 0.35); padding: 4px 8px; border-radius: 6px;
       color: color-mix(in srgb, var(--paper-accent) 68%, transparent);
       border-color: color-mix(in srgb, var(--paper-accent) 38%, transparent);
-      transform: rotate(6deg); text-transform: uppercase;
+      text-transform: uppercase;
+    }
+    .occasion-seal-scratch {
+      position: absolute; inset: -3px; z-index: 1; width: calc(100% + 6px); height: calc(100% + 6px);
+      border-radius: 9px; cursor: crosshair; touch-action: none;
+      backdrop-filter: blur(4px) saturate(70%); -webkit-backdrop-filter: blur(4px) saturate(70%);
+      transition: opacity 360ms ease, transform 360ms ease;
+    }
+    .occasion-seal-scratch.is-revealed {
+      opacity: 0; transform: scale(1.08); pointer-events: none;
     }
 
     .occasion-scratch {
@@ -555,6 +570,8 @@ function ensureStyles(): void {
       .occasion-paper { padding-left: 20px; padding-right: 20px; }
       .occasion-title { font-size: 24px; }
       .occasion-message { font-size: 18px; }
+      .occasion-signature { font-size: 20px; }
+      .occasion-signature--birthday { max-width: 156px; }
       .occasion-hint { gap: 6px; padding: 7px 7px 7px 10px; font-size: 9px; letter-spacing: 0.08em; }
       .occasion-quick-reveal { padding: 7px 8px; font-size: 9px; }
       .birthday-settings-grid { grid-template-columns: 1fr; }
@@ -1064,6 +1081,114 @@ function drawOccasionArtwork(canvas: HTMLCanvasElement, card: OccasionCard): voi
   drawThemeIllustration(ctx, card, rect.width / 2, rect.height / 2 + 1, 0.88);
 }
 
+function fitOccasionTitleToLine(title: HTMLElement): void {
+  title.style.whiteSpace = 'nowrap';
+  let fontSize = 27;
+  title.style.fontSize = `${fontSize}px`;
+  while (title.scrollWidth > title.clientWidth && fontSize > 17) {
+    fontSize -= 0.5;
+    title.style.fontSize = `${fontSize}px`;
+  }
+}
+
+function drawSealScratchCover(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, rect.width, rect.height);
+
+  roundedRectAt(ctx, 0, 0, rect.width, rect.height, 8);
+  const glass = ctx.createLinearGradient(0, 0, rect.width, rect.height);
+  glass.addColorStop(0, 'rgba(255, 255, 255, 0.82)');
+  glass.addColorStop(0.48, 'rgba(255, 255, 255, 0.56)');
+  glass.addColorStop(1, 'rgba(255, 232, 240, 0.72)');
+  ctx.fillStyle = glass;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.82)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.save();
+  roundedRectAt(ctx, 0, 0, rect.width, rect.height, 8);
+  ctx.clip();
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 0.8;
+  for (let x = -rect.height; x < rect.width + rect.height; x += 8) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x - rect.height, rect.height);
+    ctx.stroke();
+  }
+  ctx.restore();
+  return ctx;
+}
+
+function installSealScratch(canvas: HTMLCanvasElement): () => void {
+  let ctx = drawSealScratchCover(canvas);
+  if (!ctx) return () => {};
+  let drawing = false;
+  let revealed = false;
+  let lastPoint: { x: number; y: number } | null = null;
+
+  const reveal = () => {
+    if (revealed) return;
+    revealed = true;
+    canvas.classList.add('is-revealed');
+  };
+  const point = (event: PointerEvent) => {
+    const rect = canvas.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  };
+  const scratch = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    if (!ctx) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 15;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.restore();
+    if (clearedRatio(ctx, canvas) >= 0.24) reveal();
+  };
+  canvas.addEventListener('pointerdown', (event) => {
+    drawing = true;
+    lastPoint = point(event);
+    canvas.setPointerCapture?.(event.pointerId);
+    scratch(lastPoint, lastPoint);
+  });
+  canvas.addEventListener('pointermove', (event) => {
+    if (!drawing || !lastPoint) return;
+    const next = point(event);
+    scratch(lastPoint, next);
+    lastPoint = next;
+  });
+  const stop = (event: PointerEvent) => {
+    drawing = false;
+    lastPoint = null;
+    try { canvas.releasePointerCapture?.(event.pointerId); } catch { /* optional */ }
+  };
+  canvas.addEventListener('pointerup', stop);
+  canvas.addEventListener('pointercancel', stop);
+
+  const resize = () => {
+    if (!revealed) ctx = drawSealScratchCover(canvas);
+  };
+  window.addEventListener('resize', resize, { passive: true });
+  return () => {
+    window.removeEventListener('resize', resize);
+  };
+}
+
 function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): number {
   const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
   const step = Math.max(4, Math.floor((window.devicePixelRatio || 1) * 7));
@@ -1105,8 +1230,11 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
           </div>
           <p class="occasion-message">${escapeHtml(card.message)}</p>
           <div class="occasion-signature-wrap">
-            <p class="occasion-signature">${escapeHtml(card.signature)}</p>
-            <div class="occasion-stamp">LOVE SEAL</div>
+            <p class="occasion-signature${card.id === 'birthday' ? ' occasion-signature--birthday' : ''}">${formatOccasionSignature(card)}</p>
+            <div class="occasion-stamp-wrap">
+              <div class="occasion-stamp">LOVE SEAL</div>
+              <canvas class="occasion-seal-scratch" aria-label="Cào nhẹ để mở Love Seal"></canvas>
+            </div>
           </div>
         </div>
       </article>
@@ -1120,6 +1248,15 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   document.body.appendChild(overlay);
   const artCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-art');
   if (artCanvas) drawOccasionArtwork(artCanvas, card);
+  const title = overlay.querySelector<HTMLElement>('.occasion-title');
+  if (title) {
+    const fitTitle = () => {
+      if (title.isConnected) fitOccasionTitleToLine(title);
+    };
+    fitTitle();
+    window.setTimeout(fitTitle, 80);
+    document.fonts?.ready.then(fitTitle).catch(() => {});
+  }
   const shell = overlay.querySelector<HTMLElement>('.occasion-shell');
   const canvas = overlay.querySelector<HTMLCanvasElement>('.occasion-scratch');
   let cleanup = () => {};
@@ -1139,6 +1276,8 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   let ctx = drawScratchCover(canvas, card);
   if (!ctx) return;
   const quickRevealButton = overlay.querySelector<HTMLButtonElement>('.occasion-quick-reveal');
+  const sealScratchCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-seal-scratch');
+  const cleanupSealScratch = sealScratchCanvas ? installSealScratch(sealScratchCanvas) : () => {};
   let drawing = false;
   let lastPoint: { x: number; y: number } | null = null;
   let checkTimer: number | null = null;
@@ -1211,6 +1350,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', resize);
     if (checkTimer !== null) window.clearTimeout(checkTimer);
+    cleanupSealScratch();
   };
 }
 
@@ -1218,6 +1358,11 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
   })[character] || character);
+}
+
+function formatOccasionSignature(card: OccasionCard): string {
+  const signature = escapeHtml(card.signature);
+  return card.id === 'birthday' ? signature.replace(', ', ',<br>') : signature;
 }
 
 function seenKey(card: OccasionCard, context: OccasionContext, userId: string): string {
