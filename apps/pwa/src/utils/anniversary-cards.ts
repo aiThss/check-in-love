@@ -622,18 +622,8 @@ function ensureStyles(): void {
       background: var(--hint-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       box-shadow: 0 14px 30px rgba(21, 7, 20, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
       font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10.5px; font-weight: 800;
-      letter-spacing: 0.12em; color: rgba(255, 255, 255, 0.92); pointer-events: none; transition: opacity 0.2s ease;
+      letter-spacing: 0.12em; white-space: nowrap; color: rgba(255, 255, 255, 0.92); pointer-events: none; transition: opacity 0.2s ease;
     }
-    .occasion-quick-reveal {
-      flex: 0 0 auto; padding: 7px 10px; border: 1px solid rgba(255, 255, 255, 0.32);
-      border-radius: 999px; background: rgba(255, 255, 255, 0.95); color: #4c213e;
-      font: 800 10px/1 'Plus Jakarta Sans', sans-serif; letter-spacing: 0.02em;
-      cursor: pointer; pointer-events: auto; transition: transform 160ms ease, background 160ms ease;
-    }
-    .occasion-quick-reveal:hover { background: #fff; transform: translateY(-1px); }
-    .occasion-quick-reveal:active { transform: scale(0.95); }
-    .occasion-quick-reveal:focus-visible { outline: 2px solid rgba(255, 224, 238, 0.9); outline-offset: 2px; }
-    .occasion-quick-reveal[hidden] { display: none; }
     .occasion-shell.is-revealed .occasion-hint { opacity: 0; }
 
     .occasion-preview-button { position: fixed; right: 16px; bottom: calc(var(--safe-bottom, 0px) + 92px); z-index: 4500; width: 52px; height: 52px; border: 0; border-radius: 18px; background: linear-gradient(145deg, #ff7ca8, #9c5bda); color: #fff; font-size: 24px; box-shadow: 0 12px 30px rgba(118, 58, 126, 0.35); cursor: pointer; }
@@ -666,8 +656,7 @@ function ensureStyles(): void {
       .occasion-message { font-size: 18px; }
       .occasion-signature { font-size: 20px; }
       .occasion-signature--birthday { max-width: 156px; }
-      .occasion-hint { gap: 6px; padding: 7px 7px 7px 10px; font-size: 9px; letter-spacing: 0.08em; }
-      .occasion-quick-reveal { padding: 7px 8px; font-size: 9px; }
+      .occasion-hint { padding: 7px 10px; font-size: 9px; letter-spacing: 0.08em; }
       .birthday-settings-grid { grid-template-columns: 1fr; }
     }
     @keyframes occasionFade { from { opacity: 0; } to { opacity: 1; } }
@@ -1310,7 +1299,6 @@ function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement):
 
 function openCard(card: OccasionCard, onRevealed?: () => void): void {
   ensureStyles();
-  const showQuickReveal = isCardPreviewMode();
   document.querySelector('.occasion-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.className = 'occasion-overlay';
@@ -1346,8 +1334,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
       </article>
       <canvas class="occasion-scratch" aria-label="Lớp phủ cào để mở thiệp"></canvas>
       <div class="occasion-hint">
-        <span>✦ CÀO ĐỂ MỞ BÍ MẬT ✦</span>
-        <button class="occasion-quick-reveal" type="button"${showQuickReveal ? '' : ' hidden'}>Cào nhanh</button>
+        <span>Cào để mở bí mật</span>
       </div>
     </section>
   `;
@@ -1379,7 +1366,6 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   if (!canvas || !shell) return;
   let ctx = drawScratchCover(canvas, card);
   if (!ctx) return;
-  const quickRevealButton = overlay.querySelector<HTMLButtonElement>('.occasion-quick-reveal');
   const sealScratchCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-seal-scratch');
   const cleanupSealScratch = sealScratchCanvas ? installSealScratch(sealScratchCanvas) : () => {};
   let drawing = false;
@@ -1394,7 +1380,6 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     shell.classList.add('is-revealed');
     onRevealed?.();
   };
-  quickRevealButton?.addEventListener('click', reveal);
   const check = () => {
     if (checkTimer !== null || revealed) return;
     checkTimer = window.setTimeout(() => {
@@ -1475,12 +1460,6 @@ function seenKey(card: OccasionCard, context: OccasionContext, userId: string): 
 
 function isPreviewEnabled(): boolean {
   return new URLSearchParams(window.location.search).get(PREVIEW_QUERY) === '1';
-}
-
-function isCardPreviewMode(): boolean {
-  return window.location.pathname === '/preview/cards'
-    || window.location.hostname === 'preview.babyress.games'
-    || isPreviewEnabled();
 }
 
 function mountPreviewButton(getLatestMe: () => MeResponse | undefined): void {
@@ -1622,7 +1601,7 @@ declare global {
 export function initAnniversaryCards(): void {
   let latestMe: MeResponse | undefined;
   let checking = false;
-  let checkedToken: string | null = null;
+  let checkedSessionKey: string | null = null;
   let mountTimer: number | null = null;
 
   const scheduleProfileMount = () => {
@@ -1636,11 +1615,13 @@ export function initAnniversaryCards(): void {
 
   const checkToday = async (force = false) => {
     const token = store.getToken();
-    if (!token || checking || (!force && checkedToken === token)) return;
+    const todayKey = toDateKey(getCalendarDate(new Date()));
+    const sessionKey = token ? `${token}:${todayKey}` : null;
+    if (!token || checking || (!force && checkedSessionKey === sessionKey)) return;
     checking = true;
     try {
       latestMe = await getMe();
-      checkedToken = token;
+      checkedSessionKey = sessionKey;
       const card = resolveOccasionCard(latestMe);
       if (!card) return;
       const context = createContext(latestMe);
@@ -1663,7 +1644,10 @@ export function initAnniversaryCards(): void {
     if (state.token && state.token !== previous.token) void checkToday(true);
     scheduleProfileMount();
   });
-  window.addEventListener('popstate', scheduleProfileMount);
+  window.addEventListener('popstate', () => {
+    scheduleProfileMount();
+    void checkToday();
+  });
   window.addEventListener('focus', () => void checkToday(true));
   window.addEventListener('pageshow', () => void checkToday(true));
   window.LoveCheckCards = {

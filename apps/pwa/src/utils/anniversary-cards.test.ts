@@ -1,6 +1,21 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { MeResponse } from '../api/auth';
-import { calculateAge, resolveOccasionCard } from './anniversary-cards';
+
+let calculateAge: typeof import('./anniversary-cards').calculateAge;
+let resolveOccasionCard: typeof import('./anniversary-cards').resolveOccasionCard;
+
+beforeAll(async () => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  });
+  ({ calculateAge, resolveOccasionCard } = await import('./anniversary-cards'));
+});
 
 function makeMe(overrides: Partial<MeResponse> = {}): MeResponse {
   return {
@@ -23,6 +38,29 @@ describe('resolveOccasionCard', () => {
       new Date('2026-04-11T03:00:00.000Z'),
     );
     expect(card?.id).toBe('day-100');
+  });
+
+  it('waits for midnight in Vietnam before showing the 100-day card', () => {
+    const beforeMidnight = resolveOccasionCard(
+      makeMe({ couple: { loveStartDate: '2026-01-01T00:00:00.000Z' } } as Partial<MeResponse>),
+      new Date('2026-04-10T16:59:59.999Z'),
+    );
+    const atMidnight = resolveOccasionCard(
+      makeMe({ couple: { loveStartDate: '2026-01-01T00:00:00.000Z' } } as Partial<MeResponse>),
+      new Date('2026-04-10T17:00:00.000Z'),
+    );
+
+    expect(beforeMidnight?.id).not.toBe('day-100');
+    expect(atMidnight?.id).toBe('day-100');
+  });
+
+  it('stops showing the 100-day card after the exact milestone date', () => {
+    const card = resolveOccasionCard(
+      makeMe({ couple: { loveStartDate: '2026-01-01T00:00:00.000Z' } } as Partial<MeResponse>),
+      new Date('2026-04-11T17:00:00.000Z'),
+    );
+
+    expect(card?.id).not.toBe('day-100');
   });
 
   it('opens an annual anniversary card on the same month and day', () => {
