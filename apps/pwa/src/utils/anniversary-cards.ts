@@ -6,7 +6,7 @@ import { showToast } from '../components/toast';
 const VIETNAM_TIMEZONE = 'Asia/Ho_Chi_Minh';
 const SEEN_PREFIX = 'lovecheck:occasion-card:seen:v1:';
 const PREVIEW_QUERY = 'cardPreview';
-const SCRATCH_THRESHOLD = 0.56;
+const SCRATCH_THRESHOLD = 0.88;
 let birthdaySettingsLoading = false;
 
 export type OccasionCardId =
@@ -74,7 +74,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       'Vậy là anh với em đã đi cùng nhau được 100 ngày rồi. Chưa phải thật lâu, nhưng đủ để anh thấy có em trong những ngày bình thường là một điều rất dễ thương. Mình cứ chậm rãi bên nhau như thế nhé.',
     signature: () => 'Thương em, từ anh.',
-    coverText: 'Cào nhẹ để mở 100 ngày',
+    coverText: 'Cào nhẹ để mở 100 ngày đầu tiên của hai đứa',
     icon: '💯',
     pattern: 'hearts',
     colors: ['#ff8fb1', '#ff5f8f', '#9f3564'],
@@ -87,7 +87,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       '500 ngày nghe cũng nhiều thật đấy. Cảm ơn em vì vẫn ở đây, cùng anh đi qua cả những ngày vui lẫn mấy hôm chẳng vui lắm. Anh vẫn muốn những ngày sau này có em.',
     signature: () => 'Anh vẫn chọn em.',
-    coverText: 'Một điều dành cho ngày 500',
+    coverText: 'Mở xem điều anh muốn nhắn ở ngày 500',
     icon: '🎀',
     pattern: 'ribbons',
     colors: ['#d7a8ff', '#9c66db', '#5b338d'],
@@ -100,7 +100,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       'Mình đã có một đoạn đường đủ dài để nhớ, và anh vẫn mong phía trước còn thật nhiều ngày để hai đứa cùng kể tiếp. Cảm ơn em vì đã là một phần rất quan trọng trong những ngày của anh.',
     signature: () => 'Còn nhiều ngày nữa nhé em.',
-    coverText: 'Cào để mở cột mốc 1.000',
+    coverText: 'Chạm cào ngàn ngày bên nhau em nhé',
     icon: '✨',
     pattern: 'stars',
     colors: ['#72d7ff', '#5d7df3', '#35408d'],
@@ -112,7 +112,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       'Thêm một năm anh với em ở cạnh nhau. Anh không hứa lúc nào cũng hoàn hảo, chỉ mong mình vẫn chọn nói chuyện, chọn hiểu nhau và chọn ở lại. Chúc cho hai đứa mình có thêm thật nhiều ngày kỷ niệm như hôm nay.',
     signature: () => 'Mừng ngày của chúng mình.',
-    coverText: 'Kỷ niệm của hai đứa',
+    coverText: 'Cào mở ngày kỷ niệm của hai đứa mình',
     icon: '💍',
     pattern: 'petals',
     colors: ['#f6c86f', '#e9965b', '#9b5a42'],
@@ -125,7 +125,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       'Tuổi mới cứ vui hơn một chút, nhẹ lòng hơn một chút và được yêu nhiều thật nhiều. Anh sẽ cố góp phần vào mấy điều đó. Cứ là em như bây giờ nhé, vì anh thương phiên bản ấy lắm.',
     signature: () => 'Sinh nhật vui vẻ, em bé của anh.',
-    coverText: 'Có quà sinh nhật ở đây',
+    coverText: 'Món quà nhỏ mừng ngày em ra đời',
     icon: '🎂',
     pattern: 'confetti',
     colors: ['#ffd66e', '#ff9c64', '#d94b78'],
@@ -137,7 +137,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       'Mong anh với em vẫn là một đội: vui thì cùng cười, mệt thì dựa vào nhau, có chuyện gì cũng đừng buông tay quá nhanh. Chúc hai đứa mình một năm bình yên, nhiều niềm vui và nhiều lần được gặp nhau.',
     signature: () => 'Năm mới vẫn thương em.',
-    coverText: 'Cào lấy may đầu năm',
+    coverText: 'Cào lấy may và thương nhau cả năm mới',
     icon: '🎆',
     pattern: 'stars',
     colors: ['#ffcf56', '#ed6a4a', '#8f263d'],
@@ -149,7 +149,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       'Anh không giỏi nói lời hoa mỹ, nhưng chuyện anh thương em thì là thật. Hôm nay và cả những ngày không phải lễ, anh vẫn mong em luôn cảm thấy mình được yêu và được trân trọng.',
     signature: () => 'Người yêu em.',
-    coverText: 'Một chiếc Valentine bí mật',
+    coverText: 'Một chiếc thư Valentine bí mật dành riêng em',
     icon: '💌',
     pattern: 'hearts',
     colors: ['#ff839d', '#e43d68', '#8a2148'],
@@ -161,7 +161,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       'Hôm nay em cứ việc xinh, vui và được chiều. Còn những ngày bình thường, anh cũng sẽ nhớ thương em tử tế. Mong em luôn tự tin, thoải mái và làm những điều khiến mình hạnh phúc.',
     signature: () => 'Một bông hoa của riêng anh.',
-    coverText: 'Cào để nhận một bông hoa',
+    coverText: 'Một bông hoa nhỏ dành tặng em ngày 8/3',
     icon: '🌷',
     pattern: 'petals',
     colors: ['#ffb7cf', '#ef73aa', '#8e416d'],
@@ -185,7 +185,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       'Cảm ơn em vì đã xuất hiện và làm những ngày của anh có thêm nhiều điều để mong. Mong em luôn được yêu thương đúng cách, được lắng nghe và được là chính mình.',
     signature: () => 'Thương em nhiều.',
-    coverText: 'Một lời nhỏ cho ngày 20/10',
+    coverText: 'Lời thương gửi người phụ nữ anh yêu nhất',
     icon: '🌸',
     pattern: 'petals',
     colors: ['#f3a8c8', '#d76da8', '#7f416f'],
@@ -197,7 +197,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
     message: () =>
       'Giáng sinh này anh không cần điều ước gì cầu kỳ. Chỉ mong anh với em vẫn có nhau, ấm áp và bình yên. Trời có lạnh thì nhớ ở gần anh thêm một chút nhé.',
     signature: () => 'Quà Noel của anh là em.',
-    coverText: 'Cào lớp tuyết để mở quà',
+    coverText: 'Cào lớp tuyết lạnh để nhận hơi ấm Noel',
     icon: '🎄',
     pattern: 'snow',
     colors: ['#9be3d2', '#3aa58f', '#1d5e58'],
