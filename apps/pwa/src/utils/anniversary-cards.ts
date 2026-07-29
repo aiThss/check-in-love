@@ -325,18 +325,147 @@ function ensureStyles(): void {
   const style = document.createElement('style');
   style.id = 'occasion-card-styles';
   style.textContent = `
-    .occasion-overlay{position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(22,13,25,.72);backdrop-filter:blur(14px);animation:occasionFade .24s ease both}
-    .occasion-shell{position:relative;width:min(390px,100%);max-height:calc(100dvh - 40px);overflow:auto;border-radius:30px;box-shadow:0 28px 90px rgba(0,0,0,.38);background:#fff8f2;animation:occasionRise .42s cubic-bezier(.2,.85,.25,1) both}
-    .occasion-close{position:absolute;top:12px;right:12px;z-index:8;width:36px;height:36px;border:0;border-radius:999px;background:rgba(255,255,255,.86);color:#503846;font-size:20px;box-shadow:0 6px 18px rgba(55,28,43,.16);cursor:pointer}
-    .occasion-paper{position:relative;min-height:540px;padding:70px 30px 34px;overflow:hidden;background:radial-gradient(circle at 20% 10%,rgba(255,255,255,.95),transparent 28%),linear-gradient(155deg,#fffdf8,#fff4ed 58%,#f9eee7);color:#493542}
-    .occasion-paper:before,.occasion-paper:after{content:"";position:absolute;border-radius:999px;filter:blur(1px);opacity:.25;pointer-events:none}.occasion-paper:before{width:180px;height:180px;left:-80px;bottom:-70px;background:var(--occasion-a)}.occasion-paper:after{width:140px;height:140px;right:-65px;top:-55px;background:var(--occasion-b)}
-    .occasion-inner{position:relative;z-index:1;text-align:center}.occasion-icon{font-size:44px;filter:drop-shadow(0 8px 12px rgba(80,35,60,.16));margin-bottom:13px}.occasion-eyebrow{font-size:11px;font-weight:800;letter-spacing:.19em;text-transform:uppercase;color:var(--occasion-b);margin-bottom:10px}.occasion-title{font-family:"Segoe Script","Snell Roundhand","URW Chancery L","Brush Script MT",cursive;font-size:31px;line-height:1.25;color:#6a3150;margin:0 0 22px;font-weight:700}.occasion-divider{width:72px;height:1px;margin:0 auto 22px;background:linear-gradient(90deg,transparent,var(--occasion-a),transparent)}.occasion-message{font-family:"Cormorant Garamond","Palatino Linotype",Palatino,Georgia,serif;font-size:19px;line-height:1.72;margin:0;color:#4e3c46}.occasion-signature{margin-top:25px;font-family:"Segoe Script","Snell Roundhand","Brush Script MT",cursive;font-size:19px;color:var(--occasion-b);transform:rotate(-2deg)}
-    .occasion-scratch{position:absolute;inset:0;width:100%;height:100%;z-index:4;touch-action:none;cursor:grab;transition:opacity .65s ease}.occasion-scratch.scratching{cursor:grabbing}.occasion-scratch.revealed{opacity:0;pointer-events:none}.occasion-hint{position:absolute;z-index:5;left:50%;bottom:22px;transform:translateX(-50%);padding:8px 13px;border-radius:999px;background:rgba(255,255,255,.88);box-shadow:0 8px 22px rgba(54,26,42,.14);font-size:11px;font-weight:800;letter-spacing:.08em;color:#593b4a;pointer-events:none;transition:opacity .2s ease}.occasion-shell.is-revealed .occasion-hint{opacity:0}
-    .occasion-preview-button{position:fixed;right:16px;bottom:calc(var(--safe-bottom,0px) + 92px);z-index:4500;width:52px;height:52px;border:0;border-radius:18px;background:linear-gradient(145deg,#ff7ca8,#9c5bda);color:#fff;font-size:24px;box-shadow:0 12px 30px rgba(118,58,126,.35);cursor:pointer}
-    .occasion-picker-overlay{position:fixed;inset:0;z-index:4900;display:flex;align-items:flex-end;justify-content:center;background:rgba(18,12,20,.58);backdrop-filter:blur(8px)}.occasion-picker{width:min(480px,100%);max-height:80dvh;overflow:auto;padding:18px 16px calc(var(--safe-bottom,0px) + 20px);border-radius:26px 26px 0 0;background:var(--bg,#fff);box-shadow:0 -20px 60px rgba(0,0,0,.24)}.occasion-picker h3{font-size:18px;margin:0 0 4px}.occasion-picker p{font-size:12px;color:var(--text-secondary);margin:0 0 14px}.occasion-picker-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.occasion-picker-item{border:1px solid var(--border,rgba(0,0,0,.1));border-radius:16px;padding:13px;text-align:left;background:var(--surface,#fff);color:var(--text-primary,#222);cursor:pointer}.occasion-picker-item span{display:block;font-size:23px;margin-bottom:7px}.occasion-picker-item strong{display:block;font-size:13px}.occasion-picker-close{width:100%;margin-top:12px;padding:12px;border:0;border-radius:14px;background:var(--surface-solid,#eee);color:var(--text-primary,#222);font-weight:700}
-    .birthday-settings-card{padding:16px;display:flex;flex-direction:column;gap:13px}.birthday-settings-head{display:flex;gap:12px;align-items:flex-start}.birthday-settings-head>span{font-size:21px}.birthday-settings-head strong{display:block;font-size:14px}.birthday-settings-head small{display:block;margin-top:3px;color:var(--text-secondary);line-height:1.4}.birthday-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.birthday-field{display:flex;flex-direction:column;gap:6px}.birthday-field label{font-size:11px;font-weight:700;color:var(--text-secondary)}.birthday-field input{width:100%;min-width:0;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text-primary)}.birthday-age{min-height:16px;font-size:10px;color:var(--text-secondary)}.birthday-save{align-self:flex-end;border:0;border-radius:12px;padding:9px 13px;background:var(--accent);color:#fff;font-size:12px;font-weight:800;cursor:pointer}.birthday-save:disabled{opacity:.55}
-    @media(max-width:370px){.occasion-paper{padding-left:23px;padding-right:23px}.occasion-title{font-size:27px}.occasion-message{font-size:18px}.birthday-settings-grid{grid-template-columns:1fr}}
-    @keyframes occasionFade{from{opacity:0}to{opacity:1}}@keyframes occasionRise{from{opacity:0;transform:translateY(24px) scale(.97)}to{opacity:1;transform:none}}
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Dancing+Script:wght@700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@700;800&display=swap');
+
+    .occasion-overlay {
+      position: fixed; inset: 0; z-index: 5000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px; background: rgba(14, 8, 16, 0.78);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      animation: occasionFade 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .occasion-shell {
+      position: relative; width: min(390px, 100%);
+      max-height: calc(100dvh - 32px); overflow: auto;
+      border-radius: 30px;
+      box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.15);
+      background: #1a101b; animation: occasionRise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .occasion-close {
+      position: absolute; top: 14px; right: 14px; z-index: 8;
+      width: 36px; height: 36px; border: 0; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92); color: #3e2233;
+      font-size: 20px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+      cursor: pointer; transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .occasion-close:active { transform: scale(0.92); }
+
+    /* Revealed Card Paper Background */
+    .occasion-paper {
+      position: relative; min-height: 540px; padding: 60px 28px 36px;
+      overflow: hidden; border-radius: 30px;
+      background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.98), rgba(255, 248, 242, 0.96) 55%, #f6e3db 100%),
+                  linear-gradient(145deg, #fffcf8 0%, #fff0e6 48%, #f4ded5 100%);
+      color: #3b2533;
+      box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.42),
+                  inset 0 0 0 6px rgba(255, 255, 255, 0.85),
+                  inset 0 0 0 8px rgba(212, 175, 55, 0.32);
+    }
+    .occasion-border-frame {
+      position: absolute; inset: 12px; pointer-events: none;
+      border: 1px solid rgba(195, 145, 60, 0.35); border-radius: 22px;
+    }
+    .occasion-corner {
+      position: absolute; z-index: 2; font-size: 11px; color: rgba(195, 145, 60, 0.65);
+      pointer-events: none; line-height: 1;
+    }
+    .occasion-corner.top-left { top: 16px; left: 16px; }
+    .occasion-corner.top-right { top: 16px; right: 16px; }
+    .occasion-corner.bottom-left { bottom: 16px; left: 16px; }
+    .occasion-corner.bottom-right { bottom: 16px; right: 16px; }
+
+    .occasion-inner { position: relative; z-index: 2; text-align: center; }
+    .occasion-icon-wrap {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 66px; height: 66px; margin-bottom: 12px; border-radius: 999px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.92), rgba(255, 240, 245, 0.6));
+      box-shadow: 0 10px 24px rgba(160, 70, 110, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+    }
+    .occasion-icon { font-size: 38px; filter: drop-shadow(0 4px 8px rgba(80, 20, 50, 0.18)); }
+    .occasion-eyebrow {
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--occasion-b, #b35279); margin-bottom: 8px; opacity: 0.9;
+    }
+    .occasion-title {
+      font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+      font-size: 27px; font-weight: 700; line-height: 1.25; color: #5a223f;
+      margin: 0 0 16px; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
+    }
+    .occasion-divider {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      width: 140px; margin: 0 auto 18px;
+    }
+    .divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--occasion-b, #c47192), transparent); }
+    .divider-heart { font-size: 12px; color: var(--occasion-b, #c47192); opacity: 0.8; }
+    .occasion-message {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 19.5px; font-weight: 600; line-height: 1.72; color: #3e2634; margin: 0;
+      letter-spacing: 0.01em;
+    }
+    .occasion-signature-wrap {
+      margin-top: 26px; display: flex; align-items: center; justify-content: space-between;
+      padding-top: 14px; border-top: 1px dashed rgba(180, 120, 145, 0.28);
+    }
+    .occasion-signature {
+      font-family: 'Dancing Script', cursive; font-size: 23px; font-weight: 700;
+      color: var(--occasion-b, #933860); margin: 0; transform: rotate(-3deg);
+    }
+    .occasion-stamp {
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 9px; font-weight: 800;
+      letter-spacing: 0.15em; color: rgba(160, 80, 110, 0.5);
+      border: 1.5px solid rgba(160, 80, 110, 0.35); padding: 4px 8px; border-radius: 6px;
+      transform: rotate(6deg); text-transform: uppercase;
+    }
+
+    .occasion-scratch {
+      position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4;
+      touch-action: none; cursor: grab; transition: opacity 0.65s ease;
+    }
+    .occasion-scratch.scratching { cursor: grabbing; }
+    .occasion-scratch.revealed { opacity: 0; pointer-events: none; }
+    .occasion-hint {
+      position: absolute; z-index: 5; left: 50%; bottom: 20px; transform: translateX(-50%);
+      padding: 9px 16px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(8px);
+      box-shadow: 0 10px 28px rgba(35, 12, 25, 0.22);
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10.5px; font-weight: 800;
+      letter-spacing: 0.12em; color: #4e293a; pointer-events: none; transition: opacity 0.2s ease;
+    }
+    .occasion-shell.is-revealed .occasion-hint { opacity: 0; }
+
+    .occasion-preview-button { position: fixed; right: 16px; bottom: calc(var(--safe-bottom, 0px) + 92px); z-index: 4500; width: 52px; height: 52px; border: 0; border-radius: 18px; background: linear-gradient(145deg, #ff7ca8, #9c5bda); color: #fff; font-size: 24px; box-shadow: 0 12px 30px rgba(118, 58, 126, 0.35); cursor: pointer; }
+    .occasion-picker-overlay { position: fixed; inset: 0; z-index: 4900; display: flex; align-items: flex-end; justify-content: center; background: rgba(18, 12, 20, 0.58); backdrop-filter: blur(8px); }
+    .occasion-picker { width: min(480px, 100%); max-height: 80dvh; overflow: auto; padding: 18px 16px calc(var(--safe-bottom, 0px) + 20px); border-radius: 26px 26px 0 0; background: var(--bg, #fff); box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.24); }
+    .occasion-picker h3 { font-size: 18px; margin: 0 0 4px; }
+    .occasion-picker p { font-size: 12px; color: var(--text-secondary); margin: 0 0 14px; }
+    .occasion-picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .occasion-picker-item { border: 1px solid var(--border, rgba(0, 0, 0, 0.1)); border-radius: 16px; padding: 13px; text-align: left; background: var(--surface, #fff); color: var(--text-primary, #222); cursor: pointer; }
+    .occasion-picker-item span { display: block; font-size: 23px; margin-bottom: 7px; }
+    .occasion-picker-item strong { display: block; font-size: 13px; }
+    .occasion-picker-close { width: 100%; margin-top: 12px; padding: 12px; border: 0; border-radius: 14px; background: var(--surface-solid, #eee); color: var(--text-primary, #222); font-weight: 700; }
+
+    .birthday-settings-card { padding: 16px; display: flex; flex-direction: column; gap: 13px; }
+    .birthday-settings-head { display: flex; gap: 12px; align-items: flex-start; }
+    .birthday-settings-head>span { font-size: 21px; }
+    .birthday-settings-head strong { display: block; font-size: 14px; }
+    .birthday-settings-head small { display: block; margin-top: 3px; color: var(--text-secondary); line-height: 1.4; }
+    .birthday-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .birthday-field { display: flex; flex-direction: column; gap: 6px; }
+    .birthday-field label { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+    .birthday-field input { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text-primary); }
+    .birthday-age { min-height: 16px; font-size: 10px; color: var(--text-secondary); }
+    .birthday-save { align-self: flex-end; border: 0; border-radius: 12px; padding: 9px 13px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; }
+    .birthday-save:disabled { opacity: 0.55; }
+
+    @media(max-width:370px) {
+      .occasion-paper { padding-left: 20px; padding-right: 20px; }
+      .occasion-title { font-size: 24px; }
+      .occasion-message { font-size: 18px; }
+      .birthday-settings-grid { grid-template-columns: 1fr; }
+    }
+    @keyframes occasionFade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes occasionRise { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
   `;
   document.head.appendChild(style);
 }
@@ -449,27 +578,71 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   roundedPath(ctx, rect.width, rect.height, 30);
   ctx.fillStyle = gradient;
   ctx.fill();
+
   ctx.save();
   roundedPath(ctx, rect.width, rect.height, 30);
   ctx.clip();
   drawPattern(ctx, rect.width, rect.height, card.pattern);
-  const shine = ctx.createLinearGradient(0, 0, rect.width, 0);
+
+  // Outer Golden Filigree Frame
+  ctx.strokeStyle = 'rgba(255, 225, 160, 0.42)';
+  ctx.lineWidth = 2;
+  ctx.save();
+  ctx.translate(14, 14);
+  roundedPath(ctx, rect.width - 28, rect.height - 28, 22);
+  ctx.stroke();
+  ctx.restore();
+
+  // Shimmering Diagonal Gloss Highlight
+  const shine = ctx.createLinearGradient(0, 0, rect.width, rect.height);
   shine.addColorStop(0, 'rgba(255,255,255,0)');
-  shine.addColorStop(0.48, 'rgba(255,255,255,.26)');
-  shine.addColorStop(0.56, 'rgba(255,255,255,0)');
+  shine.addColorStop(0.42, 'rgba(255,255,255,.08)');
+  shine.addColorStop(0.50, 'rgba(255,255,255,.32)');
+  shine.addColorStop(0.58, 'rgba(255,255,255,.08)');
+  shine.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = shine;
   ctx.fillRect(0, 0, rect.width, rect.height);
   ctx.restore();
+
+  // Centered 3D Wax Seal Badge behind Icon
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 6;
+  ctx.beginPath();
+  ctx.arc(rect.width / 2, rect.height / 2 - 58, 44, 0, Math.PI * 2);
+  const sealGrad = ctx.createRadialGradient(
+    rect.width / 2 - 10, rect.height / 2 - 68, 4,
+    rect.width / 2, rect.height / 2 - 58, 44
+  );
+  sealGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+  sealGrad.addColorStop(0.7, 'rgba(255, 240, 246, 0.85)');
+  sealGrad.addColorStop(1, 'rgba(250, 215, 230, 0.72)');
+  ctx.fillStyle = sealGrad;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // Render Icon
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '700 42px "Segoe UI Emoji", sans-serif';
-  ctx.fillText(card.icon, rect.width / 2, rect.height / 2 - 58);
-  ctx.font = '800 18px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  wrapCanvasText(ctx, card.coverText, rect.width / 2, rect.height / 2 + 2, rect.width * 0.72, 25);
-  ctx.globalAlpha = 0.84;
-  ctx.font = '800 11px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  ctx.fillText('DÙNG TAY CÀO ĐỂ MỞ', rect.width / 2, rect.height / 2 + 70);
+  ctx.font = '700 40px "Segoe UI Emoji", sans-serif';
+  ctx.fillText(card.icon, rect.width / 2, rect.height / 2 - 57);
+
+  // Cover Text
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+  ctx.shadowBlur = 8;
+  ctx.font = '800 17.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
+  wrapCanvasText(ctx, card.coverText, rect.width / 2, rect.height / 2 + 18, rect.width * 0.76, 24);
+
+  // Action Badge Prompt
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.92;
+  ctx.font = '800 10.5px "Plus Jakarta Sans", Inter, sans-serif';
+  ctx.fillText('✦ DÙNG TAY CÀO ĐỂ MỞ BÍ MẬT ✦', rect.width / 2, rect.height / 2 + 82);
   ctx.globalAlpha = 1;
 
   if (card.coverImage) {
@@ -531,17 +704,31 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     <section class="occasion-shell" role="dialog" aria-modal="true" aria-label="${escapeHtml(card.title)}" style="--occasion-a:${card.colors[0]};--occasion-b:${card.colors[1]}">
       <button class="occasion-close" type="button" aria-label="Đóng">×</button>
       <article class="occasion-paper">
+        <div class="occasion-border-frame"></div>
+        <div class="occasion-corner top-left">✦</div>
+        <div class="occasion-corner top-right">✦</div>
+        <div class="occasion-corner bottom-left">✦</div>
+        <div class="occasion-corner bottom-right">✦</div>
         <div class="occasion-inner">
-          <div class="occasion-icon">${card.icon}</div>
-          <div class="occasion-eyebrow">${escapeHtml(card.eyebrow)}</div>
+          <div class="occasion-icon-wrap">
+            <span class="occasion-icon">${card.icon}</span>
+          </div>
+          <div class="occasion-eyebrow"><span>◆ ${escapeHtml(card.eyebrow)} ◆</span></div>
           <h2 class="occasion-title">${escapeHtml(card.title)}</h2>
-          <div class="occasion-divider"></div>
+          <div class="occasion-divider">
+            <span class="divider-line"></span>
+            <span class="divider-heart">♥</span>
+            <span class="divider-line"></span>
+          </div>
           <p class="occasion-message">${escapeHtml(card.message)}</p>
-          <p class="occasion-signature">${escapeHtml(card.signature)}</p>
+          <div class="occasion-signature-wrap">
+            <p class="occasion-signature">${escapeHtml(card.signature)}</p>
+            <div class="occasion-stamp">LOVE SEAL</div>
+          </div>
         </div>
       </article>
       <canvas class="occasion-scratch" aria-label="Lớp phủ cào để mở thiệp"></canvas>
-      <div class="occasion-hint">CÀO ĐỂ MỞ THIỆP</div>
+      <div class="occasion-hint">✦ CÀO ĐỂ MỞ BÍ MẬT ✦</div>
     </section>
   `;
   document.body.appendChild(overlay);
