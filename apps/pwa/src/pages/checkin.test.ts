@@ -44,6 +44,7 @@ describe('Check-in close button navigation', () => {
 
     const closeBtn = page.querySelector<HTMLButtonElement>('#back-btn');
     expect(closeBtn).not.toBeNull();
+    expect(closeBtn?.type).toBe('button');
     expect(closeBtn?.textContent).toBe('✕');
 
     closeBtn?.click();

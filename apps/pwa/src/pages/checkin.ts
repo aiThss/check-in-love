@@ -58,7 +58,7 @@ export function renderCheckinPage(): HTMLElement {
   const header = document.createElement('div');
   header.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:0;min-width:0;';
   header.innerHTML = `
-    <button id="back-btn" class="btn-icon" aria-label="Đóng" style="border-radius:50%;width:44px;height:44px;font-size:18px;font-weight:700;">✕</button>
+    <button type="button" id="back-btn" class="btn-icon" aria-label="Đóng" style="position:relative;z-index:2;touch-action:manipulation;pointer-events:auto;border-radius:50%;width:44px;height:44px;font-size:18px;font-weight:700;">✕</button>
     <div>
       <h1 style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">Gửi khoảnh khắc</h1>
       <p style="font-size:13px;color:var(--text-secondary);">Chia sẻ hiện tại của bạn với người ấy</p>
@@ -83,9 +83,14 @@ export function renderCheckinPage(): HTMLElement {
     }
   }
 
-  header.querySelector('#back-btn')?.addEventListener('click', () => {
-    clearSelectedPhoto();
-    navigate('/app/home');
+  header.querySelector('#back-btn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      clearSelectedPhoto();
+    } finally {
+      navigate('/app/home');
+    }
   });
 
   // Type Selector Tab
