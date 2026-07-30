@@ -50,5 +50,18 @@ describe('Check-in close button navigation', () => {
     closeBtn?.click();
 
     expect(navigate).toHaveBeenCalledWith('/app/home');
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('navigates on pointer release for touch-style interaction', async () => {
+    const { renderCheckinPage } = await import('./checkin');
+    const page = renderCheckinPage();
+    document.body.appendChild(page);
+
+    const closeBtn = page.querySelector<HTMLButtonElement>('#back-btn');
+    closeBtn?.dispatchEvent(new Event('pointerup', { bubbles: true, cancelable: true }));
+
+    expect(navigate).toHaveBeenCalledWith('/app/home');
+    expect(navigate).toHaveBeenCalledTimes(1);
   });
 });

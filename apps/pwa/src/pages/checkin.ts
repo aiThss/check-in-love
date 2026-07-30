@@ -83,15 +83,44 @@ export function renderCheckinPage(): HTMLElement {
     }
   }
 
-  header.querySelector('#back-btn')?.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
+  function navigateHomeFromCheckin(): void {
+    const target = '/app/home';
+
     try {
       clearSelectedPhoto();
-    } finally {
-      navigate('/app/home');
+    } catch (error) {
+      logger.warn('Failed to clear the selected check-in photo before closing', error);
     }
-  });
+
+    try {
+      navigate(target);
+    } catch (error) {
+      logger.error('Failed to navigate away from check-in', error);
+      window.location.replace(target);
+      return;
+    }
+
+    // The client router updates the URL synchronously. Keep a hard-navigation
+    // fallback for stale WebViews or runtimes that swallow the router update.
+    window.setTimeout(() => {
+      if (window.location.pathname === '/app/checkin') window.location.replace(target);
+    }, 0);
+  }
+
+  const closeCheckin = header.querySelector<HTMLButtonElement>('#back-btn');
+  if (closeCheckin) {
+    let closeRequested = false;
+    const handleClose = (event: Event): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (closeRequested) return;
+      closeRequested = true;
+      navigateHomeFromCheckin();
+    };
+
+    closeCheckin.addEventListener('pointerup', handleClose);
+    closeCheckin.addEventListener('click', handleClose);
+  }
 
   // Type Selector Tab
   const tabsWrapper = document.createElement('div');
@@ -291,7 +320,7 @@ export function renderCheckinPage(): HTMLElement {
         <img class="photo-composer-image" src="${selectedPreviewUrl}" alt="Ảnh check-in đã chọn" />
         <div class="photo-composer-vignette"></div>
         <div class="photo-composer-topbar">
-          <button id="remove-photo" class="photo-icon-button" aria-label="Xóa ảnh">×</button>
+          <button type="button" id="remove-photo" class="photo-icon-button" aria-label="Xóa ảnh">×</button>
         </div>
         <div class="photo-composer-actions">
           <button id="retake-photo" class="photo-action-button" type="button">Chụp lại</button>
@@ -301,8 +330,7 @@ export function renderCheckinPage(): HTMLElement {
 
       picker.querySelector('#remove-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        clearSelectedPhoto();
-        navigate('/app/home');
+        navigateHomeFromCheckin();
       });
       picker.querySelector('#retake-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
