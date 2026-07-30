@@ -1,4 +1,4 @@
-import { navigate } from '../router';
+import { getCurrentPath, navigate } from '../router';
 
 interface NavItem {
   icon: string;
@@ -23,6 +23,9 @@ function applyActiveState(path: string): void {
     const active = button.dataset.route === path;
     button.classList.toggle('active', active);
     button.setAttribute('aria-current', active ? 'page' : 'false');
+    if (button.classList.contains('nav-checkin-btn')) {
+      button.setAttribute('aria-label', active ? 'Đóng check-in' : 'Tạo check-in mới');
+    }
 
     if (!button.classList.contains('nav-checkin-btn')) {
       // Touch browsers can keep :hover stuck after tapping. Keep inactive tabs
@@ -55,6 +58,7 @@ export function createNav(): HTMLElement {
 
     if (item.isCheckin) {
       button.className = 'nav-checkin-btn';
+      button.type = 'button';
       button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
 
       // Wrap in relative container with glow ring (ported from locket)
@@ -68,8 +72,10 @@ export function createNav(): HTMLElement {
       wrapper.appendChild(button);
 
       button.addEventListener('click', () => {
-        applyActiveState(item.path);
-        navigate(item.path);
+        const currentPath = getCurrentPath().split('?')[0].replace(/\/$/, '') || '/';
+        const targetPath = currentPath === item.path ? '/app/home' : item.path;
+        applyActiveState(targetPath);
+        navigate(targetPath);
       });
 
       inner.appendChild(wrapper);
