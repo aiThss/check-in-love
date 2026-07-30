@@ -7,7 +7,9 @@ const VIETNAM_TIMEZONE = 'Asia/Ho_Chi_Minh';
 const SEEN_PREFIX = 'lovecheck:occasion-card:seen:v1:';
 const PREVIEW_QUERY = 'cardPreview';
 const SCRATCH_THRESHOLD = 0.88;
+const BIRTHDAY_NOTICE_PREFIX = 'lovecheck:birthday-setup-notice:v1:';
 let birthdaySettingsLoading = false;
+const birthdayNoticeSession = new Set<string>();
 
 const OCCASION_ART_SVG = `
 <svg class="occasion-art" viewBox="0 0 130 155" width="160" height="185" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -641,12 +643,10 @@ function ensureStyles(): void {
     .birthday-settings-head { display: flex; gap: 12px; align-items: flex-start; }
     .birthday-settings-head>span { font-size: 21px; }
     .birthday-settings-head strong { display: block; font-size: 14px; }
-    .birthday-settings-head small { display: block; margin-top: 3px; color: var(--text-secondary); line-height: 1.4; }
     .birthday-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .birthday-field { display: flex; flex-direction: column; gap: 6px; }
     .birthday-field label { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
     .birthday-field input { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text-primary); }
-    .birthday-age { min-height: 16px; font-size: 10px; color: var(--text-secondary); }
     .birthday-save { align-self: flex-end; border: 0; border-radius: 12px; padding: 9px 13px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; }
     .birthday-save:disabled { opacity: 0.55; }
 
@@ -1513,9 +1513,30 @@ function toInputDate(value?: string): string {
   return date.year ? toDateKey(date) : '';
 }
 
-function ageLabel(value: string): string {
-  const age = calculateAge(value || undefined);
-  return age === undefined ? 'Chưa có tuổi hiển thị' : `${age} tuổi`;
+export function needsBirthdaySetup(me: Pick<MeResponse, 'user' | 'partnerUser'>): boolean {
+  return !me.user.birthday || !(me.user.partnerBirthday || me.partnerUser?.birthday);
+}
+
+function notifyMissingBirthday(me: MeResponse): void {
+  if (!needsBirthdaySetup(me)) return;
+
+  const key = `${BIRTHDAY_NOTICE_PREFIX}${me.user.id}`;
+  if (birthdayNoticeSession.has(key)) return;
+
+  try {
+    if (sessionStorage.getItem(key) === '1') {
+      birthdayNoticeSession.add(key);
+      return;
+    }
+    sessionStorage.setItem(key, '1');
+  } catch {
+    // The in-memory guard still prevents duplicate notices if storage is unavailable.
+  }
+
+  birthdayNoticeSession.add(key);
+  window.setTimeout(() => {
+    showToast('Bạn chưa lưu đủ Birthday. Thêm ngày đặc biệt để giữ bất ngờ nhé 🎂', 'info');
+  }, 700);
 }
 
 async function mountBirthdaySettings(): Promise<void> {
@@ -1541,33 +1562,27 @@ async function mountBirthdaySettings(): Promise<void> {
   card.innerHTML = `
     <div class="birthday-settings-head">
       <span>🎂</span>
-      <div><strong>Sinh nhật và tuổi</strong><small>Lưu ngày sinh để hai đứa tự nhận thiệp đúng ngày. Tuổi được tính tự động.</small></div>
+      <div><strong>Birthday</strong></div>
     </div>
     <div class="birthday-settings-grid">
       <div class="birthday-field">
-        <label for="birthday-self">Sinh nhật của bạn</label>
+        <label for="birthday-self">Birthday của bạn</label>
         <input id="birthday-self" type="date" value="${toInputDate(me.user.birthday)}" />
-        <span class="birthday-age" data-age-self>${ageLabel(toInputDate(me.user.birthday))}</span>
       </div>
       <div class="birthday-field">
-        <label for="birthday-partner">Sinh nhật người ấy</label>
+        <label for="birthday-partner">Birthday người ấy</label>
         <input id="birthday-partner" type="date" value="${toInputDate(me.user.partnerBirthday || me.partnerUser?.birthday)}" />
-        <span class="birthday-age" data-age-partner>${ageLabel(toInputDate(me.user.partnerBirthday || me.partnerUser?.birthday))}</span>
       </div>
     </div>
-    <button type="button" class="birthday-save">Lưu ngày sinh</button>
+    <button type="button" class="birthday-save">Lưu Birthday</button>
   `;
   editRow.insertAdjacentElement('afterend', card);
   const selfInput = card.querySelector<HTMLInputElement>('#birthday-self');
   const partnerInput = card.querySelector<HTMLInputElement>('#birthday-partner');
-  const selfAge = card.querySelector<HTMLElement>('[data-age-self]');
-  const partnerAge = card.querySelector<HTMLElement>('[data-age-partner]');
   const save = card.querySelector<HTMLButtonElement>('.birthday-save');
   const max = toDateKey(getCalendarDate(new Date()));
   if (selfInput) selfInput.max = max;
   if (partnerInput) partnerInput.max = max;
-  selfInput?.addEventListener('input', () => { if (selfAge) selfAge.textContent = ageLabel(selfInput.value); });
-  partnerInput?.addEventListener('input', () => { if (partnerAge) partnerAge.textContent = ageLabel(partnerInput.value); });
   save?.addEventListener('click', async () => {
     save.disabled = true;
     save.textContent = 'Đang lưu...';
@@ -1577,11 +1592,11 @@ async function mountBirthdaySettings(): Promise<void> {
         partnerBirthday: partnerInput?.value || null,
       });
       await getMe();
-      showToast('Đã lưu ngày sinh và cập nhật tuổi!', 'success');
+      showToast('Đã lưu Birthday!', 'success');
       save.textContent = 'Đã lưu';
-      window.setTimeout(() => { save.textContent = 'Lưu ngày sinh'; }, 1200);
+      window.setTimeout(() => { save.textContent = 'Lưu Birthday'; }, 1200);
     } catch (error) {
-      showToast(`Không lưu được ngày sinh: ${(error as Error).message}`, 'error');
+      showToast(`Không lưu được Birthday: ${(error as Error).message}`, 'error');
       save.textContent = 'Thử lại';
     } finally {
       save.disabled = false;
@@ -1622,6 +1637,7 @@ export function initAnniversaryCards(): void {
     try {
       latestMe = await getMe();
       checkedSessionKey = sessionKey;
+      notifyMissingBirthday(latestMe);
       const card = resolveOccasionCard(latestMe);
       if (!card) return;
       const context = createContext(latestMe);

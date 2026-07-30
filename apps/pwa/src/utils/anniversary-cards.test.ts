@@ -4,6 +4,7 @@ import type { MeResponse } from '../api/auth';
 
 let calculateAge: typeof import('./anniversary-cards').calculateAge;
 let resolveOccasionCard: typeof import('./anniversary-cards').resolveOccasionCard;
+let needsBirthdaySetup: typeof import('./anniversary-cards').needsBirthdaySetup;
 
 beforeAll(async () => {
   Object.defineProperty(window, 'matchMedia', {
@@ -14,7 +15,7 @@ beforeAll(async () => {
       removeEventListener: vi.fn(),
     }),
   });
-  ({ calculateAge, resolveOccasionCard } = await import('./anniversary-cards'));
+  ({ calculateAge, resolveOccasionCard, needsBirthdaySetup } = await import('./anniversary-cards'));
 });
 
 function makeMe(overrides: Partial<MeResponse> = {}): MeResponse {
@@ -101,5 +102,19 @@ describe('resolveOccasionCard', () => {
 describe('calculateAge', () => {
   it('calculates the age from the birthday year', () => {
     expect(calculateAge('2006-05-04T00:00:00.000Z', { year: 2026, month: 7, day: 29 })).toBe(20);
+  });
+});
+
+describe('needsBirthdaySetup', () => {
+  it('asks for Birthday when either birthday is missing', () => {
+    expect(needsBirthdaySetup(makeMe())).toBe(true);
+    expect(needsBirthdaySetup(makeMe({ user: { birthday: '2000-05-04' } } as Partial<MeResponse>))).toBe(true);
+    expect(needsBirthdaySetup(makeMe({ user: { partnerBirthday: '2001-06-05' } } as Partial<MeResponse>))).toBe(true);
+  });
+
+  it('does not ask when both birthdays are available', () => {
+    expect(needsBirthdaySetup(makeMe({
+      user: { birthday: '2000-05-04', partnerBirthday: '2001-06-05' },
+    } as Partial<MeResponse>))).toBe(false);
   });
 });
