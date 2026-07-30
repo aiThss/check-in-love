@@ -1540,6 +1540,7 @@ function notifyMissingBirthday(me: MeResponse): void {
 }
 
 async function mountBirthdaySettings(): Promise<void> {
+  ensureStyles();
   const page = document.querySelector<HTMLElement>('.profile-page');
   if (!page || page.querySelector('.birthday-settings-card') || birthdaySettingsLoading) return;
   const editRow = Array.from(page.querySelectorAll<HTMLElement>('.card-solid')).find((row) =>
@@ -1561,8 +1562,11 @@ async function mountBirthdaySettings(): Promise<void> {
   card.className = 'card-solid birthday-settings-card';
   card.innerHTML = `
     <div class="birthday-settings-head">
-      <span>🎂</span>
-      <div><strong>Birthday</strong></div>
+      <span class="birthday-settings-icon">🎂</span>
+      <div>
+        <span class="birthday-settings-title">Ngày sinh nhật</span>
+        <span class="birthday-settings-subtitle">Cập nhật sinh nhật hai bạn để nhận thiệp chúc mừng tự động</span>
+      </div>
     </div>
     <div class="birthday-settings-grid">
       <div class="birthday-field">
@@ -1585,7 +1589,7 @@ async function mountBirthdaySettings(): Promise<void> {
   if (partnerInput) partnerInput.max = max;
   save?.addEventListener('click', async () => {
     save.disabled = true;
-    save.textContent = 'Đang lưu...';
+    save.textContent = '⏳ Đang lưu...';
     try {
       await updateProfile({
         birthday: selfInput?.value || null,
@@ -1593,11 +1597,11 @@ async function mountBirthdaySettings(): Promise<void> {
       });
       await getMe();
       showToast('Đã lưu Birthday!', 'success');
-      save.textContent = 'Đã lưu';
+      save.textContent = '✨ Đã lưu';
       window.setTimeout(() => { save.textContent = 'Lưu Birthday'; }, 1200);
     } catch (error) {
       showToast(`Không lưu được Birthday: ${(error as Error).message}`, 'error');
-      save.textContent = 'Thử lại';
+      save.textContent = '🔄 Thử lại';
     } finally {
       save.disabled = false;
     }
