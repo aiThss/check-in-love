@@ -5,16 +5,16 @@
 
 :root {
   /* ── Backgrounds ──────────────────────────────────────────── */
-  --bg: #fffafa;
-  --surface: rgba(255, 255, 255, 0.72);
+  --bg: #f8e2e7;
+  --surface: #ffffff;
   --surface-solid: #fff4f7;
 
   /* ── Text ─────────────────────────────────────────────────── */
-  --text-primary: #050505;
-  --text-secondary: #737373;
+  --text-primary: #1f0f15;
+  --text-secondary: #6e4e58;
 
   /* ── Borders ──────────────────────────────────────────────── */
-  --border: rgba(255, 255, 255, 0.88);
+  --border: rgba(220, 60, 110, 0.18);
 
   /* ── Accent ───────────────────────────────────────────────── */
   --accent: #ff3b7f;
@@ -22,8 +22,8 @@
   --accent-glow: rgba(255, 59, 127, 0.18);
 
   /* ── Shadows ──────────────────────────────────────────────── */
-  --shadow: 0 18px 46px rgba(115, 44, 68, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.88);
-  --shadow-elevated: 0 22px 50px rgba(115, 44, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow: 0 10px 30px rgba(160, 30, 70, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-elevated: 0 16px 36px rgba(160, 30, 70, 0.14), inset 0 1px 0 rgba(255, 255, 255, 1);
 
   /* ── Radii ────────────────────────────────────────────────── */
   --radius-card: 28px;

@@ -403,7 +403,7 @@ export function renderProfilePage(): HTMLElement {
   const root = document.createElement('div');
   root.className = 'page profile-page animate-fade-in';
   root.style.cssText = `
-    padding: calc(var(--safe-top) + 24px) 16px calc(var(--safe-bottom) + 100px) 16px;
+    padding: calc(var(--safe-top) + 24px) 16px calc(var(--safe-bottom) + var(--nav-height, 86px) + 60px) 16px;
     max-width: 480px;
     margin: 0 auto;
     width: 100%;
@@ -480,6 +480,10 @@ export function renderProfilePage(): HTMLElement {
       : `<img src="/profile.png" alt="avatar" style="width:70%;height:70%;object-fit:contain;" />`;
     const partnerAvatar = user.partnerAvatarUrl ? `<img src="${user.partnerAvatarUrl}" style="width:100%;height:100%;object-fit:cover;" />` : '💖';
 
+    const displayPartnerName = (user.partnerName && user.partnerName !== 'undefined')
+      ? user.partnerName
+      : (partner?.displayName || 'Người ấy');
+
     profileCard.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;position:relative;">
         <div id="my-avatar-container" class="avatar avatar-lg" style="border:3px solid var(--accent);cursor:pointer;position:relative;">
@@ -495,7 +499,7 @@ export function renderProfilePage(): HTMLElement {
       
       <div style="text-align:center;width:100%;">
         <h2 style="font-size:18px;font-weight:700;margin-bottom:12px;">
-          ${user.displayName} & ${user.partnerName}
+          ${user.displayName || 'Bạn'} & ${displayPartnerName}
         </h2>
 
         <div style="
@@ -576,16 +580,16 @@ export function renderProfilePage(): HTMLElement {
         </div>
       </div>
 
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;border-top:1px solid var(--border);width:100%;padding-top:16px;">
+      <div class="profile-days-section">
         <span style="font-size:32px;font-weight:800;color:var(--accent);">${days}</span>
         <span style="font-size:13px;font-weight:600;color:var(--text-secondary);">ngày bên nhau 💕</span>
         <span style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Bắt đầu từ: ${couple.loveStartDate ? new Date(couple.loveStartDate).toLocaleDateString('vi-VN') : 'Chưa đặt'}</span>
       </div>
 
       <div style="
-        background:var(--surface-solid);
-        border:1px solid var(--border);
-        border-radius:12px;
+        background:#ffffff;
+        border:1px solid rgba(248, 57, 19, 0.12);
+        border-radius:16px;
         padding:10px 14px;
         display:flex;
         align-items:center;
@@ -593,10 +597,16 @@ export function renderProfilePage(): HTMLElement {
         width:100%;
         font-size:13px;
         cursor:pointer;
+        box-shadow:0 2px 6px rgba(0, 0, 0, 0.03);
       " id="copy-code-container">
-        <span style="color:var(--text-secondary);">Couple Code:</span>
-        <strong style="color:var(--accent);font-family:monospace;font-size:15px;letter-spacing:1px;">${couple.code}</strong>
-        <span style="font-size:11px;color:var(--text-secondary);background:var(--border);padding:2px 6px;border-radius:4px;">Sao chép</span>
+        <span style="color:var(--text-secondary);font-weight:500;">Couple Code:</span>
+        <strong style="color:var(--accent);font-family:monospace;font-size:16px;letter-spacing:1.5px;font-weight:700;">${couple.code || (couple as any).coupleCode || 'LOVE123'}</strong>
+        <button type="button" aria-label="Sao chép" title="Sao chép couple code" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;background:rgba(255, 59, 127, 0.1);border:1px solid rgba(255, 59, 127, 0.2);color:var(--accent);cursor:pointer;transition:all 0.2s ease;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
       </div>
     `;
 
