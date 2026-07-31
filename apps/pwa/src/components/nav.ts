@@ -15,7 +15,10 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '<img src="/user.png" alt="Profile" style="width:22px;height:22px;object-fit:contain;display:block;" />', label: 'Profile', path: '/app/profile' },
 ];
 
-const SUPPORTS_HOVER = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+const SUPPORTS_HOVER =
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    : false;
 let nav: HTMLElement | null = null;
 
 function applyActiveState(path: string): void {

@@ -6,7 +6,7 @@ import { clearPrivateClientState } from '../session';
 declare const __API_URL__: string;
 const API_URL: string =
   (typeof __API_URL__ !== 'undefined' ? __API_URL__ : null) ||
-  (window as Window & { __API_URL__?: string }).__API_URL__ ||
+  (typeof window !== 'undefined' ? (window as Window & { __API_URL__?: string }).__API_URL__ : null) ||
   'http://localhost:3001/api';
 
 // ── Error class ───────────────────────────────────────────────────────────────
