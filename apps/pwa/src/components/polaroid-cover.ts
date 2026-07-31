@@ -1,4 +1,5 @@
 import '../styles/polaroid-cover.css';
+import { showToast } from './toast';
 
 export interface PolaroidCoverOptions {
   imageUrl: string;
@@ -232,6 +233,13 @@ function autoOpenLatestHomeSurprise(): void {
 let syncFrame: number | null = null;
 
 function schedulePillSync(): void {
+  if (typeof document === 'undefined') return;
+  if (typeof requestAnimationFrame === 'undefined') {
+    injectLatestCheckinPill();
+    syncScratchPills();
+    autoOpenLatestHomeSurprise();
+    return;
+  }
   if (syncFrame !== null) return;
   syncFrame = requestAnimationFrame(() => {
     syncFrame = null;
@@ -481,6 +489,84 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   closeButton.setAttribute('aria-label', 'Đóng');
   closeButton.textContent = '✕';
 
+  const downloadButton = document.createElement('button');
+  downloadButton.type = 'button';
+  downloadButton.className = 'polaroid-modal-download';
+  downloadButton.setAttribute('aria-label', 'Tải ảnh xuống');
+  downloadButton.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+
+  downloadButton.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    if (!imageUrl) return;
+
+    const originalContent = downloadButton.innerHTML;
+    downloadButton.innerHTML = `<span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#fff transparent transparent transparent;display:inline-block;border-style:solid;border-radius:50%;animation:spin 0.8s linear infinite;"></span>`;
+    (downloadButton as HTMLElement).style.pointerEvents = 'none';
+
+    const ts = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const fileName = `checkin-love-${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}-${pad(ts.getHours())}-${pad(ts.getMinutes())}.jpg`;
+
+    // 1. Android Native App Wrapper
+    const isAndroidWrapper = typeof navigator !== 'undefined' && navigator.userAgent.includes('LoveCheckAndroidWrapper');
+    if (isAndroidWrapper && (window as any).LoveCheckAndroid && typeof (window as any).LoveCheckAndroid.downloadFile === 'function') {
+      try {
+        (window as any).LoveCheckAndroid.downloadFile(imageUrl, fileName);
+        showToast('Đang tải ảnh xuống...', 'loading-spark');
+      } catch (e) {
+        window.open(imageUrl, '_blank', 'noopener,noreferrer');
+      } finally {
+        setTimeout(() => {
+          downloadButton.innerHTML = originalContent;
+          (downloadButton as HTMLElement).style.pointerEvents = '';
+        }, 1000);
+      }
+      return;
+    }
+
+    // 2. Web / PWA (with iOS Web Share API fallback for files)
+    try {
+      const response = await fetch(imageUrl, { mode: 'cors' });
+      const blob = await response.blob();
+
+      const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      if (isIOS && navigator.canShare && navigator.share) {
+        try {
+          const file = new File([blob], fileName, { type: blob.type });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'Ảnh check-in',
+            });
+            showToast('Đã mở trình chia sẻ', 'success');
+            return;
+          }
+        } catch (shareError) {
+          console.log('Share failed, trying standard download:', shareError);
+        }
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = fileName;
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+
+      showToast('Đã tải ảnh xuống thành công', 'success');
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+    } catch (err) {
+      console.error('Download failed:', err);
+      window.open(imageUrl, '_blank', 'noopener,noreferrer');
+      showToast('Mở ảnh trong tab mới. Hãy nhấn giữ để lưu.', 'info');
+    } finally {
+      downloadButton.innerHTML = originalContent;
+      (downloadButton as HTMLElement).style.pointerEvents = '';
+    }
+  });
+
   const stage = document.createElement('div');
   stage.className = 'polaroid-stage-view';
   stage.classList.toggle('is-revealed', revealed);
@@ -521,7 +607,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
   footer.append(copy, status);
   stage.append(image, canvas, hud, success);
-  modal.append(closeButton, stage, footer);
+  modal.append(closeButton, downloadButton, stage, footer);
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 

@@ -17,6 +17,35 @@ function calcDaysTogether(loveStartDate?: string): number {
   return Math.max(0, Math.floor(diff / 86400000));
 }
 
+function calcDaysUntilBirthday(birthdayStr?: string | null): { days: number; isToday: boolean; text: string } | null {
+  if (!birthdayStr) return null;
+  const rawDate = birthdayStr.split('T')[0];
+  const parts = rawDate.split('-');
+  if (parts.length < 3) return null;
+
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  if (isNaN(month) || isNaN(day)) return null;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let nextBday = new Date(now.getFullYear(), month, day);
+  if (nextBday < today) {
+    nextBday = new Date(now.getFullYear() + 1, month, day);
+  }
+
+  const diffMs = nextBday.getTime() - today.getTime();
+  const days = Math.round(diffMs / 86400000);
+  const isToday = days === 0;
+
+  return {
+    days,
+    isToday,
+    text: isToday ? 'Hôm nay! 🎉' : `còn ${days} ngày`,
+  };
+}
+
 const GITHUB_RELEASE_API = 'https://api.github.com/repos/aiThss/check-in-love/releases/latest';
 const GITHUB_RELEASES_PAGE = 'https://github.com/aiThss/check-in-love/releases/latest';
 
@@ -451,6 +480,9 @@ export function renderProfilePage(): HTMLElement {
     const partner = data.partnerUser;
 
     const days = calcDaysTogether(couple.loveStartDate);
+    const myBday = calcDaysUntilBirthday(user.birthday);
+    const partnerBday = calcDaysUntilBirthday(user.partnerBirthday || partner?.birthday);
+
     const myAvatar = user.avatarUrl
       ? `<img src="${user.avatarUrl}" style="width:100%;height:100%;object-fit:cover;" />`
       : `<img src="/profile.png" alt="avatar" style="width:70%;height:70%;object-fit:contain;" />`;
@@ -469,12 +501,48 @@ export function renderProfilePage(): HTMLElement {
         </div>
       </div>
       
-      <div style="text-align:center;">
+      <div style="text-align:center;width:100%;">
         <h2 style="font-size:18px;font-weight:700;">
           ${user.displayName} & ${user.partnerName}
         </h2>
-        <div class="streak-banner" style="margin-top:8px;">
-          🔥 ${couple.streak || 0} ngày streak
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:10px;width:100%;">
+          <div id="btn-my-bday-pill" class="birthday-countdown-pill" style="
+            background:var(--surface-solid);
+            border:1px solid var(--border);
+            border-radius:20px;
+            padding:6px 12px;
+            font-size:12px;
+            font-weight:600;
+            color:var(--text-primary);
+            display:inline-flex;
+            align-items:center;
+            gap:4px;
+            cursor:pointer;
+          ">
+            <span>🎂</span>
+            <span>${user.displayName || 'Bạn'}: ${myBday ? myBday.text : 'Chưa cài'}</span>
+          </div>
+
+          <div class="streak-banner">
+            🔥 ${couple.streak || 0} ngày streak
+          </div>
+
+          <div id="btn-partner-bday-pill" class="birthday-countdown-pill" style="
+            background:var(--surface-solid);
+            border:1px solid var(--border);
+            border-radius:20px;
+            padding:6px 12px;
+            font-size:12px;
+            font-weight:600;
+            color:var(--text-primary);
+            display:inline-flex;
+            align-items:center;
+            gap:4px;
+            cursor:pointer;
+          ">
+            <span>🎂</span>
+            <span>${user.partnerName || 'Người ấy'}: ${partnerBday ? partnerBday.text : 'Chưa cài'}</span>
+          </div>
         </div>
       </div>
 
@@ -501,6 +569,27 @@ export function renderProfilePage(): HTMLElement {
         <span style="font-size:11px;color:var(--text-secondary);background:var(--border);padding:2px 6px;border-radius:4px;">Sao chép</span>
       </div>
     `;
+
+    // Click to jump to birthday settings
+    profileCard.querySelector('#btn-my-bday-pill')?.addEventListener('click', () => {
+      const settingsCard = document.querySelector('.birthday-settings-card');
+      if (settingsCard) {
+        settingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        settingsCard.querySelector<HTMLInputElement>('#birthday-self')?.focus();
+      } else {
+        showToast('Hãy cài ngày sinh ở mục Chỉnh sửa thông tin bên dưới', 'info');
+      }
+    });
+
+    profileCard.querySelector('#btn-partner-bday-pill')?.addEventListener('click', () => {
+      const settingsCard = document.querySelector('.birthday-settings-card');
+      if (settingsCard) {
+        settingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        settingsCard.querySelector<HTMLInputElement>('#birthday-partner')?.focus();
+      } else {
+        showToast('Hãy cài ngày sinh ở mục Chỉnh sửa thông tin bên dưới', 'info');
+      }
+    });
 
     // Click to copy code
     profileCard.querySelector('#copy-code-container')?.addEventListener('click', () => {
