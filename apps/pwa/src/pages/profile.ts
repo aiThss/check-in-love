@@ -494,46 +494,84 @@ export function renderProfilePage(): HTMLElement {
       </div>
       
       <div style="text-align:center;width:100%;">
-        <h2 style="font-size:18px;font-weight:700;">
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:12px;">
           ${user.displayName} & ${user.partnerName}
         </h2>
-        <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:10px;width:100%;">
-          <div id="btn-my-bday-pill" class="birthday-countdown-pill" style="
+
+        <div style="
+          display:grid;
+          grid-template-columns:1fr 1.15fr 1fr;
+          gap:6px;
+          width:100%;
+          align-items:stretch;
+        ">
+          <!-- Left: User Age -->
+          <div id="btn-my-bday-pill" style="
             background:var(--surface-solid);
             border:1px solid var(--border);
-            border-radius:20px;
-            padding:6px 12px;
-            font-size:12px;
-            font-weight:600;
-            color:var(--text-primary);
-            display:inline-flex;
+            border-radius:16px;
+            padding:9px 4px;
+            display:flex;
+            flex-direction:column;
             align-items:center;
-            gap:4px;
+            justify-content:center;
+            gap:2px;
             cursor:pointer;
+            min-width:0;
+            transition:transform 0.15s ease, border-color 0.15s ease;
           ">
-            <span>🎂</span>
-            <span>${user.displayName || 'Bạn'}: ${myAge !== undefined ? `${myAge} tuổi` : 'Chưa đặt'}</span>
+            <span style="font-size:15px;line-height:1;">🎂</span>
+            <span style="font-size:10px;color:var(--text-secondary);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;">
+              ${user.displayName || 'Bạn'}
+            </span>
+            <strong style="font-size:12px;font-weight:700;color:var(--text-primary);white-space:nowrap;">
+              ${myAge !== undefined ? `${myAge} tuổi` : 'Chưa đặt'}
+            </strong>
           </div>
 
-          <div class="streak-banner">
-            🔥 ${couple.streak || 0} ngày streak
+          <!-- Center: Streak Banner -->
+          <div style="
+            background:linear-gradient(135deg, #ff3b7f, #ff6b35);
+            border-radius:16px;
+            padding:9px 4px;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:2px;
+            color:#ffffff;
+            box-shadow:0 4px 14px rgba(255, 59, 127, 0.28);
+            min-width:0;
+          ">
+            <span style="font-size:15px;line-height:1;">🔥</span>
+            <span style="font-size:10px;opacity:0.9;font-weight:600;white-space:nowrap;">Chuỗi Streak</span>
+            <strong style="font-size:13px;font-weight:800;white-space:nowrap;">
+              ${couple.streak || 0} ngày
+            </strong>
           </div>
 
-          <div id="btn-partner-bday-pill" class="birthday-countdown-pill" style="
+          <!-- Right: Partner Age -->
+          <div id="btn-partner-bday-pill" style="
             background:var(--surface-solid);
             border:1px solid var(--border);
-            border-radius:20px;
-            padding:6px 12px;
-            font-size:12px;
-            font-weight:600;
-            color:var(--text-primary);
-            display:inline-flex;
+            border-radius:16px;
+            padding:9px 4px;
+            display:flex;
+            flex-direction:column;
             align-items:center;
-            gap:4px;
+            justify-content:center;
+            gap:2px;
             cursor:pointer;
+            min-width:0;
+            transition:transform 0.15s ease, border-color 0.15s ease;
           ">
-            <span>🎂</span>
-            <span>${user.partnerName || 'Người ấy'}: ${partnerAge !== undefined ? `${partnerAge} tuổi` : 'Chưa đặt'}</span>
+            <span style="font-size:15px;line-height:1;">🎂</span>
+            <span style="font-size:10px;color:var(--text-secondary);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;">
+              ${user.partnerName || 'Người ấy'}
+            </span>
+            <strong style="font-size:12px;font-weight:700;color:var(--text-primary);white-space:nowrap;">
+              ${partnerAge !== undefined ? `${partnerAge} tuổi` : 'Chưa đặt'}
+            </strong>
           </div>
         </div>
       </div>
