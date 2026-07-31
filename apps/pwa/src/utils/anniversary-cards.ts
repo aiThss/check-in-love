@@ -657,7 +657,6 @@ function ensureStyles(): void {
       .occasion-signature { font-size: 20px; }
       .occasion-signature--birthday { max-width: 156px; }
       .occasion-hint { padding: 7px 10px; font-size: 9px; letter-spacing: 0.08em; }
-      .birthday-settings-grid { grid-template-columns: 1fr; }
     }
     @keyframes occasionFade { from { opacity: 0; } to { opacity: 1; } }
     @keyframes occasionRise { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }

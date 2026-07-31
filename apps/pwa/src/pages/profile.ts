@@ -17,33 +17,25 @@ function calcDaysTogether(loveStartDate?: string): number {
   return Math.max(0, Math.floor(diff / 86400000));
 }
 
-function calcDaysUntilBirthday(birthdayStr?: string | null): { days: number; isToday: boolean; text: string } | null {
-  if (!birthdayStr) return null;
+function calcUserAge(birthdayStr?: string | null): number | undefined {
+  if (!birthdayStr) return undefined;
   const rawDate = birthdayStr.split('T')[0];
   const parts = rawDate.split('-');
-  if (parts.length < 3) return null;
+  if (parts.length < 3) return undefined;
 
-  const month = parseInt(parts[1], 10) - 1;
-  const day = parseInt(parts[2], 10);
-  if (isNaN(month) || isNaN(day)) return null;
+  const birthYear = parseInt(parts[0], 10);
+  const birthMonth = parseInt(parts[1], 10) - 1;
+  const birthDay = parseInt(parts[2], 10);
+  if (isNaN(birthYear) || isNaN(birthMonth) || isNaN(birthDay)) return undefined;
 
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  let nextBday = new Date(now.getFullYear(), month, day);
-  if (nextBday < today) {
-    nextBday = new Date(now.getFullYear() + 1, month, day);
+  let age = now.getFullYear() - birthYear;
+  const m = now.getMonth() - birthMonth;
+  if (m < 0 || (m === 0 && now.getDate() < birthDay)) {
+    age--;
   }
 
-  const diffMs = nextBday.getTime() - today.getTime();
-  const days = Math.round(diffMs / 86400000);
-  const isToday = days === 0;
-
-  return {
-    days,
-    isToday,
-    text: isToday ? 'Hôm nay! 🎉' : `còn ${days} ngày`,
-  };
+  return age >= 0 && age <= 130 ? age : undefined;
 }
 
 const GITHUB_RELEASE_API = 'https://api.github.com/repos/aiThss/check-in-love/releases/latest';
@@ -480,8 +472,8 @@ export function renderProfilePage(): HTMLElement {
     const partner = data.partnerUser;
 
     const days = calcDaysTogether(couple.loveStartDate);
-    const myBday = calcDaysUntilBirthday(user.birthday);
-    const partnerBday = calcDaysUntilBirthday(user.partnerBirthday || partner?.birthday);
+    const myAge = calcUserAge(user.birthday);
+    const partnerAge = calcUserAge(user.partnerBirthday || partner?.birthday);
 
     const myAvatar = user.avatarUrl
       ? `<img src="${user.avatarUrl}" style="width:100%;height:100%;object-fit:cover;" />`
@@ -520,7 +512,7 @@ export function renderProfilePage(): HTMLElement {
             cursor:pointer;
           ">
             <span>🎂</span>
-            <span>${user.displayName || 'Bạn'}: ${myBday ? myBday.text : 'Chưa cài'}</span>
+            <span>${user.displayName || 'Bạn'}: ${myAge !== undefined ? `${myAge} tuổi` : 'Chưa đặt'}</span>
           </div>
 
           <div class="streak-banner">
@@ -541,7 +533,7 @@ export function renderProfilePage(): HTMLElement {
             cursor:pointer;
           ">
             <span>🎂</span>
-            <span>${user.partnerName || 'Người ấy'}: ${partnerBday ? partnerBday.text : 'Chưa cài'}</span>
+            <span>${user.partnerName || 'Người ấy'}: ${partnerAge !== undefined ? `${partnerAge} tuổi` : 'Chưa đặt'}</span>
           </div>
         </div>
       </div>

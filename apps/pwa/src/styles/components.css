@@ -1863,12 +1863,6 @@ textarea.input {
   cursor: not-allowed;
 }
 
-@media (max-width: 420px) {
-  .birthday-settings-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* ── Onboarding ─────────────────────────────────────────────── */
 .onboarding-step {
   display: flex;
