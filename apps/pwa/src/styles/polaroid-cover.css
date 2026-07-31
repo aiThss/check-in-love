@@ -368,23 +368,6 @@
   background: linear-gradient(135deg, rgba(255, 47, 125, 0.14), rgba(111, 92, 255, 0.14));
   color: var(--accent, #ff3b7f);
   font-size: 13px;
-
-/* Fallback before the DOM observer finishes syncing. */
-.recent-memories-list .recent-memory-item:not(:first-child) .polaroid-scratch-pill,
-.memory-grid .memory-tile:not(:first-child) .polaroid-scratch-pill,
-.love-foil-search-active .memory-grid .polaroid-scratch-pill {
-  display: none !important;
-}
-
-.btn-polaroid-scratch-trigger {
-  width: 100%;
-  margin-top: 10px;
-  padding: 11px 14px;
-  border: 1px solid rgba(255, 59, 127, 0.26);
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(255, 47, 125, 0.14), rgba(111, 92, 255, 0.14));
-  color: var(--accent, #ff3b7f);
-  font-size: 13px;
   font-weight: 680;
   cursor: pointer;
 }

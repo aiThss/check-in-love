@@ -1299,7 +1299,6 @@ function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement):
 
 function openCard(card: OccasionCard, onRevealed?: () => void): void {
   ensureStyles();
-  const showQuickReveal = isCardPreviewMode() && card.id !== 'day-100';
   document.querySelector('.occasion-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.className = 'occasion-overlay';
