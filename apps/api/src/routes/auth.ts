@@ -5,8 +5,7 @@ import { z } from 'zod';
 import { env } from '../config/env';
 import { OtpCode } from '../db/models/OtpCode';
 import { Couple } from '../db/models/Couple';
-import { User } from '../db/models/User';
-import { sendOtpEmail } from '../services/email';
+import { isEmailConfigured, sendOtpEmail } from '../services/email';
 
 // Safe user shape to return in responses (no passwordHash)
 function toSafeUser(user: InstanceType<typeof User>) {
@@ -115,7 +114,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Check if Gmail is configured
-      if (!env.GMAIL_USER || !env.GMAIL_APP_PASSWORD) {
+      if (!isEmailConfigured()) {
         return reply.status(503).send({
           error: 'Tính năng gửi email chưa được cấu hình',
           code: 'EMAIL_NOT_CONFIGURED',
@@ -390,7 +389,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: 'Tài khoản bị khóa', code: 'USER_BLOCKED' });
       }
 
-      if (!env.GMAIL_USER || !env.GMAIL_APP_PASSWORD) {
+      if (!isEmailConfigured()) {
         return reply.status(503).send({
           error: 'Tính năng gửi email chưa được cấu hình',
           code: 'EMAIL_NOT_CONFIGURED',

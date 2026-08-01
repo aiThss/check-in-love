@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { env } from '../config/env';
 import { OtpCode } from '../db/models/OtpCode';
 import { User } from '../db/models/User';
-import { sendOtpEmail } from '../services/email';
+import { isEmailConfigured, sendOtpEmail } from '../services/email';
 
 const sendResetOtpBodySchema = z.object({
   email: z.string().email(),
@@ -44,7 +44,7 @@ export default async function passwordResetRoutes(app: FastifyInstance): Promise
         });
       }
 
-      if (!env.GMAIL_USER || !env.GMAIL_APP_PASSWORD) {
+      if (!isEmailConfigured()) {
         return reply.status(503).send({
           error: 'Tính năng gửi email chưa được cấu hình',
           code: 'EMAIL_NOT_CONFIGURED',

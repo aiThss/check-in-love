@@ -2,17 +2,36 @@ import nodemailer from 'nodemailer';
 import { env } from '../config/env';
 import { OtpCode } from '../db/models/OtpCode';
 
-let transporter: nodemailer.Transporter | null = null;
+export function isEmailConfigured(): boolean {
+  return Boolean(
+    (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) ||
+    (env.GMAIL_USER && env.GMAIL_APP_PASSWORD)
+  );
+}
 
 function getTransporter(): nodemailer.Transporter {
   if (!transporter) {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: env.GMAIL_USER,
-        pass: env.GMAIL_APP_PASSWORD,
-      },
-    });
+    if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) {
+      const port = env.SMTP_PORT ? parseInt(env.SMTP_PORT, 10) : 587;
+      const secure = env.SMTP_SECURE !== undefined ? env.SMTP_SECURE === 'true' : port === 465;
+      transporter = nodemailer.createTransport({
+        host: env.SMTP_HOST,
+        port,
+        secure,
+        auth: {
+          user: env.SMTP_USER,
+          pass: env.SMTP_PASS,
+        },
+      });
+    } else {
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: env.GMAIL_USER,
+          pass: env.GMAIL_APP_PASSWORD,
+        },
+      });
+    }
   }
   return transporter;
 }
@@ -127,8 +146,10 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
       ? 'đăng nhập vào tài khoản Check IN Love'
       : 'hoàn tất đăng ký tài khoản Check IN Love';
 
+  const fromAddress = env.SMTP_FROM || (env.SMTP_USER ? `"Check IN Love 💕" <${env.SMTP_USER}>` : `"Check IN Love 💕" <${env.GMAIL_USER}>`);
+
   await mailer.sendMail({
-    from: `"Check IN Love 💕" <${env.GMAIL_USER}>`,
+    from: fromAddress,
     to,
     subject,
     html,
