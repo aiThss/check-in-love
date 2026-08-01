@@ -110,7 +110,8 @@ function watchForServiceWorkerUpdate(registration: ServiceWorkerRegistration): v
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as Window & { MSStream?: unknown }).MSStream;
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-const isCardPreviewHost = window.location.hostname === 'preview.babyress.games';
+const isCardPreviewHost =
+  window.location.hostname === 'preview.couple.io.vn' || window.location.hostname === 'preview.babyress.games';
 
 function renderBlockedPage(): HTMLElement {
   const el = document.createElement('div');
