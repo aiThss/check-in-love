@@ -619,6 +619,10 @@ class MainActivity : ComponentActivity() {
         private const val UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000L
 
         private val allowedHosts = setOf(
+            "couple.io.vn",
+            "api.couple.io.vn",
+            "preview.couple.io.vn",
+            "api-preview.couple.io.vn",
             "couple.babyress.games",
             "api.couple.babyress.games",
             "localhost",
