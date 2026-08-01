@@ -24,7 +24,7 @@ class LoveCheckWidgetProvider : AppWidgetProvider() {
         private const val PREFS_NAME = "lovecheck_widget"
         private const val KEY_STREAK = "streak"
         private const val KEY_PARTNER_NAME = "partner_name"
-        private const val CHECKIN_URL = "https://couple.babyress.games/app/checkin"
+        private const val CHECKIN_URL = "https://couple.io.vn/app/checkin"
 
         private const val KEY_LATEST_SENDER = "latest_sender"
         private const val KEY_LATEST_TITLE = "latest_title"
@@ -93,7 +93,7 @@ class LoveCheckWidgetProvider : AppWidgetProvider() {
             }
 
             val launchUrl = if (!latestUrl.isNullOrBlank()) {
-                "https://couple.babyress.games$latestUrl"
+                "https://couple.io.vn$latestUrl"
             } else {
                 CHECKIN_URL
             }

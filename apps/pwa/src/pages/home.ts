@@ -852,7 +852,11 @@ export function renderHomePage(): HTMLElement {
   }
 
   renderPushPrompt();
-  setTimeout(() => loadCheckin(), 3000);
+  if (getCachedLatestPartnerCheckin()) {
+    loadCheckin(true);
+  } else {
+    setTimeout(() => loadCheckin(), 3000);
+  }
   return page;
 }
 

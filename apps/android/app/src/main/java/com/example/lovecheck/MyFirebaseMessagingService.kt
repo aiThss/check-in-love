@@ -119,7 +119,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         // Setup click intent to navigate inside WebView
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            data = Uri.parse("https://couple.babyress.games$targetUrl")
+            data = Uri.parse("https://couple.io.vn$targetUrl")
         }
         val pendingIntent = PendingIntent.getActivity(
             this,

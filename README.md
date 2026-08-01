@@ -50,9 +50,9 @@ check-in-love/
 
 | Service | URL |
 |---------|-----|
-| PWA (app chính) | https://couple.babyress.games |
-| API Backend | https://api.couple.babyress.games/api |
-| Admin Dashboard | https://admin.couple.babyress.games |
+| PWA (app chính) | https://couple.io.vn |
+| API Backend | https://api.couple.io.vn/api |
+| Admin Dashboard | https://admin.couple.io.vn |
 
 ---
 
@@ -108,11 +108,11 @@ Dokploy cần VPS với Docker đã cài. Truy cập Dokploy dashboard của b�
 
 ### 2. Tạo DNS Cloudflare
 
-Vào **Cloudflare → babyress.games → DNS** và thêm 3 records:
+Vào **Cloudflare → couple.io.vn → DNS** và thêm 3 records:
 
 ```
 Type  Name     Target                    Proxy
-A     couple   <VPS_IP_ADDRESS>          ON ☁️
+A     @        <VPS_IP_ADDRESS>          ON ☁️
 A     api      <VPS_IP_ADDRESS>          ON ☁️
 A     admin    <VPS_IP_ADDRESS>          ON ☁️
 ```
@@ -136,9 +136,9 @@ Với mỗi service, vào **Domains** tab và thêm:
 
 | Service | Domain | Port |
 |---------|--------|------|
-| `pwa` | `couple.babyress.games` | 80 |
-| `api` | `api.couple.babyress.games` | 3001 |
-| `admin` | `admin.couple.babyress.games` | 80 |
+| `pwa` | `couple.io.vn` | 80 |
+| `api` | `api.couple.io.vn` | 3001 |
+| `admin` | `admin.couple.io.vn` | 80 |
 
 Dokploy sẽ tự cấp Let's Encrypt cert. Vì Cloudflare đã proxy, cert nội bộ sẽ hoạt động ổn.
 
@@ -152,11 +152,11 @@ MONGODB_URI=mongodb://mongo:27017/checkinlove
 JWT_SECRET=<random_string_min_32_chars>
 ADMIN_EMAIL=your@email.com
 ADMIN_PASSWORD=your_strong_password
-PUBLIC_BASE_URL=https://api.couple.babyress.games
+PUBLIC_BASE_URL=https://api.couple.io.vn
 UPLOAD_DIR=/app/uploads
 MAX_UPLOAD_MB=10
-ALLOWED_ORIGINS=https://couple.babyress.games,https://admin.couple.babyress.games
-VITE_API_URL=https://api.couple.babyress.games/api
+ALLOWED_ORIGINS=https://couple.io.vn,https://admin.couple.io.vn
+VITE_API_URL=https://api.couple.io.vn/api
 ADMIN_ENABLE_TEST_RESET=true
 VAPID_PUBLIC_KEY=<web_push_public_key>
 VAPID_PRIVATE_KEY=<web_push_private_key>
@@ -189,7 +189,7 @@ checkinlove_admin  | nginx: ready
 
 ### 8. Kiểm tra health
 ```bash
-curl https://api.couple.babyress.games/api/health
+curl https://api.couple.io.vn/api/health
 # → {"status":"ok","timestamp":"...","version":"1.0.0"}
 ```
 
@@ -200,7 +200,7 @@ curl https://api.couple.babyress.games/api/health
 Vì iPhone không cho cài APK và không có Apple Developer account:
 
 1. Mở **Safari** trên iPhone (phải là Safari, không phải Chrome trên iOS)
-2. Vào: `https://couple.babyress.games`
+2. Vào: `https://couple.io.vn`
 3. App sẽ hiển thị hướng dẫn tự động:
    - Bấm nút **Share** (📤) ở thanh công cụ Safari
    - Chọn **"Thêm vào Màn hình chính"** (Add to Home Screen)
@@ -216,7 +216,7 @@ Vì iPhone không cho cài APK và không có Apple Developer account:
 
 ### Option 1: PWA (dễ nhất)
 1. Mở Chrome trên Android
-2. Vào `https://couple.babyress.games`
+2. Vào `https://couple.io.vn`
 3. Chrome sẽ hỏi "Cài đặt app?" → bấm **Cài đặt**
 4. App xuất hiện trên màn hình như app native
 

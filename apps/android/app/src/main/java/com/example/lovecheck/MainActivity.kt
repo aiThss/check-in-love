@@ -613,12 +613,14 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val APP_URL = "https://couple.babyress.games"
+        private const val APP_URL = "https://couple.io.vn"
         private const val RETRY_SCHEME = "lovecheck"
         private const val STICKER_PATCH_VERSION = "1.1.10"
         private const val UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000L
 
         private val allowedHosts = setOf(
+            "couple.io.vn",
+            "api.couple.io.vn",
             "couple.babyress.games",
             "api.couple.babyress.games",
             "localhost",

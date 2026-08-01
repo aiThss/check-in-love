@@ -35,7 +35,7 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
         private const val KEY_HAS_IMAGE = "has_image"
         private const val KEY_TIMESTAMP = "timestamp"
 
-        private const val CHECKIN_URL = "https://couple.babyress.games/app/checkin"
+        private const val CHECKIN_URL = "https://couple.io.vn/app/checkin"
 
         fun updatePartnerCheckin(
             context: Context,
