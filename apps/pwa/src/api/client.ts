@@ -4,10 +4,33 @@ import { navigate } from '../router';
 import { clearPrivateClientState } from '../session';
 
 declare const __API_URL__: string;
-const API_URL: string =
-  (typeof __API_URL__ !== 'undefined' ? __API_URL__ : null) ||
-  (typeof window !== 'undefined' ? (window as Window & { __API_URL__?: string }).__API_URL__ : null) ||
-  'http://localhost:3001/api';
+
+function getApiUrl(): string {
+  if (typeof window !== 'undefined') {
+    const custom = (window as Window & { __API_URL__?: string }).__API_URL__;
+    if (custom) return custom;
+
+    const host = window.location.hostname;
+    const protocol = window.location.protocol;
+
+    if (host === 'couple.io.vn') {
+      return 'https://api.couple.io.vn/api';
+    }
+    if (host.startsWith('app.') || host.startsWith('pwa.')) {
+      const parentDomain = host.replace(/^(app|pwa)\./, '');
+      return `${protocol}//api.${parentDomain}/api`;
+    }
+  }
+
+  const baked = typeof __API_URL__ !== 'undefined' ? __API_URL__ : '';
+  if (baked && !baked.includes('localhost') && !baked.includes('127.0.0.1')) {
+    return baked;
+  }
+
+  return baked || 'http://localhost:3001/api';
+}
+
+const API_URL: string = getApiUrl();
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
