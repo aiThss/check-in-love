@@ -2,6 +2,8 @@ import nodemailer from 'nodemailer';
 import { env } from '../config/env';
 import { OtpCode } from '../db/models/OtpCode';
 
+let transporter: nodemailer.Transporter | null = null;
+
 export function isEmailConfigured(): boolean {
   return Boolean(
     (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) ||

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { env } from '../config/env';
 import { OtpCode } from '../db/models/OtpCode';
 import { Couple } from '../db/models/Couple';
+import { User } from '../db/models/User';
 import { isEmailConfigured, sendOtpEmail } from '../services/email';
 
 // Safe user shape to return in responses (no passwordHash)
