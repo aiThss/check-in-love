@@ -15,7 +15,7 @@ function getTransporter(): nodemailer.Transporter {
   if (!transporter) {
     if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) {
       const port = env.SMTP_PORT ? parseInt(env.SMTP_PORT, 10) : 587;
-      const secure = env.SMTP_SECURE !== undefined ? env.SMTP_SECURE === 'true' : port === 465;
+      const secure = port === 465 || (env.SMTP_SECURE === 'true' && port !== 587);
       transporter = nodemailer.createTransport({
         host: env.SMTP_HOST,
         port,
