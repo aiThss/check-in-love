@@ -36,7 +36,7 @@ export function renderLoginPage(): HTMLElement {
   emailInput.type = 'email';
   emailInput.id = 'admin-email';
   emailInput.className = 'form-input';
-  emailInput.placeholder = 'admin@checkinlove.com';
+  emailInput.placeholder = 'danhthai4560@gmail.com';
   emailInput.name = 'email';
   emailInput.autocomplete = 'username';
   emailInput.required = true;
