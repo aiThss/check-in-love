@@ -135,7 +135,10 @@ initRouter({
   '/preview/cards': () => import('./pages/card-preview').then(({ renderCardPreviewPage }) => renderCardPreviewPage()),
   '/install': () => import('./pages/install').then(({ renderInstallPage }) => renderInstallPage()),
   '/login': () => import('./pages/login').then(({ renderLoginPage }) => renderLoginPage()),
-  '/onboarding': () => import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage()),
+  '/onboarding': () =>
+    isCardPreviewHost
+      ? import('./pages/card-preview').then(({ renderCardPreviewPage }) => renderCardPreviewPage())
+      : import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage()),
   '/blocked': () => renderBlockedPage(),
   '/app/home': () => import('./pages/home').then(({ renderHomePage }) => renderHomePage()),
   '/app/checkin': () => import('./pages/checkin').then(({ renderCheckinPage }) => renderCheckinPage()),
