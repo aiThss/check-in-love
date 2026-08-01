@@ -3,7 +3,7 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-ARG VITE_API_URL=http://localhost:3001/api
+ARG VITE_API_URL=https://api.couple.io.vn/api
 
 # Copy monorepo root package files
 COPY package.json package-lock.json ./
