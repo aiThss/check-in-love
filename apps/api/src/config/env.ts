@@ -32,6 +32,7 @@ const envSchema = z.object({
   VAPID_EMAIL: z.string().email().optional(),
   GMAIL_USER: z.string().email().optional(),
   GMAIL_APP_PASSWORD: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().optional(),
   SMTP_SECURE: z.string().optional(),

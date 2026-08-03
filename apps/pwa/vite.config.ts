@@ -14,5 +14,6 @@ export default defineConfig({
   },
   define: {
     __API_URL__: JSON.stringify(process.env.VITE_API_URL || 'http://localhost:3001/api'),
+    __GOOGLE_CLIENT_ID__: JSON.stringify(process.env.VITE_GOOGLE_CLIENT_ID || ''),
   },
 });

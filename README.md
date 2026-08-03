@@ -39,6 +39,17 @@ A private couple check-in application.
    docker-compose up --build
    ```
 
+## Google Sign-In
+
+Set the same OAuth 2.0 Client ID for both the API and PWA build:
+
+```env
+GOOGLE_CLIENT_ID=<oauth_2_web_client_id>
+VITE_GOOGLE_CLIENT_ID=<same_oauth_2_web_client_id>
+```
+
+Create a **Web application** client in Google Cloud Console and add the PWA domain to **Authorized JavaScript origins**. Google login links to an existing Check IN Love account by verified email; new users can register through onboarding.
+
 ## 📄 License
 
 Private project.
