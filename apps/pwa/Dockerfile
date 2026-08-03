@@ -4,6 +4,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 ARG VITE_API_URL=http://localhost:3001/api
+ARG VITE_GOOGLE_CLIENT_ID=
 
 # Copy monorepo root package files
 COPY package.json package-lock.json ./
@@ -22,6 +23,7 @@ RUN npm run build --workspace=@checkinlove/shared
 # Build PWA
 COPY apps/pwa ./apps/pwa
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN npm run build --workspace=@checkinlove/pwa
 
 # ─── Stage 2: Serve ───────────────────────────────────────────────────────────

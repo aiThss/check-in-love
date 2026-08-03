@@ -163,7 +163,11 @@ VAPID_PRIVATE_KEY=<web_push_private_key>
 VAPID_EMAIL=admin@example.com
 GMAIL_USER=<gmail_address_optional_for_email_otp>
 GMAIL_APP_PASSWORD=<gmail_app_password_optional_for_email_otp>
+GOOGLE_CLIENT_ID=<oauth_2_web_client_id>
+VITE_GOOGLE_CLIENT_ID=<same_oauth_2_web_client_id>
 ```
+
+Google Sign-In cần một OAuth 2.0 Client ID loại **Web application** trong Google Cloud Console. Thêm domain PWA vào **Authorized JavaScript origins**, sau đó dùng cùng Client ID cho `GOOGLE_CLIENT_ID` (API) và `VITE_GOOGLE_CLIENT_ID` (PWA build). Người dùng phải đăng ký tài khoản Check IN Love bằng đúng email Google đó; lần đăng nhập Google đầu tiên sẽ tự liên kết hai tài khoản.
 
 ### 6. Volumes trong Dokploy
 

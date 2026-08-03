@@ -32,6 +32,7 @@ const envSchema = z.object({
   VAPID_EMAIL: z.string().email().optional(),
   GMAIL_USER: z.string().email().optional(),
   GMAIL_APP_PASSWORD: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
   ADMIN_ENABLE_TEST_RESET: z
     .string()
     .optional()

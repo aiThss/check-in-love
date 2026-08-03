@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { FastifyInstance } from 'fastify';
+import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { env } from '../config/env';
@@ -63,6 +64,10 @@ const loginBodySchema = z.object({
 const loginSendOtpBodySchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+});
+
+const googleLoginBodySchema = z.object({
+  credential: z.string().min(1).max(5000),
 });
 
 const sendOtpBodySchema = z.object({
@@ -541,6 +546,127 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       if (email && otpCode) {
         await OtpCode.deleteMany({ email: email.toLowerCase(), purpose: 'login' });
       }
+
+      return reply.status(200).send({
+        token,
+        user: toSafeUser(user),
+        couple: {
+          id: couple._id.toString(),
+          code: couple.code,
+          loveStartDate: couple.loveStartDate,
+          memberIds: couple.memberIds.map((id) => id.toString()),
+          streak: couple.streak,
+          lastCheckinDate: couple.lastCheckinDate,
+        },
+      });
+    },
+  );
+
+  /**
+   * POST /auth/google
+   * Verify a Google Identity Services ID token and log in an existing user.
+   * Google accounts are linked by verified email on the first successful login.
+   */
+  app.post(
+    '/auth/google',
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (request, reply) => {
+      const parsed = googleLoginBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply
+          .status(400)
+          .send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
+      }
+
+      const clientId = env.GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        return reply.status(503).send({
+          error: 'Đăng nhập Google chưa được cấu hình',
+          code: 'GOOGLE_AUTH_NOT_CONFIGURED',
+        });
+      }
+
+      let googlePayload;
+      try {
+        const googleClient = new OAuth2Client(clientId);
+        const ticket = await googleClient.verifyIdToken({
+          idToken: parsed.data.credential,
+          audience: clientId,
+        });
+        googlePayload = ticket.getPayload();
+      } catch (err) {
+        app.log.warn({ err }, 'Google ID token verification failed');
+        return reply.status(401).send({
+          error: 'Tài khoản Google không hợp lệ hoặc đã hết hạn',
+          code: 'GOOGLE_TOKEN_INVALID',
+        });
+      }
+
+      const googleId = googlePayload?.sub;
+      const googleEmail = googlePayload?.email?.trim().toLowerCase();
+      if (
+        !googlePayload ||
+        !googleId ||
+        !googleEmail ||
+        googlePayload.email_verified !== true
+      ) {
+        return reply.status(401).send({
+          error: 'Tài khoản Google chưa được xác thực email',
+          code: 'GOOGLE_EMAIL_NOT_VERIFIED',
+        });
+      }
+
+      let user = await User.findOne({ googleId });
+      if (!user) {
+        user = await User.findOne({
+          $or: [{ email: googleEmail }, { email_aliases: googleEmail }],
+        });
+      }
+
+      if (!user) {
+        return reply.status(404).send({
+          error: 'Email Google chưa được đăng ký trong Check IN Love',
+          code: 'GOOGLE_ACCOUNT_NOT_REGISTERED',
+        });
+      }
+
+      if (user.googleId && user.googleId !== googleId) {
+        return reply.status(409).send({
+          error: 'Email này đã được liên kết với tài khoản Google khác',
+          code: 'GOOGLE_ACCOUNT_MISMATCH',
+        });
+      }
+
+      if (user.status === 'blocked') {
+        return reply
+          .status(403)
+          .send({ error: 'Tài khoản bị khóa', code: 'USER_BLOCKED' });
+      }
+
+      if (!user.googleId) {
+        user.googleId = googleId;
+        await user.save();
+      }
+
+      const couple = await Couple.findById(user.coupleId);
+      if (!couple) {
+        return reply
+          .status(500)
+          .send({ error: 'Couple not found', code: 'INTERNAL_ERROR' });
+      }
+
+      const token = signToken(
+        user._id.toString(),
+        couple._id.toString(),
+        user.role,
+      );
 
       return reply.status(200).send({
         token,
