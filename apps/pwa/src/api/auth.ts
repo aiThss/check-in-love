@@ -18,10 +18,6 @@ export interface LoginPayload {
   otpCode: string;
 }
 
-export interface GoogleLoginPayload {
-  credential: string;
-}
-
 export interface AuthResponse {
   token: string;
   user: import('./types').User;
@@ -57,13 +53,6 @@ export function startOnboarding(payload: StartOnboardingPayload): Promise<AuthRe
 
 export function login(payload: LoginPayload): Promise<AuthResponse> {
   return apiFetch<AuthResponse>('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export function loginWithGoogle(payload: GoogleLoginPayload): Promise<AuthResponse> {
-  return apiFetch<AuthResponse>('/auth/google', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

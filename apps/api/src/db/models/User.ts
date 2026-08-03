@@ -6,7 +6,6 @@ export interface UserDocument extends Document {
   partnerName: string;
   email?: string;
   email_aliases?: string[];
-  googleId?: string;
   passwordHash?: string;
   avatarUrl?: string;
   partnerAvatarUrl?: string;
@@ -34,7 +33,6 @@ const UserSchema = new Schema<UserDocument>(
     partnerName: { type: String, required: true },
     email: { type: String, required: false },
     email_aliases: { type: [String], default: [] },
-    googleId: { type: String, required: false },
     passwordHash: { type: String, required: false },
     avatarUrl: { type: String, required: false },
     partnerAvatarUrl: { type: String, required: false },
@@ -71,6 +69,5 @@ const UserSchema = new Schema<UserDocument>(
 // Sparse unique index: only enforces uniqueness when email is not null
 UserSchema.index({ email: 1 }, { unique: true, sparse: true });
 UserSchema.index({ email_aliases: 1 });
-UserSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 
 export const User = mongoose.model<UserDocument>('User', UserSchema);
