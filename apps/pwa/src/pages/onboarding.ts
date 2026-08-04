@@ -269,10 +269,14 @@ export function renderOnboardingPage(): HTMLElement {
     const toggleWrapper = document.createElement('div');
     toggleWrapper.style.cssText = 'width:100%;';
     toggleWrapper.innerHTML = `
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:14px 18px;background:var(--surface-solid);border:1.5px solid var(--border);border-radius:900px;">
-        <input type="checkbox" id="use-account-toggle" style="width:18px;height:18px;flex-shrink:0;margin:0;accent-color:var(--accent);" ${formData.useAccount ? 'checked' : ''} />
-        <span style="font-size:11px;font-weight:500;line-height:1.4">Đăng ký tài khoản để sử dụng trên thiết bị khác</span>
-      </label>
+      <div id="use-account-card" class="account-toggle-card ${formData.useAccount ? 'is-checked' : ''}" role="checkbox" aria-checked="${formData.useAccount}" tabindex="0">
+        <div class="custom-checkbox-box">
+          <svg class="custom-check-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <span class="account-toggle-label">Đăng ký tài khoản để sử dụng trên thiết bị khác</span>
+      </div>
     `;
 
     const accountFields = document.createElement('div');
@@ -313,11 +317,13 @@ export function renderOnboardingPage(): HTMLElement {
     content.appendChild(toggleWrapper);
     content.appendChild(accountFields);
 
-    const toggle = toggleWrapper.querySelector<HTMLInputElement>('#use-account-toggle')!;
-    toggle.addEventListener('change', () => {
-      formData.useAccount = toggle.checked;
-      accountFields.style.maxHeight = toggle.checked ? '200px' : '0';
-      accountFields.style.opacity = toggle.checked ? '1' : '0';
+    const toggleCard = toggleWrapper.querySelector<HTMLElement>('#use-account-card')!;
+    toggleCard.addEventListener('click', () => {
+      formData.useAccount = !formData.useAccount;
+      toggleCard.classList.toggle('is-checked', formData.useAccount);
+      toggleCard.setAttribute('aria-checked', String(formData.useAccount));
+      accountFields.style.maxHeight = formData.useAccount ? '200px' : '0';
+      accountFields.style.opacity = formData.useAccount ? '1' : '0';
     });
 
     const nextBtn = document.createElement('button');
