@@ -41,13 +41,15 @@ export function initDevHelper(): void {
         <button class="dev-jump-btn" data-target="login-google">🌐 Login: Google</button>
       </div>
 
-      <div class="dev-section-title">🔔 Test Toast & Thông báo</div>
+      <div class="dev-section-title">🔔 Test Thông báo Thực tế PWA</div>
       <div class="dev-noti-links">
-        <button class="dev-noti-btn" data-noti="success">💖 Success (Tim tích)</button>
-        <button class="dev-noti-btn" data-noti="error">💔 Error (Tim vỡ lắc)</button>
-        <button class="dev-noti-btn" data-noti="info">🎵 Info (Love EQ Sóng)</button>
-        <button class="dev-noti-btn" data-noti="spark">✨ Loading (Love Spark)</button>
-        <button class="dev-noti-btn" data-noti="chat">💬 Loading (Love Chat)</button>
+        <button class="dev-noti-btn" data-noti="checkin-success">📸 Check-in: Gửi thành công! (Success)</button>
+        <button class="dev-noti-btn" data-noti="checkin-error">⚠️ Check-in: Vui lòng chọn hoặc chụp ảnh! (Error)</button>
+        <button class="dev-noti-btn" data-noti="eq-info">🎵 Upload: Đang thử nén ảnh nhẹ hơn... (Love EQ)</button>
+        <button class="dev-noti-btn" data-noti="spark-loading">✨ Memories: Đang tải lại kỷ niệm... (Love Spark)</button>
+        <button class="dev-noti-btn" data-noti="chat-loading">💬 Messages: Đang kết nối trò chuyện... (Love Chat)</button>
+        <button class="dev-noti-btn" data-noti="copy-code">📋 Profile: Đã sao chép couple code! (Success)</button>
+        <button class="dev-noti-btn" data-noti="otp-sent">✉️ Auth: Mã OTP đã được gửi tới email! (Success)</button>
       </div>
 
       <div class="dev-panel-footer">
@@ -189,25 +191,31 @@ export function initDevHelper(): void {
     });
   });
 
-  // Handle Notification Tests
+  // Handle Real PWA Notification Tests
   root.querySelectorAll<HTMLButtonElement>('.dev-noti-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const notiType = btn.getAttribute('data-noti');
       switch (notiType) {
-        case 'success':
-          showToast('Đã lưu cài đặt kỷ niệm thành công! 💕', 'success');
+        case 'checkin-success':
+          showToast('Gửi check-in thành công! 💕', 'success');
           break;
-        case 'error':
-          showToast('Mật khẩu không chính xác, vui lòng thử lại! 💔', 'error');
+        case 'checkin-error':
+          showToast('Vui lòng chọn hoặc chụp ảnh!', 'error');
           break;
-        case 'info':
-          showToast('Đang kết nối Love Equalizer... 🎵', 'info');
+        case 'eq-info':
+          showToast('Upload ảnh chưa ổn, đang thử bản nhẹ hơn... 🎵', 'info');
           break;
-        case 'spark':
-          showToast('Đang tải dữ liệu lãng mạn... ✨', 'loading-spark');
+        case 'spark-loading':
+          showToast('Đang tải lại kỷ niệm... ✨', 'loading-spark');
           break;
-        case 'chat':
-          showToast('Đang gửi tin nhắn tình yêu... 💬', 'loading');
+        case 'chat-loading':
+          showToast('Đang kết nối trò chuyện... 💬', 'loading');
+          break;
+        case 'copy-code':
+          showToast('Đã sao chép couple code!', 'success');
+          break;
+        case 'otp-sent':
+          showToast('Mã OTP đã được gửi tới email của bạn! ✉️', 'success');
           break;
       }
     });
