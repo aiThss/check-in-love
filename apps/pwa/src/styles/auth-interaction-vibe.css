@@ -678,6 +678,80 @@
   color: #3c4043;
 }
 
+/*
+ * Auth compositing guard
+ *
+ * Google Identity Services renders a cross-origin iframe inside this card.
+ * Keeping translucent glass surfaces (especially the shared `.glass-card` and
+ * `.btn-ghost` rules) underneath that iframe makes Chromium Android sometimes
+ * composite the rest of the login form as a grey/white veil. The login form
+ * must remain readable and stable in both themes, so its interactive surfaces
+ * intentionally use opaque colors and do not participate in backdrop effects.
+ */
+.login-page-pwa .auth-tabs-wrap,
+.login-page-pwa .auth-tab-pill,
+.login-page-pwa .auth-form-card,
+.login-page-pwa .google-login-intro-v2,
+.login-page-pwa .auth-back-btn,
+.login-page-pwa .auth-footer-action .btn-ghost {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+:root:not([data-theme='dark']) .login-page-pwa .auth-tabs-wrap,
+[data-theme='light'] .login-page-pwa .auth-tabs-wrap {
+  background: #f7e6ed !important;
+  border-color: rgba(255, 59, 127, 0.22) !important;
+}
+
+:root:not([data-theme='dark']) .login-page-pwa .auth-form-card,
+[data-theme='light'] .login-page-pwa .auth-form-card {
+  background: #ffffff !important;
+  border-color: rgba(255, 59, 127, 0.22) !important;
+}
+
+:root:not([data-theme='dark']) .login-page-pwa .google-login-intro-v2,
+[data-theme='light'] .login-page-pwa .google-login-intro-v2 {
+  background: #fff7fa !important;
+  border-color: rgba(255, 59, 127, 0.22) !important;
+}
+
+:root:not([data-theme='dark']) .login-page-pwa .auth-back-btn,
+[data-theme='light'] .login-page-pwa .auth-back-btn,
+:root:not([data-theme='dark']) .login-page-pwa .auth-footer-action .btn-ghost,
+[data-theme='light'] .login-page-pwa .auth-footer-action .btn-ghost {
+  background: #fff4f7 !important;
+  border-color: rgba(255, 59, 127, 0.22) !important;
+}
+
+[data-theme='dark'] .login-page-pwa .auth-tabs-wrap {
+  background: #211a1e !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+[data-theme='dark'] .login-page-pwa .auth-form-card {
+  background: #211a1e !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+[data-theme='dark'] .login-page-pwa .google-login-intro-v2 {
+  background: #2b2026 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+[data-theme='dark'] .login-page-pwa .auth-back-btn,
+[data-theme='dark'] .login-page-pwa .auth-footer-action .btn-ghost {
+  background: #2a1f25 !important;
+  border-color: rgba(255, 118, 170, 0.3) !important;
+}
+
+[data-theme='dark'] .login-page-pwa .auth-tab-pill.active {
+  background: #5b2140 !important;
+  border-color: rgba(255, 118, 170, 0.42) !important;
+}
+
 /* Footer & Divider */
 .auth-footer-action {
   display: flex;
