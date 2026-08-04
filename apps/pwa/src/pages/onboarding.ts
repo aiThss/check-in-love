@@ -275,7 +275,7 @@ export function renderOnboardingPage(): HTMLElement {
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
         </div>
-        <span class="account-toggle-label">Đăng ký tài khoản để sử dụng trên thiết bị khác</span>
+        <span class="account-toggle-label" style="font-size:10.8px;">Đăng ký tài khoản để sử dụng trên thiết bị khác</span>
       </div>
     `;
 
