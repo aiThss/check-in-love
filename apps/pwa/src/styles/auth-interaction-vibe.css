@@ -2,16 +2,25 @@
    Loaded after the shared component sheet so these rules can deliberately tune
    the light glass theme without changing buttons throughout the signed-in app. */
 
-input,
-input.input,
-.input,
-.onboarding-step .input,
-.login-page-pwa .input,
-.onboarding-step .otp-input,
-.login-page-pwa .otp-input {
+/* ─── Light Mode Input & Button Overrides ────────────────────────────── */
+:root:not([data-theme='dark']) input,
+:root:not([data-theme='dark']) input.input,
+:root:not([data-theme='dark']) .input,
+:root:not([data-theme='dark']) .onboarding-step .input,
+:root:not([data-theme='dark']) .login-page-pwa .input,
+:root:not([data-theme='dark']) .onboarding-step .otp-input,
+:root:not([data-theme='dark']) .login-page-pwa .otp-input,
+[data-theme='light'] input,
+[data-theme='light'] input.input,
+[data-theme='light'] .input,
+[data-theme='light'] .onboarding-step .input,
+[data-theme='light'] .login-page-pwa .input,
+[data-theme='light'] .onboarding-step .otp-input,
+[data-theme='light'] .login-page-pwa .otp-input {
   border: 1.5px solid rgba(103, 76, 88, 0.24) !important;
   border-radius: 900px !important;
   background: rgba(255, 255, 255, 0.72) !important;
+  color: #1f151b !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.94),
     0 10px 28px rgba(80, 42, 59, 0.055) !important;
@@ -23,17 +32,26 @@ input.input,
     transform 160ms ease;
 }
 
-.onboarding-step .input:hover,
-.login-page-pwa .input:hover {
+:root:not([data-theme='dark']) input::placeholder,
+:root:not([data-theme='dark']) .input::placeholder,
+[data-theme='light'] input::placeholder,
+[data-theme='light'] .input::placeholder {
+  color: rgba(103, 76, 88, 0.55) !important;
+}
+
+:root:not([data-theme='dark']) .input:hover,
+:root:not([data-theme='dark']) .login-page-pwa .input:hover,
+[data-theme='light'] .input:hover,
+[data-theme='light'] .login-page-pwa .input:hover {
   border-color: rgba(255, 59, 127, 0.36) !important;
 }
 
-.onboarding-step .input:focus,
-.login-page-pwa .input:focus,
-.onboarding-step .otp-input:focus,
-.login-page-pwa .otp-input:focus {
+:root:not([data-theme='dark']) .input:focus,
+:root:not([data-theme='dark']) .login-page-pwa .input:focus,
+[data-theme='light'] .input:focus,
+[data-theme='light'] .login-page-pwa .input:focus {
   border-color: var(--accent) !important;
-  background: rgba(255, 255, 255, 0.88) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
   outline: none !important;
   box-shadow:
     0 0 0 3px rgba(255, 59, 127, 0.18),
@@ -41,20 +59,26 @@ input.input,
     inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
 }
 
-.onboarding-step .btn-ghost,
-.login-page-pwa .btn-ghost {
+:root:not([data-theme='dark']) .btn-ghost,
+:root:not([data-theme='dark']) .onboarding-step .btn-ghost,
+:root:not([data-theme='dark']) .login-page-pwa .btn-ghost,
+[data-theme='light'] .btn-ghost,
+[data-theme='light'] .onboarding-step .btn-ghost,
+[data-theme='light'] .login-page-pwa .btn-ghost {
   min-height: 52px;
   border: 1.5px solid rgba(255, 59, 127, 0.24) !important;
   border-radius: 900px !important;
   background: rgba(255, 255, 255, 0.7) !important;
-  color: var(--text-primary) !important;
+  color: #1f151b !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.94),
     0 9px 24px rgba(80, 42, 59, 0.06) !important;
 }
 
-.onboarding-step .btn-ghost:active,
-.login-page-pwa .btn-ghost:active {
+:root:not([data-theme='dark']) .btn-ghost:active,
+:root:not([data-theme='dark']) .onboarding-step .btn-ghost:active,
+[data-theme='light'] .btn-ghost:active,
+[data-theme='light'] .onboarding-step .btn-ghost:active {
   border-color: rgba(255, 59, 127, 0.5) !important;
   background: rgba(255, 235, 243, 0.88) !important;
 }
@@ -98,21 +122,36 @@ input.input,
     0 5px 12px rgba(255, 59, 127, 0.22);
 }
 
+/* ─── Dark Mode Input & Button Overrides ─────────────────────────────── */
+[data-theme='dark'] input,
+[data-theme='dark'] input.input,
+[data-theme='dark'] .input,
 [data-theme='dark'] .onboarding-step .input,
 [data-theme='dark'] .login-page-pwa .input,
 [data-theme='dark'] .onboarding-step .otp-input,
 [data-theme='dark'] .login-page-pwa .otp-input {
-  border-color: rgba(255, 255, 255, 0.16) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 900px !important;
   background: rgba(38, 29, 34, 0.86) !important;
+  color: #ffffff !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
     0 10px 28px rgba(0, 0, 0, 0.16) !important;
+  outline: none !important;
 }
 
-[data-theme='dark'] .onboarding-step .input:focus,
-[data-theme='dark'] .login-page-pwa .input:focus,
-[data-theme='dark'] .onboarding-step .otp-input:focus,
-[data-theme='dark'] .login-page-pwa .otp-input:focus {
+[data-theme='dark'] input::placeholder,
+[data-theme='dark'] .input::placeholder {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+[data-theme='dark'] .input:hover,
+[data-theme='dark'] .login-page-pwa .input:hover {
+  border-color: rgba(255, 118, 170, 0.4) !important;
+}
+
+[data-theme='dark'] .input:focus,
+[data-theme='dark'] .login-page-pwa .input:focus {
   border-color: var(--accent) !important;
   background: rgba(46, 34, 40, 0.94) !important;
   box-shadow:
@@ -120,13 +159,23 @@ input.input,
     0 12px 30px rgba(0, 0, 0, 0.22) !important;
 }
 
+[data-theme='dark'] .btn-ghost,
 [data-theme='dark'] .onboarding-step .btn-ghost,
 [data-theme='dark'] .login-page-pwa .btn-ghost {
-  border-color: rgba(255, 118, 170, 0.3) !important;
+  min-height: 52px;
+  border: 1.5px solid rgba(255, 118, 170, 0.3) !important;
+  border-radius: 900px !important;
   background: rgba(42, 31, 37, 0.84) !important;
+  color: #ffffff !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
     0 9px 24px rgba(0, 0, 0, 0.16) !important;
+}
+
+[data-theme='dark'] .btn-ghost:active,
+[data-theme='dark'] .onboarding-step .btn-ghost:active {
+  border-color: var(--accent) !important;
+  background: rgba(60, 42, 52, 0.95) !important;
 }
 
 [data-theme='dark'] .progress-dots {
