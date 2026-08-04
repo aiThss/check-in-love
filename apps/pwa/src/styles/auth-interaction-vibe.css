@@ -17,7 +17,7 @@
 [data-theme='light'] .login-page-pwa .input,
 [data-theme='light'] .onboarding-step .otp-input,
 [data-theme='light'] .login-page-pwa .otp-input {
-  border: 1.5px solid rgba(103, 76, 88, 0.24) !important;
+  border: 1.5px solid rgba(255, 59, 127, 0.22) !important;
   border-radius: 900px !important;
   background: rgba(255, 255, 255, 0.72) !important;
   color: #1f151b !important;
@@ -66,7 +66,7 @@
 [data-theme='light'] .onboarding-step .btn-ghost,
 [data-theme='light'] .login-page-pwa .btn-ghost {
   min-height: 52px;
-  border: 1.5px solid rgba(255, 59, 127, 0.24) !important;
+  border: 1.5px solid rgba(255, 59, 127, 0.22) !important;
   border-radius: 900px !important;
   background: rgba(255, 255, 255, 0.7) !important;
   color: #1f151b !important;
@@ -307,7 +307,7 @@
 .auth-tabs-wrap {
   display: flex;
   background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 59, 127, 0.15);
+  border: 1.5px solid rgba(255, 59, 127, 0.22);
   border-radius: 999px;
   padding: 4px;
   gap: 4px;
@@ -353,7 +353,7 @@
 /* Glass Form Card */
 .auth-form-card {
   background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1.5px solid rgba(255, 59, 127, 0.22);
   backdrop-filter: blur(24px) saturate(140%);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
   border-radius: 24px;
@@ -588,7 +588,7 @@
   padding: 12px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 1.5px solid rgba(255, 59, 127, 0.22);
 }
 
 [data-theme='dark'] .google-login-intro-v2 {
