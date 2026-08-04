@@ -18,6 +18,7 @@ declare global {
     LoveCheckAndroid?: {
       updateWidget?: (streak: number, partnerName: string) => void;
       getFcmToken?: () => string;
+      signInWithGoogle?: () => void;
     };
     onFcmTokenReceived?: (token: string) => void;
   }

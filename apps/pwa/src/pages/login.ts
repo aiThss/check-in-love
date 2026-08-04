@@ -43,6 +43,8 @@ declare global {
         id?: GoogleIdentityServices;
       };
     };
+    onNativeGoogleCredential?: (credential: string) => void;
+    onNativeGoogleSignInError?: (message: string) => void;
   }
 }
 
@@ -479,6 +481,12 @@ function mountGoogleSignInButton(
   status: HTMLElement,
   onCredential: (credential: string) => void,
 ): void {
+  const nativeGoogleSignIn = window.LoveCheckAndroid?.signInWithGoogle;
+  if (typeof nativeGoogleSignIn === 'function') {
+    mountNativeGoogleSignInButton(mount, status, nativeGoogleSignIn, onCredential);
+    return;
+  }
+
   if (!GOOGLE_CLIENT_ID) {
     status.textContent = 'Đăng nhập Google chưa được cấu hình cho môi trường này.';
     return;
@@ -513,6 +521,41 @@ function mountGoogleSignInButton(
       console.error('[Google Sign-In] Failed to load or initialize Google Identity Services', error);
       status.innerHTML = 'Không thể tải đăng nhập Google.<br>Vui lòng kiểm tra kết nối mạng.';
     });
+}
+
+function mountNativeGoogleSignInButton(
+  mount: HTMLElement,
+  status: HTMLElement,
+  signInWithGoogle: () => void,
+  onCredential: (credential: string) => void,
+): void {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'google-native-signin-button';
+  button.innerHTML = '<span class="google-native-signin-logo">G</span><span>Tiếp tục với Google</span>';
+  mount.replaceChildren(button);
+  status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
+
+  window.onNativeGoogleCredential = (credential: string) => {
+    button.disabled = false;
+    onCredential(credential);
+  };
+  window.onNativeGoogleSignInError = (message: string) => {
+    button.disabled = false;
+    status.textContent = message || 'Không thể đăng nhập Google trên thiết bị này.';
+  };
+
+  button.addEventListener('click', () => {
+    button.disabled = true;
+    status.textContent = 'Đang mở Google…';
+    try {
+      signInWithGoogle();
+    } catch (error) {
+      button.disabled = false;
+      status.textContent = 'Không thể mở đăng nhập Google trên thiết bị này.';
+      console.error('[Google Sign-In] Native sign-in request failed', error);
+    }
+  });
 }
 
 async function handleGoogleLogin(

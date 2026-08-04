@@ -15,8 +15,11 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -28,6 +31,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -36,6 +43,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.messaging.FirebaseMessaging
 import java.io.File
 import java.io.IOException
@@ -45,9 +55,15 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-private class LoveCheckBridge(private val context: Context) {
+private class LoveCheckBridge(
+    private val context: Context,
+    private val onGoogleSignInRequested: () -> Unit,
+) {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     @JavascriptInterface
     fun updateWidget(streak: Int, partnerName: String) {
         LoveCheckWidgetProvider.updateWidgetData(context, streak, partnerName)
@@ -109,6 +125,11 @@ private class LoveCheckBridge(private val context: Context) {
             e.printStackTrace()
         }
     }
+
+    @JavascriptInterface
+    fun signInWithGoogle() {
+        mainHandler.post(onGoogleSignInRequested)
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -123,6 +144,10 @@ class MainActivity : ComponentActivity() {
     private var updateCheckRunning = false
     private var lastUpdateCheckAt = 0L
     private var updateDialog: AlertDialog? = null
+    private var nativeGoogleSignInInProgress = false
+    private val credentialManager by lazy(LazyThreadSafetyMode.NONE) {
+        CredentialManager.create(this)
+    }
 
     private val fcmReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -220,7 +245,9 @@ class MainActivity : ComponentActivity() {
                             settings.userAgentString + " LoveCheckAndroidWrapper/$versionName"
 
                         addJavascriptInterface(
-                            LoveCheckBridge(context.applicationContext),
+                            LoveCheckBridge(context.applicationContext) {
+                                startNativeGoogleSignIn()
+                            },
                             "LoveCheckAndroid",
                         )
 
@@ -444,6 +471,62 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun startNativeGoogleSignIn() {
+        if (nativeGoogleSignInInProgress || isFinishing || isDestroyed) return
+
+        nativeGoogleSignInInProgress = true
+        lifecycleScope.launch {
+            try {
+                val googleOption = GetSignInWithGoogleOption.Builder(
+                    getString(R.string.google_web_client_id),
+                ).build()
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleOption)
+                    .build()
+                val result = credentialManager.getCredential(
+                    request = request,
+                    context = this@MainActivity,
+                )
+                val credential = result.credential
+                if (
+                    credential !is CustomCredential ||
+                    credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                ) {
+                    throw IllegalStateException("Unexpected Google credential type")
+                }
+
+                val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                injectNativeGoogleCredential(googleCredential.idToken)
+            } catch (error: GetCredentialException) {
+                Log.w(TAG, "Native Google sign-in was cancelled or unavailable", error)
+                injectNativeGoogleError("Không thể đăng nhập Google. Vui lòng thử lại.")
+            } catch (error: Exception) {
+                Log.e(TAG, "Native Google sign-in failed", error)
+                injectNativeGoogleError("Không thể đăng nhập Google trên thiết bị này.")
+            } finally {
+                nativeGoogleSignInInProgress = false
+            }
+        }
+    }
+
+    private fun injectNativeGoogleCredential(idToken: String) {
+        evaluateNativeGoogleCallback("onNativeGoogleCredential", idToken)
+    }
+
+    private fun injectNativeGoogleError(message: String) {
+        evaluateNativeGoogleCallback("onNativeGoogleSignInError", message)
+    }
+
+    private fun evaluateNativeGoogleCallback(functionName: String, value: String) {
+        val escapedValue = JSONObject.quote(value)
+        webView?.post {
+            webView?.evaluateJavascript(
+                "if (typeof window.$functionName === 'function') { window.$functionName($escapedValue); }",
+                null,
+            )
+        }
+    }
+
     override fun onDestroy() {
         try {
             unregisterReceiver(fcmReceiver)
@@ -613,6 +696,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        private const val TAG = "LoveCheckGoogle"
         private const val APP_URL = "https://couple.io.vn"
         private const val RETRY_SCHEME = "lovecheck"
         private const val STICKER_PATCH_VERSION = "1.1.10"

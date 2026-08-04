@@ -4,4 +4,5 @@
     <string name="widget_description">Hien thi streak va mo nhanh man gui check-in</string>
     <string name="quick_widget_name">Check IN Love Partner</string>
     <string name="quick_widget_description">Hien thi check-in va anh moi nhat cua doi phuong</string>
+    <string name="google_web_client_id" translatable="false">894898478385-g6e1nfj90upono5559an4r443f13ds9s.apps.googleusercontent.com</string>
 </resources>

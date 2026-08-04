@@ -641,6 +641,43 @@
   color: var(--text-tertiary, #888);
 }
 
+.google-native-signin-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: min(320px, 100%);
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  border-radius: 6px;
+  background: #fff;
+  color: #3c4043;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.18);
+}
+
+.google-native-signin-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.google-native-signin-logo {
+  color: #4285f4;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+[data-theme='dark'] .google-native-signin-button {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #fff;
+  color: #3c4043;
+}
+
 /* Footer & Divider */
 .auth-footer-action {
   display: flex;
