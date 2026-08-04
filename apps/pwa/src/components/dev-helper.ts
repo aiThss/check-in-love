@@ -31,25 +31,25 @@ export function initDevHelper(): void {
         <button class="dev-panel-close" id="dev-close-btn">✕</button>
       </div>
 
-      <div class="dev-section-title">📍 Nhảy nhanh các trang & bước</div>
+      <div class="dev-section-title">📍 Nhảy nhanh các trang</div>
       <div class="dev-quick-links">
-        <button class="dev-jump-btn" data-target="step-0">1️⃣ Step 1: Tên của bạn</button>
-        <button class="dev-jump-btn" data-target="step-1">2️⃣ Step 2: Tên người ấy</button>
-        <button class="dev-jump-btn" data-target="step-2">3️⃣ Step 3: Couple Code</button>
-        <button class="dev-jump-btn" data-target="step-3">4️⃣ Step 4: Chọn Ngày yêu</button>
-        <button class="dev-jump-btn" data-target="login-email">✉️ Login: Email & OTP</button>
-        <button class="dev-jump-btn" data-target="login-google">🌐 Login: Google</button>
+        <button class="dev-jump-btn" data-target="step-0">1️⃣ Step 1: Tên bạn</button>
+        <button class="dev-jump-btn" data-target="step-1">2️⃣ Step 2: Người ấy</button>
+        <button class="dev-jump-btn" data-target="step-2">3️⃣ Step 3: Code</button>
+        <button class="dev-jump-btn" data-target="step-3">4️⃣ Step 4: Ngày yêu</button>
+        <button class="dev-jump-btn" data-target="login-email">✉️ Login Email</button>
+        <button class="dev-jump-btn" data-target="login-google">🌐 Login Google</button>
       </div>
 
-      <div class="dev-section-title">🔔 Test Thông báo Thực tế PWA</div>
+      <div class="dev-section-title">🔔 Test Thông báo Toast</div>
       <div class="dev-noti-links">
-        <button class="dev-noti-btn" data-noti="checkin-success">📸 Check-in: Gửi thành công! (Success)</button>
-        <button class="dev-noti-btn" data-noti="checkin-error">⚠️ Check-in: Vui lòng chọn hoặc chụp ảnh! (Error)</button>
-        <button class="dev-noti-btn" data-noti="eq-info">🎵 Upload: Đang thử nén ảnh nhẹ hơn... (Love EQ)</button>
-        <button class="dev-noti-btn" data-noti="spark-loading">✨ Memories: Đang tải lại kỷ niệm... (Love Spark)</button>
-        <button class="dev-noti-btn" data-noti="chat-loading">💬 Messages: Đang kết nối trò chuyện... (Love Chat)</button>
-        <button class="dev-noti-btn" data-noti="copy-code">📋 Profile: Đã sao chép couple code! (Success)</button>
-        <button class="dev-noti-btn" data-noti="otp-sent">✉️ Auth: Mã OTP đã được gửi tới email! (Success)</button>
+        <button class="dev-noti-btn" data-noti="checkin-success">📸 Check-in OK</button>
+        <button class="dev-noti-btn" data-noti="checkin-error">⚠️ Check-in Lỗi</button>
+        <button class="dev-noti-btn" data-noti="eq-info">🎵 Love EQ Sóng</button>
+        <button class="dev-noti-btn" data-noti="spark-loading">✨ Spark Kỷ niệm</button>
+        <button class="dev-noti-btn" data-noti="chat-loading">💬 Chat Kết nối</button>
+        <button class="dev-noti-btn" data-noti="copy-code">📋 Copy Code</button>
+        <button class="dev-noti-btn" data-noti="otp-sent">✉️ Gửi Mã OTP</button>
       </div>
 
       <div class="dev-panel-footer">
