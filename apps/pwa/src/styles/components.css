@@ -670,6 +670,11 @@ textarea.input {
   height: 28px;
 }
 
+.toast-icon .loveEq {
+  width: 28px;
+  height: 28px;
+}
+
 .toast-exit {
   animation: fadeOut var(--duration-normal) var(--ease) forwards;
 }

@@ -1,6 +1,7 @@
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
 import { loveSparkLoaderMarkup } from './love-spark-loader';
+import { createLoveEqLoaderMarkup } from './love-eq-loader';
 
 type ToastType = 'success' | 'error' | 'info' | 'loading' | 'loading-spark';
 type ToastIcon = string | (() => string);
@@ -153,7 +154,7 @@ const errorHeartMarkup = `<svg class="toast-error-heart" width="34" height="34" 
 const ICONS: Record<ToastType, ToastIcon> = {
   success: createSuccessHeartMarkup,
   error: errorHeartMarkup,
-  info: `<img src="/icons8-waiting.png" style="width: 28px; height: 28px; object-fit: contain;" alt="info" />`,
+  info: createLoveEqLoaderMarkup,
   'loading-spark': loveSparkLoaderMarkup,
   loading: `<svg class="loveChat" viewBox="0 0 100 100" width="112" height="112" xmlns="http://www.w3.org/2000/svg" aria-label="love chat loader">
     <style>
