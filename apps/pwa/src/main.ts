@@ -29,7 +29,9 @@ initMessageThreadEnhancements();
 initProfileCopyright();
 initProfileUiCleanup();
 initAnniversaryCards();
-initDevHelper();
+if ((import.meta as any).env?.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  initDevHelper();
+}
 
 void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
 

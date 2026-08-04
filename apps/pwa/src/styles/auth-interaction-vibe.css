@@ -2,6 +2,9 @@
    Loaded after the shared component sheet so these rules can deliberately tune
    the light glass theme without changing buttons throughout the signed-in app. */
 
+input,
+input.input,
+.input,
 .onboarding-step .input,
 .login-page-pwa .input,
 .onboarding-step .otp-input,

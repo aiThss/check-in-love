@@ -578,7 +578,7 @@ a {
   width: 100%;
   background: var(--surface-solid);
   border: 1.5px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 900px !important;
   padding: 14px 16px;
   font-size: 16px;
   color: var(--text-primary);
