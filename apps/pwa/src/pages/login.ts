@@ -48,6 +48,9 @@ declare global {
 
 const GOOGLE_CLIENT_ID =
   typeof __GOOGLE_CLIENT_ID__ !== 'undefined' ? __GOOGLE_CLIENT_ID__ : '';
+const GOOGLE_SDK_URL = 'https://accounts.google.com/gsi/client';
+const GOOGLE_SDK_MAX_ATTEMPTS = 3;
+let googleSdkPromise: Promise<void> | null = null;
 
 export function renderLoginPage(): HTMLElement {
   const root = document.createElement('div');
@@ -415,35 +418,60 @@ export function renderLoginPage(): HTMLElement {
   return root;
 }
 
-function loadGoogleSdkScript(onLoaded: () => void): void {
+function loadGoogleSdkScript(): Promise<void> {
   if (window.google?.accounts?.id) {
-    onLoaded();
-    return;
+    return Promise.resolve();
   }
 
-  let script = document.getElementById('google-gsi-script') as HTMLScriptElement | null;
-  if (!script) {
-    script = document.createElement('script');
-    script.id = 'google-gsi-script';
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
+  if (googleSdkPromise) {
+    return googleSdkPromise;
   }
 
-  script.addEventListener('load', () => onLoaded());
-  script.addEventListener('error', () => {
-    setTimeout(() => {
-      if (script && script.parentNode) script.parentNode.removeChild(script);
-      const newScript = document.createElement('script');
-      newScript.id = 'google-gsi-script';
-      newScript.src = 'https://accounts.google.com/gsi/client';
-      newScript.async = true;
-      newScript.defer = true;
-      newScript.onload = () => onLoaded();
-      document.head.appendChild(newScript);
-    }, 1000);
+  googleSdkPromise = new Promise<void>((resolve, reject) => {
+    let attempts = 0;
+
+    const load = (): void => {
+      if (window.google?.accounts?.id) {
+        resolve();
+        return;
+      }
+
+      attempts += 1;
+      const script = document.createElement('script');
+      script.id = 'google-gsi-script';
+      script.src = GOOGLE_SDK_URL;
+      script.async = true;
+      script.defer = true;
+
+      const retryOrReject = (): void => {
+        script.remove();
+        if (attempts >= GOOGLE_SDK_MAX_ATTEMPTS) {
+          reject(new Error('Google Identity Services SDK failed to load'));
+          return;
+        }
+        window.setTimeout(load, attempts * 500);
+      };
+
+      script.onload = () => {
+        if (window.google?.accounts?.id) {
+          resolve();
+        } else {
+          retryOrReject();
+        }
+      };
+      script.onerror = retryOrReject;
+      document.head.appendChild(script);
+    };
+
+    load();
   });
+
+  googleSdkPromise = googleSdkPromise.catch((error: unknown) => {
+    googleSdkPromise = null;
+    throw error;
+  });
+
+  return googleSdkPromise;
 }
 
 function mountGoogleSignInButton(
@@ -458,10 +486,13 @@ function mountGoogleSignInButton(
 
   status.textContent = 'Đang kết nối Google Identity…';
 
-  let attempts = 0;
-  const tryRender = (): void => {
-    const googleId = window.google?.accounts?.id;
-    if (googleId) {
+  void loadGoogleSdkScript()
+    .then(() => {
+      const googleId = window.google?.accounts?.id;
+      if (!googleId) {
+        throw new Error('Google Identity Services SDK loaded without the identity API');
+      }
+
       googleId.initialize({
         client_id: GOOGLE_CLIENT_ID,
         cancel_on_tap_outside: true,
@@ -477,18 +508,11 @@ function mountGoogleSignInButton(
         logo_alignment: 'left',
       });
       status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
-      return;
-    }
-
-    attempts += 1;
-    if (attempts >= 80) {
+    })
+    .catch((error: unknown) => {
+      console.error('[Google Sign-In] Failed to load or initialize Google Identity Services', error);
       status.innerHTML = 'Không thể tải đăng nhập Google.<br>Vui lòng kiểm tra kết nối mạng.';
-      return;
-    }
-    window.setTimeout(tryRender, 100);
-  };
-
-  tryRender();
+    });
 }
 
 async function handleGoogleLogin(
