@@ -44,6 +44,7 @@ import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.messaging.FirebaseMessaging
@@ -477,16 +478,7 @@ class MainActivity : ComponentActivity() {
         nativeGoogleSignInInProgress = true
         lifecycleScope.launch {
             try {
-                val googleOption = GetSignInWithGoogleOption.Builder(
-                    getString(R.string.google_web_client_id),
-                ).build()
-                val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(googleOption)
-                    .build()
-                val result = credentialManager.getCredential(
-                    request = request,
-                    context = this@MainActivity,
-                )
+                val result = requestNativeGoogleCredential()
                 val credential = result.credential
                 if (
                     credential !is CustomCredential ||
@@ -498,14 +490,82 @@ class MainActivity : ComponentActivity() {
                 val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 injectNativeGoogleCredential(googleCredential.idToken)
             } catch (error: GetCredentialException) {
-                Log.w(TAG, "Native Google sign-in was cancelled or unavailable", error)
-                injectNativeGoogleError("Không thể đăng nhập Google. Vui lòng thử lại.")
+                val errorType = error::class.java.simpleName
+                Log.w(
+                    TAG,
+                    "Native Google sign-in unavailable: $errorType: ${error.message}",
+                    error,
+                )
+                injectNativeGoogleError(nativeGoogleErrorMessage(error))
             } catch (error: Exception) {
-                Log.e(TAG, "Native Google sign-in failed", error)
-                injectNativeGoogleError("Không thể đăng nhập Google trên thiết bị này.")
+                val errorType = error::class.java.simpleName
+                Log.e(
+                    TAG,
+                    "Native Google sign-in failed: $errorType: ${error.message}",
+                    error,
+                )
+                injectNativeGoogleError("Không thể mở Google trên thiết bị này ($errorType).")
             } finally {
                 nativeGoogleSignInInProgress = false
             }
+        }
+    }
+
+    private suspend fun requestNativeGoogleCredential() = run {
+        val webClientId = getString(R.string.google_web_client_id)
+        val buttonOption = GetSignInWithGoogleOption.Builder(webClientId).build()
+        val buttonRequest = GetCredentialRequest.Builder()
+            .addCredentialOption(buttonOption)
+            .build()
+
+        try {
+            credentialManager.getCredential(
+                request = buttonRequest,
+                context = this@MainActivity,
+            )
+        } catch (error: GetCredentialException) {
+            if (isUserCancelledCredentialRequest(error)) throw error
+
+            Log.w(
+                TAG,
+                "Google button flow failed; retrying with account picker: " +
+                    "${error::class.java.simpleName}: ${error.message}",
+                error,
+            )
+
+            val accountOption = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false)
+                .setServerClientId(webClientId)
+                .build()
+            val accountRequest = GetCredentialRequest.Builder()
+                .addCredentialOption(accountOption)
+                .build()
+
+            credentialManager.getCredential(
+                request = accountRequest,
+                context = this@MainActivity,
+            )
+        }
+    }
+
+    private fun isUserCancelledCredentialRequest(error: GetCredentialException): Boolean {
+        val errorType = error::class.java.simpleName
+        return errorType.contains("Cancellation", ignoreCase = true) ||
+            errorType.contains("Interrupted", ignoreCase = true)
+    }
+
+    private fun nativeGoogleErrorMessage(error: GetCredentialException): String {
+        val errorType = error::class.java.simpleName
+        return when {
+            errorType.contains("NoCredential", ignoreCase = true) ->
+                "Google chưa trả về tài khoản. Kiểm tra Google Play services và cấu hình Android OAuth."
+            errorType.contains("ProviderConfiguration", ignoreCase = true) ->
+                "Credential Manager chưa có Google provider. Hãy cập nhật Google Play services."
+            errorType.contains("Unsupported", ignoreCase = true) ->
+                "Thiết bị chưa hỗ trợ Credential Manager. Hãy cập nhật Android/Google Play services."
+            errorType.contains("Cancellation", ignoreCase = true) ->
+                "Đăng nhập Google đã bị huỷ."
+            else -> "Không thể mở Google trên thiết bị này ($errorType)."
         }
     }
 
