@@ -14,7 +14,7 @@ export function initDevHelper(): void {
       <span class="dev-label">Ghim Trang Dev</span>
     </button>
 
-    <div class="dev-helper-panel glass-card hidden-dev-panel" id="dev-panel">
+    <div class="dev-helper-panel hidden-dev-panel" id="dev-panel">
       <div class="dev-panel-header">
         <strong>🛠️ Dev Quick Jump & Pin</strong>
         <button class="dev-panel-close" id="dev-close-btn">✕</button>
