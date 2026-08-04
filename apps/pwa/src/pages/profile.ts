@@ -513,21 +513,18 @@ export function renderProfilePage(): HTMLElement {
           <div id="btn-my-bday-pill" style="
             background:var(--surface-solid);
             border:1px solid var(--border);
-            border-radius:16px;
-            padding:9px 4px;
+            border-radius:14px;
+            padding:5px 8px;
             display:flex;
             flex-direction:column;
             align-items:center;
             justify-content:center;
-            gap:2px;
+            gap:1px;
             cursor:pointer;
             min-width:0;
             transition:transform 0.15s ease, border-color 0.15s ease;
           ">
-            <span style="font-size:15px;line-height:1;">🎂</span>
-            <span style="font-size:10px;color:var(--text-secondary);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;">
-              ${user.displayName || 'Bạn'}
-            </span>
+            <span style="font-size:14px;line-height:1;">🎂</span>
             <strong style="font-size:12px;font-weight:700;color:var(--text-primary);white-space:nowrap;">
               ${myAge !== undefined ? `${myAge} tuổi` : 'Chưa đặt'}
             </strong>
@@ -536,20 +533,19 @@ export function renderProfilePage(): HTMLElement {
           <!-- Center: Streak Banner -->
           <div style="
             background:linear-gradient(135deg, #ff3b7f, #ff6b35);
-            border-radius:16px;
-            padding:9px 4px;
+            border-radius:14px;
+            padding:5px 8px;
             display:flex;
             flex-direction:column;
             align-items:center;
             justify-content:center;
-            gap:2px;
+            gap:1px;
             color:#ffffff;
             box-shadow:0 4px 14px rgba(255, 59, 127, 0.28);
             min-width:0;
           ">
-            <span style="font-size:15px;line-height:1;">🔥</span>
-            <span style="font-size:10px;opacity:0.9;font-weight:600;white-space:nowrap;">Chuỗi Streak</span>
-            <strong style="font-size:13px;font-weight:800;white-space:nowrap;">
+            <span style="font-size:10px;opacity:0.9;font-weight:600;white-space:nowrap;">Streak 🔥</span>
+            <strong style="font-size:12px;font-weight:800;white-space:nowrap;">
               ${couple.streak || 0} ngày
             </strong>
           </div>
@@ -558,21 +554,18 @@ export function renderProfilePage(): HTMLElement {
           <div id="btn-partner-bday-pill" style="
             background:var(--surface-solid);
             border:1px solid var(--border);
-            border-radius:16px;
-            padding:9px 4px;
+            border-radius:14px;
+            padding:5px 8px;
             display:flex;
             flex-direction:column;
             align-items:center;
             justify-content:center;
-            gap:2px;
+            gap:1px;
             cursor:pointer;
             min-width:0;
             transition:transform 0.15s ease, border-color 0.15s ease;
           ">
-            <span style="font-size:15px;line-height:1;">🎂</span>
-            <span style="font-size:10px;color:var(--text-secondary);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;">
-              ${user.partnerName || 'Người ấy'}
-            </span>
+            <span style="font-size:14px;line-height:1;">🎂</span>
             <strong style="font-size:12px;font-weight:700;color:var(--text-primary);white-space:nowrap;">
               ${partnerAge !== undefined ? `${partnerAge} tuổi` : 'Chưa đặt'}
             </strong>
@@ -597,7 +590,7 @@ export function renderProfilePage(): HTMLElement {
         width:100%;
         font-size:13px;
         cursor:pointer;
-        box-shadow:0 2px 6px rgba(0, 0, 0, 0.03);
+        box-shadow:0 2px 6px rgba(0, 0, 0, 1);
       " id="copy-code-container">
         <span style="color:var(--text-secondary);font-weight:500;">Couple Code:</span>
         <strong style="color:var(--accent);font-family:monospace;font-size:16px;letter-spacing:1.5px;font-weight:700;">${couple.code || (couple as any).coupleCode || 'LOVE123'}</strong>

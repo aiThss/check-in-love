@@ -41,18 +41,19 @@ export function renderOnboardingPage(): HTMLElement {
   const deviceId = getOrCreateDeviceId();
 
   // State
-  let currentStep = 0;
+  const savedStep = sessionStorage.getItem('dev_onboarding_step');
+  let currentStep = savedStep !== null ? Math.max(0, Math.min(4, parseInt(savedStep, 10))) : 0;
   const TOTAL_STEPS = 5; // Added OTP step
 
   const formData = {
-    displayName: '',
-    partnerName: '',
-    coupleCode: '',
-    loveStartDate: '',
-    email: '',
+    displayName: sessionStorage.getItem('dev_onboarding_displayName') || '',
+    partnerName: sessionStorage.getItem('dev_onboarding_partnerName') || '',
+    coupleCode: sessionStorage.getItem('dev_onboarding_coupleCode') || '',
+    loveStartDate: sessionStorage.getItem('dev_onboarding_loveStartDate') || '',
+    email: sessionStorage.getItem('dev_onboarding_email') || '',
     password: '',
     otpCode: '',
-    useAccount: false,
+    useAccount: sessionStorage.getItem('dev_onboarding_useAccount') === 'true',
     emailVerified: false,
   };
 
@@ -125,13 +126,13 @@ export function renderOnboardingPage(): HTMLElement {
   function renderStep1(): void {
     const content = document.createElement('div');
     content.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;gap:24px;width:100%;max-width:360px;';
+      'display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:360px;';
 
     content.innerHTML = `
       <div style="font-size:72px;line-height:1" class="animate-pulse">👋</div>
       <div style="text-align:center">
         <h1 class="onboarding-title">Tên của bạn là gì?</h1>
-        <p class="onboarding-subtitle" style="margin-top:8px">Chúng tớ sẽ dùng tên này để hiển thị trong app</p>
+        <p class="onboarding-subtitle" style="margin-top:8px">Chúng tớ sẽ dùng tên này <br> để hiển thị trong app</p>
       </div>
     `;
 
@@ -188,7 +189,7 @@ export function renderOnboardingPage(): HTMLElement {
   function renderStep2(): void {
     const content = document.createElement('div');
     content.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;gap:24px;width:100%;max-width:360px;';
+      'display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:360px;';
 
     content.innerHTML = `
       <div style="font-size:72px;line-height:1" class="animate-pulse">💕</div>
@@ -268,7 +269,7 @@ export function renderOnboardingPage(): HTMLElement {
     const toggleWrapper = document.createElement('div');
     toggleWrapper.style.cssText = 'width:100%;';
     toggleWrapper.innerHTML = `
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;background:var(--surface-solid);border:1px solid var(--border);border-radius:14px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 18px;background:var(--surface-solid);border:1.5px solid var(--border);border-radius:900px;">
         <input type="checkbox" id="use-account-toggle" style="width:18px;height:18px;accent-color:var(--accent);" ${formData.useAccount ? 'checked' : ''} />
         <span style="font-size:11px;font-weight:500;line-height:1.4">Đăng ký tài khoản để sử dụng trên thiết bị khác</span>
       </label>
@@ -862,7 +863,9 @@ export function renderOnboardingPage(): HTMLElement {
 
         dayPreview.innerHTML = `
           <div class="love-date-preview-days">
-            💕 Hai đứa đã bên nhau <strong>${days.toLocaleString()}</strong> ngày
+            <span class="preview-text-phrase">💕 Hai đứa đã bên nhau</span>
+            <strong class="preview-days-count">${days.toLocaleString()}</strong>
+            <span class="preview-text-unit">ngày</span>
           </div>
           <div class="love-date-preview-sub">${formattedDate}</div>
           <div class="love-date-milestone-pill">${milestoneText}</div>
@@ -1023,6 +1026,13 @@ export function renderOnboardingPage(): HTMLElement {
   // ── Step renderer ─────────────────────────────────────────────────────────
 
   function renderCurrentStep() {
+    sessionStorage.setItem('dev_onboarding_step', String(currentStep));
+    sessionStorage.setItem('dev_onboarding_displayName', formData.displayName);
+    sessionStorage.setItem('dev_onboarding_partnerName', formData.partnerName);
+    sessionStorage.setItem('dev_onboarding_coupleCode', formData.coupleCode);
+    sessionStorage.setItem('dev_onboarding_loveStartDate', formData.loveStartDate);
+    sessionStorage.setItem('dev_onboarding_useAccount', String(formData.useAccount));
+
     switch (currentStep) {
       case 0: renderStep1(); break;
       case 1: renderStep2(); break;

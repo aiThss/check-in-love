@@ -442,7 +442,7 @@ export function renderMessagesPage(): RoutePage {
       thread.replaceChildren();
       const empty = document.createElement('p');
       empty.className = 'messages-empty';
-      empty.textContent = 'Chưa tải được tin nhắn. Hãy thử lại nhé.';
+      empty.textContent = 'Chưa tải được tin nhắn.\nHãy thử lại nhé.';
       thread.append(empty, bottomSentinel);
     }
   }

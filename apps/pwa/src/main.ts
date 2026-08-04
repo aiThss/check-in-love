@@ -18,6 +18,7 @@ import { initProfileUiCleanup } from './utils/profile-ui-cleanup';
 import { initAnniversaryCards } from './utils/anniversary-cards';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 import { showModal } from './components/modal';
+import { initDevHelper } from './components/dev-helper';
 
 store.initTheme();
 initKeyboardViewport();
@@ -28,6 +29,7 @@ initMessageThreadEnhancements();
 initProfileCopyright();
 initProfileUiCleanup();
 initAnniversaryCards();
+initDevHelper();
 
 void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
 

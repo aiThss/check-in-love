@@ -2115,7 +2115,7 @@ textarea.input {
 .love-date-preview-card {
   width: 100%;
   text-align: center;
-  padding: 16px 20px;
+  padding: 16px 12px;
   background: linear-gradient(135deg, rgba(255, 107, 157, 0.12), rgba(255, 182, 193, 0.08));
   border-radius: 20px;
   border: 1px solid rgba(255, 107, 157, 0.25);
@@ -2127,20 +2127,23 @@ textarea.input {
 }
 
 .love-date-preview-days {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--accent, #ff4b72);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  text-align: center;
+  line-height: 1.4;
+  width: 100%;
+  white-space: nowrap;
+  letter-spacing: -0.2px;
 }
 
 .love-date-preview-days strong {
-  font-size: 22px;
+  font-size: 18.5px;
   font-weight: 800;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
   color: var(--accent, #ff4b72);
+  display: inline-block;
+  margin: 0 2px;
 }
 
 .love-date-preview-sub {
@@ -2179,10 +2182,10 @@ textarea.input {
 
 /* Thin distinct border for Couple Code Box */
 #copy-code-container {
-  background: #ffffff !important;
-  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1.5px solid rgba(255, 59, 127, 0.22) !important;
   border-radius: 16px !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03) !important;
+  box-shadow: 0 4px 14px rgba(80, 42, 59, 0.05) !important;
 }
 
 [data-theme='dark'] #copy-code-container {
@@ -3313,8 +3316,8 @@ textarea.input {
 /* Tối ưu hóa Copy Code Box ở trang Profile trong Light Mode */
 :root:not([data-theme='dark']) #copy-code-container,
 [data-theme='light'] #copy-code-container {
-  background: rgba(255, 255, 255, 0.3) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1.5px solid rgba(255, 59, 127, 0.22) !important;
 }
 
 :root:not([data-theme='dark']) #copy-code-container span:last-child,
@@ -4625,6 +4628,7 @@ textarea:focus-visible,
   font-size: 14px;
   line-height: 1.5;
   text-align: center;
+  white-space: pre-line; 
 }
 
 .chat-checkin-group {
