@@ -134,6 +134,7 @@ initRouter({
     return import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage());
   },
   '/preview/cards': () => import('./pages/card-preview').then(({ renderCardPreviewPage }) => renderCardPreviewPage()),
+  '/preview/loaders': () => import('./pages/loading-preview').then(({ renderLoadingPreviewPage }) => renderLoadingPreviewPage()),
   '/test-mail': () => import('./pages/test-mail').then(({ renderTestMailPage }) => renderTestMailPage()),
   '/install': () => import('./pages/install').then(({ renderInstallPage }) => renderInstallPage()),
   '/login': () => import('./pages/login').then(({ renderLoginPage }) => renderLoginPage()),
