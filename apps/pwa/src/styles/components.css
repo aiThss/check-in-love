@@ -2051,15 +2051,18 @@ textarea.input {
   right: 8px;
   height: 40px;
   transform: translateY(-50%);
-  background: var(--accent-soft, rgba(255, 75, 114, 0.12));
+  background: var(--accent-soft, rgba(255, 75, 114, 0.14));
   border-radius: 12px;
-  border: 1px solid rgba(255, 75, 114, 0.3);
+  border: 1.5px solid var(--accent, #ff3b7f);
   pointer-events: none;
+  z-index: 0;
 }
 
 .love-date-wheel-col {
   flex: 1;
   height: 100%;
+  position: relative;
+  z-index: 1;
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
@@ -2085,9 +2088,13 @@ textarea.input {
 }
 
 .love-date-wheel-item.selected {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--accent, #ff4b72);
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: var(--accent, #ff3b7f) !important;
+}
+
+[data-theme='dark'] .love-date-wheel-item.selected {
+  color: #ff6fae !important;
 }
 
 .love-date-native-trigger {

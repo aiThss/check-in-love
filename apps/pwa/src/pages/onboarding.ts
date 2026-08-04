@@ -810,8 +810,15 @@ export function renderOnboardingPage(): HTMLElement {
       updateActivePreset();
     }
 
+    function highlightSelectedItems() {
+      getSelectedValueFromCol(wheelDay, daysList);
+      getSelectedValueFromCol(wheelMonth, monthsList);
+      getSelectedValueFromCol(wheelYear, yearsList);
+    }
+
     let scrollTimer: ReturnType<typeof setTimeout> | null = null;
     function onColScroll() {
+      highlightSelectedItems();
       if (scrollTimer) clearTimeout(scrollTimer);
       scrollTimer = setTimeout(() => {
         syncFromWheel();
@@ -839,9 +846,7 @@ export function renderOnboardingPage(): HTMLElement {
         if (monthIdx >= 0) wheelMonth.scrollTop = monthIdx * 40;
         if (yearIdx >= 0) wheelYear.scrollTop = yearIdx * 40;
 
-        getSelectedValueFromCol(wheelDay, daysList);
-        getSelectedValueFromCol(wheelMonth, monthsList);
-        getSelectedValueFromCol(wheelYear, yearsList);
+        highlightSelectedItems();
 
         setTimeout(() => { isProgrammaticScroll = false; }, 60);
       }
@@ -920,8 +925,12 @@ export function renderOnboardingPage(): HTMLElement {
       syncFromDateString(dateInput.value);
     });
 
-    // Initial sync
-    syncFromDateString(formData.loveStartDate);
+    // Initial sync with double frame delay to ensure DOM dimensions & layout are ready
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        syncFromDateString(formData.loveStartDate);
+      });
+    });
 
     content.appendChild(pickerCard);
     content.appendChild(dayPreview);
