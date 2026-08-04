@@ -269,8 +269,8 @@ export function renderOnboardingPage(): HTMLElement {
     const toggleWrapper = document.createElement('div');
     toggleWrapper.style.cssText = 'width:100%;';
     toggleWrapper.innerHTML = `
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 18px;background:var(--surface-solid);border:1.5px solid var(--border);border-radius:900px;">
-        <input type="checkbox" id="use-account-toggle" style="width:18px;height:18px;accent-color:var(--accent);" ${formData.useAccount ? 'checked' : ''} />
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:14px 18px;background:var(--surface-solid);border:1.5px solid var(--border);border-radius:900px;">
+        <input type="checkbox" id="use-account-toggle" style="width:18px;height:18px;flex-shrink:0;margin:0;accent-color:var(--accent);" ${formData.useAccount ? 'checked' : ''} />
         <span style="font-size:11px;font-weight:500;line-height:1.4">Đăng ký tài khoản để sử dụng trên thiết bị khác</span>
       </label>
     `;
