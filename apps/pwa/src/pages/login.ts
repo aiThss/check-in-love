@@ -408,14 +408,45 @@ export function renderLoginPage(): HTMLElement {
   const googleMount = googlePanel.querySelector<HTMLElement>('#google-signin-button')!;
   const googleStatus = googlePanel.querySelector<HTMLElement>('#google-login-status')!;
 
-  mountGoogleButton(googleMount, googleStatus, (credential) => {
+  mountGoogleSignInButton(googleMount, googleStatus, (credential) => {
     void handleGoogleLogin(credential, googleWrap, googleStatus);
   });
 
   return root;
 }
 
-function mountGoogleButton(
+function loadGoogleSdkScript(onLoaded: () => void): void {
+  if (window.google?.accounts?.id) {
+    onLoaded();
+    return;
+  }
+
+  let script = document.getElementById('google-gsi-script') as HTMLScriptElement | null;
+  if (!script) {
+    script = document.createElement('script');
+    script.id = 'google-gsi-script';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
+  script.addEventListener('load', () => onLoaded());
+  script.addEventListener('error', () => {
+    setTimeout(() => {
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+      const newScript = document.createElement('script');
+      newScript.id = 'google-gsi-script';
+      newScript.src = 'https://accounts.google.com/gsi/client';
+      newScript.async = true;
+      newScript.defer = true;
+      newScript.onload = () => onLoaded();
+      document.head.appendChild(newScript);
+    }, 1000);
+  });
+}
+
+function mountGoogleSignInButton(
   mount: HTMLElement,
   status: HTMLElement,
   onCredential: (credential: string) => void,
@@ -424,6 +455,8 @@ function mountGoogleButton(
     status.textContent = 'Đăng nhập Google chưa được cấu hình cho môi trường này.';
     return;
   }
+
+  status.textContent = 'Đang kết nối Google Identity…';
 
   let attempts = 0;
   const tryRender = (): void => {
@@ -448,8 +481,8 @@ function mountGoogleButton(
     }
 
     attempts += 1;
-    if (attempts >= 50) {
-      status.textContent = 'Không thể tải đăng nhập Google. Vui lòng kiểm tra kết nối mạng.';
+    if (attempts >= 80) {
+      status.innerHTML = 'Không thể tải đăng nhập Google.<br>Vui lòng kiểm tra kết nối mạng.';
       return;
     }
     window.setTimeout(tryRender, 100);
