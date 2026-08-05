@@ -483,7 +483,14 @@ function mountGoogleSignInButton(
 ): void {
   const nativeGoogleSignIn = window.LoveCheckAndroid?.signInWithGoogle;
   if (typeof nativeGoogleSignIn === 'function') {
-    mountNativeGoogleSignInButton(mount, status, nativeGoogleSignIn, onCredential);
+    // Phải gọi trực tiếp trên object, không được dùng detached reference
+    // vì Android JavascriptInterface không cho phép invoke trên non-injected object
+    mountNativeGoogleSignInButton(
+      mount,
+      status,
+      () => window.LoveCheckAndroid!.signInWithGoogle(),
+      onCredential,
+    );
     return;
   }
 
