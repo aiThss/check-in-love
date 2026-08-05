@@ -2022,15 +2022,18 @@ textarea.input {
   font-weight: 600;
   background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
   color: var(--text-secondary);
-  border: 1px solid transparent;
+  border: 1.5px solid rgba(255, 107, 157, 0.45);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  box-shadow: 0 0 0 0 rgba(255, 107, 157, 0);
 }
 
 .love-date-preset-chip:hover {
   background: var(--accent-soft, rgba(255, 107, 157, 0.12));
   color: var(--accent);
+  border-color: rgba(255, 75, 114, 0.7);
+  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.2);
 }
 
 .love-date-preset-chip.active {
