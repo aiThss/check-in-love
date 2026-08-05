@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "894898478385",
+    "project_id": "check-in-couple",
+    "storage_bucket": "check-in-couple.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:894898478385:android:0f0b859c9c56aeae266410",
+        "android_client_info": {
+          "package_name": "com.example.lovecheck"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "894898478385-su4cj7lftgn797r49edudsuvhpuq5m9s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lovecheck",
+            "certificate_hash": "03ade2e0d65208fab98832723ab08a4cb8454613"
+          }
+        },
+        {
+          "client_id": "894898478385-g6e1nfj90upono5559an4r443f13ds9s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQATrAFn6oRkbZwMulehVIIjjEhCiw6bY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "894898478385-g6e1nfj90upono5559an4r443f13ds9s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
