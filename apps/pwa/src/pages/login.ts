@@ -481,14 +481,18 @@ function mountGoogleSignInButton(
   status: HTMLElement,
   onCredential: (credential: string) => void,
 ): void {
-  const nativeGoogleSignIn = window.LoveCheckAndroid?.signInWithGoogle;
-  if (typeof nativeGoogleSignIn === 'function') {
-    // Phải gọi trực tiếp trên object, không được dùng detached reference
-    // vì Android JavascriptInterface không cho phép invoke trên non-injected object
+  if (typeof window.LoveCheckAndroid !== 'undefined' && window.LoveCheckAndroid) {
     mountNativeGoogleSignInButton(
       mount,
       status,
-      () => window.LoveCheckAndroid!.signInWithGoogle(),
+      () => {
+        // Phải gọi trực tiếp window.LoveCheckAndroid.signInWithGoogle()
+        // Không dùng optional chaining ?.() vì TypeScript sẽ biên dịch thành .call()
+        // khiến Chromium Android WebView báo lỗi "non-injected object"
+        if (window.LoveCheckAndroid && typeof window.LoveCheckAndroid.signInWithGoogle === 'function') {
+          window.LoveCheckAndroid.signInWithGoogle();
+        }
+      },
       onCredential,
     );
     return;
