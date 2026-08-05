@@ -496,18 +496,19 @@ class MainActivity : ComponentActivity() {
                     "Native Google sign-in unavailable: $errorType: ${error.message}",
                     error,
                 )
-                injectNativeGoogleError(nativeGoogleErrorMessage(error))
+                if (isUserCancelledCredentialRequest(error)) {
+                    injectNativeGoogleError("CANCELLED")
+                } else {
+                    injectNativeGoogleError(nativeGoogleErrorMessage(error))
+                }
             } catch (error: Exception) {
                 val errorType = error::class.java.simpleName
-                val rawMsg = error.message?.take(120) ?: ""
                 Log.e(
                     TAG,
                     "Native Google sign-in failed: $errorType: ${error.message}",
                     error,
                 )
-                injectNativeGoogleError(
-                    "[$errorType] Lỗi không mong đợi.${if (rawMsg.isNotBlank()) "\n\nChi tiết: $rawMsg" else ""}",
-                )
+                injectNativeGoogleError("Không thể mở đăng nhập Google. Vui lòng thử lại.")
             } finally {
                 nativeGoogleSignInInProgress = false
             }
@@ -553,25 +554,23 @@ class MainActivity : ComponentActivity() {
 
     private fun isUserCancelledCredentialRequest(error: GetCredentialException): Boolean {
         val errorType = error::class.java.simpleName
+        val msg = error.message ?: ""
         return errorType.contains("Cancellation", ignoreCase = true) ||
-            errorType.contains("Interrupted", ignoreCase = true)
+            errorType.contains("Interrupted", ignoreCase = true) ||
+            msg.contains("Cancelled by user", ignoreCase = true)
     }
 
     private fun nativeGoogleErrorMessage(error: GetCredentialException): String {
         val errorType = error::class.java.simpleName
-        val rawMsg = error.message?.take(120) ?: ""
-        val hint = when {
+        return when {
             errorType.contains("NoCredential", ignoreCase = true) ->
-                "Không tìm thấy tài khoản Google. Hãy đảm bảo thiết bị đã đăng nhập Google."
+                "Chưa chọn tài khoản Google."
             errorType.contains("ProviderConfiguration", ignoreCase = true) ->
-                "Cấu hình OAuth chưa đúng. Kiểm tra Google Play Services hoặc SHA-1 chưa được đăng ký."
+                "Dịch vụ Google Play chưa được cấu hình cho ứng dụng này."
             errorType.contains("Unsupported", ignoreCase = true) ->
-                "Thiết bị chưa hỗ trợ Credential Manager. Hãy cập nhật Android / Google Play Services."
-            errorType.contains("Cancellation", ignoreCase = true) ->
-                "Đăng nhập Google đã bị huỷ."
-            else -> "Lỗi không xác định."
+                "Thiết bị không hỗ trợ Credential Manager."
+            else -> "Không thể đăng nhập Google. Vui lòng thử lại sau."
         }
-        return "[$errorType] $hint${if (rawMsg.isNotBlank()) "\n\nChi tiết: $rawMsg" else ""}"
     }
 
     private fun injectNativeGoogleCredential(idToken: String) {

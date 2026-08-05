@@ -556,11 +556,15 @@ function mountNativeGoogleSignInButton(
   };
   window.onNativeGoogleSignInError = (message: string) => {
     button.disabled = false;
+    if (message === 'CANCELLED' || message.includes('Cancellation') || message.includes('huỷ')) {
+      status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
+      status.style.color = '';
+      status.style.fontWeight = '';
+      return;
+    }
     const displayMsg = message || 'Không thể đăng nhập Google trên thiết bị này.';
-    // Hiển thị toast nổi bật
-    showToast('❌ ' + displayMsg.split('\n')[0], 'error');
-    // Hiển thị chi tiết đầy đủ dưới button (có thể có nhiều dòng)
-    status.innerHTML = displayMsg.replace(/\n/g, '<br>');
+    showToast('❌ ' + displayMsg, 'error');
+    status.textContent = displayMsg;
     status.style.color = '#e53935';
     status.style.fontWeight = '500';
     console.error('[Google Sign-In] Error:', displayMsg);
@@ -575,7 +579,7 @@ function mountNativeGoogleSignInButton(
       signInWithGoogle();
     } catch (error) {
       button.disabled = false;
-      const errMsg = error instanceof Error ? `[JSError] ${error.message}` : 'Không thể gọi native Google sign-in.';
+      const errMsg = error instanceof Error ? error.message : 'Không thể gọi native Google sign-in.';
       showToast('❌ ' + errMsg, 'error');
       status.textContent = errMsg;
       status.style.color = '#e53935';
