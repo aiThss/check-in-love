@@ -851,7 +851,7 @@
   font-size: 13px;
   color: var(--text-secondary);
   margin-bottom: 20px;
-  text-wrap: balance;
+  white-space: nowrap;
 }
 
 /* ── Dev Helper Widget Styles ───────────────────────────────────────────── */

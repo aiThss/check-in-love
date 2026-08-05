@@ -595,7 +595,7 @@ function createResetPasswordModal(): HTMLElement {
     <div class="auth-modal-card glass-card">
       <button class="auth-modal-close" id="close-modal-btn">✕</button>
       <h2 class="auth-modal-title">Khôi phục Mật khẩu</h2>
-      <p class="auth-modal-subtitle">Nhập email để nhận mã xác thực đặt lại mật khẩu mới.</p>
+      <p class="auth-modal-subtitle">Nhập email để đặt lại mật khẩu mới</p>
 
       <!-- Modal Step 1 -->
       <form id="reset-step1-form" class="auth-step-form">
