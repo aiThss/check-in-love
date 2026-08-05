@@ -59,7 +59,7 @@ import javax.net.ssl.HttpsURLConnection
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-private class LoveCheckBridge(
+class LoveCheckBridge(
     private val context: Context,
     private val onGoogleSignInRequested: () -> Unit,
 ) {
