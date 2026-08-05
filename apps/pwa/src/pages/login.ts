@@ -535,25 +535,40 @@ function mountNativeGoogleSignInButton(
   button.innerHTML = '<span class="google-native-signin-logo">G</span><span>Tiếp tục với Google</span>';
   mount.replaceChildren(button);
   status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
+  status.style.color = '';
 
   window.onNativeGoogleCredential = (credential: string) => {
     button.disabled = false;
+    status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
+    status.style.color = '';
     onCredential(credential);
   };
   window.onNativeGoogleSignInError = (message: string) => {
     button.disabled = false;
-    status.textContent = message || 'Không thể đăng nhập Google trên thiết bị này.';
+    const displayMsg = message || 'Không thể đăng nhập Google trên thiết bị này.';
+    // Hiển thị toast nổi bật
+    showToast('❌ ' + displayMsg.split('\n')[0], 'error');
+    // Hiển thị chi tiết đầy đủ dưới button (có thể có nhiều dòng)
+    status.innerHTML = displayMsg.replace(/\n/g, '<br>');
+    status.style.color = '#e53935';
+    status.style.fontWeight = '500';
+    console.error('[Google Sign-In] Error:', displayMsg);
   };
 
   button.addEventListener('click', () => {
     button.disabled = true;
     status.textContent = 'Đang mở Google…';
+    status.style.color = '';
+    status.style.fontWeight = '';
     try {
       signInWithGoogle();
     } catch (error) {
       button.disabled = false;
-      status.textContent = 'Không thể mở đăng nhập Google trên thiết bị này.';
-      console.error('[Google Sign-In] Native sign-in request failed', error);
+      const errMsg = error instanceof Error ? `[JSError] ${error.message}` : 'Không thể gọi native Google sign-in.';
+      showToast('❌ ' + errMsg, 'error');
+      status.textContent = errMsg;
+      status.style.color = '#e53935';
+      console.error('[Google Sign-In] Native call threw:', error);
     }
   });
 }
