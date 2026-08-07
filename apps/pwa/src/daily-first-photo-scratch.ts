@@ -6,6 +6,7 @@ const REVEAL_STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
 const DAILY_FIRST_PHOTO_PREFIX = 'lovecheck:daily-surprise:first-partner-photo:v2:';
 const MAX_TODAY_PAGES = 20;
 const DAILY_RETRY_DELAY_MS = 60_000;
+const SPECIAL_MODAL_CLOSED_EVENT = 'lovecheck:special-modal-closed';
 
 let attemptInFlight: Promise<void> | null = null;
 let attemptedUserDay = '';
@@ -51,6 +52,10 @@ function isHomeEntry(): boolean {
   return path === '/app/home' || (path === '/' && store.isAuthenticated());
 }
 
+function hasSpecialModal(): boolean {
+  return Boolean(document.querySelector('.polaroid-modal-backdrop, .occasion-overlay, .occasion-picker-overlay'));
+}
+
 function getRevealStorageKey(imageUrl: string): string {
   return `${REVEAL_STORAGE_PREFIX}${hashString(normalizeImageUrl(imageUrl))}`;
 }
@@ -88,7 +93,10 @@ async function loadTodayPartnerPhotos(start: Date, end: Date): Promise<CheckIn[]
   const photos: CheckIn[] = [];
 
   for (let page = 1; page <= MAX_TODAY_PAGES; page += 1) {
-    const response = await getCheckins(page, 50, after, 'photo', { force: true });
+    const response = await getCheckins(page, 50, after, 'photo', {
+      force: true,
+      preserveSessionOnUnauthorized: true,
+    });
     photos.push(...response.data);
     if (!response.hasMore) break;
   }
@@ -126,10 +134,10 @@ async function openFirstPartnerPhotoForToday(userId: string, dayKey: string): Pr
     const imageUrl = firstPhoto?.photoUrl;
     if (!firstPhoto || !imageUrl) return 'retry';
     if (wasDailyScratchShown(userId, dayKey) || wasImageRevealed(imageUrl)) return 'completed';
-    if (document.querySelector('.polaroid-modal-backdrop')) return 'retry';
+    if (hasSpecialModal()) return 'retry';
 
     const { openPolaroidCoverModal } = await import('./components/polaroid-cover');
-    if (!isHomeEntry() || getLocalDayKey() !== dayKey || document.querySelector('.polaroid-modal-backdrop')) return 'retry';
+    if (!isHomeEntry() || getLocalDayKey() !== dayKey || hasSpecialModal()) return 'retry';
 
     openPolaroidCoverModal({
       imageUrl,
@@ -180,11 +188,20 @@ function maybeStartDailyScratch(): void {
     });
 }
 
+function retryAfterSpecialModalClosed(): void {
+  if (retryTimer !== null) {
+    window.clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  maybeStartDailyScratch();
+}
+
 const routeObserver = new MutationObserver(maybeStartDailyScratch);
 routeObserver.observe(document.documentElement, { childList: true, subtree: true });
 
 window.addEventListener('popstate', maybeStartDailyScratch);
 window.addEventListener('pageshow', maybeStartDailyScratch);
+window.addEventListener(SPECIAL_MODAL_CLOSED_EVENT, retryAfterSpecialModalClosed);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') maybeStartDailyScratch();
 });

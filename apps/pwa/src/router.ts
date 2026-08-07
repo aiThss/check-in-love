@@ -30,9 +30,70 @@ const AUTO_REVALIDATE_ROUTES = new Set(['/app/home', '/app/memories']);
 const AUTO_REVALIDATE_AFTER_MS = 15_000;
 const APP_HISTORY_STATE_KEY = '__checkInLoveAppHistory';
 const STANDALONE_FLOW_ROUTES = new Set(['/app/onboarding', '/app/google-onboarding']);
+const CHUNK_RECOVERY_PARAM = '__chunk_recovery';
+const CHUNK_RECOVERY_SESSION_KEY = 'lovecheck:chunk-recovery:v1';
 
 function isAppShellRoute(path: string): boolean {
   return path.startsWith('/app/') && !STANDALONE_FLOW_ROUTES.has(path);
+}
+
+function isDynamicImportFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /failed to fetch dynamically imported module|importing a module script failed|loading chunk|chunk load error|err_aborted/i.test(message);
+}
+
+function hasChunkRecoveryMarker(): boolean {
+  return new URLSearchParams(window.location.search).has(CHUNK_RECOVERY_PARAM);
+}
+
+async function recoverFromDynamicImportFailure(): Promise<boolean> {
+  // A broken asset can be caused by a stale service-worker cache after a deploy.
+  // Clear only the app shell caches; authentication lives in localStorage and is
+  // deliberately untouched here.
+  if (hasChunkRecoveryMarker()) return false;
+
+  try {
+    if (sessionStorage.getItem(CHUNK_RECOVERY_SESSION_KEY) === window.location.pathname) return false;
+    sessionStorage.setItem(CHUNK_RECOVERY_SESSION_KEY, window.location.pathname);
+  } catch {
+    // The URL marker below still prevents an infinite reload loop when storage is unavailable.
+  }
+
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    await registration?.update();
+  } catch {
+    // A service worker is optional; a network reload is still useful without one.
+  }
+
+  try {
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames
+        .filter((name) => name.startsWith('lovecheck-'))
+        .map((name) => caches.delete(name)));
+    }
+  } catch {
+    // Cache Storage can be unavailable in some Android WebViews.
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.set(CHUNK_RECOVERY_PARAM, String(Date.now()));
+  window.location.replace(`${url.pathname}${url.search}${url.hash}`);
+  return true;
+}
+
+function clearChunkRecoveryMarker(): void {
+  try {
+    sessionStorage.removeItem(CHUNK_RECOVERY_SESSION_KEY);
+  } catch {
+    // Ignore unavailable session storage.
+  }
+
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(CHUNK_RECOVERY_PARAM)) return;
+  url.searchParams.delete(CHUNK_RECOVERY_PARAM);
+  history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 type AppHistoryKind = 'boundary' | 'route' | 'layer';
@@ -440,6 +501,7 @@ async function renderRoute(path: string, locationPath = getCurrentPath()): Promi
     currentElement = nextContainer;
     currentPage = nextPage;
     nextPage.activate?.();
+    clearChunkRecoveryMarker();
 
     requestAnimationFrame(() => {
       if (version !== navigationVersion) return;
@@ -452,6 +514,11 @@ async function renderRoute(path: string, locationPath = getCurrentPath()): Promi
   } catch (error) {
     if (version !== navigationVersion) return;
     logger.error(`[Router] Failed to render route: ${resolvedPath}`, error);
+    if (isDynamicImportFailure(error)) {
+      if (await recoverFromDynamicImportFailure()) return;
+      renderMessage(activeShell.pageHost, 'Ứng dụng vừa được cập nhật', 'Hãy tải lại trang để dùng phiên bản mới nhất.');
+      return;
+    }
     renderMessage(activeShell.pageHost, 'Có lỗi xảy ra', 'Vui lòng thử lại.');
   }
 }

@@ -96,6 +96,14 @@ describe('Messages scroll and reply behavior', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it('shows the date and year for messages from another day', async () => {
+    const { formatMessageTime } = await import('./messages');
+    const now = new Date('2026-08-08T08:00:00.000Z');
+
+    expect(formatMessageTime('2026-08-08T07:25:00.000Z', now)).toMatch(/14:25$/);
+    expect(formatMessageTime('2026-08-07T07:25:00.000Z', now)).toMatch(/07\/08\/2026 14:25$/);
+  });
+
   async function mount(data: ChatMessage[], hasMore = false) {
     mocks.getMessages.mockResolvedValue(response(data, hasMore));
     const { renderMessagesPage } = await import('./messages');

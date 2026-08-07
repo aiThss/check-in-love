@@ -72,18 +72,24 @@ export class ApiError extends Error {
   }
 }
 
+export type ApiFetchOptions = RequestInit & {
+  /** Background UI should not sign the user out when its optional request races a session update. */
+  preserveSessionOnUnauthorized?: boolean;
+};
+
 // ── Core fetch wrapper ────────────────────────────────────────────────────────
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const token = localStorage.getItem('lovecheck_token');
+  const { preserveSessionOnUnauthorized = false, ...requestOptions } = options;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    ...(requestOptions.headers as Record<string, string>),
   };
 
   // Don't set Content-Type for FormData — browser sets it with boundary
-  if (options.body instanceof FormData) {
+  if (requestOptions.body instanceof FormData) {
     delete headers['Content-Type'];
   }
 
@@ -96,7 +102,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   let response: Response;
   try {
     response = await fetch(url, {
-      ...options,
+      ...requestOptions,
       headers,
     });
   } catch (err) {
@@ -104,10 +110,14 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   // Handle 401 → not authenticated
-  if (response.status === 401) {
+  if (response.status === 401 && !preserveSessionOnUnauthorized) {
     clearPrivateClientState();
     navigate('/onboarding', true);
     throw new ApiError('Phiên đăng nhập hết hạn', 'UNAUTHORIZED', 401);
+  }
+
+  if (response.status === 401) {
+    throw new ApiError('Phiên đăng nhập chưa sẵn sàng', 'UNAUTHORIZED', 401);
   }
 
   // Handle 403 with USER_BLOCKED code

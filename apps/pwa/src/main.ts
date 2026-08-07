@@ -82,7 +82,7 @@ if ('serviceWorker' in navigator) {
   } else {
     window.addEventListener('load', () => {
       navigator.serviceWorker
-        .register('/sw.js')
+        .register('/sw.js', { updateViaCache: 'none' })
         .then((registration) => {
           watchForServiceWorkerUpdate(registration);
           if (store.isAuthenticated() && 'Notification' in window && Notification.permission === 'granted') {

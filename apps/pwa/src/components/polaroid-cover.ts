@@ -414,6 +414,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   let lastRatioCheckAt = 0;
   let width = 0;
   let height = 0;
+  let destroyed = false;
 
   const backdrop = document.createElement('div');
   backdrop.className = 'polaroid-modal-backdrop love-foil-modal';
@@ -723,6 +724,8 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   };
 
   function destroy(): void {
+    if (destroyed) return;
+    destroyed = true;
     if (ratioFrame !== null) cancelAnimationFrame(ratioFrame);
     if (ratioTimer !== null) clearTimeout(ratioTimer);
     resizeObserver?.disconnect();
@@ -734,6 +737,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     canvas.removeEventListener('pointercancel', onPointerUp);
     canvas.removeEventListener('pointerleave', onPointerUp);
     backdrop.remove();
+    window.dispatchEvent(new Event('lovecheck:special-modal-closed'));
   }
 
   closeButton.addEventListener('click', destroy);

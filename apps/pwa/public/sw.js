@@ -1,9 +1,9 @@
 /* ============================================================
    LoveCheck Service Worker
-   Cache name: lovecheck-v5
+   Cache name: lovecheck-v6
    ============================================================ */
 
-const CACHE_NAME = 'lovecheck-v5';
+const CACHE_NAME = 'lovecheck-v6';
 const OFFLINE_URL = '/offline.html';
 
 const SHELL_ASSETS = [

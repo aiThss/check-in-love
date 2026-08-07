@@ -32,6 +32,7 @@ interface MessageView {
   element: HTMLElement;
   bubble: HTMLElement;
   content: HTMLParagraphElement;
+  time: HTMLTimeElement;
   quote: HTMLButtonElement | null;
   replyKeys: Set<string>;
 }
@@ -45,8 +46,23 @@ function escapeHtml(value: string | undefined): string {
     .replace(/'/g, '&#039;');
 }
 
-function formatTime(value: string): string {
-  return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+function localDayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+export function formatMessageTime(value: string, now = new Date()): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const time = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  if (localDayKey(date) === localDayKey(now)) return time;
+
+  const day = date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  return `${day} ${time}`;
 }
 
 function getLatestActivityTime(item: ChatMessage): number {
@@ -219,6 +235,9 @@ export function renderMessagesPage(): RoutePage {
     view.element.classList.toggle('own', item.isOwn);
     view.content.textContent = messageText(item);
     view.content.hidden = !messageText(item);
+    view.time.textContent = formatMessageTime(item.createdAt);
+    view.time.dateTime = item.createdAt;
+    view.time.title = new Date(item.createdAt).toLocaleString('vi-VN');
     const image = view.bubble.querySelector<HTMLImageElement>('img');
     if (image && item.imageUrl && image.src !== item.imageUrl) image.src = item.imageUrl;
 
@@ -352,10 +371,12 @@ export function renderMessagesPage(): RoutePage {
     bubble.appendChild(content);
     primary.appendChild(bubble);
     const time = document.createElement('time');
-    time.textContent = formatTime(item.createdAt);
+    time.textContent = formatMessageTime(item.createdAt);
+    time.dateTime = item.createdAt;
+    time.title = new Date(item.createdAt).toLocaleString('vi-VN');
     primary.appendChild(time);
 
-    const view: MessageView = { item, element, bubble, content, quote, replyKeys: new Set() };
+    const view: MessageView = { item, element, bubble, content, time, quote, replyKeys: new Set() };
     primary.addEventListener('click', () => element.classList.toggle('show-timestamp'));
     installSwipeReply(view);
     return view;

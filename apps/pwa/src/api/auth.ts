@@ -161,7 +161,7 @@ export function confirmPasswordReset(
   });
 }
 
-export async function getMe(): Promise<MeResponse> {
+export async function getMe(options: { preserveSessionOnUnauthorized?: boolean } = {}): Promise<MeResponse> {
   if (isMockNewUserMode()) {
     const mockRes = loadMockNewGoogleUserResponse();
     store.set({ user: mockRes.user, couple: null });
@@ -181,7 +181,7 @@ export async function getMe(): Promise<MeResponse> {
     };
   }
 
-  const response = await apiFetch<MeResponse>('/me');
+  const response = await apiFetch<MeResponse>('/me', options);
   store.set({ user: response.user, couple: response.couple });
   return response;
 }

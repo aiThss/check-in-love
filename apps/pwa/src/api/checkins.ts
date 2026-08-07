@@ -204,7 +204,7 @@ export async function getCheckins(
   limit: number = 20,
   after?: string,
   type?: string,
-  options: { force?: boolean } = {},
+  options: { force?: boolean; preserveSessionOnUnauthorized?: boolean } = {},
 ): Promise<PaginatedResponse<CheckIn>> {
   if (isMockPreviewMode()) {
     const allItems = loadMockPreviewData().checkins
@@ -227,6 +227,7 @@ export async function getCheckins(
     const typeQuery = type ? '&type=' + encodeURIComponent(type) : '';
     const res = await apiFetch<{ checkIns: RawCheckIn[]; pagination: PaginationInfo }>(
       '/checkins?page=' + page + '&limit=' + limit + afterQuery + typeQuery,
+      { preserveSessionOnUnauthorized: options.preserveSessionOnUnauthorized },
     );
 
     const data = (res.checkIns || []).map(mapCheckin);

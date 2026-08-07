@@ -8,6 +8,7 @@ const SEEN_PREFIX = 'lovecheck:occasion-card:seen:v1:';
 const PREVIEW_QUERY = 'cardPreview';
 const SCRATCH_THRESHOLD = 0.88;
 const BIRTHDAY_NOTICE_PREFIX = 'lovecheck:birthday-setup-notice:v1:';
+const SPECIAL_MODAL_CLOSED_EVENT = 'lovecheck:special-modal-closed';
 let birthdaySettingsLoading = false;
 const birthdayNoticeSession = new Set<string>();
 
@@ -958,6 +959,7 @@ function drawPattern(ctx: CanvasRenderingContext2D, width: number, height: numbe
 
 function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): CanvasRenderingContext2D | null {
   const rect = canvas.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) return null;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.max(1, Math.round(rect.width * dpr));
   canvas.height = Math.max(1, Math.round(rect.height * dpr));
@@ -1297,6 +1299,15 @@ function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement):
 }
 
 function openCard(card: OccasionCard, onRevealed?: () => void): void {
+  if (document.querySelector('.polaroid-modal-backdrop')) {
+    const openAfterPhotoCloses = () => {
+      if (document.querySelector('.polaroid-modal-backdrop')) return;
+      openCard(card, onRevealed);
+    };
+    window.addEventListener(SPECIAL_MODAL_CLOSED_EVENT, openAfterPhotoCloses, { once: true });
+    return;
+  }
+
   ensureStyles();
   document.querySelector('.occasion-overlay')?.remove();
   const overlay = document.createElement('div');
@@ -1350,21 +1361,30 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   const shell = overlay.querySelector<HTMLElement>('.occasion-shell');
   const canvas = overlay.querySelector<HTMLCanvasElement>('.occasion-scratch');
   let cleanup = () => {};
+  let initFrame: number | null = null;
+  let closed = false;
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') close();
+  };
   const close = () => {
+    if (closed) return;
+    closed = true;
+    if (initFrame !== null) cancelAnimationFrame(initFrame);
     cleanup();
+    window.removeEventListener('keydown', onKey);
     overlay.remove();
+    window.dispatchEvent(new Event(SPECIAL_MODAL_CLOSED_EVENT));
   };
   overlay.querySelector('.occasion-close')?.addEventListener('click', close);
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) close();
   });
-  const onKey = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') close();
-  };
   window.addEventListener('keydown', onKey);
-  if (!canvas || !shell) return;
-  let ctx = drawScratchCover(canvas, card);
-  if (!ctx) return;
+  if (!canvas || !shell) {
+    close();
+    return;
+  }
+  let ctx: CanvasRenderingContext2D | null = null;
   const sealScratchCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-seal-scratch');
   const cleanupSealScratch = sealScratchCanvas ? installSealScratch(sealScratchCanvas) : () => {};
   let drawing = false;
@@ -1372,12 +1392,32 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   let checkTimer: number | null = null;
   let revealed = false;
 
+  const initializeScratch = (attempt = 0): void => {
+    if (closed || revealed || ctx) return;
+    const nextContext = drawScratchCover(canvas, card);
+    if (nextContext) {
+      ctx = nextContext;
+      return;
+    }
+    if (attempt >= 8) {
+      close();
+      showToast('Thiệp chưa tải xong, bạn thử lại nhé.', 'error');
+      return;
+    }
+    initFrame = requestAnimationFrame(() => initializeScratch(attempt + 1));
+  };
+
   const reveal = () => {
     if (revealed) return;
     revealed = true;
     canvas.classList.add('revealed');
     shell.classList.add('is-revealed');
-    onRevealed?.();
+    try {
+      onRevealed?.();
+    } catch (error) {
+      // A storage restriction must not tear down the app after the card is revealed.
+      console.warn('[Occasion card] Could not persist seen state', error);
+    }
   };
   const check = () => {
     if (checkTimer !== null || revealed) return;
@@ -1431,15 +1471,21 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   canvas.addEventListener('pointercancel', stop);
   const resize = () => {
     if (revealed) return;
-    ctx = drawScratchCover(canvas, card);
+    const nextContext = drawScratchCover(canvas, card);
+    if (nextContext) ctx = nextContext;
   };
   window.addEventListener('resize', resize, { passive: true });
+  const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
+  resizeObserver?.observe(shell);
   cleanup = () => {
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', resize);
+    resizeObserver?.disconnect();
     if (checkTimer !== null) window.clearTimeout(checkTimer);
     cleanupSealScratch();
   };
+
+  initializeScratch();
 }
 
 function escapeHtml(value: string): string {
@@ -1455,6 +1501,22 @@ function formatOccasionSignature(card: OccasionCard): string {
 
 function seenKey(card: OccasionCard, context: OccasionContext, userId: string): string {
   return `${SEEN_PREFIX}${userId}:${context.dateKey}:${card.id}`;
+}
+
+function hasSeenCard(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markCardSeen(key: string): void {
+  try {
+    localStorage.setItem(key, '1');
+  } catch {
+    // The card is still usable for this session if storage is unavailable.
+  }
 }
 
 function isPreviewEnabled(): boolean {
@@ -1521,6 +1583,10 @@ function isOnboardingRoute(): boolean {
     .includes(window.location.pathname);
 }
 
+function hasSpecialModal(): boolean {
+  return Boolean(document.querySelector('.polaroid-modal-backdrop, .occasion-overlay, .occasion-picker-overlay'));
+}
+
 function notifyMissingBirthday(me: MeResponse): void {
   if (!needsBirthdaySetup(me)) return;
 
@@ -1560,7 +1626,7 @@ async function mountBirthdaySettings(): Promise<void> {
   birthdaySettingsLoading = true;
   let me: MeResponse;
   try {
-    me = await getMe();
+    me = await getMe({ preserveSessionOnUnauthorized: true });
   } catch {
     return;
   } finally {
@@ -1631,6 +1697,7 @@ export function initAnniversaryCards(): void {
   let latestMe: MeResponse | undefined;
   let checking = false;
   let checkedSessionKey: string | null = null;
+  let scheduledCardKey: string | null = null;
   let mountTimer: number | null = null;
 
   const scheduleProfileMount = () => {
@@ -1652,7 +1719,7 @@ export function initAnniversaryCards(): void {
     if (!token || checking || (!force && checkedSessionKey === sessionKey)) return;
     checking = true;
     try {
-      latestMe = await getMe();
+      latestMe = await getMe({ preserveSessionOnUnauthorized: true });
       // Do not interrupt onboarding with a birthday reminder. The session
       // remains unchecked so the reminder can run after the final navigation.
       if (isOnboardingRoute()) return;
@@ -1662,9 +1729,12 @@ export function initAnniversaryCards(): void {
       if (!card) return;
       const context = createContext(latestMe);
       const key = seenKey(card, context, latestMe.user.id);
-      if (localStorage.getItem(key) === '1') return;
+      if (hasSeenCard(key) || scheduledCardKey === key || hasSpecialModal()) return;
+      scheduledCardKey = key;
       window.setTimeout(() => {
-        openCard(card, () => localStorage.setItem(key, '1'));
+        scheduledCardKey = null;
+        if (hasSeenCard(key) || hasSpecialModal()) return;
+        openCard(card, () => markCardSeen(key));
       }, 350);
     } catch {
       // Occasion cards are a non-blocking enhancement.
@@ -1686,6 +1756,7 @@ export function initAnniversaryCards(): void {
   });
   window.addEventListener('focus', () => void checkToday(true));
   window.addEventListener('pageshow', () => void checkToday(true));
+  window.addEventListener(SPECIAL_MODAL_CLOSED_EVENT, () => void checkToday(true));
   window.LoveCheckCards = {
     open: (id) => openCard(buildCard(id, previewContext(latestMe))),
     list: () => [...PREVIEW_ORDER],
