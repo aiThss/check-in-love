@@ -1519,6 +1519,11 @@ export function needsBirthdaySetup(me: Pick<MeResponse, 'user' | 'partnerUser'>)
 function notifyMissingBirthday(me: MeResponse): void {
   if (!needsBirthdaySetup(me)) return;
 
+  // Không hiển thị thông báo sinh nhật khi đang ở luồng Onboarding hoặc Đăng nhập.
+  // Đợi sau khi user hoàn tất onboarding vào app chính mới nhắc để user nhớ vào setup sau cùng.
+  const pathname = window.location.pathname;
+  if (pathname.includes('/onboarding') || pathname.includes('/login')) return;
+
   const key = `${BIRTHDAY_NOTICE_PREFIX}${me.user.id}`;
   if (birthdayNoticeSession.has(key)) return;
 
