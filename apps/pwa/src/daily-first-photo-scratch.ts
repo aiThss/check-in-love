@@ -133,6 +133,7 @@ async function openFirstPartnerPhotoForToday(userId: string, dayKey: string): Pr
     }, null);
     const imageUrl = firstPhoto?.photoUrl;
     if (!firstPhoto || !imageUrl) return 'retry';
+    if (firstPhoto.includeScratch === false) return 'completed';
     if (wasDailyScratchShown(userId, dayKey) || wasImageRevealed(imageUrl)) return 'completed';
     if (hasSpecialModal()) return 'retry';
 

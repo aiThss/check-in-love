@@ -184,6 +184,7 @@ export function renderCheckinPage(): HTMLElement {
   let isProcessingPhoto = false;
   let photoCaption = '';
   let photoSurpriseText = '';
+  let includeScratch = true;
   let selectedQuickMsg: string | null = null;
 
   function clearSelectedPhoto(): void {
@@ -230,11 +231,12 @@ export function renderCheckinPage(): HTMLElement {
     const fd = new FormData();
     fd.append('type', 'photo');
     fd.append('clientMutationId', clientMutationId);
+    fd.append('includeScratch', includeScratch ? 'true' : 'false');
     fd.append('file', file, file.name || 'checkin-photo.jpg');
     if (caption) {
       fd.append('caption', caption);
     }
-    if (photoSurpriseText.trim()) {
+    if (includeScratch && photoSurpriseText.trim()) {
       fd.append('surpriseText', photoSurpriseText.trim());
     }
     return fd;
@@ -415,21 +417,56 @@ export function renderCheckinPage(): HTMLElement {
     }
     contentArea.appendChild(capGroup);
 
-    const surpriseTextGroup = document.createElement('div');
-    surpriseTextGroup.className = 'input-group';
-    surpriseTextGroup.innerHTML = `
-      <label class="input-label">Lời nhắn trên lớp cào (tuỳ chọn)</label>
-      <input type="text" id="surprise-text-input" class="input" placeholder="Unbox quà ngày mới nào" maxlength="120" />
+    const scratchToggle = document.createElement('button');
+    scratchToggle.type = 'button';
+    scratchToggle.className = `checkin-scratch-toggle${includeScratch ? ' is-on' : ''}`;
+    scratchToggle.setAttribute('aria-pressed', String(includeScratch));
+    scratchToggle.style.cssText = `
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:11px 13px;
+      border:1px solid ${includeScratch ? 'rgba(255, 59, 127, 0.34)' : 'var(--border)'};
+      border-radius:16px;
+      background:${includeScratch ? 'linear-gradient(135deg, rgba(255, 47, 125, 0.12), rgba(111, 92, 255, 0.1))' : 'var(--surface-solid)'};
+      color:var(--text-primary);
+      text-align:left;
+      cursor:pointer;
     `;
-    compactCaptionGroup(surpriseTextGroup);
-    const surpriseTextInput = surpriseTextGroup.querySelector<HTMLInputElement>('#surprise-text-input');
-    if (surpriseTextInput) {
-      surpriseTextInput.value = photoSurpriseText;
-      surpriseTextInput.addEventListener('input', () => {
-        photoSurpriseText = surpriseTextInput.value;
-      });
+    scratchToggle.innerHTML = `
+      <span style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;">
+        <span aria-hidden="true" style="color:${includeScratch ? 'var(--accent)' : 'var(--text-secondary)'};font-size:18px;">✦</span>
+        Lớp cào
+      </span>
+      <span style="padding:4px 8px;border-radius:999px;background:${includeScratch ? 'rgba(255, 59, 127, 0.16)' : 'rgba(255,255,255,0.07)'};color:${includeScratch ? 'var(--accent)' : 'var(--text-secondary)'};font-size:11px;font-weight:800;">
+        ${includeScratch ? 'Bật' : 'Tắt'}
+      </span>
+    `;
+    scratchToggle.addEventListener('click', () => {
+      includeScratch = !includeScratch;
+      renderContentForm();
+    });
+    contentArea.appendChild(scratchToggle);
+
+    if (includeScratch) {
+      const surpriseTextGroup = document.createElement('div');
+      surpriseTextGroup.className = 'input-group';
+      surpriseTextGroup.innerHTML = `
+        <label class="input-label">Lời nhắn (tuỳ chọn)</label>
+        <input type="text" id="surprise-text-input" class="input" placeholder="Một lời nhắn nhỏ..." maxlength="120" />
+      `;
+      compactCaptionGroup(surpriseTextGroup);
+      const surpriseTextInput = surpriseTextGroup.querySelector<HTMLInputElement>('#surprise-text-input');
+      if (surpriseTextInput) {
+        surpriseTextInput.value = photoSurpriseText;
+        surpriseTextInput.addEventListener('input', () => {
+          photoSurpriseText = surpriseTextInput.value;
+        });
+      }
+      contentArea.appendChild(surpriseTextGroup);
     }
-    contentArea.appendChild(surpriseTextGroup);
 
     const quickHeader = document.createElement('label');
     quickHeader.className = 'input-label';
@@ -633,6 +670,7 @@ export function renderCheckinPage(): HTMLElement {
         clearSelectedPhoto();
         photoCaption = '';
         photoSurpriseText = '';
+        includeScratch = true;
         selectedQuickMsg = null;
         renderContentForm();
       }

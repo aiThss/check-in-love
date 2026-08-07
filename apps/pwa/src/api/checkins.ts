@@ -55,6 +55,7 @@ export interface RawCheckIn {
   imageUrl?: string;
   photoUrl?: string;
   caption?: string;
+  includeScratch?: boolean;
   surpriseText?: string;
   mood?: MoodType;
   reactions?: RawReaction[];
@@ -155,6 +156,7 @@ function mapCheckin(item: RawCheckIn): CheckIn {
     type: item.type,
     photoUrl: item.imageUrl || item.photoUrl,
     caption: item.caption,
+    includeScratch: item.includeScratch ?? true,
     surpriseText: item.surpriseText,
     mood: item.mood,
     reactions: mapReactionList(item.reactions || []),
@@ -266,6 +268,7 @@ export async function createCheckin(
       photoUrl: body instanceof FormData && body.get('photo') instanceof File
         ? preview.checkins.find((item) => item.photoUrl)?.photoUrl
         : undefined,
+      includeScratch: bodyValue('includeScratch') !== 'false',
       reactions: [],
       replies: [],
       ownerName: currentUser.displayName,

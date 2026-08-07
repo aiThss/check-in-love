@@ -42,6 +42,7 @@ export interface CheckInDocument extends Document {
   imageUrl?: string;
   storagePath?: string;
   caption?: string;
+  includeScratch?: boolean;
   surpriseText?: string;
   mood?: MoodType;
   quickMessage?: string;
@@ -111,6 +112,7 @@ const CheckInSchema = new Schema<CheckInDocument>(
     imageUrl: { type: String, required: false },
     storagePath: { type: String, required: false },
     caption: { type: String, required: false, maxlength: 280 },
+    includeScratch: { type: Boolean, required: false, default: true },
     surpriseText: { type: String, required: false, maxlength: 120 },
     mood: {
       type: String,

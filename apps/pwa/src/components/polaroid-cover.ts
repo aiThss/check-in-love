@@ -1,5 +1,4 @@
 import '../styles/polaroid-cover.css';
-import { showToast } from './toast';
 
 export interface PolaroidCoverOptions {
   imageUrl: string;
@@ -19,7 +18,7 @@ export interface PolaroidCoverOptions {
 }
 
 const DEFAULT_REVEAL_THRESHOLD = 0.8;
-const DEFAULT_COVER_TEXT = 'Unbox quà ngày mới nào';
+const DEFAULT_COVER_TEXT = 'Chào ngày mới nhé';
 const STAGE_CORNER_RADIUS = 28;
 const STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
 const GLOBAL_INSTALL_KEY = '__loveCheckLoveFoilInstalled';
@@ -162,7 +161,8 @@ function syncScratchPills(): void {
 
   document.querySelectorAll<HTMLElement>('.polaroid-scratch-pill').forEach((pill) => {
     const image = getPillImage(pill);
-    const latest = Boolean(image && isLatestPill(pill));
+    const scratchEnabled = image?.dataset.scratchEnabled !== 'false';
+    const latest = Boolean(image && scratchEnabled && isLatestPill(pill));
 
     pill.hidden = !latest;
     pill.setAttribute('aria-hidden', latest ? 'false' : 'true');
@@ -181,7 +181,8 @@ function syncScratchPills(): void {
 
 function injectLatestCheckinPill(): void {
   document.querySelectorAll<HTMLElement>('.checkin-card').forEach((card) => {
-    if (!card.querySelector('.checkin-card-image') || card.querySelector('.polaroid-scratch-pill')) return;
+    const image = card.querySelector<HTMLImageElement>('.checkin-card-image');
+    if (!image || image.dataset.scratchEnabled === 'false' || card.querySelector('.polaroid-scratch-pill')) return;
 
     const button = document.createElement('button');
     button.type = 'button';
@@ -331,6 +332,42 @@ function drawLoveFoil(
   }
   ctx.restore();
 
+  const drawSpark = (x: number, y: number, size: number, alpha: number): void => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#fff7f0';
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(size * 0.28, -size * 0.28);
+    ctx.lineTo(size, 0);
+    ctx.lineTo(size * 0.28, size * 0.28);
+    ctx.lineTo(0, size);
+    ctx.lineTo(-size * 0.28, size * 0.28);
+    ctx.lineTo(-size, 0);
+    ctx.lineTo(-size * 0.28, -size * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
+  drawSpark(width * 0.16, height * 0.18, 5, 0.82);
+  drawSpark(width * 0.84, height * 0.22, 7, 0.72);
+  drawSpark(width * 0.2, height * 0.82, 4, 0.58);
+  drawSpark(width * 0.8, height * 0.82, 5, 0.68);
+
+  ctx.save();
+  ctx.globalAlpha = 0.42;
+  ctx.strokeStyle = '#fff7f0';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(width * 0.82, height * 0.17, width * 0.08, Math.PI * 0.15, Math.PI * 1.4);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(width * 0.18, height * 0.78, width * 0.06, Math.PI * 1.05, Math.PI * 1.9);
+  ctx.stroke();
+  ctx.restore();
+
   const panelX = width * 0.09;
   const panelY = height * 0.22;
   const panelWidth = width * 0.82;
@@ -355,11 +392,7 @@ function drawLoveFoil(
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.globalAlpha = 0.78;
-  ctx.font = "800 10px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.letterSpacing = '2px';
-  ctx.fillText('GOOD MORNING  ·  LOVE DROP', width / 2, height * 0.14);
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = 0.96;
   ctx.font = '28px serif';
   ctx.fillText('♥', width / 2, height * 0.3);
 
@@ -368,7 +401,7 @@ function drawLoveFoil(
   const lines: string[] = [];
   let line = '';
   const maxWidth = width * 0.66;
-  ctx.font = "800 19px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.font = "800 18px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   words.forEach((word) => {
     const candidate = line ? `${line} ${word}` : word;
     if (line && ctx.measureText(candidate).width > maxWidth && lines.length < 2) {
@@ -385,12 +418,16 @@ function drawLoveFoil(
   visibleLines.forEach((text, index) => {
     ctx.fillText(text, width / 2, titleStart + index * lineHeight);
   });
-  ctx.globalAlpha = 0.82;
-  ctx.font = "800 10px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText('CÀO NHẸ ĐỂ MỞ NGÀY MỚI', width / 2, height * 0.62);
-  ctx.globalAlpha = 0.5;
-  ctx.font = "700 9px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText('01  /  A LITTLE MOMENT FOR US', width / 2, height * 0.78);
+  ctx.globalAlpha = 0.45;
+  ctx.strokeStyle = '#fff7f0';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(width * 0.3, height * 0.62);
+  ctx.lineTo(width * 0.42, height * 0.62);
+  ctx.moveTo(width * 0.58, height * 0.62);
+  ctx.lineTo(width * 0.7, height * 0.62);
+  ctx.stroke();
+  drawSpark(width / 2, height * 0.62, 3, 0.72);
   ctx.restore();
   ctx.restore();
 }
@@ -466,90 +503,6 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   const modal = document.createElement('div');
   modal.className = 'polaroid-modal-container polaroid-daily-card';
 
-  const closeButton = document.createElement('button');
-  closeButton.type = 'button';
-  closeButton.className = 'polaroid-modal-close';
-  closeButton.setAttribute('aria-label', 'Đóng');
-  closeButton.textContent = '✕';
-
-  const downloadButton = document.createElement('button');
-  downloadButton.type = 'button';
-  downloadButton.className = 'polaroid-modal-download';
-  downloadButton.setAttribute('aria-label', 'Tải ảnh xuống');
-  downloadButton.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
-
-  downloadButton.addEventListener('click', async (event) => {
-    event.stopPropagation();
-    if (!imageUrl) return;
-
-    const originalContent = downloadButton.innerHTML;
-    downloadButton.innerHTML = `<span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#fff transparent transparent transparent;display:inline-block;border-style:solid;border-radius:50%;animation:spin 0.8s linear infinite;"></span>`;
-    (downloadButton as HTMLElement).style.pointerEvents = 'none';
-
-    const ts = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const fileName = `checkin-love-${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}-${pad(ts.getHours())}-${pad(ts.getMinutes())}.jpg`;
-
-    // 1. Android Native App Wrapper
-    const isAndroidWrapper = typeof navigator !== 'undefined' && navigator.userAgent.includes('LoveCheckAndroidWrapper');
-    if (isAndroidWrapper && (window as any).LoveCheckAndroid && typeof (window as any).LoveCheckAndroid.downloadFile === 'function') {
-      try {
-        (window as any).LoveCheckAndroid.downloadFile(imageUrl, fileName);
-        showToast('Đang tải ảnh xuống...', 'loading-spark');
-      } catch (e) {
-        window.open(imageUrl, '_blank', 'noopener,noreferrer');
-      } finally {
-        setTimeout(() => {
-          downloadButton.innerHTML = originalContent;
-          (downloadButton as HTMLElement).style.pointerEvents = '';
-        }, 1000);
-      }
-      return;
-    }
-
-    // 2. Web / PWA (with iOS Web Share API fallback for files)
-    try {
-      const response = await fetch(imageUrl, { mode: 'cors' });
-      const blob = await response.blob();
-
-      const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      if (isIOS && navigator.canShare && navigator.share) {
-        try {
-          const file = new File([blob], fileName, { type: blob.type });
-          if (navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: 'Ảnh check-in',
-            });
-            showToast('Đã mở trình chia sẻ', 'success');
-            return;
-          }
-        } catch (shareError) {
-          console.log('Share failed, trying standard download:', shareError);
-        }
-      }
-
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = objectUrl;
-      anchor.download = fileName;
-      anchor.style.display = 'none';
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-
-      showToast('Đã tải ảnh xuống thành công', 'success');
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
-    } catch (err) {
-      console.error('Download failed:', err);
-      window.open(imageUrl, '_blank', 'noopener,noreferrer');
-      showToast('Mở ảnh trong tab mới. Hãy nhấn giữ để lưu.', 'info');
-    } finally {
-      downloadButton.innerHTML = originalContent;
-      (downloadButton as HTMLElement).style.pointerEvents = '';
-    }
-  });
-
   const stage = document.createElement('div');
   stage.className = 'polaroid-stage-view';
   stage.classList.toggle('is-revealed', revealed);
@@ -566,7 +519,6 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   const hud = document.createElement('div');
   hud.className = `polaroid-hud${revealed ? ' hidden' : ''}`;
   hud.innerHTML = `
-    <span class="polaroid-hud-text">Cào để chào ngày mới</span>
     <div class="polaroid-hud-progress" role="progressbar" aria-label="Tiến độ cào ảnh" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="polaroid-hud-bar"></div></div>
   `;
 
@@ -578,14 +530,11 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   footer.className = 'polaroid-love-foil-footer';
 
   const copy = document.createElement('div');
-  const kicker = document.createElement('small');
-  kicker.className = 'polaroid-love-foil-kicker';
-  kicker.textContent = 'A LITTLE LOVE · THIS MORNING';
   const heading = document.createElement('strong');
   heading.textContent = title;
   const meta = document.createElement('span');
   meta.textContent = dateText;
-  copy.append(kicker, heading, meta);
+  copy.append(heading, meta);
 
   const status = document.createElement('span');
   status.className = `polaroid-love-foil-status${alreadyOpened && !restartScratch ? ' is-opened' : ''}`;
@@ -593,7 +542,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
   footer.append(copy, status);
   stage.append(image, canvas, hud, success);
-  modal.append(closeButton, downloadButton, stage, footer);
+  modal.append(stage, footer);
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 
@@ -787,7 +736,6 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     window.dispatchEvent(new Event('lovecheck:special-modal-closed'));
   }
 
-  closeButton.addEventListener('click', destroy);
   backdrop.addEventListener('click', (event) => {
     if (event.target === backdrop) destroy();
   });

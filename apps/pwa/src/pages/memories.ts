@@ -682,7 +682,7 @@ export function renderMemoriesPage(): HTMLElement {
       if (item.type === 'photo' || (item as any).photoUrl) {
         card.style.cssText = 'position:relative;border-radius:20px;overflow:hidden;aspect-ratio:1;cursor:pointer;';
         card.innerHTML = `
-          <img src="${escapeHtml((item as any).photoUrl)}" style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
+            <img src="${escapeHtml((item as any).photoUrl)}" data-scratch-enabled="${item.includeScratch !== false ? 'true' : 'false'}" style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
           <span class="polaroid-scratch-pill">✨ Polaroid Cover</span>
           <div class="memory-item-info">
             <span style="font-size:11px;opacity:0.9;color:#fff;">${escapeHtml(item.ownerName)}</span>
@@ -726,6 +726,8 @@ export function renderMemoriesPage(): HTMLElement {
             imageUrl: photoUrl,
             title: item.caption || `Kỷ niệm của ${item.ownerName} 💖`,
             dateText: formatTime(item.createdAt),
+            coverText: item.surpriseText,
+            forceScratch: item.includeScratch !== false,
             timerSeconds: 5,
           });
         } else {
@@ -772,9 +774,7 @@ export function renderMemoriesPage(): HTMLElement {
               alt="Ảnh check-in"
               loading="eager"
             />
-            <button type="button" class="btn-polaroid-scratch-trigger">
-              📸 Trải nghiệm Polaroid Scratch Cover
-            </button>
+            ${item.includeScratch !== false ? '<button type="button" class="btn-polaroid-scratch-trigger">Mở lớp cào</button>' : ''}
           </div>
           ${item.caption ? `<p class="checkin-detail-caption">${escapeHtml(item.caption)}</p>` : ''}
         `;
@@ -986,10 +986,12 @@ export function renderMemoriesPage(): HTMLElement {
         const photoUrl = getCheckinPhotoUrl(item);
         if (!photoUrl) return;
         openPolaroidCoverModal({
-          imageUrl: photoUrl,
-          title: item.caption || 'Kỷ niệm yêu thương 💖',
-          dateText: formatTime(item.createdAt),
-          timerSeconds: 5,
+           imageUrl: photoUrl,
+           title: item.caption || 'Kỷ niệm yêu thương 💖',
+           dateText: formatTime(item.createdAt),
+           coverText: item.surpriseText,
+           forceScratch: item.includeScratch !== false,
+           timerSeconds: 5,
         });
       });
     };

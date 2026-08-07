@@ -57,6 +57,7 @@ export interface CheckIn {
   type: CheckInType;
   photoUrl?: string;
   caption?: string;
+  includeScratch?: boolean;
   surpriseText?: string;
   mood?: MoodType;
   reactions: Reaction[];
