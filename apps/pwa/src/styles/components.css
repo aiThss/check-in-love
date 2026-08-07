@@ -3920,9 +3920,13 @@ textarea:focus-visible,
 }
 
 [data-theme='dark'] body::before,
-[data-theme='dark'] body::after,
-[data-theme='dark'] .page::before {
+[data-theme='dark'] body::after {
   opacity: 0.11;
+}
+
+/* Giữ lại lớp hồng ở đáy như light mode để dark mode có thêm chiều sâu. */
+[data-theme='dark'] .page::before {
+  opacity: 0.18;
 }
 
 [data-theme='dark'] .card,
