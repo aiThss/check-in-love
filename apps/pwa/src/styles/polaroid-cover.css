@@ -338,20 +338,6 @@
   filter: saturate(0.7);
 }
 
-.polaroid-scratch-pill.is-opened::after {
-  content: '';
-  width: 6px;
-  height: 3px;
-  top: 5px;
-  right: 4px;
-  border: solid #6f3f75;
-  border-width: 0 0 2px 2px;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  transform: rotate(-45deg);
-}
-
 /* Fallback before the DOM observer finishes syncing. */
 .recent-memories-list .recent-memory-item:not(:first-child) .polaroid-scratch-pill,
 .memory-grid .memory-tile:not(:first-child) .polaroid-scratch-pill,
