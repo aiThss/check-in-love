@@ -232,6 +232,7 @@ export function renderMessagesPage(): RoutePage {
   function patchView(view: MessageView, item: ChatMessage): void {
     view.item = item;
     view.element.dataset.messageId = item.id;
+    view.element.dataset.messageCreatedAt = item.createdAt;
     view.element.classList.toggle('own', item.isOwn);
     view.content.textContent = messageText(item);
     view.content.hidden = !messageText(item);
@@ -375,6 +376,7 @@ export function renderMessagesPage(): RoutePage {
     time.dateTime = item.createdAt;
     time.title = new Date(item.createdAt).toLocaleString('vi-VN');
     primary.appendChild(time);
+    element.dataset.messageCreatedAt = item.createdAt;
 
     const view: MessageView = { item, element, bubble, content, time, quote, replyKeys: new Set() };
     primary.addEventListener('click', () => element.classList.toggle('show-timestamp'));

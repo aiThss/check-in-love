@@ -8,8 +8,7 @@ import { showToast } from '../components/toast';
 import { invalidateRoutes } from '../route-invalidation';
 import { navigate } from '../router';
 
-const MESSAGE_GAP_MINUTES = 20;
-const MINUTES_PER_DAY = 24 * 60;
+const MESSAGE_GAP_MS = 20 * 60 * 1000;
 const REFRESH_DRAFT_KEY = 'lovecheck_message_draft_after_manual_refresh';
 
 let initialized = false;
@@ -22,15 +21,11 @@ function getActiveMessagesPage(): HTMLElement | null {
     ?? document.querySelector<HTMLElement>('.messages-page');
 }
 
-function parseClockMinutes(message: HTMLElement): number | null {
-  const label = message.querySelector<HTMLTimeElement>('time')?.textContent?.trim();
-  const match = label?.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (hour > 23 || minute > 59) return null;
-  return hour * 60 + minute;
+function parseMessageTimestamp(message: HTMLElement): number | null {
+  const value = message.dataset.messageCreatedAt;
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 function createTimeSeparator(label: string): HTMLTimeElement {
@@ -41,7 +36,7 @@ function createTimeSeparator(label: string): HTMLTimeElement {
   return separator;
 }
 
-function decorateTimeSeparators(page: HTMLElement): void {
+export function decorateTimeSeparators(page: HTMLElement): void {
   const thread = page.querySelector<HTMLElement>('.messages-thread');
   if (!thread) return;
 
@@ -50,29 +45,21 @@ function decorateTimeSeparators(page: HTMLElement): void {
   const messageElements = Array.from(
     thread.querySelectorAll<HTMLElement>(':scope > [data-message-id]'),
   );
-  let previousClockMinutes: number | null = null;
-  let previousTimelineMinutes: number | null = null;
-  let dayOffsetMinutes = 0;
+  let previousTimestamp: number | null = null;
 
   messageElements.forEach((message) => {
-    const clockMinutes = parseClockMinutes(message);
+    const timestamp = parseMessageTimestamp(message);
     const label = message.querySelector<HTMLTimeElement>('time')?.textContent?.trim();
-    if (clockMinutes === null || !label) return;
+    if (timestamp === null || !label) return;
 
-    if (previousClockMinutes !== null && clockMinutes < previousClockMinutes) {
-      dayOffsetMinutes += MINUTES_PER_DAY;
-    }
-
-    const timelineMinutes = dayOffsetMinutes + clockMinutes;
     if (
-      previousTimelineMinutes !== null
-      && timelineMinutes - previousTimelineMinutes >= MESSAGE_GAP_MINUTES
+      previousTimestamp !== null
+      && timestamp - previousTimestamp >= MESSAGE_GAP_MS
     ) {
       message.before(createTimeSeparator(label));
     }
 
-    previousClockMinutes = clockMinutes;
-    previousTimelineMinutes = timelineMinutes;
+    previousTimestamp = timestamp;
   });
 }
 
