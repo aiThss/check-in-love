@@ -29,6 +29,11 @@ interface AppShell {
 const AUTO_REVALIDATE_ROUTES = new Set(['/app/home', '/app/memories']);
 const AUTO_REVALIDATE_AFTER_MS = 15_000;
 const APP_HISTORY_STATE_KEY = '__checkInLoveAppHistory';
+const STANDALONE_FLOW_ROUTES = new Set(['/app/onboarding']);
+
+function isAppShellRoute(path: string): boolean {
+  return path.startsWith('/app/') && !STANDALONE_FLOW_ROUTES.has(path);
+}
 
 type AppHistoryKind = 'boundary' | 'route' | 'layer';
 export type HistoryLayerCloseReason = 'back' | 'replace' | 'navigation';
@@ -100,7 +105,7 @@ function writeRouteHistory(path: string, replace: boolean): void {
   const target = new URL(path, window.location.origin);
   const nextPath = target.pathname + target.search;
   const state = withoutAppHistoryState();
-  const appRoute = target.pathname.startsWith('/app/');
+  const appRoute = isAppShellRoute(target.pathname);
   const appState = appRoute && appBoundarySeeded
     ? createAppHistoryState('route', nextPath)
     : null;
@@ -113,7 +118,7 @@ function writeRouteHistory(path: string, replace: boolean): void {
 
 function ensureAppHistoryBoundary(path: string): void {
   const target = new URL(path, window.location.origin);
-  if (!store.isAuthenticated() || !target.pathname.startsWith('/app/')) return;
+  if (!store.isAuthenticated() || !isAppShellRoute(target.pathname)) return;
 
   const nextPath = target.pathname + target.search;
   if (appBoundarySeeded) {
@@ -360,14 +365,14 @@ async function renderRoute(path: string, locationPath = getCurrentPath()): Promi
   const resolvedPath = resolveRoute(path);
   const location = new URL(locationPath, window.location.origin);
   const pageKey = `${resolvedPath}${location.search}`;
-  if (resolvedPath.startsWith('/app/')) ensureAppHistoryBoundary(getCurrentPath());
+  if (isAppShellRoute(resolvedPath)) ensureAppHistoryBoundary(getCurrentPath());
   const factory = routes[resolvedPath];
   if (!factory) {
     renderMessage(activeShell.pageHost, 'Không tìm thấy trang', 'Trang này không tồn tại.');
     return;
   }
 
-  const isAppRoute = resolvedPath.startsWith('/app/');
+  const isAppRoute = isAppShellRoute(resolvedPath);
   saveCurrentScroll();
 
   try {
@@ -422,6 +427,9 @@ async function renderRoute(path: string, locationPath = getCurrentPath()): Promi
     if (currentPage && currentPage !== nextPage) currentPage.deactivate?.();
 
     activeShell.navHost.hidden = !isAppRoute;
+    const isStandaloneFlow = resolvedPath === '/onboarding' || STANDALONE_FLOW_ROUTES.has(resolvedPath);
+    const devHelper = document.getElementById('dev-helper-root');
+    if (devHelper) devHelper.style.display = isStandaloneFlow ? 'none' : '';
     if (isAppRoute) setActiveNav(resolvedPath);
     if (!nextContainer.isConnected) activeShell.pageHost.appendChild(nextContainer);
     setOnlyActivePage(activeShell.pageHost, nextContainer);
