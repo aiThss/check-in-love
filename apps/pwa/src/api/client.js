@@ -1,6 +1,29 @@
 // ── API Base Client ───────────────────────────────────────────────────────────
-const API_URL = (typeof __API_URL__ !== 'undefined' ? __API_URL__ : null) ||
-    window.__API_URL__ ||
+function isLoopbackApiUrl(value) {
+    try {
+        const host = (value.includes('://') ? new URL(value).hostname : value).toLowerCase();
+        return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    }
+    catch {
+        return false;
+    }
+}
+function getLanDevelopmentApiUrl() {
+    if (typeof window === 'undefined' || window.location.protocol !== 'http:' || window.location.port !== '5173') {
+        return null;
+    }
+    const host = window.location.hostname;
+    if (isLoopbackApiUrl(host)) {
+        return null;
+    }
+    return `http://${host}:3001/api`;
+}
+const customApiUrl = typeof window !== 'undefined' ? window.__API_URL__ : null;
+const bakedApiUrl = typeof __API_URL__ !== 'undefined' ? __API_URL__ : null;
+const API_URL = (customApiUrl && !isLoopbackApiUrl(customApiUrl) ? customApiUrl : null) ||
+    getLanDevelopmentApiUrl() ||
+    customApiUrl ||
+    bakedApiUrl ||
     'http://localhost:3001/api';
 // ── Error class ───────────────────────────────────────────────────────────────
 export class ApiError extends Error {
