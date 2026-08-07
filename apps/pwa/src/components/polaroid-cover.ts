@@ -440,8 +440,8 @@ function clipToStage(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
+  radius = getStageCornerRadius(width, height),
 ): void {
-  const radius = getStageCornerRadius(width, height);
   ctx.beginPath();
   ctx.moveTo(radius, 0);
   ctx.lineTo(width - radius, 0);
@@ -495,6 +495,8 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   let lastRatioCheckAt = 0;
   let width = 0;
   let height = 0;
+  let stageRadius = STAGE_CORNER_RADIUS;
+  let successTimer: number | null = null;
   let destroyed = false;
 
   const backdrop = document.createElement('div');
@@ -576,13 +578,17 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
     width = stageWidth;
     height = stageHeight;
+    const cssRadius = Number.parseFloat(window.getComputedStyle(stage).borderTopLeftRadius);
+    stageRadius = Number.isFinite(cssRadius)
+      ? Math.min(cssRadius, width / 2, height / 2)
+      : getStageCornerRadius(width, height);
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (!revealed) {
       ctx.save();
-      clipToStage(ctx, width, height);
+      clipToStage(ctx, width, height, stageRadius);
       drawLoveFoil(ctx, width, height, coverText);
       ctx.restore();
       updateProgress(0);
@@ -596,7 +602,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     let cleared = 0;
     let sampled = 0;
 
-    const radius = Math.min(STAGE_CORNER_RADIUS * dpr, canvas.width / 2, canvas.height / 2);
+    const radius = Math.min(stageRadius * dpr, canvas.width / 2, canvas.height / 2);
     for (let index = 3; index < pixels.length; index += stride) {
       const pixel = (index - 3) / 4;
       const x = pixel % canvas.width;
@@ -618,6 +624,10 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     stage.classList.add('is-revealed');
     hud.classList.add('hidden');
     success.classList.remove('hidden');
+    successTimer = window.setTimeout(() => {
+      success.classList.add('hidden');
+      successTimer = null;
+    }, 2000);
     status.classList.add('is-opened');
     status.textContent = 'Đã mở';
     syncScratchPills();
@@ -654,7 +664,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
     const radius = brushRadius ?? Math.max(25, Math.min(width, height) * 0.09);
     ctx.save();
-    clipToStage(ctx, width, height);
+    clipToStage(ctx, width, height, stageRadius);
     ctx.globalCompositeOperation = 'destination-out';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -724,6 +734,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     destroyed = true;
     if (ratioFrame !== null) cancelAnimationFrame(ratioFrame);
     if (ratioTimer !== null) clearTimeout(ratioTimer);
+    if (successTimer !== null) clearTimeout(successTimer);
     resizeObserver?.disconnect();
     window.removeEventListener('resize', resize);
     window.removeEventListener('keydown', onEscape);
