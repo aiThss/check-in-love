@@ -236,6 +236,38 @@
 
 /* ─── Modern Login V2 Redesign Styles ─────────────────────────────────────── */
 
+:root:not([data-theme='dark']) .rm-inline-composer input,
+:root:not([data-theme='dark']) .rm-inline-composer input:hover,
+:root:not([data-theme='dark']) .rm-inline-composer input:focus,
+:root:not([data-theme='dark']) .rm-inline-composer input:focus-visible,
+[data-theme='light'] .rm-inline-composer input,
+[data-theme='light'] .rm-inline-composer input:hover,
+[data-theme='light'] .rm-inline-composer input:focus,
+[data-theme='light'] .rm-inline-composer input:focus-visible,
+[data-theme='dark'] .rm-inline-composer input,
+[data-theme='dark'] .rm-inline-composer input:hover,
+[data-theme='dark'] .rm-inline-composer input:focus,
+[data-theme='dark'] .rm-inline-composer input:focus-visible {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.checkin-page #text-input {
+  border: 1px solid var(--border) !important;
+  border-radius: 22px !important;
+  background: var(--surface-solid) !important;
+  box-shadow: none !important;
+}
+
+.checkin-page #text-input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow) !important;
+  outline: none !important;
+}
+
 .login-page-pwa {
   position: relative;
   overflow-x: hidden;
@@ -861,6 +893,48 @@
   right: 20px;
   z-index: 9999;
   font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dev-helper-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dev-theme-toggle-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  box-shadow: 0 8px 24px rgba(160, 30, 70, 0.18) !important;
+  transition: transform 150ms ease, filter 150ms ease, background-color 150ms ease !important;
+}
+
+[data-theme='dark'] .dev-theme-toggle-btn {
+  background: rgba(28, 20, 26, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+.dev-theme-toggle-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+.dev-theme-icon {
+  font-size: 17px;
+  line-height: 1;
 }
 
 .dev-helper-toggle-btn {

@@ -2,6 +2,7 @@ import { navigate } from '../router';
 import { store } from '../store/index';
 import { startOnboarding, sendOtp, verifyOtp } from '../api/auth';
 import { showToast } from '../components/toast';
+import { MOCK_PREVIEW_TOKEN, seedMockPreviewData } from '../dev/mock-data';
 
 // ── UUID v4 ───────────────────────────────────────────────────────────────────
 
@@ -987,33 +988,20 @@ export function renderOnboardingPage(): HTMLElement {
     } catch (err: unknown) {
       // Fallback for local UI preview when backend API server is offline
       showToast('Đã tạo dữ liệu xem thử Local! Đang vào trang chính...', 'info');
-      
-      const mockUser = {
-        id: 'mock_user_1',
-        displayName: formData.displayName || 'Bạn',
-        partnerName: formData.partnerName || 'Người ấy',
-        coupleId: 'mock_couple_1',
-        createdAt: new Date().toISOString(),
-      };
-
-      const mockCouple = {
-        id: 'mock_couple_1',
-        code: formData.coupleCode ? formData.coupleCode.toUpperCase() : 'LOVE123',
-        coupleCode: formData.coupleCode ? formData.coupleCode.toUpperCase() : 'LOVE123',
-        loveStartDate: formData.loveStartDate || new Date().toISOString().split('T')[0],
-        streak: 1,
-        user1Id: 'mock_user_1',
-        user2Id: 'mock_user_2',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      const preview = seedMockPreviewData({
+        displayName: formData.displayName,
+        partnerName: formData.partnerName,
+        coupleCode: formData.coupleCode,
+        loveStartDate: formData.loveStartDate,
+        email: formData.useAccount ? formData.email : undefined,
+      });
 
       store.set({
-        token: 'mock_preview_token',
-        user: mockUser as any,
-        couple: mockCouple as any,
+        token: MOCK_PREVIEW_TOKEN,
+        user: preview.user,
+        couple: preview.couple,
       });
-      localStorage.setItem('lovecheck_token', 'mock_preview_token');
+      localStorage.setItem('lovecheck_token', MOCK_PREVIEW_TOKEN);
 
       showSuccessAndNavigate();
     }

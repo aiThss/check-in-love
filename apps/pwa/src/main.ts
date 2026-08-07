@@ -144,6 +144,7 @@ initRouter({
   '/app/home': () => import('./pages/home').then(({ renderHomePage }) => renderHomePage()),
   '/app/checkin': () => import('./pages/checkin').then(({ renderCheckinPage }) => renderCheckinPage()),
   '/app/memories': () => import('./pages/memories').then(({ renderMemoriesPage }) => renderMemoriesPage()),
+  '/app/replies': () => import('./pages/replies').then(({ renderRepliesPage }) => renderRepliesPage()),
   '/app/random': () => import('./pages/random').then(({ renderRandomPage }) => renderRandomPage()),
   '/app/profile': () => import('./pages/profile').then(({ renderProfilePage }) => renderProfilePage()),
   '/app/messages': () => import('./pages/messages').then(({ renderMessagesPage }) => renderMessagesPage()),

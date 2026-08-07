@@ -1,4 +1,5 @@
 import { navigate } from '../router';
+import { store } from '../store/index';
 import { getCheckins, addReaction } from '../api/checkins';
 import { createMessage } from '../api/messages';
 import { showToast } from '../components/toast';
@@ -7,6 +8,7 @@ import { openReactionPicker } from '../components/reaction-picker';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import { smilePlusIconMarkup } from '../components/smile-plus-icon';
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
+import { createReplyToggle, getReplyPagePath } from '../components/reply-toggle';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
 let cachedMemories: CheckIn[] = [];
@@ -191,6 +193,12 @@ function buildSocialRow(
   `;
   const input = form.querySelector<HTMLInputElement>('input');
   const submitButton = form.querySelector<HTMLButtonElement>('.rm-send-message');
+  const replyToggle = createReplyToggle(
+    () => item.replies,
+    () => navigate(getReplyPagePath(item.id)),
+    'Trả lời',
+    () => input?.focus(),
+  );
   let isSending = false;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -205,6 +213,18 @@ function buildSocialRow(
         referencedCheckinId: item.id,
         clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
       });
+      const currentUser = store.get().user;
+      item.replies = [
+        ...item.replies,
+        {
+          userId: currentUser?.id ?? 'me',
+          userName: currentUser?.displayName ?? 'Bạn',
+          message,
+          isOwn: true,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      replyToggle.sync();
       if (input) {
         input.value = '';
         input.placeholder = 'Gửi tin nhắn...';
@@ -222,6 +242,8 @@ function buildSocialRow(
     openReactionPicker(item);
   });
   row.appendChild(form);
+  row.appendChild(replyToggle.toggle);
+  row.appendChild(replyToggle.panel);
   return row;
 }
 
@@ -731,6 +753,7 @@ export function renderMemoriesPage(): HTMLElement {
 
     const detail = document.createElement('div');
     detail.className = 'checkin-detail';
+    let isReplySectionOpen = false;
 
     const renderDetailContent = () => {
       // Lấy URL ảnh tốt nhất, kể cả khi type lệch hoặc field thiếu
@@ -794,7 +817,10 @@ export function renderMemoriesPage(): HTMLElement {
             `
             : ''
         }
-        <div class="reply-section">
+        <button type="button" class="reply-toggle-button detail-reply-toggle" aria-expanded="false">
+          💬 Xem phản hồi <span>${replies.length}</span>
+        </button>
+        <div class="reply-section" hidden>
           <div class="reply-section-title">
             <h4>Replies</h4>
             <span>${replies.length}</span>
@@ -807,6 +833,14 @@ export function renderMemoriesPage(): HTMLElement {
           </form>
         </div>
       `;
+
+      const replyToggle = detail.querySelector<HTMLButtonElement>('.detail-reply-toggle');
+      const replySection = detail.querySelector<HTMLElement>('.reply-section');
+      if (replyToggle && replySection) {
+        replySection.hidden = true;
+        replyToggle.setAttribute('aria-expanded', 'false');
+        replyToggle.addEventListener('click', () => navigate(getReplyPagePath(item.id)));
+      }
 
       const replyList = detail.querySelector<HTMLElement>('#reply-list');
       if (replyList) renderReplies(replyList, replies);
@@ -922,6 +956,19 @@ export function renderMemoriesPage(): HTMLElement {
             referencedCheckinId: item.id,
             clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
           });
+          const currentUser = store.get().user;
+          item.replies = [
+            ...item.replies,
+            {
+              userId: currentUser?.id ?? 'me',
+              userName: currentUser?.displayName ?? 'Bạn',
+              message,
+              isOwn: true,
+              createdAt: new Date().toISOString(),
+            },
+          ];
+          isReplySectionOpen = true;
+          renderDetailContent();
           if (input) input.value = '';
         } catch {
           showToast('Không gửi được reply', 'error');

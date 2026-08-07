@@ -1,5 +1,11 @@
 import { navigate, getCurrentPath } from '../router';
 import { showToast } from './toast';
+import { store, type AppState } from '../store';
+import {
+  clearMockPreviewData,
+  MOCK_PREVIEW_TOKEN,
+  seedMockPreviewData,
+} from '../dev/mock-data';
 
 export function initDevHelper(): void {
   // Only mount once
@@ -20,10 +26,15 @@ export function initDevHelper(): void {
   }
 
   root.innerHTML = `
-    <button class="dev-helper-toggle-btn" id="dev-toggle-btn" title="Kéo thả di chuyển / Click mở Dev Panel">
-      <span class="dev-icon">📌</span>
-      <span class="dev-label">Pin</span>
-    </button>
+    <div class="dev-helper-actions">
+      <button class="dev-theme-toggle-btn" id="dev-theme-toggle-btn" type="button" aria-pressed="false">
+        <span class="dev-theme-icon" aria-hidden="true"></span>
+      </button>
+      <button class="dev-helper-toggle-btn" id="dev-toggle-btn" type="button" title="Kéo thả di chuyển / Click mở Dev Panel">
+        <span class="dev-icon">📌</span>
+        <span class="dev-label">Pin</span>
+      </button>
+    </div>
 
     <div class="dev-helper-panel hidden-dev-panel" id="dev-panel">
       <div class="dev-panel-header">
@@ -53,6 +64,7 @@ export function initDevHelper(): void {
       </div>
 
       <div class="dev-panel-footer">
+        <button class="btn-dev-action" id="dev-load-preview-btn">🧪 Mở demo đầy đủ</button>
         <button class="btn-dev-action" id="dev-fill-mock-btn">⚡ Điền dữ liệu mẫu</button>
         <button class="btn-dev-action btn-danger-sm" id="dev-clear-btn">🔄 Reset</button>
       </div>
@@ -62,10 +74,43 @@ export function initDevHelper(): void {
   document.body.appendChild(root);
 
   const toggleBtn = root.querySelector<HTMLButtonElement>('#dev-toggle-btn')!;
+  const themeToggleBtn = root.querySelector<HTMLButtonElement>('#dev-theme-toggle-btn')!;
+  const themeIcon = root.querySelector<HTMLElement>('.dev-theme-icon')!;
   const panel = root.querySelector<HTMLElement>('#dev-panel')!;
   const closeBtn = root.querySelector<HTMLButtonElement>('#dev-close-btn')!;
+  const loadPreviewBtn = root.querySelector<HTMLButtonElement>('#dev-load-preview-btn')!;
   const fillMockBtn = root.querySelector<HTMLButtonElement>('#dev-fill-mock-btn')!;
   const clearBtn = root.querySelector<HTMLButtonElement>('#dev-clear-btn')!;
+
+  const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function getEffectiveTheme(theme: AppState['theme']): 'light' | 'dark' {
+    if (theme === 'system') return systemThemeQuery.matches ? 'dark' : 'light';
+    return theme;
+  }
+
+  function updateThemeToggle(theme: AppState['theme']): void {
+    const isDark = getEffectiveTheme(theme) === 'dark';
+    themeIcon.textContent = isDark ? '☀️' : '🌙';
+    const targetTheme = isDark ? 'sáng' : 'tối';
+    const label = `Chuyển sang giao diện ${targetTheme}`;
+    themeToggleBtn.title = label;
+    themeToggleBtn.setAttribute('aria-label', label);
+    themeToggleBtn.setAttribute('aria-pressed', String(isDark));
+  }
+
+  updateThemeToggle(store.get().theme);
+  store.subscribe((state) => updateThemeToggle(state.theme));
+  systemThemeQuery.addEventListener('change', () => {
+    if (store.get().theme === 'system') updateThemeToggle('system');
+  });
+
+  themeToggleBtn.addEventListener('click', () => {
+    const currentTheme = getEffectiveTheme(store.get().theme);
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    store.set({ theme: nextTheme });
+    showToast(`Đã chuyển sang giao diện ${nextTheme === 'dark' ? 'tối' : 'sáng'}.`, 'success');
+  });
 
   // ── Drag & Drop Floating Bubble Logic ────────────────────────────────────
   let isDragging = false;
@@ -221,8 +266,28 @@ export function initDevHelper(): void {
     });
   });
 
+  // Load a complete local preview dataset so every app page has realistic data.
+  loadPreviewBtn.addEventListener('click', () => {
+    const preview = seedMockPreviewData();
+    store.set({
+      token: MOCK_PREVIEW_TOKEN,
+      user: preview.user,
+      couple: preview.couple,
+    });
+    showToast('Đã nạp đầy đủ dữ liệu demo local!', 'success');
+    panel.classList.add('hidden-dev-panel');
+    navigate('/app/home', true);
+  });
+
   // Fill Mock Test Data Action
   fillMockBtn.addEventListener('click', () => {
+    seedMockPreviewData({
+      displayName: 'Danh Thái',
+      partnerName: 'Phương Trang',
+      coupleCode: 'LOVE2026',
+      loveStartDate: '2024-01-01',
+      email: 'danhthai4560@gmail.com',
+    });
     sessionStorage.setItem('dev_onboarding_displayName', 'Danh Thái');
     sessionStorage.setItem('dev_onboarding_partnerName', 'Phương Trang');
     sessionStorage.setItem('dev_onboarding_coupleCode', 'LOVE2026');
@@ -234,6 +299,10 @@ export function initDevHelper(): void {
 
   // Clear Dev Cache
   clearBtn.addEventListener('click', () => {
+    clearMockPreviewData();
+    if (store.get().token === MOCK_PREVIEW_TOKEN) {
+      store.clear();
+    }
     sessionStorage.removeItem('dev_onboarding_step');
     sessionStorage.removeItem('dev_onboarding_displayName');
     sessionStorage.removeItem('dev_onboarding_partnerName');

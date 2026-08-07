@@ -171,12 +171,12 @@ export function navigate(path: string, replace = false): void {
   closeActiveHistoryLayerForNavigation();
 
   if (nextPath === getCurrentPath()) {
-    void renderRoute(target.pathname);
+    void renderRoute(target.pathname, nextPath);
     return;
   }
 
   writeRouteHistory(nextPath, replace);
-  void renderRoute(target.pathname);
+  void renderRoute(target.pathname, nextPath);
 }
 
 /** Removes authenticated DOM and its in-memory UI state. */
@@ -227,11 +227,11 @@ export function initRouter(nextRoutes: Routes): void {
       const normalized = fallback.pathname + fallback.search;
       writeAppHistoryState('replace', createAppHistoryState('boundary', normalized), normalized);
       writeAppHistoryState('push', createAppHistoryState('route', normalized), normalized);
-      void renderRoute(fallback.pathname);
+      void renderRoute(fallback.pathname, normalized);
       return;
     }
 
-    void renderRoute(window.location.pathname);
+    void renderRoute(window.location.pathname, getCurrentPath());
   });
 
   document.addEventListener('click', (event) => {
@@ -251,7 +251,7 @@ export function initRouter(nextRoutes: Routes): void {
     navigate(`${target.pathname}${target.search}`);
   });
 
-  void renderRoute(window.location.pathname);
+  void renderRoute(window.location.pathname, getCurrentPath());
 }
 
 function ensureShell(): AppShell | null {
@@ -346,7 +346,7 @@ function evictCachedRoute(path: string, cached: CachedPage): void {
   }
 }
 
-async function renderRoute(path: string): Promise<void> {
+async function renderRoute(path: string, locationPath = getCurrentPath()): Promise<void> {
   const activeShell = ensureShell();
   if (!activeShell) return;
 
@@ -358,6 +358,8 @@ async function renderRoute(path: string): Promise<void> {
   }
 
   const resolvedPath = resolveRoute(path);
+  const location = new URL(locationPath, window.location.origin);
+  const pageKey = `${resolvedPath}${location.search}`;
   if (resolvedPath.startsWith('/app/')) ensureAppHistoryBoundary(getCurrentPath());
   const factory = routes[resolvedPath];
   if (!factory) {
@@ -375,10 +377,10 @@ async function renderRoute(path: string): Promise<void> {
     let cachedPage: CachedPage | undefined;
 
     if (isAppRoute) {
-      cachedPage = pageCache.get(resolvedPath);
+      cachedPage = pageCache.get(pageKey);
       if (cachedPage && shouldRevalidateCachedRoute(resolvedPath, cachedPage)) {
         restoredScroll = { scrollX: cachedPage.scrollX, scrollY: cachedPage.scrollY };
-        evictCachedRoute(resolvedPath, cachedPage);
+        evictCachedRoute(pageKey, cachedPage);
         cachedPage = undefined;
       } else if (!cachedPage) {
         // Consume an invalidation created before the page was mounted.
@@ -394,10 +396,10 @@ async function renderRoute(path: string): Promise<void> {
       nextPage = normalizeRoutePage(await factory());
       if (version !== navigationVersion) return;
 
-      nextContainer = createPageContainer(resolvedPath, nextPage);
+      nextContainer = createPageContainer(pageKey, nextPage);
 
       if (isAppRoute) {
-        pageCache.set(resolvedPath, {
+        pageCache.set(pageKey, {
           page: nextPage,
           container: nextContainer,
           scrollX: restoredScroll?.scrollX ?? 0,
@@ -425,7 +427,7 @@ async function renderRoute(path: string): Promise<void> {
     setOnlyActivePage(activeShell.pageHost, nextContainer);
     if (!cachedPage) nextPage.element.classList.add('page-enter');
 
-    currentPath = resolvedPath;
+    currentPath = pageKey;
     currentElement = nextContainer;
     currentPage = nextPage;
     nextPage.activate?.();

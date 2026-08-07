@@ -8,6 +8,8 @@ import { openReactionPicker, reactionPillsHtml } from '../components/reaction-pi
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import { smilePlusIconMarkup } from '../components/smile-plus-icon';
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
+import { createReplyToggle, getReplyPagePath } from '../components/reply-toggle';
+import { createMessage } from '../api/messages';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -175,7 +177,6 @@ function buildReactionPicker(
 function buildReactionSummary(
   checkin: CheckIn,
   onShowPicker: () => void,
-  onReply: () => void,
 ): HTMLElement {
   const row = document.createElement('div');
   row.className = 'checkin-actions-row';
@@ -198,34 +199,8 @@ function buildReactionSummary(
       .join('');
   }
 
-  const replyBtn = document.createElement('button');
-  replyBtn.type = 'button';
-  replyBtn.className = 'reply-button';
-  replyBtn.textContent = `Reply${checkin.replies.length ? ` ${checkin.replies.length}` : ''}`;
-  replyBtn.addEventListener('click', onReply);
-
   row.appendChild(summary);
-  row.appendChild(replyBtn);
   return row;
-}
-
-function buildReplyPreview(replies: CheckInReply[]): HTMLElement | null {
-  if (replies.length === 0) return null;
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'reply-preview-list';
-
-  replies.slice(-2).forEach((reply) => {
-    const item = document.createElement('div');
-    item.className = `reply-preview${reply.isOwn ? ' own' : ''}`;
-    item.innerHTML = `
-      <strong>${escapeHtml(reply.userName)}</strong>
-      <span>${escapeHtml(reply.message)}</span>
-    `;
-    wrapper.appendChild(item);
-  });
-
-  return wrapper;
 }
 
 function showReplyComposer(
@@ -251,7 +226,29 @@ function showReplyComposer(
         throw new Error('Reply message required');
       }
 
-      const replies = await addReply(checkin.id, message);
+      let replies: CheckInReply[];
+      try {
+        await createMessage({
+          type: 'text',
+          text: message,
+          referencedCheckinId: checkin.id,
+          clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
+        });
+        const currentUser = store.get().user;
+        replies = [
+          ...checkin.replies,
+          {
+            userId: currentUser?.id ?? 'me',
+            userName: currentUser?.displayName ?? 'Bạn',
+            message,
+            isOwn: true,
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      } catch {
+        // Keep the older reply endpoint as a compatibility fallback for legacy deployments.
+        replies = await addReply(checkin.id, message);
+      }
       onSaved(replies);
       showToast('Đã gửi reply', 'success');
     },
@@ -309,16 +306,22 @@ function buildCheckinCard(
   attachLongPress(card, showPicker);
   wrapper.appendChild(card);
   wrapper.appendChild(picker);
-  let actions = buildReactionSummary(checkin, showPicker, onReply);
+  let actions = buildReactionSummary(checkin, showPicker);
   wrapper.appendChild(actions);
 
-  let replies = buildReplyPreview(checkin.replies);
-  if (replies) wrapper.appendChild(replies);
+  const replyToggle = createReplyToggle(
+    () => checkin.replies,
+    () => navigate(getReplyPagePath(checkin.id)),
+    'Trả lời',
+    onReply,
+  );
+  wrapper.appendChild(replyToggle.toggle);
+  wrapper.appendChild(replyToggle.panel);
 
   return {
     element: wrapper,
     patchInteractions: () => {
-      const nextActions = buildReactionSummary(checkin, showPicker, onReply);
+      const nextActions = buildReactionSummary(checkin, showPicker);
       actions.replaceWith(nextActions);
       actions = nextActions;
 
@@ -327,11 +330,7 @@ function buildCheckinCard(
         button.classList.toggle('selected', Boolean(reaction?.reactedByMe));
       });
 
-      const nextReplies = buildReplyPreview(checkin.replies);
-      if (replies && nextReplies) replies.replaceWith(nextReplies);
-      else if (replies) replies.remove();
-      else if (nextReplies) actions.insertAdjacentElement('afterend', nextReplies);
-      replies = nextReplies;
+      replyToggle.sync();
     },
   };
 }
@@ -556,6 +555,12 @@ function buildRecentMemoriesSection(): HTMLElement {
             showToast('Không react được, thử lại nhé', 'error');
           }
         });
+        const replyToggle = createReplyToggle(
+          () => item.replies,
+          () => navigate(getReplyPagePath(item.id)),
+          'Trả lời',
+          () => replyInput?.focus(),
+        );
         replyForm.addEventListener('submit', async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -563,7 +568,24 @@ function buildRecentMemoriesSection(): HTMLElement {
           if (!message) return;
 
           try {
-            item.replies = await addReply(item.id, message);
+            await createMessage({
+              type: 'text',
+              text: message,
+              referencedCheckinId: item.id,
+              clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
+            });
+            const currentUser = store.get().user;
+            item.replies = [
+              ...item.replies,
+              {
+                userId: currentUser?.id ?? 'me',
+                userName: currentUser?.displayName ?? 'Bạn',
+                message,
+                isOwn: true,
+                createdAt: new Date().toISOString(),
+              },
+            ];
+            replyToggle.sync();
             if (replyInput) {
               replyInput.value = '';
               replyInput.placeholder = 'Gửi tin nhắn...';
@@ -582,6 +604,8 @@ function buildRecentMemoriesSection(): HTMLElement {
         reactionRow.appendChild(replyForm);
         body.appendChild(reactionRow);
         body.appendChild(inlineReactionPicker);
+        body.appendChild(replyToggle.toggle);
+        body.appendChild(replyToggle.panel);
 
         // Only the oldest photo is the exit point to the full memory archive.
         if (idx === items.length - 1) {

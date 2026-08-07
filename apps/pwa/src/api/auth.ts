@@ -1,5 +1,6 @@
 import { apiFetch } from './client';
 import { store } from '../store/index';
+import { isMockPreviewMode, loadMockPreviewData } from '../dev/mock-data';
 
 export interface StartOnboardingPayload {
   deviceId: string;
@@ -98,6 +99,16 @@ export function confirmPasswordReset(
 }
 
 export async function getMe(): Promise<MeResponse> {
+  if (isMockPreviewMode()) {
+    const preview = loadMockPreviewData();
+    store.set({ user: preview.user, couple: preview.couple });
+    return {
+      user: preview.user,
+      couple: preview.couple,
+      partnerUser: preview.partnerUser,
+    };
+  }
+
   const response = await apiFetch<MeResponse>('/me');
   store.set({ user: response.user, couple: response.couple });
   return response;

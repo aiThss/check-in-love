@@ -10,6 +10,11 @@ import { mapChatMessage, type RawMessage } from './messages';
 import { getMe } from './auth';
 import { invalidateRoutes } from '../route-invalidation';
 import { store } from '../store/index';
+import {
+  isMockPreviewMode,
+  loadMockPreviewData,
+  saveMockPreviewData,
+} from '../dev/mock-data';
 import type {
   CheckIn,
   CheckInReply,
@@ -167,6 +172,11 @@ export function getCachedLatestPartnerCheckin(): CheckIn | null {
 }
 
 export async function getLatestPartnerCheckin(options: { force?: boolean } = {}): Promise<CheckIn | null> {
+  if (isMockPreviewMode()) {
+    const currentUserId = store.get().user?.id;
+    return loadMockPreviewData().checkins.find((item) => item.userId !== currentUserId) ?? null;
+  }
+
   return fetchQuery(
     'checkins:latest-partner',
     async () => {
@@ -196,6 +206,21 @@ export async function getCheckins(
   type?: string,
   options: { force?: boolean } = {},
 ): Promise<PaginatedResponse<CheckIn>> {
+  if (isMockPreviewMode()) {
+    const allItems = loadMockPreviewData().checkins
+      .filter((item) => !type || item.type === type)
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    const start = (page - 1) * limit;
+    const data = allItems.slice(start, start + limit);
+    return Promise.resolve({
+      data,
+      total: allItems.length,
+      page,
+      limit,
+      hasMore: start + data.length < allItems.length,
+    });
+  }
+
   const key = `checkins:list:${page}:${limit}:${after ?? ''}:${type ?? ''}`;
   return fetchQuery(key, async () => {
     const afterQuery = after ? '&after=' + encodeURIComponent(after) : '';
@@ -222,6 +247,37 @@ export async function getCheckins(
 export async function createCheckin(
   body: FormData | Record<string, unknown>,
 ): Promise<CreateCheckinResult> {
+  if (isMockPreviewMode()) {
+    const preview = loadMockPreviewData();
+    const now = new Date().toISOString();
+    const bodyValue = (key: string): string => {
+      if (body instanceof FormData) return String(body.get(key) ?? '');
+      return String(body[key] ?? '');
+    };
+    const currentUser = preview.user;
+    const checkIn: CheckIn = {
+      id: `mock_checkin_${Date.now()}`,
+      userId: currentUser.id,
+      coupleId: preview.couple.id,
+      type: (bodyValue('type') || 'text') as CheckInType,
+      caption: bodyValue('caption') || bodyValue('text') || 'Một khoảnh khắc mới trong ngày 💕',
+      mood: (bodyValue('mood') || 'happy') as MoodType,
+      photoUrl: body instanceof FormData && body.get('photo') instanceof File
+        ? preview.checkins.find((item) => item.photoUrl)?.photoUrl
+        : undefined,
+      reactions: [],
+      replies: [],
+      ownerName: currentUser.displayName,
+      ownerAvatarUrl: currentUser.avatarUrl,
+      isOwn: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    preview.checkins.unshift(checkIn);
+    saveMockPreviewData(preview);
+    return Promise.resolve({ checkIn, streak: preview.couple.streak });
+  }
+
   const res = await apiFetch<{ checkIn: RawCheckIn; streak?: number; chatMessage?: RawMessage }>('/checkins', {
     method: 'POST',
     body: body instanceof FormData ? body : JSON.stringify(body),
@@ -244,6 +300,24 @@ export async function addReaction(
   checkinId: string,
   type: ReactionType,
 ): Promise<Reaction[]> {
+  if (isMockPreviewMode()) {
+    const preview = loadMockPreviewData();
+    const checkIn = preview.checkins.find((item) => item.id === checkinId);
+    if (!checkIn) return [];
+    const existing = checkIn.reactions.find((item) => item.type === type);
+    if (!existing) checkIn.reactions.push({ type, count: 1, reactedByMe: true });
+    else if (existing.reactedByMe) {
+      existing.count = Math.max(0, existing.count - 1);
+      existing.reactedByMe = false;
+      checkIn.reactions = checkIn.reactions.filter((item) => item.count > 0);
+    } else {
+      existing.count += 1;
+      existing.reactedByMe = true;
+    }
+    saveMockPreviewData(preview);
+    return checkIn.reactions;
+  }
+
   return dedupeMutation(`reaction:${checkinId}:${type}`, async () => {
     const res = await apiFetch<{ reactions: RawReaction[] }>(`/checkins/${checkinId}/reactions`, {
       method: 'POST',
@@ -260,6 +334,22 @@ export async function addReply(
   checkinId: string,
   message: string,
 ): Promise<CheckInReply[]> {
+  if (isMockPreviewMode()) {
+    const preview = loadMockPreviewData();
+    const checkIn = preview.checkins.find((item) => item.id === checkinId);
+    if (!checkIn) return [];
+    const now = new Date().toISOString();
+    checkIn.replies.push({
+      userId: preview.user.id,
+      userName: preview.user.displayName,
+      message,
+      isOwn: true,
+      createdAt: now,
+    });
+    saveMockPreviewData(preview);
+    return checkIn.replies;
+  }
+
   return dedupeMutation(`reply:${checkinId}:${message}`, async () => {
     const res = await apiFetch<{ replies: RawReply[] }>(`/checkins/${checkinId}/replies`, {
       method: 'POST',
@@ -276,6 +366,13 @@ export async function addReply(
 }
 
 export async function deleteCheckin(checkinId: string): Promise<void> {
+  if (isMockPreviewMode()) {
+    const preview = loadMockPreviewData();
+    preview.checkins = preview.checkins.filter((item) => item.id !== checkinId);
+    saveMockPreviewData(preview);
+    return;
+  }
+
   await apiFetch<void>(`/checkins/${checkinId}`, {
     method: 'DELETE',
   });

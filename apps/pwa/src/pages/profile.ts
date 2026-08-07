@@ -9,6 +9,7 @@ import { openCamera, openGallery, CameraResult } from '../components/camera';
 import { apiFetch } from '../api/client';
 import { ensurePushSubscription } from '../api/push';
 import type { User, Couple } from '../api/types';
+import { isMockPreviewMode } from '../dev/mock-data';
 
 function calcDaysTogether(loveStartDate?: string): number {
   if (!loveStartDate) return 0;
@@ -188,11 +189,16 @@ function saveReminderSettings(settings: ReminderSettings): void {
 }
 
 async function loadReminderSettings(): Promise<ReminderSettings> {
+  if (isMockPreviewMode()) return getReminderSettings();
   const response = await apiFetch<{ reminder: ReminderSettings }>('/me/reminder');
   return response.reminder;
 }
 
 async function saveRemoteReminderSettings(settings: ReminderSettings): Promise<ReminderSettings> {
+  if (isMockPreviewMode()) {
+    saveReminderSettings(settings);
+    return settings;
+  }
   const response = await apiFetch<{ reminder: ReminderSettings }>('/me/reminder', {
     method: 'PATCH',
     body: JSON.stringify(settings),
