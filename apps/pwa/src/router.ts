@@ -427,9 +427,10 @@ async function renderRoute(path: string, locationPath = getCurrentPath()): Promi
     if (currentPage && currentPage !== nextPage) currentPage.deactivate?.();
 
     activeShell.navHost.hidden = !isAppRoute;
-    const isStandaloneFlow = resolvedPath === '/onboarding' || STANDALONE_FLOW_ROUTES.has(resolvedPath);
     const devHelper = document.getElementById('dev-helper-root');
-    if (devHelper) devHelper.style.display = isStandaloneFlow ? 'none' : '';
+    // Dev Helper is a global development overlay. It must remain available
+    // on standalone auth/setup pages as well as regular app routes.
+    if (devHelper) devHelper.style.display = '';
     if (isAppRoute) setActiveNav(resolvedPath);
     if (!nextContainer.isConnected) activeShell.pageHost.appendChild(nextContainer);
     setOnlyActivePage(activeShell.pageHost, nextContainer);

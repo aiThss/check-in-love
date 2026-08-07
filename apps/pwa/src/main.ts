@@ -29,7 +29,13 @@ initMessageThreadEnhancements();
 initProfileCopyright();
 initProfileUiCleanup();
 initAnniversaryCards();
-if ((import.meta as any).env?.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+const devHost = window.location.hostname;
+const isPrivateDevHost = devHost === 'localhost'
+  || devHost === '127.0.0.1'
+  || devHost.startsWith('192.168.')
+  || devHost.startsWith('10.')
+  || /^172\.(1[6-9]|2\d|3[01])\./.test(devHost);
+if ((import.meta as any).env?.DEV || isPrivateDevHost) {
   initDevHelper();
 }
 
