@@ -1,4 +1,5 @@
 import { navigate } from '../router';
+import { createThemeToggleButton } from '../components/theme-toggle';
 import { store } from '../store/index';
 import { startOnboarding, sendOtp, verifyOtp } from '../api/auth';
 import { showToast } from '../components/toast';
@@ -117,7 +118,8 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     centerSlot.appendChild(renderProgressDots());
 
     const rightSlot = document.createElement('div');
-    rightSlot.style.cssText = 'width:40px;height:40px;';
+    rightSlot.style.cssText = 'width:40px;height:40px;display:flex;align-items:center;justify-content:flex-end;';
+    rightSlot.appendChild(createThemeToggleButton());
 
     topRow.appendChild(leftSlot);
     topRow.appendChild(centerSlot);

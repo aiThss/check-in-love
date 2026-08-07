@@ -6,6 +6,7 @@ import {
   confirmPasswordReset,
 } from '../api/auth';
 import { showToast } from '../components/toast';
+import { createThemeToggleButton } from '../components/theme-toggle';
 import { navigate } from '../router';
 import { store } from '../store/index';
 
@@ -81,6 +82,7 @@ export function renderLoginPage(): HTMLElement {
     </div>
     <span class="auth-header-spacer"></span>
   `;
+  header.querySelector('.auth-header-spacer')?.replaceWith(createThemeToggleButton());
 
   // Auth Tabs Container
   const tabsWrap = document.createElement('div');

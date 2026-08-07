@@ -28,7 +28,7 @@ const defaultState: AppState = {
   token: null,
   user: null,
   couple: null,
-  theme: 'system',
+  theme: 'light',
   hasNewCheckin: false,
 };
 

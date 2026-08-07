@@ -252,7 +252,7 @@
 
 .polaroid-love-foil-footer strong {
   overflow: hidden;
-  color: var(--text-primary, #fff);
+  color: #ffffff;
   font-size: 14px;
   font-weight: 720;
   line-height: 1.3;
@@ -261,7 +261,7 @@
 }
 
 .polaroid-love-foil-footer span {
-  color: var(--text-secondary, #b6afb4);
+  color: rgba(255, 245, 248, 0.78);
   font-size: 11px;
 }
 

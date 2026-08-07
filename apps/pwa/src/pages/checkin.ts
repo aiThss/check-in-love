@@ -421,26 +421,29 @@ export function renderCheckinPage(): HTMLElement {
     scratchToggle.type = 'button';
     scratchToggle.className = `checkin-scratch-toggle${includeScratch ? ' is-on' : ''}`;
     scratchToggle.setAttribute('aria-pressed', String(includeScratch));
+    scratchToggle.setAttribute('aria-expanded', String(includeScratch));
+    scratchToggle.setAttribute('aria-controls', 'surprise-text-group');
     scratchToggle.style.cssText = `
       width:100%;
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:12px;
-      padding:11px 13px;
+      min-height:44px;
+      padding:8px 11px;
       border:1px solid ${includeScratch ? 'rgba(255, 59, 127, 0.34)' : 'var(--border)'};
-      border-radius:16px;
+      border-radius:14px;
       background:${includeScratch ? 'linear-gradient(135deg, rgba(255, 47, 125, 0.12), rgba(111, 92, 255, 0.1))' : 'var(--surface-solid)'};
       color:var(--text-primary);
       text-align:left;
       cursor:pointer;
     `;
     scratchToggle.innerHTML = `
-      <span style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;">
-        <span aria-hidden="true" style="color:${includeScratch ? 'var(--accent)' : 'var(--text-secondary)'};font-size:18px;">✦</span>
+      <span style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:750;">
+        <span aria-hidden="true" style="color:${includeScratch ? 'var(--accent)' : 'var(--text-secondary)'};font-size:16px;">✦</span>
         Lớp cào
       </span>
-      <span style="padding:4px 8px;border-radius:999px;background:${includeScratch ? 'rgba(255, 59, 127, 0.16)' : 'rgba(255,255,255,0.07)'};color:${includeScratch ? 'var(--accent)' : 'var(--text-secondary)'};font-size:11px;font-weight:800;">
+      <span style="padding:3px 7px;border-radius:999px;background:${includeScratch ? 'rgba(255, 59, 127, 0.16)' : 'rgba(255,255,255,0.07)'};color:${includeScratch ? 'var(--accent)' : 'var(--text-secondary)'};font-size:10px;font-weight:800;">
         ${includeScratch ? 'Bật' : 'Tắt'}
       </span>
     `;
@@ -452,7 +455,8 @@ export function renderCheckinPage(): HTMLElement {
 
     if (includeScratch) {
       const surpriseTextGroup = document.createElement('div');
-      surpriseTextGroup.className = 'input-group';
+      surpriseTextGroup.className = 'input-group checkin-scratch-message';
+      surpriseTextGroup.id = 'surprise-text-group';
       surpriseTextGroup.innerHTML = `
         <label class="input-label">Lời nhắn (tuỳ chọn)</label>
         <input type="text" id="surprise-text-input" class="input" placeholder="Một lời nhắn nhỏ..." maxlength="120" />

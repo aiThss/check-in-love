@@ -351,10 +351,44 @@ function drawLoveFoil(
     ctx.restore();
   };
 
+  const drawHeart = (
+    x: number,
+    y: number,
+    size: number,
+    color: string,
+    rotation: number,
+    alpha = 1,
+  ): void => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = size * 0.7;
+    ctx.beginPath();
+    ctx.moveTo(0, size * 0.82);
+    ctx.bezierCurveTo(-size * 1.15, size * 0.05, -size * 0.7, -size * 0.72, 0, -size * 0.2);
+    ctx.bezierCurveTo(size * 0.7, -size * 0.72, size * 1.15, size * 0.05, 0, size * 0.82);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 247, 240, 0.62)';
+    ctx.lineWidth = Math.max(0.8, size * 0.08);
+    ctx.stroke();
+    ctx.restore();
+  };
+
   drawSpark(width * 0.16, height * 0.18, 5, 0.82);
   drawSpark(width * 0.84, height * 0.22, 7, 0.72);
   drawSpark(width * 0.2, height * 0.82, 4, 0.58);
   drawSpark(width * 0.8, height * 0.82, 5, 0.68);
+  drawHeart(width * 0.16, height * 0.11, 10, '#ff4f91', -0.18, 0.94);
+  drawHeart(width * 0.86, height * 0.12, 8, '#ffd166', 0.14, 0.92);
+  drawHeart(width * 0.07, height * 0.52, 7, '#65e6c4', -0.34, 0.82);
+  drawHeart(width * 0.93, height * 0.54, 9, '#a88bff', 0.28, 0.84);
+  drawHeart(width * 0.22, height * 0.9, 8, '#ff896b', -0.2, 0.86);
+  drawHeart(width * 0.79, height * 0.9, 7, '#ff77b7', 0.2, 0.82);
 
   ctx.save();
   ctx.globalAlpha = 0.42;

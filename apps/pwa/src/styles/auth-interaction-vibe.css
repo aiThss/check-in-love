@@ -361,6 +361,26 @@
   width: 40px;
 }
 
+.auth-theme-toggle {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  font-size: 17px;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(255, 59, 127, 0.12);
+}
+
+[data-theme='light'] .auth-theme-toggle {
+  background: #fff4f7;
+  border-color: rgba(255, 59, 127, 0.22);
+}
+
+[data-theme='dark'] .auth-theme-toggle {
+  background: #2a1f25;
+  border-color: rgba(255, 118, 170, 0.3);
+}
+
 .auth-brand-center {
   display: flex;
   flex-direction: column;
@@ -760,6 +780,7 @@
 .login-page-pwa .auth-form-card,
 .login-page-pwa .google-login-intro-v2,
 .login-page-pwa .auth-back-btn,
+.login-page-pwa .auth-theme-toggle,
 .login-page-pwa .auth-footer-action .btn-ghost {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
@@ -786,7 +807,7 @@
 }
 
 [data-theme='light'] .login-page-pwa .auth-back-btn,
-[data-theme='light'] .login-page-pwa .auth-back-btn,
+[data-theme='light'] .login-page-pwa .auth-theme-toggle,
 [data-theme='light'] .login-page-pwa .auth-footer-action .btn-ghost,
 [data-theme='light'] .login-page-pwa .auth-footer-action .btn-ghost {
   background: #fff4f7 !important;
@@ -809,6 +830,7 @@
 }
 
 [data-theme='dark'] .login-page-pwa .auth-back-btn,
+[data-theme='dark'] .login-page-pwa .auth-theme-toggle,
 [data-theme='dark'] .login-page-pwa .auth-footer-action .btn-ghost {
   background: #2a1f25 !important;
   border-color: rgba(255, 118, 170, 0.3) !important;
