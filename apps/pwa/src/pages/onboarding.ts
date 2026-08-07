@@ -38,7 +38,9 @@ function calcDaysTogether(dateStr: string): number {
 
 // ── Onboarding Page ───────────────────────────────────────────────────────────
 
-export function renderOnboardingPage(): HTMLElement {
+export type OnboardingMode = 'email' | 'google';
+
+export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): HTMLElement {
   const deviceId = getOrCreateDeviceId();
 
   // State
@@ -46,7 +48,9 @@ export function renderOnboardingPage(): HTMLElement {
   let currentStep = savedStep !== null ? Math.max(0, Math.min(4, parseInt(savedStep, 10))) : 0;
   const TOTAL_STEPS = 5; // Added OTP step
 
-  const isGoogleUser = sessionStorage.getItem('google_authenticated_user') === 'true' || Boolean(store.get().user?.googleId);
+  const isGoogleUser = options.mode === 'google'
+    || sessionStorage.getItem('google_authenticated_user') === 'true'
+    || Boolean(store.get().user?.googleId);
 
   const formData = {
     displayName: sessionStorage.getItem('dev_onboarding_displayName') || store.get().user?.displayName || '',
@@ -165,12 +169,16 @@ export function renderOnboardingPage(): HTMLElement {
     nextBtn.addEventListener('click', goNext);
     content.appendChild(nextBtn);
 
-    const loginBtn = document.createElement('button');
-    loginBtn.className = 'btn-ghost';
-    loginBtn.style.cssText = 'width:100%;font-size:14px;';
-    loginBtn.textContent = 'Đã có tài khoản? Đăng nhập';
-    loginBtn.addEventListener('click', () => navigate('/login', true));
-    content.appendChild(loginBtn);
+    // This action belongs only to the email/OTP entry flow. The Google flow
+    // has already authenticated the account and uses its own standalone page.
+    if (!isGoogleUser) {
+      const loginBtn = document.createElement('button');
+      loginBtn.className = 'btn-ghost';
+      loginBtn.style.cssText = 'width:100%;font-size:14px;';
+      loginBtn.textContent = 'Đã có tài khoản? Đăng nhập bằng Google';
+      loginBtn.addEventListener('click', () => navigate('/login?tab=google', true));
+      content.appendChild(loginBtn);
+    }
 
     renderStep(content);
     requestAnimationFrame(() => input.focus());
@@ -268,66 +276,73 @@ export function renderOnboardingPage(): HTMLElement {
     });
     content.appendChild(codeInput);
 
-    // Account toggle
-    const toggleWrapper = document.createElement('div');
-    toggleWrapper.style.cssText = 'width:100%;';
-    toggleWrapper.innerHTML = `
-      <div id="use-account-card" class="account-toggle-card ${formData.useAccount ? 'is-checked' : ''}" role="checkbox" aria-checked="${formData.useAccount}" tabindex="0">
-        <div class="custom-checkbox-box">
-          <svg class="custom-check-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
+    let emailInput: HTMLInputElement | null = null;
+    let passwordInput: HTMLInputElement | null = null;
+    if (!isGoogleUser) {
+      // Email/OTP-only option. Google users already have an account identity,
+      // so this registration toggle must not appear in their flow.
+      const toggleWrapper = document.createElement('div');
+      toggleWrapper.style.cssText = 'width:100%;';
+      toggleWrapper.innerHTML = `
+        <div id="use-account-card" class="account-toggle-card ${formData.useAccount ? 'is-checked' : ''}" role="checkbox" aria-checked="${formData.useAccount}" tabindex="0">
+          <div class="custom-checkbox-box">
+            <svg class="custom-check-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="account-toggle-label" style="font-size:10.8px;">Đăng ký tài khoản để sử dụng trên thiết bị khác</span>
         </div>
-        <span class="account-toggle-label" style="font-size:10.8px;">Đăng ký tài khoản để sử dụng trên thiết bị khác</span>
-      </div>
-    `;
+      `;
 
-    const accountFields = document.createElement('div');
-    accountFields.style.cssText = `
-      width:100%;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      overflow:hidden;
-      transition:max-height 0.3s ease, opacity 0.3s ease;
-      max-height:${formData.useAccount ? '200px' : '0'};
-      opacity:${formData.useAccount ? '1' : '0'};
-    `;
+      const accountFields = document.createElement('div');
+      accountFields.style.cssText = `
+        width:100%;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        overflow:hidden;
+        transition:max-height 0.3s ease, opacity 0.3s ease;
+        max-height:${formData.useAccount ? '200px' : '0'};
+        opacity:${formData.useAccount ? '1' : '0'};
+      `;
 
-    const emailInput = document.createElement('input');
-    emailInput.type = 'email';
-    emailInput.className = 'input';
-    emailInput.placeholder = 'Email của bạn';
-    emailInput.value = formData.email;
-    emailInput.addEventListener('input', () => {
-      formData.email = emailInput.value.trim();
-      // Reset verification state if email changes
-      formData.emailVerified = false;
-      formData.otpCode = '';
-    });
+      const emailField = document.createElement('input');
+      emailInput = emailField;
+      emailField.type = 'email';
+      emailField.className = 'input';
+      emailField.placeholder = 'Email của bạn';
+      emailField.value = formData.email;
+      emailField.addEventListener('input', () => {
+        formData.email = emailField.value.trim();
+        // Reset verification state if email changes
+        formData.emailVerified = false;
+        formData.otpCode = '';
+      });
 
-    const passwordInput = document.createElement('input');
-    passwordInput.type = 'password';
-    passwordInput.className = 'input';
-    passwordInput.placeholder = 'Mật khẩu (tối thiểu 6 ký tự)';
-    passwordInput.value = formData.password;
-    passwordInput.addEventListener('input', () => {
-      formData.password = passwordInput.value;
-    });
+      const passwordField = document.createElement('input');
+      passwordInput = passwordField;
+      passwordField.type = 'password';
+      passwordField.className = 'input';
+      passwordField.placeholder = 'Mật khẩu (tối thiểu 6 ký tự)';
+      passwordField.value = formData.password;
+      passwordField.addEventListener('input', () => {
+        formData.password = passwordField.value;
+      });
 
-    accountFields.appendChild(emailInput);
-    accountFields.appendChild(passwordInput);
-    content.appendChild(toggleWrapper);
-    content.appendChild(accountFields);
+      accountFields.appendChild(emailField);
+      accountFields.appendChild(passwordField);
+      content.appendChild(toggleWrapper);
+      content.appendChild(accountFields);
 
-    const toggleCard = toggleWrapper.querySelector<HTMLElement>('#use-account-card')!;
-    toggleCard.addEventListener('click', () => {
-      formData.useAccount = !formData.useAccount;
-      toggleCard.classList.toggle('is-checked', formData.useAccount);
-      toggleCard.setAttribute('aria-checked', String(formData.useAccount));
-      accountFields.style.maxHeight = formData.useAccount ? '200px' : '0';
-      accountFields.style.opacity = formData.useAccount ? '1' : '0';
-    });
+      const toggleCard = toggleWrapper.querySelector<HTMLElement>('#use-account-card')!;
+      toggleCard.addEventListener('click', () => {
+        formData.useAccount = !formData.useAccount;
+        toggleCard.classList.toggle('is-checked', formData.useAccount);
+        toggleCard.setAttribute('aria-checked', String(formData.useAccount));
+        accountFields.style.maxHeight = formData.useAccount ? '200px' : '0';
+        accountFields.style.opacity = formData.useAccount ? '1' : '0';
+      });
+    }
 
     const nextBtn = document.createElement('button');
     nextBtn.className = 'btn-primary btn-primary-full';
@@ -342,18 +357,18 @@ export function renderOnboardingPage(): HTMLElement {
       if (formData.useAccount) {
         if (!formData.email) {
           showToast('Vui lòng nhập email', 'error');
-          emailInput.focus();
+          emailInput?.focus();
           return;
         }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(formData.email)) {
           showToast('Email không hợp lệ', 'error');
-          emailInput.focus();
+          emailInput?.focus();
           return;
         }
         if (formData.password.length < 6) {
           showToast('Mật khẩu cần ít nhất 6 ký tự', 'error');
-          passwordInput.focus();
+          passwordInput?.focus();
           return;
         }
       }

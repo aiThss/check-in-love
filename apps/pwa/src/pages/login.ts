@@ -244,8 +244,13 @@ export function renderLoginPage(): HTMLElement {
   tabGoogle.addEventListener('click', () => switchTab('google'));
 
   // Restore saved login tab on load
+  const requestedLoginTab = new URLSearchParams(window.location.search).get('tab') as 'email' | 'google' | null;
   const savedLoginTab = sessionStorage.getItem('dev_login_tab') as 'email' | 'google' | null;
-  if (savedLoginTab) switchTab(savedLoginTab);
+  if (requestedLoginTab === 'email' || requestedLoginTab === 'google') {
+    switchTab(requestedLoginTab);
+  } else if (savedLoginTab) {
+    switchTab(savedLoginTab);
+  }
 
   // Email Step 1 Form Handler
   const emailForm = emailPanel.querySelector<HTMLFormElement>('#email-login-form')!;
@@ -632,6 +637,15 @@ async function handleGoogleLogin(
     }
 
     if (!result.couple) {
+      // Google onboarding is a separate flow. Do not resume a stale partial
+      // Email/OTP registration step from the same browser session.
+      [
+        'dev_onboarding_step',
+        'dev_onboarding_partnerName',
+        'dev_onboarding_coupleCode',
+        'dev_onboarding_loveStartDate',
+        'dev_onboarding_useAccount',
+      ].forEach((key) => sessionStorage.removeItem(key));
       sessionStorage.setItem('google_authenticated_user', 'true');
       if (result.user.email) {
         sessionStorage.setItem('dev_onboarding_email', result.user.email);
@@ -640,7 +654,7 @@ async function handleGoogleLogin(
         sessionStorage.setItem('dev_onboarding_displayName', result.user.displayName);
       }
       showToast('Đăng nhập Google thành công! Vui lòng hoàn tất thiết lập cặp đôi. ✨', 'info');
-      navigate('/app/onboarding', true);
+      navigate('/app/google-onboarding', true);
     } else if (isDevGoogleLogin) {
       showToast('Đăng nhập Dev Google thành công! Hãy kiểm tra thông tin của bạn.', 'info');
       navigate('/app/profile', true);

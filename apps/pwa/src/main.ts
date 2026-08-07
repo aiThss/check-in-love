@@ -141,6 +141,7 @@ initRouter({
   '/login': () => import('./pages/login').then(({ renderLoginPage }) => renderLoginPage()),
   '/onboarding': () => import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage()),
   '/app/onboarding': () => import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage()),
+  '/app/google-onboarding': () => import('./pages/google-onboarding').then(({ renderGoogleOnboardingPage }) => renderGoogleOnboardingPage()),
   '/blocked': () => renderBlockedPage(),
   '/app/home': () => import('./pages/home').then(({ renderHomePage }) => renderHomePage()),
   '/app/checkin': () => import('./pages/checkin').then(({ renderCheckinPage }) => renderCheckinPage()),

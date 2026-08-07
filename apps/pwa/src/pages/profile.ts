@@ -616,7 +616,7 @@ export function renderProfilePage(): HTMLElement {
         settingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
         settingsCard.querySelector<HTMLInputElement>('#birthday-self')?.focus();
       } else {
-        showToast('Hãy cài ngày sinh ở mục Chỉnh sửa thông tin bên dưới', 'info');
+        showToast('Hãy điền ngày sinh ở thẻ Sinh nhật bên dưới', 'info');
       }
     });
 
@@ -626,7 +626,7 @@ export function renderProfilePage(): HTMLElement {
         settingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
         settingsCard.querySelector<HTMLInputElement>('#birthday-partner')?.focus();
       } else {
-        showToast('Hãy cài ngày sinh ở mục Chỉnh sửa thông tin bên dưới', 'info');
+        showToast('Hãy điền ngày sinh ở thẻ Sinh nhật bên dưới', 'info');
       }
     });
 

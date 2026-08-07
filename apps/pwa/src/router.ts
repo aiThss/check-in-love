@@ -29,7 +29,7 @@ interface AppShell {
 const AUTO_REVALIDATE_ROUTES = new Set(['/app/home', '/app/memories']);
 const AUTO_REVALIDATE_AFTER_MS = 15_000;
 const APP_HISTORY_STATE_KEY = '__checkInLoveAppHistory';
-const STANDALONE_FLOW_ROUTES = new Set(['/app/onboarding']);
+const STANDALONE_FLOW_ROUTES = new Set(['/app/onboarding', '/app/google-onboarding']);
 
 function isAppShellRoute(path: string): boolean {
   return path.startsWith('/app/') && !STANDALONE_FLOW_ROUTES.has(path);

@@ -1534,7 +1534,7 @@ function notifyMissingBirthday(me: MeResponse): void {
 
   birthdayNoticeSession.add(key);
   window.setTimeout(() => {
-    showToast('Bạn chưa lưu đủ Birthday. Thêm ngày đặc biệt để giữ bất ngờ nhé 🎂', 'info');
+    showToast('Bạn chưa thiết lập đủ ngày sinh nhật. Vào Profile để bổ sung nhé 🎂', 'info');
   }, 700);
 }
 
@@ -1559,25 +1559,26 @@ async function mountBirthdaySettings(): Promise<void> {
   if (!document.body.contains(page) || page.querySelector('.birthday-settings-card')) return;
   const card = document.createElement('div');
   card.className = 'card-solid birthday-settings-card';
+  const birthdaySetupNeeded = needsBirthdaySetup(me);
   card.innerHTML = `
     <div class="birthday-settings-head">
       <span class="birthday-settings-icon">🎂</span>
       <div>
-        <span class="birthday-settings-title">Ngày sinh nhật</span>
-        <span class="birthday-settings-subtitle">Cập nhật sinh nhật hai bạn để nhận thiệp chúc mừng tự động</span>
+        <span class="birthday-settings-title">${birthdaySetupNeeded ? 'Chưa thiết lập đủ ngày sinh nhật' : 'Ngày sinh nhật'}</span>
+        <span class="birthday-settings-subtitle">${birthdaySetupNeeded ? 'Điền ngày sinh của hai bạn để app nhắc đúng ngày và chuẩn bị bất ngờ.' : 'Cập nhật sinh nhật hai bạn để nhận thiệp chúc mừng tự động'}</span>
       </div>
     </div>
     <div class="birthday-settings-grid">
       <div class="birthday-field">
-        <label for="birthday-self">Birthday của bạn</label>
+        <label for="birthday-self">Sinh nhật của bạn</label>
         <input id="birthday-self" type="date" value="${toInputDate(me.user.birthday)}" />
       </div>
       <div class="birthday-field">
-        <label for="birthday-partner">Birthday người ấy</label>
+        <label for="birthday-partner">Sinh nhật người ấy</label>
         <input id="birthday-partner" type="date" value="${toInputDate(me.user.partnerBirthday || me.partnerUser?.birthday)}" />
       </div>
     </div>
-    <button type="button" class="birthday-save">Lưu Birthday</button>
+    <button type="button" class="birthday-save">${birthdaySetupNeeded ? 'Thiết lập ngày sinh' : 'Lưu ngày sinh'}</button>
   `;
   editRow.insertAdjacentElement('afterend', card);
   const selfInput = card.querySelector<HTMLInputElement>('#birthday-self');
@@ -1597,7 +1598,7 @@ async function mountBirthdaySettings(): Promise<void> {
       await getMe();
       showToast('Đã lưu Birthday!', 'success');
       save.textContent = '✨ Đã lưu';
-      window.setTimeout(() => { save.textContent = 'Lưu Birthday'; }, 1200);
+      window.setTimeout(() => { save.textContent = 'Lưu ngày sinh'; }, 1200);
     } catch (error) {
       showToast(`Không lưu được Birthday: ${(error as Error).message}`, 'error');
       save.textContent = '🔄 Thử lại';
