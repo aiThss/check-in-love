@@ -1,15 +1,18 @@
-import { getCheckins, getLatestPartnerCheckin } from './api/checkins';
+import { getCheckins } from './api/checkins';
 import type { CheckIn } from './api/types';
 import { store } from './store/index';
 
 const REVEAL_STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
-const LEGACY_AUTO_OPEN_PREFIX = 'lovecheck:daily-surprise:auto-open:v1:';
 const DAILY_FIRST_PHOTO_PREFIX = 'lovecheck:daily-surprise:first-partner-photo:v1:';
-const PENDING_CLASS = 'daily-first-photo-scratch-pending';
 const MAX_TODAY_PAGES = 20;
+const DAILY_RETRY_DELAY_MS = 60_000;
 
 let attemptInFlight: Promise<void> | null = null;
 let attemptedUserDay = '';
+let completedUserDay = '';
+let retryTimer: number | null = null;
+
+type DailyAttemptResult = 'completed' | 'retry';
 
 function normalizeImageUrl(value: string): string {
   try {
@@ -35,8 +38,8 @@ function getLocalDayKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-function getLocalDayBounds(): { start: Date; end: Date } {
-  const start = new Date();
+function getLocalDayBounds(date = new Date()): { start: Date; end: Date } {
+  const start = new Date(date);
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
@@ -80,26 +83,6 @@ function markDailyScratchShown(userId: string, dayKey: string): void {
   }
 }
 
-function suppressLegacyLatestAutoOpen(imageUrl: string): void {
-  const key = `${LEGACY_AUTO_OPEN_PREFIX}${hashString(normalizeImageUrl(imageUrl))}`;
-  try {
-    sessionStorage.setItem(key, 'shown');
-  } catch {
-    // The legacy observer may still run when storage is unavailable.
-  }
-}
-
-function suppressRenderedHomeImage(): void {
-  const image = document.querySelector<HTMLImageElement>('.checkin-card .checkin-card-image');
-  const imageUrl = image?.currentSrc || image?.src;
-  if (imageUrl) suppressLegacyLatestAutoOpen(imageUrl);
-}
-
-async function suppressLatestPartnerCheckin(): Promise<void> {
-  const latest = await getLatestPartnerCheckin({ force: true }).catch(() => null);
-  if (latest?.photoUrl) suppressLegacyLatestAutoOpen(latest.photoUrl);
-}
-
 async function loadTodayPartnerPhotos(start: Date, end: Date): Promise<CheckIn[]> {
   const after = new Date(start.getTime() - 1).toISOString();
   const photos: CheckIn[] = [];
@@ -126,28 +109,28 @@ function formatScratchTime(createdAt: string): string {
   });
 }
 
-async function openFirstPartnerPhotoForToday(userId: string, dayKey: string): Promise<void> {
-  document.documentElement.classList.add(PENDING_CLASS);
-
+async function openFirstPartnerPhotoForToday(userId: string, dayKey: string): Promise<DailyAttemptResult> {
   try {
-    const { start, end } = getLocalDayBounds();
-    const [partnerPhotos] = await Promise.all([
-      loadTodayPartnerPhotos(start, end),
-      suppressLatestPartnerCheckin(),
-    ]);
+    const lookupDate = new Date();
+    const { start, end } = getLocalDayBounds(lookupDate);
+    const partnerPhotos = await loadTodayPartnerPhotos(start, end);
 
-    if (!isHomeEntry()) return;
+    if (!isHomeEntry() || getLocalDayKey() !== dayKey) return 'retry';
 
-    const firstPhoto = partnerPhotos[0];
+    const firstPhoto = partnerPhotos.reduce<CheckIn | null>((earliest, current) => {
+      if (!earliest) return current;
+      return new Date(current.createdAt).getTime() < new Date(earliest.createdAt).getTime()
+        ? current
+        : earliest;
+    }, null);
     const imageUrl = firstPhoto?.photoUrl;
-    if (!firstPhoto || !imageUrl) return;
-    if (wasDailyScratchShown(userId, dayKey) || wasImageRevealed(imageUrl)) return;
-    if (document.querySelector('.polaroid-modal-backdrop')) return;
+    if (!firstPhoto || !imageUrl) return 'retry';
+    if (wasDailyScratchShown(userId, dayKey) || wasImageRevealed(imageUrl)) return 'completed';
+    if (document.querySelector('.polaroid-modal-backdrop')) return 'retry';
 
     const { openPolaroidCoverModal } = await import('./components/polaroid-cover');
-    if (!isHomeEntry() || document.querySelector('.polaroid-modal-backdrop')) return;
+    if (!isHomeEntry() || getLocalDayKey() !== dayKey || document.querySelector('.polaroid-modal-backdrop')) return 'retry';
 
-    markDailyScratchShown(userId, dayKey);
     openPolaroidCoverModal({
       imageUrl,
       title: firstPhoto.caption || `Ảnh đầu tiên hôm nay của ${firstPhoto.ownerName} 💖`,
@@ -155,11 +138,25 @@ async function openFirstPartnerPhotoForToday(userId: string, dayKey: string): Pr
       coverText: firstPhoto.surpriseText,
       forceScratch: true,
     });
+    markDailyScratchShown(userId, dayKey);
+    return 'completed';
   } catch {
-    // Home continues normally when the daily surprise lookup fails.
-  } finally {
-    document.documentElement.classList.remove(PENDING_CLASS);
+    // A later retry can recover from a temporary API or module-loading failure.
+    return 'retry';
   }
+}
+
+function scheduleDailyRetry(userDay: string): void {
+  if (retryTimer !== null) return;
+  retryTimer = window.setTimeout(() => {
+    retryTimer = null;
+    const currentUserId = store.get().user?.id;
+    if (!currentUserId || `${currentUserId}:${getLocalDayKey()}` !== userDay) {
+      maybeStartDailyScratch();
+      return;
+    }
+    maybeStartDailyScratch();
+  }, DAILY_RETRY_DELAY_MS);
 }
 
 function maybeStartDailyScratch(): void {
@@ -170,22 +167,20 @@ function maybeStartDailyScratch(): void {
 
   const dayKey = getLocalDayKey();
   const userDay = `${userId}:${dayKey}`;
-  if (attemptedUserDay === userDay || attemptInFlight) return;
+  if (completedUserDay === userDay || attemptInFlight || (attemptedUserDay === userDay && retryTimer !== null)) return;
 
   attemptedUserDay = userDay;
-  attemptInFlight = openFirstPartnerPhotoForToday(userId, dayKey).finally(() => {
-    attemptInFlight = null;
-  });
+  attemptInFlight = openFirstPartnerPhotoForToday(userId, dayKey)
+    .then((result) => {
+      if (result === 'completed') completedUserDay = userDay;
+      else scheduleDailyRetry(userDay);
+    })
+    .finally(() => {
+      attemptInFlight = null;
+    });
 }
 
-const concealStyle = document.createElement('style');
-concealStyle.textContent = `html.${PENDING_CLASS} .checkin-card, html.${PENDING_CLASS} .recent-memories-list { visibility: hidden !important; }`;
-document.head.appendChild(concealStyle);
-
-const routeObserver = new MutationObserver(() => {
-  suppressRenderedHomeImage();
-  maybeStartDailyScratch();
-});
+const routeObserver = new MutationObserver(maybeStartDailyScratch);
 routeObserver.observe(document.documentElement, { childList: true, subtree: true });
 
 window.addEventListener('popstate', maybeStartDailyScratch);
@@ -194,5 +189,4 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') maybeStartDailyScratch();
 });
 
-suppressRenderedHomeImage();
 maybeStartDailyScratch();

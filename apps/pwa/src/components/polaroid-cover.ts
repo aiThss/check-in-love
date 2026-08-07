@@ -22,9 +22,7 @@ const DEFAULT_REVEAL_THRESHOLD = 0.8;
 const DEFAULT_COVER_TEXT = 'Unbox quà ngày mới nào';
 const STAGE_CORNER_RADIUS = 28;
 const STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
-const HOME_AUTO_OPEN_PREFIX = 'lovecheck:daily-surprise:auto-open:v1:';
 const GLOBAL_INSTALL_KEY = '__loveCheckLoveFoilInstalled';
-const homeAutoOpenedImages = new Set<string>();
 
 type LoveFoilWindow = Window & {
   [GLOBAL_INSTALL_KEY]?: boolean;
@@ -194,42 +192,6 @@ function injectLatestCheckinPill(): void {
   });
 }
 
-const pendingHomeImageLoads = new WeakSet<HTMLImageElement>();
-
-function autoOpenLatestHomeSurprise(): void {
-  if (window.location.pathname !== '/app/home') return;
-  if (document.querySelector('.polaroid-modal-backdrop')) return;
-
-  const card = document.querySelector<HTMLElement>('.checkin-card');
-  const image = card?.querySelector<HTMLImageElement>('.checkin-card-image');
-  if (!card || !image || !isElementVisible(image)) return;
-
-  if (!image.complete || image.naturalWidth === 0) {
-    if (!pendingHomeImageLoads.has(image)) {
-      pendingHomeImageLoads.add(image);
-      image.addEventListener('load', schedulePillSync, { once: true });
-    }
-    return;
-  }
-
-  const imageUrl = image.currentSrc || image.src;
-  if (!imageUrl || readRevealState(imageUrl) || hasHomeAutoOpened(imageUrl)) return;
-
-  const pill = card.querySelector('.polaroid-scratch-pill');
-  const copy = pill
-    ? getSurfaceCopy(pill)
-    : { title: 'Bất ngờ mới dành cho bạn 💖', dateText: 'Check-in mới nhất' };
-
-  saveHomeAutoOpened(imageUrl);
-  openPolaroidCoverModal({
-    imageUrl,
-    title: copy.title,
-    dateText: copy.dateText,
-    forceScratch: true,
-    coverText: image.dataset.surpriseText,
-  });
-}
-
 let syncFrame: number | null = null;
 
 function schedulePillSync(): void {
@@ -237,7 +199,6 @@ function schedulePillSync(): void {
   if (typeof requestAnimationFrame === 'undefined') {
     injectLatestCheckinPill();
     syncScratchPills();
-    autoOpenLatestHomeSurprise();
     return;
   }
   if (syncFrame !== null) return;
@@ -245,7 +206,6 @@ function schedulePillSync(): void {
     syncFrame = null;
     injectLatestCheckinPill();
     syncScratchPills();
-    autoOpenLatestHomeSurprise();
   });
 }
 
@@ -389,28 +349,6 @@ function drawLoveFoil(
   ctx.fillText('CÀO ĐỂ MỞ', width / 2, titleStart + visibleLines.length * lineHeight + 5);
   ctx.restore();
   ctx.restore();
-}
-
-function hasHomeAutoOpened(imageUrl: string): boolean {
-  const key = `${HOME_AUTO_OPEN_PREFIX}${hashString(normalizeImageUrl(imageUrl))}`;
-  if (homeAutoOpenedImages.has(key)) return true;
-
-  try {
-    return sessionStorage.getItem(key) === 'shown';
-  } catch {
-    return false;
-  }
-}
-
-function saveHomeAutoOpened(imageUrl: string): void {
-  const key = `${HOME_AUTO_OPEN_PREFIX}${hashString(normalizeImageUrl(imageUrl))}`;
-  homeAutoOpenedImages.add(key);
-
-  try {
-    sessionStorage.setItem(key, 'shown');
-  } catch {
-    // The in-memory marker above still prevents repeat opens in this view.
-  }
 }
 
 function getStageCornerRadius(width: number, height: number): number {
