@@ -3,7 +3,7 @@ import type { CheckIn } from './api/types';
 import { store } from './store/index';
 
 const REVEAL_STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
-const DAILY_FIRST_PHOTO_PREFIX = 'lovecheck:daily-surprise:first-partner-photo:v1:';
+const DAILY_FIRST_PHOTO_PREFIX = 'lovecheck:daily-surprise:first-partner-photo:v2:';
 const MAX_TODAY_PAGES = 20;
 const DAILY_RETRY_DELAY_MS = 60_000;
 
