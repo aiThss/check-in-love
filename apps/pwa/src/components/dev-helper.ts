@@ -285,7 +285,7 @@ export function initDevHelper(): void {
   // Fill Mock Test Data Action
   fillMockBtn.addEventListener('click', () => {
     sessionStorage.setItem('dev_onboarding_displayName', 'Danh Thái');
-    sessionStorage.setItem('dev_onboarding_partnerName', 'Phương Trang');
+    sessionStorage.setItem('dev_onboarding_partnerName', 'Thúy Hà');
     sessionStorage.setItem('dev_onboarding_coupleCode', 'LOVE2026');
     sessionStorage.setItem('dev_onboarding_loveStartDate', '2024-01-01');
     sessionStorage.setItem('dev_onboarding_email', 'danhthai4560@gmail.com');
