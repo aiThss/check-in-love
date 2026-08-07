@@ -507,9 +507,10 @@ function mountGoogleSignInButton(
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn-ghost btn-full';
+    btn.dataset.devGoogleLogin = 'true';
     btn.style.cssText =
       'margin-top: 10px; font-size: 14px; border: 1.5px dashed var(--accent); color: var(--accent); padding: 12px 16px; border-radius: 20px; background: rgba(255, 59, 127, 0.08); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; width: 280px; max-width: 100%;';
-    btn.innerHTML = '<span>🌐</span><span>Login Google Mẫu (Dev)</span>';
+    btn.innerHTML = '<span>🧪</span><span>Test với Google Mẫu (Dev Local)</span>';
     btn.addEventListener('click', () => {
       onCredential('mock-google-new-user');
     });
@@ -547,7 +548,10 @@ function mountGoogleSignInButton(
       });
       status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
 
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.')) {
+      const isDevHost = window.location.hostname === 'localhost'
+        || window.location.hostname === '127.0.0.1'
+        || window.location.hostname.startsWith('192.168.');
+      if (isDevHost && !mount.querySelector('[data-dev-google-login]')) {
         mount.appendChild(createMockGoogleBtn());
       }
     })
