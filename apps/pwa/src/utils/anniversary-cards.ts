@@ -1516,6 +1516,11 @@ export function needsBirthdaySetup(me: Pick<MeResponse, 'user' | 'partnerUser'>)
   return !me.user.birthday || !(me.user.partnerBirthday || me.partnerUser?.birthday);
 }
 
+function isOnboardingRoute(): boolean {
+  return ['/onboarding', '/login', '/app/onboarding', '/app/google-onboarding']
+    .includes(window.location.pathname);
+}
+
 function notifyMissingBirthday(me: MeResponse): void {
   if (!needsBirthdaySetup(me)) return;
 
@@ -1634,6 +1639,9 @@ export function initAnniversaryCards(): void {
       mountTimer = null;
       void mountBirthdaySettings();
       mountPreviewButton(() => latestMe);
+      // Router navigation uses history.replaceState/pushState without a
+      // popstate event, so re-check after the newly rendered page settles.
+      void checkToday();
     }, 60);
   };
 
@@ -1645,6 +1653,9 @@ export function initAnniversaryCards(): void {
     checking = true;
     try {
       latestMe = await getMe();
+      // Do not interrupt onboarding with a birthday reminder. The session
+      // remains unchecked so the reminder can run after the final navigation.
+      if (isOnboardingRoute()) return;
       checkedSessionKey = sessionKey;
       notifyMissingBirthday(latestMe);
       const card = resolveOccasionCard(latestMe);
