@@ -3,7 +3,9 @@ import { showToast } from './toast';
 import { store, type AppState } from '../store';
 import {
   clearMockPreviewData,
+  clearMockNewUserData,
   MOCK_PREVIEW_TOKEN,
+  MOCK_GOOGLE_NEW_USER_TOKEN,
   seedMockPreviewData,
 } from '../dev/mock-data';
 
@@ -268,6 +270,7 @@ export function initDevHelper(): void {
 
   // Load a complete local preview dataset so every app page has realistic data.
   loadPreviewBtn.addEventListener('click', () => {
+    clearMockNewUserData();
     const preview = seedMockPreviewData();
     store.set({
       token: MOCK_PREVIEW_TOKEN,
@@ -281,13 +284,6 @@ export function initDevHelper(): void {
 
   // Fill Mock Test Data Action
   fillMockBtn.addEventListener('click', () => {
-    seedMockPreviewData({
-      displayName: 'Danh Thái',
-      partnerName: 'Phương Trang',
-      coupleCode: 'LOVE2026',
-      loveStartDate: '2024-01-01',
-      email: 'danhthai4560@gmail.com',
-    });
     sessionStorage.setItem('dev_onboarding_displayName', 'Danh Thái');
     sessionStorage.setItem('dev_onboarding_partnerName', 'Phương Trang');
     sessionStorage.setItem('dev_onboarding_coupleCode', 'LOVE2026');
@@ -300,9 +296,11 @@ export function initDevHelper(): void {
   // Clear Dev Cache
   clearBtn.addEventListener('click', () => {
     clearMockPreviewData();
-    if (store.get().token === MOCK_PREVIEW_TOKEN) {
+    clearMockNewUserData();
+    if (store.get().token === MOCK_PREVIEW_TOKEN || store.get().token === MOCK_GOOGLE_NEW_USER_TOKEN) {
       store.clear();
     }
+    sessionStorage.removeItem('google_authenticated_user');
     sessionStorage.removeItem('dev_onboarding_step');
     sessionStorage.removeItem('dev_onboarding_displayName');
     sessionStorage.removeItem('dev_onboarding_partnerName');

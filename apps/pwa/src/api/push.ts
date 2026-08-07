@@ -1,6 +1,6 @@
 import { apiFetch } from './client';
 import { logger } from '../utils/logger';
-import { isMockPreviewMode } from '../dev/mock-data';
+import { isMockLocalMode } from '../dev/mock-data';
 
 interface PushConfig {
   enabled: boolean;
@@ -73,7 +73,7 @@ async function saveSubscription(subscription: PushSubscription): Promise<void> {
 export async function ensurePushSubscription(
   requestPermission = false,
 ): Promise<PushSetupResult> {
-  if (isMockPreviewMode()) {
+  if (isMockLocalMode()) {
     return { status: 'disabled', message: 'Thông báo đang tắt trong dữ liệu demo local' };
   }
 
@@ -134,7 +134,7 @@ export async function ensurePushSubscription(
 }
 
 export async function getPushSetupState(): Promise<PushSetupResult> {
-  if (isMockPreviewMode()) return { status: 'disabled' };
+  if (isMockLocalMode()) return { status: 'disabled' };
 
   if (!isPushSupported()) {
     return { status: 'unsupported' };

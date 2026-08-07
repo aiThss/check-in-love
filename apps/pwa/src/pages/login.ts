@@ -498,8 +498,22 @@ function mountGoogleSignInButton(
     return;
   }
 
+  const createMockGoogleBtn = () => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-ghost btn-full';
+    btn.style.cssText =
+      'margin-top: 10px; font-size: 14px; border: 1.5px dashed var(--accent); color: var(--accent); padding: 12px 16px; border-radius: 20px; background: rgba(255, 59, 127, 0.08); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; width: 280px; max-width: 100%;';
+    btn.innerHTML = '<span>🌐</span><span>Login Google Mẫu (Dev)</span>';
+    btn.addEventListener('click', () => {
+      onCredential('mock-google-new-user');
+    });
+    return btn;
+  };
+
   if (!GOOGLE_CLIENT_ID) {
-    status.textContent = 'Đăng nhập Google chưa được cấu hình cho môi trường này.';
+    mount.replaceChildren(createMockGoogleBtn());
+    status.textContent = 'Chế độ Dev Local: Bấm nút trên để thử Luồng Google Mẫu.';
     return;
   }
 
@@ -527,10 +541,15 @@ function mountGoogleSignInButton(
         logo_alignment: 'left',
       });
       status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
+
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.')) {
+        mount.appendChild(createMockGoogleBtn());
+      }
     })
     .catch((error: unknown) => {
       console.error('[Google Sign-In] Failed to load or initialize Google Identity Services', error);
       status.innerHTML = 'Không thể tải đăng nhập Google.<br>Vui lòng kiểm tra kết nối mạng.';
+      mount.replaceChildren(createMockGoogleBtn());
     });
 }
 
@@ -599,14 +618,36 @@ async function handleGoogleLogin(
 
   try {
     const result = await loginWithGoogle({ credential });
+
     store.set({
       token: result.token,
       user: result.user,
       couple: result.couple,
     });
     localStorage.setItem('lovecheck_token', result.token);
-    showToast('Đăng nhập Google thành công! 🎉', 'success');
-    navigate('/app/home', true);
+
+    const isDevGoogleLogin = credential.startsWith('mock-google-');
+    if (isDevGoogleLogin) {
+      sessionStorage.setItem('google_authenticated_user', 'true');
+    }
+
+    if (!result.couple) {
+      sessionStorage.setItem('google_authenticated_user', 'true');
+      if (result.user.email) {
+        sessionStorage.setItem('dev_onboarding_email', result.user.email);
+      }
+      if (result.user.displayName) {
+        sessionStorage.setItem('dev_onboarding_displayName', result.user.displayName);
+      }
+      showToast('Đăng nhập Google thành công! Vui lòng hoàn tất thiết lập cặp đôi. ✨', 'info');
+      navigate('/app/onboarding', true);
+    } else if (isDevGoogleLogin) {
+      showToast('Đăng nhập Dev Google thành công! Hãy kiểm tra thông tin của bạn.', 'info');
+      navigate('/app/profile', true);
+    } else {
+      showToast('Đăng nhập Google thành công! 🎉', 'success');
+      navigate('/app/home', true);
+    }
   } catch (err) {
     buttonWrap.style.pointerEvents = '';
     buttonWrap.removeAttribute('aria-busy');

@@ -477,7 +477,7 @@ export function renderProfilePage(): HTMLElement {
     const couple = data.couple;
     const partner = data.partnerUser;
 
-    const days = calcDaysTogether(couple.loveStartDate);
+    const days = couple?.loveStartDate ? calcDaysTogether(couple.loveStartDate) : 0;
     const myAge = calcUserAge(user.birthday);
     const partnerAge = calcUserAge(user.partnerBirthday || partner?.birthday);
 
@@ -552,7 +552,7 @@ export function renderProfilePage(): HTMLElement {
           ">
             <span style="font-size:10px;opacity:0.9;font-weight:600;white-space:nowrap;">Streak 🔥</span>
             <strong style="font-size:12px;font-weight:800;white-space:nowrap;">
-              ${couple.streak || 0} ngày
+              ${couple?.streak || 0} ngày
             </strong>
           </div>
 
@@ -582,7 +582,7 @@ export function renderProfilePage(): HTMLElement {
       <div class="profile-days-section">
         <span style="font-size:32px;font-weight:800;color:var(--accent);">${days}</span>
         <span style="font-size:13px;font-weight:600;color:var(--text-secondary);">ngày bên nhau 💕</span>
-        <span style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Bắt đầu từ: ${couple.loveStartDate ? new Date(couple.loveStartDate).toLocaleDateString('vi-VN') : 'Chưa đặt'}</span>
+        <span style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Bắt đầu từ: ${couple?.loveStartDate ? new Date(couple.loveStartDate).toLocaleDateString('vi-VN') : 'Chưa đặt'}</span>
       </div>
 
       <div style="
@@ -599,7 +599,7 @@ export function renderProfilePage(): HTMLElement {
         box-shadow:0 2px 6px rgba(0, 0, 0, 1);
       " id="copy-code-container">
         <span style="color:var(--text-secondary);font-weight:500;">Couple Code:</span>
-        <strong style="color:var(--accent);font-family:monospace;font-size:16px;letter-spacing:1.5px;font-weight:700;">${couple.code || (couple as any).coupleCode || 'LOVE123'}</strong>
+        <strong style="color:var(--accent);font-family:monospace;font-size:16px;letter-spacing:1.5px;font-weight:700;">${couple?.code || (couple as any)?.coupleCode || 'LOVE123'}</strong>
         <button type="button" aria-label="Sao chép" title="Sao chép couple code" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;background:rgba(255, 59, 127, 0.1);border:1px solid rgba(255, 59, 127, 0.2);color:var(--accent);cursor:pointer;transition:all 0.2s ease;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -632,8 +632,10 @@ export function renderProfilePage(): HTMLElement {
 
     // Click to copy code
     profileCard.querySelector('#copy-code-container')?.addEventListener('click', () => {
-      navigator.clipboard.writeText(couple.code);
-      showToast('Đã sao chép couple code!', 'success');
+      if (couple?.code) {
+        navigator.clipboard.writeText(couple.code);
+        showToast('Đã sao chép couple code!', 'success');
+      }
     });
 
     // Avatar Upload Triggers
@@ -717,7 +719,11 @@ export function renderProfilePage(): HTMLElement {
       <span style="font-size:16px;color:var(--text-secondary);">→</span>
     `;
     editRow.addEventListener('click', () => {
-      showEditProfileModal(user, couple);
+      if (couple) {
+        showEditProfileModal(user, couple);
+      } else {
+        showToast('Vui lòng hoàn tất ghép đôi cặp đôi trước.', 'info');
+      }
     });
     settingsContainer.appendChild(editRow);
 

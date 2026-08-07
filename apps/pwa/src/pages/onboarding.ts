@@ -46,16 +46,18 @@ export function renderOnboardingPage(): HTMLElement {
   let currentStep = savedStep !== null ? Math.max(0, Math.min(4, parseInt(savedStep, 10))) : 0;
   const TOTAL_STEPS = 5; // Added OTP step
 
+  const isGoogleUser = sessionStorage.getItem('google_authenticated_user') === 'true' || Boolean(store.get().user?.googleId);
+
   const formData = {
-    displayName: sessionStorage.getItem('dev_onboarding_displayName') || '',
+    displayName: sessionStorage.getItem('dev_onboarding_displayName') || store.get().user?.displayName || '',
     partnerName: sessionStorage.getItem('dev_onboarding_partnerName') || '',
     coupleCode: sessionStorage.getItem('dev_onboarding_coupleCode') || '',
     loveStartDate: sessionStorage.getItem('dev_onboarding_loveStartDate') || '',
-    email: sessionStorage.getItem('dev_onboarding_email') || '',
+    email: sessionStorage.getItem('dev_onboarding_email') || store.get().user?.email || '',
     password: '',
     otpCode: '',
-    useAccount: sessionStorage.getItem('dev_onboarding_useAccount') === 'true',
-    emailVerified: false,
+    useAccount: isGoogleUser ? false : sessionStorage.getItem('dev_onboarding_useAccount') === 'true',
+    emailVerified: isGoogleUser,
   };
 
   // Root container
@@ -1009,6 +1011,15 @@ export function renderOnboardingPage(): HTMLElement {
 
 
   function showSuccessAndNavigate() {
+    sessionStorage.removeItem('google_authenticated_user');
+    sessionStorage.removeItem('dev_onboarding_step');
+    sessionStorage.removeItem('dev_onboarding_displayName');
+    sessionStorage.removeItem('dev_onboarding_partnerName');
+    sessionStorage.removeItem('dev_onboarding_coupleCode');
+    sessionStorage.removeItem('dev_onboarding_loveStartDate');
+    sessionStorage.removeItem('dev_onboarding_email');
+    sessionStorage.removeItem('dev_onboarding_useAccount');
+
     root.innerHTML = '';
     root.style.cssText +=
       'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;';
@@ -1041,8 +1052,8 @@ export function renderOnboardingPage(): HTMLElement {
       case 1: renderStep2(); break;
       case 2: renderStep3(); break;
       case 3:
-        // If using account, show OTP step; otherwise show date step
-        if (formData.useAccount) {
+        // If using account and not Google user, show OTP step; otherwise show date step
+        if (formData.useAccount && !isGoogleUser) {
           renderStep4OTP();
         } else {
           renderStepDate();

@@ -349,7 +349,7 @@ function isSameDay(left: CalendarDate, right: CalendarDate): boolean {
 
 function createContext(me: MeResponse, now = new Date()): OccasionContext {
   const today = getCalendarDate(now);
-  const start = me.couple.loveStartDate ? getCalendarDate(me.couple.loveStartDate) : undefined;
+  const start = me.couple?.loveStartDate ? getCalendarDate(me.couple.loveStartDate) : undefined;
   const birthday = me.user.partnerBirthday || me.partnerUser?.birthday;
   return {
     today,

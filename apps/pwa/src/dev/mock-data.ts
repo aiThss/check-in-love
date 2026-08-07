@@ -9,6 +9,7 @@ import type {
 
 export const MOCK_PREVIEW_TOKEN = 'mock_preview_token';
 const MOCK_DATA_KEY = 'lovecheck_dev_preview_data';
+const MOCK_NEW_USER_KEY = 'lovecheck_dev_new_google_user';
 const MOCK_DATA_VERSION = 2;
 
 export interface MockPreviewData {
@@ -291,8 +292,89 @@ function buildMockData(overrides: MockPreviewOverrides = {}): MockPreviewData {
   };
 }
 
+export const MOCK_GOOGLE_NEW_USER_TOKEN = 'mock_google_token_new_user';
+
+export interface MockNewGoogleUserResponse {
+  token: typeof MOCK_GOOGLE_NEW_USER_TOKEN;
+  user: User;
+  couple: null;
+  isNewUser: true;
+}
+
+function clearMockOnboardingState(): void {
+  sessionStorage.removeItem('google_authenticated_user');
+  sessionStorage.removeItem('dev_onboarding_displayName');
+  sessionStorage.removeItem('dev_onboarding_partnerName');
+  sessionStorage.removeItem('dev_onboarding_coupleCode');
+  sessionStorage.removeItem('dev_onboarding_loveStartDate');
+  sessionStorage.removeItem('dev_onboarding_email');
+  sessionStorage.removeItem('dev_onboarding_useAccount');
+  sessionStorage.removeItem('dev_onboarding_step');
+}
+
+export function isMockNewUserMode(): boolean {
+  return localStorage.getItem('lovecheck_token') === MOCK_GOOGLE_NEW_USER_TOKEN;
+}
+
+export function createMockNewGoogleUserResponse(): MockNewGoogleUserResponse {
+  clearMockPreviewData();
+  clearMockNewUserData();
+  clearMockOnboardingState();
+
+  const uniqueSuffix = Date.now().toString().slice(-6);
+  const user: User = {
+    id: `mock_google_user_${uniqueSuffix}`,
+    displayName: '',
+    partnerName: '',
+    email: `test.google.${uniqueSuffix}@gmail.com`,
+    avatarUrl: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
+    deviceId: 'mock-device-local',
+    coupleId: '',
+    googleId: `mock-google-${uniqueSuffix}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const response: MockNewGoogleUserResponse = {
+    token: MOCK_GOOGLE_NEW_USER_TOKEN,
+    user,
+    couple: null,
+    isNewUser: true,
+  };
+  localStorage.setItem(MOCK_NEW_USER_KEY, JSON.stringify(user));
+  return response;
+}
+
+export function loadMockNewGoogleUserResponse(): MockNewGoogleUserResponse {
+  try {
+    const raw = localStorage.getItem(MOCK_NEW_USER_KEY);
+    if (raw) {
+      const user = JSON.parse(raw) as User;
+      if (user && typeof user.id === 'string' && typeof user.email === 'string') {
+        return {
+          token: MOCK_GOOGLE_NEW_USER_TOKEN,
+          user,
+          couple: null,
+          isNewUser: true,
+        };
+      }
+    }
+  } catch {
+    // Recreate a valid local Google user below.
+  }
+
+  return createMockNewGoogleUserResponse();
+}
+
+export function clearMockNewUserData(): void {
+  localStorage.removeItem(MOCK_NEW_USER_KEY);
+}
+
 export function isMockPreviewMode(): boolean {
   return localStorage.getItem('lovecheck_token') === MOCK_PREVIEW_TOKEN;
+}
+
+export function isMockLocalMode(): boolean {
+  return isMockPreviewMode() || isMockNewUserMode();
 }
 
 export function loadMockPreviewData(): MockPreviewData {

@@ -1,10 +1,12 @@
 import { clearQueryCache } from './api/query-cache';
 import { clearPageCache } from './router';
 import { store } from './store/index';
+import { clearMockNewUserData } from './dev/mock-data';
 
 /** Clear all data that belongs to the signed-in couple without reloading the app. */
 export function clearPrivateClientState(): void {
   store.clear();
+  clearMockNewUserData();
   clearPageCache();
   clearQueryCache();
 

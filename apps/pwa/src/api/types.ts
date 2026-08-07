@@ -15,6 +15,7 @@ export type MoodType =
 
 export interface User extends Omit<SharedUser, 'role' | 'status'> {
   deviceId: string;
+  googleId?: string;
 }
 
 export interface Couple {

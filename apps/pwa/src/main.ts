@@ -140,6 +140,7 @@ initRouter({
   '/install': () => import('./pages/install').then(({ renderInstallPage }) => renderInstallPage()),
   '/login': () => import('./pages/login').then(({ renderLoginPage }) => renderLoginPage()),
   '/onboarding': () => import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage()),
+  '/app/onboarding': () => import('./pages/onboarding').then(({ renderOnboardingPage }) => renderOnboardingPage()),
   '/blocked': () => renderBlockedPage(),
   '/app/home': () => import('./pages/home').then(({ renderHomePage }) => renderHomePage()),
   '/app/checkin': () => import('./pages/checkin').then(({ renderCheckinPage }) => renderCheckinPage()),

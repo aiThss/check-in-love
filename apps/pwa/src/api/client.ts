@@ -2,7 +2,6 @@
 
 import { navigate } from '../router';
 import { clearPrivateClientState } from '../session';
-import { MOCK_PREVIEW_TOKEN, seedMockPreviewData } from '../dev/mock-data';
 
 declare const __API_URL__: string;
 
@@ -60,29 +59,6 @@ function getApiUrl(): string {
 
 const API_URL: string = getApiUrl();
 
-function getLocalMockGoogleResponse<T>(path: string, options: RequestInit): T | null {
-  if (path !== '/auth/google' || options.method?.toUpperCase() !== 'POST' || typeof options.body !== 'string') {
-    return null;
-  }
-
-  try {
-    const payload = JSON.parse(options.body) as { credential?: unknown };
-    if (typeof payload.credential !== 'string' || !payload.credential.startsWith('mock-google-')) {
-      return null;
-    }
-
-    const preview = seedMockPreviewData();
-    return {
-      token: MOCK_PREVIEW_TOKEN,
-      user: preview.user,
-      couple: preview.couple,
-      isNewUser: false,
-    } as T;
-  } catch {
-    return null;
-  }
-}
-
 // ── Error class ───────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
@@ -99,10 +75,6 @@ export class ApiError extends Error {
 // ── Core fetch wrapper ────────────────────────────────────────────────────────
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  // The Google mock button is intentionally usable without an API/MongoDB server.
-  const localMockResponse = getLocalMockGoogleResponse<T>(path, options);
-  if (localMockResponse) return localMockResponse;
-
   const token = localStorage.getItem('lovecheck_token');
 
   const headers: Record<string, string> = {
