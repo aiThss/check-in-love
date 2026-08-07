@@ -279,6 +279,8 @@ class MainActivity : ComponentActivity() {
                                     null,
                                 )
 
+                                installAndroidCardLayoutGuard(view)
+
                                 pendingFcmToken?.let { token ->
                                     pendingFcmToken = null
                                     injectFcmToken(token)
@@ -457,6 +459,68 @@ class MainActivity : ComponentActivity() {
     private fun initialUrlFromIntent(intent: Intent?): String {
         val data = intent?.data ?: return APP_URL
         return if (isAllowedInWebView(data)) data.toString() else APP_URL
+    }
+
+    private fun installAndroidCardLayoutGuard(view: WebView) {
+        // Android WebView can report a zero-sized scratch canvas for several frames
+        // right after a fixed modal is attached. The web card retries only a handful
+        // of animation frames, closes itself, and its focus/pageshow retry loop then
+        // opens it again, producing a stack of "Thiệp chưa tải xong" toasts.
+        // Keep this fix APK-only: give the card shell a stable viewport-sized layout
+        // before the PWA's canvas initializer measures it. No PWA source is changed.
+        view.evaluateJavascript(
+            """
+            (function installLoveCheckAndroidCardLayoutGuard() {
+              if (window.__loveCheckAndroidCardLayoutGuardInstalled) return;
+              window.__loveCheckAndroidCardLayoutGuardInstalled = true;
+
+              var style = document.getElementById('lovecheck-android-card-layout-guard');
+              if (!style) {
+                style = document.createElement('style');
+                style.id = 'lovecheck-android-card-layout-guard';
+                style.textContent =
+                  '.android-wrapper .occasion-overlay{' +
+                    'width:100vw!important;height:100dvh!important;min-height:100vh!important;' +
+                  '}' +
+                  '.android-wrapper .occasion-shell{' +
+                    'min-width:1px!important;min-height:1px!important;' +
+                  '}' +
+                  '.android-wrapper .occasion-scratch{' +
+                    'display:block!important;min-width:1px!important;min-height:1px!important;' +
+                  '}';
+                (document.head || document.documentElement).appendChild(style);
+              }
+
+              var primeCardLayout = function(root) {
+                var overlay = root && root.matches && root.matches('.occasion-overlay')
+                  ? root
+                  : root && root.querySelector
+                    ? root.querySelector('.occasion-overlay')
+                    : null;
+                if (!overlay) return;
+
+                var shell = overlay.querySelector('.occasion-shell');
+                var canvas = overlay.querySelector('.occasion-scratch');
+                if (!shell || !canvas) return;
+
+                // Force one synchronous layout pass before the card's next rAF.
+                shell.getBoundingClientRect();
+                canvas.getBoundingClientRect();
+              };
+
+              var observer = new MutationObserver(function(records) {
+                records.forEach(function(record) {
+                  record.addedNodes.forEach(function(node) {
+                    if (node && node.nodeType === 1) primeCardLayout(node);
+                  });
+                });
+              });
+              observer.observe(document.documentElement, { childList: true, subtree: true });
+              primeCardLayout(document);
+            })();
+            """.trimIndent(),
+            null,
+        )
     }
 
     private fun injectFcmToken(token: String) {
