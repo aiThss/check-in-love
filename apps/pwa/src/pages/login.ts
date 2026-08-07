@@ -522,8 +522,8 @@ function mountGoogleSignInButton(
         theme: 'outline',
         size: 'large',
         text: 'signin_with',
-        shape: 'rectangular',
-        width: 320,
+        shape: 'pill',
+        width: 280,
         logo_alignment: 'left',
       });
       status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
