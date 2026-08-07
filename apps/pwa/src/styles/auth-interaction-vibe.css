@@ -649,8 +649,11 @@
   align-items: center;
   gap: 12px;
   text-align: left;
-  padding: 12px;
-  border-radius: 16px;
+  padding: 12px 16px;
+  width: 280px;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.5);
   border: 1.5px solid rgba(255, 59, 127, 0.22);
 }
