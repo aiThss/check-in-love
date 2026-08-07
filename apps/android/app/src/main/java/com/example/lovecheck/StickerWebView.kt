@@ -18,6 +18,10 @@ import org.json.JSONObject
  * WebView does not advertise rich-content support by default, so Android keyboards
  * fall back to copying stickers into the clipboard. This wrapper advertises image
  * MIME types and forwards committed sticker bytes to the PWA JavaScript bridge.
+ *
+ * It also installs Android-only layout guards for the two canvas-based scratch UIs.
+ * Chromium WebView on some devices intermittently resolves their percentage/aspect
+ * ratio heights as a tiny horizontal strip even though normal Chrome/PWA is fine.
  */
 @SuppressLint("ViewConstructor")
 class StickerWebView(context: Context) : WebView(context) {
@@ -25,28 +29,27 @@ class StickerWebView(context: Context) : WebView(context) {
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
 
-        // Install the Android-only occasion-card workaround repeatedly while the SPA
-        // boots. A WebView navigation replaces the JS world, so later passes make sure
-        // the hook exists in the final document before the automatic card can open.
-        CARD_FIX_DELAYS_MS.forEach { delayMs ->
-            postDelayed({ installAndroidOccasionCardFix() }, delayMs)
+        // A SPA navigation can replace the JavaScript world. Install the Android-only
+        // guards repeatedly during startup so the final document always receives them.
+        WEB_FIX_DELAYS_MS.forEach { delayMs ->
+            postDelayed({ installAndroidWebViewFixes() }, delayMs)
         }
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         if (hasWindowFocus) {
-            post { installAndroidOccasionCardFix() }
+            post { installAndroidWebViewFixes() }
         }
     }
 
-    private fun installAndroidOccasionCardFix() {
+    private fun installAndroidWebViewFixes() {
         evaluateJavascript(
             """
             (function () {
               if (!document || !document.documentElement || typeof Node === 'undefined') return;
 
-              var STYLE_ID = 'lovecheck-android-occasion-card-fix-v3';
+              var STYLE_ID = 'lovecheck-android-canvas-layout-fix-v4';
               var style = document.getElementById(STYLE_ID);
               if (!style) {
                 style = document.createElement('style');
@@ -69,15 +72,40 @@ class StickerWebView(context: Context) : WebView(context) {
                     'top:0!important;left:0!important;right:auto!important;bottom:auto!important;' +
                     'max-width:none!important;max-height:none!important;' +
                     'box-sizing:border-box!important;' +
+                  '}' +
+                  '.android-wrapper .polaroid-modal-backdrop{' +
+                    'box-sizing:border-box!important;overflow:hidden!important;' +
+                    'align-items:center!important;justify-content:center!important;' +
+                  '}' +
+                  '.android-wrapper .polaroid-modal-container{' +
+                    'box-sizing:border-box!important;' +
+                    'animation:none!important;transform:none!important;' +
+                  '}' +
+                  '.android-wrapper .polaroid-stage-view{' +
+                    'box-sizing:border-box!important;aspect-ratio:auto!important;' +
+                    'flex:none!important;min-height:1px!important;' +
+                    'animation:none!important;transform:none!important;' +
+                  '}' +
+                  '.android-wrapper .polaroid-stage-photo,' +
+                  '.android-wrapper .polaroid-stage-canvas{' +
+                    'box-sizing:border-box!important;display:block!important;' +
+                    'top:0!important;left:0!important;right:auto!important;bottom:auto!important;' +
+                    'max-width:none!important;max-height:none!important;' +
                   '}';
                 (document.head || document.documentElement).appendChild(style);
               }
 
+              var px = function (value) {
+                var parsed = parseFloat(value || '0');
+                return Number.isFinite(parsed) ? parsed : 0;
+              };
+
               var readCssPx = function (name) {
                 try {
-                  var value = getComputedStyle(document.documentElement).getPropertyValue(name);
-                  var parsed = parseFloat(value || '0');
-                  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+                  return Math.max(
+                    0,
+                    px(getComputedStyle(document.documentElement).getPropertyValue(name))
+                  );
                 } catch (_) {
                   return 0;
                 }
@@ -95,14 +123,19 @@ class StickerWebView(context: Context) : WebView(context) {
                 matching.slice(1).forEach(function (toast) { toast.remove(); });
               };
 
-              var normalizeCard = function (root) {
-                var overlay = null;
-                if (root && root.nodeType === 1 && root.matches && root.matches('.occasion-overlay')) {
-                  overlay = root;
-                } else if (root && root.querySelector) {
-                  overlay = root.querySelector('.occasion-overlay');
+              var findFromRoot = function (root, selector) {
+                if (root && root.nodeType === 1 && root.matches && root.matches(selector)) return root;
+                if (root && root.querySelector) {
+                  var nested = root.querySelector(selector);
+                  if (nested) return nested;
                 }
-                if (!overlay) overlay = document.querySelector('.occasion-overlay');
+                return document.querySelector(selector);
+              };
+
+              // Occasion-card guard. This fixes the separate anniversary/birthday card
+              // without touching its PWA source.
+              var normalizeOccasionCard = function (root) {
+                var overlay = findFromRoot(root, '.occasion-overlay');
                 if (!overlay || !overlay.isConnected) return;
 
                 var shell = overlay.querySelector('.occasion-shell');
@@ -120,9 +153,6 @@ class StickerWebView(context: Context) : WebView(context) {
                 var bottomPadding = Math.max(16, Math.round(navBar + 8));
                 var availableHeight = Math.max(240, viewportHeight - topPadding - bottomPadding);
 
-                // MainActivity used to inject 100dvh/min-height rules. Inline !important
-                // values here deliberately win over that older guard so the modal stays
-                // inside the real WebView viewport and below the status bar.
                 overlay.style.setProperty('position', 'fixed', 'important');
                 overlay.style.setProperty('inset', '0px', 'important');
                 overlay.style.setProperty('width', 'auto', 'important');
@@ -143,15 +173,11 @@ class StickerWebView(context: Context) : WebView(context) {
                 shell.style.setProperty('animation', 'none', 'important');
                 shell.style.setProperty('transform', 'none', 'important');
 
-                // Force layout only after the modal has the Android-safe box above.
                 var shellRect = shell.getBoundingClientRect();
                 var paperRect = paper.getBoundingClientRect();
                 var width = Math.max(1, Math.round(shellRect.width || paperRect.width || 1));
                 var height = Math.max(1, Math.round(shellRect.height || paperRect.height || 1));
 
-                // If this WebView briefly reports an empty auto-height shell, the paper
-                // already has a 540px minimum height. Use that actual paper box once,
-                // but never force the shell taller than the safe viewport.
                 if (height < 2 && paperRect.height >= 2) {
                   height = Math.min(availableHeight, Math.round(paperRect.height));
                   shell.style.setProperty('height', height + 'px', 'important');
@@ -166,10 +192,6 @@ class StickerWebView(context: Context) : WebView(context) {
                   canvas.getAttribute('data-android-layout-width') !== widthText ||
                   canvas.getAttribute('data-android-layout-height') !== heightText
                 ) {
-                  // This is the core fix. Android WebView intermittently resolves the
-                  // PWA's absolute canvas height:100% as a tiny strip. Give the canvas
-                  // the exact rendered shell box in CSS pixels before drawScratchCover
-                  // calls getBoundingClientRect().
                   canvas.style.setProperty('position', 'absolute', 'important');
                   canvas.style.setProperty('top', '0px', 'important');
                   canvas.style.setProperty('left', '0px', 'important');
@@ -181,83 +203,178 @@ class StickerWebView(context: Context) : WebView(context) {
                   canvas.setAttribute('data-android-layout-height', heightText);
                 }
 
-                // Materialize the corrected rectangle synchronously. openCard() calls
-                // initializeScratch() immediately after appendChild returns, so this
-                // must happen in the same JS turn rather than in a MutationObserver.
                 canvas.getBoundingClientRect();
 
-                if (!shell.__loveCheckAndroidCardResizeV3 && typeof ResizeObserver !== 'undefined') {
-                  var resizeObserver = new ResizeObserver(function () {
+                if (!shell.__loveCheckAndroidCardResizeV4 && typeof ResizeObserver !== 'undefined') {
+                  var observer = new ResizeObserver(function () {
                     if (!overlay.isConnected) {
-                      resizeObserver.disconnect();
+                      observer.disconnect();
                       return;
                     }
-                    normalizeCard(overlay);
+                    normalizeOccasionCard(overlay);
                   });
-                  resizeObserver.observe(shell);
-                  resizeObserver.observe(paper);
-                  shell.__loveCheckAndroidCardResizeV3 = resizeObserver;
+                  observer.observe(shell);
+                  observer.observe(paper);
+                  shell.__loveCheckAndroidCardResizeV4 = observer;
                 }
+              };
 
-                // Fonts and the 100-day cover image can settle after the first layout.
-                // Re-measure a few times, without touching PWA source or forcing a
-                // global resize event that could recursively redraw the canvas.
-                if (!overlay.__loveCheckAndroidSettlesV3) {
-                  overlay.__loveCheckAndroidSettlesV3 = true;
-                  [0, 80, 240].forEach(function (delay) {
+              // Daily-photo Love Foil guard. This is intentionally separate from the
+              // occasion-card fix: the broken horizontal strip in Android is the HUD +
+              // canvas of .polaroid-stage-view, whose CSS height comes only from
+              // aspect-ratio. Some WebViews collapse that flex item's aspect-ratio.
+              var normalizePolaroid = function (root) {
+                var backdrop = findFromRoot(root, '.polaroid-modal-backdrop');
+                if (!backdrop || !backdrop.isConnected) return;
+
+                var modal = backdrop.querySelector('.polaroid-modal-container');
+                var stage = backdrop.querySelector('.polaroid-stage-view');
+                var canvas = backdrop.querySelector('.polaroid-stage-canvas');
+                var photo = backdrop.querySelector('.polaroid-stage-photo');
+                var footer = backdrop.querySelector('.polaroid-love-foil-footer');
+                if (!modal || !stage || !canvas || !photo) return;
+
+                var viewportWidth = Math.max(
+                  1,
+                  Math.round(window.innerWidth || document.documentElement.clientWidth || 1)
+                );
+                var viewportHeight = Math.max(
+                  1,
+                  Math.round(window.innerHeight || document.documentElement.clientHeight || 1)
+                );
+                var statusBar = readCssPx('--android-status-bar');
+                var navBar = readCssPx('--android-nav-bar');
+                var topPadding = Math.max(18, Math.round(statusBar + 10));
+                var bottomPadding = Math.max(18, Math.round(navBar + 10));
+                var sidePadding = 14;
+                var usableHeight = Math.max(180, viewportHeight - topPadding - bottomPadding);
+                var modalWidth = Math.max(180, Math.min(420, viewportWidth - sidePadding * 2));
+
+                backdrop.style.setProperty('position', 'fixed', 'important');
+                backdrop.style.setProperty('inset', '0px', 'important');
+                backdrop.style.setProperty('box-sizing', 'border-box', 'important');
+                backdrop.style.setProperty('padding-top', topPadding + 'px', 'important');
+                backdrop.style.setProperty('padding-bottom', bottomPadding + 'px', 'important');
+                backdrop.style.setProperty('padding-left', sidePadding + 'px', 'important');
+                backdrop.style.setProperty('padding-right', sidePadding + 'px', 'important');
+                backdrop.style.setProperty('overflow', 'hidden', 'important');
+                backdrop.style.setProperty('align-items', 'center', 'important');
+                backdrop.style.setProperty('justify-content', 'center', 'important');
+
+                modal.style.setProperty('width', modalWidth + 'px', 'important');
+                modal.style.setProperty('max-width', modalWidth + 'px', 'important');
+                modal.style.setProperty('max-height', usableHeight + 'px', 'important');
+                modal.style.setProperty('box-sizing', 'border-box', 'important');
+                modal.style.setProperty('animation', 'none', 'important');
+                modal.style.setProperty('transform', 'none', 'important');
+
+                // Read the actual content box after fixing modal width. The footer is
+                // included so a short/landscape viewport still gets a square stage that
+                // fits without being clipped.
+                var modalStyle = getComputedStyle(modal);
+                var horizontalPadding = px(modalStyle.paddingLeft) + px(modalStyle.paddingRight);
+                var verticalPadding = px(modalStyle.paddingTop) + px(modalStyle.paddingBottom);
+                var gap = px(modalStyle.rowGap || modalStyle.gap) || 10;
+                var contentWidth = Math.max(1, Math.floor(modal.clientWidth - horizontalPadding));
+                var footerHeight = footer ? Math.max(0, Math.round(footer.offsetHeight)) : 0;
+                if (footerHeight < 1) footerHeight = 68;
+                var maxStageFromHeight = Math.max(
+                  1,
+                  Math.floor(usableHeight - verticalPadding - gap - footerHeight - 2)
+                );
+                var stageSize = Math.max(1, Math.min(contentWidth, maxStageFromHeight));
+
+                // Never trust aspect-ratio for this WebView. Give the stage, image and
+                // canvas the same explicit square CSS box before the PWA's rAF resize()
+                // reads stage.offsetWidth/offsetHeight.
+                stage.style.setProperty('aspect-ratio', 'auto', 'important');
+                stage.style.setProperty('flex', 'none', 'important');
+                stage.style.setProperty('align-self', 'center', 'important');
+                stage.style.setProperty('width', stageSize + 'px', 'important');
+                stage.style.setProperty('height', stageSize + 'px', 'important');
+                stage.style.setProperty('min-width', stageSize + 'px', 'important');
+                stage.style.setProperty('min-height', stageSize + 'px', 'important');
+                stage.style.setProperty('max-width', stageSize + 'px', 'important');
+                stage.style.setProperty('max-height', stageSize + 'px', 'important');
+                stage.style.setProperty('animation', 'none', 'important');
+                stage.style.setProperty('transform', 'none', 'important');
+
+                [photo, canvas].forEach(function (element) {
+                  element.style.setProperty('position', 'absolute', 'important');
+                  element.style.setProperty('top', '0px', 'important');
+                  element.style.setProperty('left', '0px', 'important');
+                  element.style.setProperty('right', 'auto', 'important');
+                  element.style.setProperty('bottom', 'auto', 'important');
+                  element.style.setProperty('width', stageSize + 'px', 'important');
+                  element.style.setProperty('height', stageSize + 'px', 'important');
+                  element.style.setProperty('max-width', 'none', 'important');
+                  element.style.setProperty('max-height', 'none', 'important');
+                });
+
+                stage.setAttribute('data-android-stage-size', String(stageSize));
+                stage.getBoundingClientRect();
+                canvas.getBoundingClientRect();
+
+                // The PWA has its own ResizeObserver on the stage. Changing the explicit
+                // box above wakes that observer so it redraws the foil at the corrected
+                // dimensions; no global resize event or PWA modification is required.
+                if (!backdrop.__loveCheckAndroidPolaroidSettlesV4) {
+                  backdrop.__loveCheckAndroidPolaroidSettlesV4 = true;
+                  [0, 50, 160].forEach(function (delay) {
                     setTimeout(function () {
-                      if (overlay.isConnected) normalizeCard(overlay);
+                      if (backdrop.isConnected) normalizePolaroid(backdrop);
                     }, delay);
                   });
                 }
               };
 
-              // MutationObserver is retained as a fallback and for toast cleanup, but
-              // it is too late for the first canvas measurement by itself.
-              if (!window.__loveCheckAndroidOccasionObserverV3) {
-                window.__loveCheckAndroidOccasionObserverV3 = new MutationObserver(function (records) {
+              if (!window.__loveCheckAndroidCanvasObserverV4) {
+                window.__loveCheckAndroidCanvasObserverV4 = new MutationObserver(function (records) {
                   records.forEach(function (record) {
                     record.addedNodes.forEach(function (node) {
-                      if (node && node.nodeType === 1) normalizeCard(node);
+                      if (!node || node.nodeType !== 1) return;
+                      normalizeOccasionCard(node);
+                      normalizePolaroid(node);
                     });
                   });
                   pruneDuplicateCardToasts();
                 });
-                window.__loveCheckAndroidOccasionObserverV3.observe(
+                window.__loveCheckAndroidCanvasObserverV4.observe(
                   document.documentElement,
                   { childList: true, subtree: true }
                 );
               }
 
-              // Intercept appendChild once. The PWA appends .occasion-overlay directly
-              // to document.body and then initializes its canvas in the same call stack.
-              // Normalizing immediately after the native append, before appendChild
-              // returns, guarantees the canvas has a real width/height on that first draw.
-              if (!window.__loveCheckAndroidAppendChildV3) {
+              // Both modals are appended directly to body. Hook appendChild so layout is
+              // normalized synchronously before either renderer can measure its canvas.
+              if (!window.__loveCheckAndroidAppendChildV4) {
                 var nativeAppendChild = Node.prototype.appendChild;
-                window.__loveCheckAndroidAppendChildV3 = nativeAppendChild;
+                window.__loveCheckAndroidAppendChildV4 = nativeAppendChild;
                 Node.prototype.appendChild = function (child) {
                   var result = nativeAppendChild.call(this, child);
                   try {
                     if (child && child.nodeType === 1) {
-                      var isOverlay = child.matches && child.matches('.occasion-overlay');
-                      var containsOverlay = child.querySelector && child.querySelector('.occasion-overlay');
-                      if (isOverlay || containsOverlay) normalizeCard(child);
+                      normalizeOccasionCard(child);
+                      normalizePolaroid(child);
                     }
                   } catch (_) {
-                    // Never interfere with normal DOM insertion if the guard itself fails.
+                    // The guard must never interfere with normal DOM insertion.
                   }
                   return result;
                 };
               }
 
-              if (!window.__loveCheckAndroidViewportFixV3) {
-                window.__loveCheckAndroidViewportFixV3 = function () { normalizeCard(document); };
-                window.addEventListener('resize', window.__loveCheckAndroidViewportFixV3, { passive: true });
-                window.addEventListener('orientationchange', window.__loveCheckAndroidViewportFixV3, { passive: true });
+              if (!window.__loveCheckAndroidViewportFixV4) {
+                window.__loveCheckAndroidViewportFixV4 = function () {
+                  normalizeOccasionCard(document);
+                  normalizePolaroid(document);
+                };
+                window.addEventListener('resize', window.__loveCheckAndroidViewportFixV4, { passive: true });
+                window.addEventListener('orientationchange', window.__loveCheckAndroidViewportFixV4, { passive: true });
               }
 
-              normalizeCard(document);
+              normalizeOccasionCard(document);
+              normalizePolaroid(document);
               pruneDuplicateCardToasts();
             })();
             """.trimIndent(),
@@ -409,7 +526,7 @@ class StickerWebView(context: Context) : WebView(context) {
             "image/jpeg",
             "image/*",
         )
-        private val CARD_FIX_DELAYS_MS = longArrayOf(0L, 50L, 150L, 500L, 1_500L, 3_000L)
+        private val WEB_FIX_DELAYS_MS = longArrayOf(0L, 50L, 150L, 500L, 1_500L, 3_000L)
         private const val MAX_STICKER_BYTES = 6 * 1024 * 1024
     }
 }
