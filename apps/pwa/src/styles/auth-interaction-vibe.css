@@ -255,6 +255,38 @@
   outline: none !important;
 }
 
+/* Keep the message and reply composers consistent with the borderless inline composer. */
+:root:not([data-theme='dark']) .messages-input-wrap input,
+:root:not([data-theme='dark']) .messages-input-wrap input:hover,
+:root:not([data-theme='dark']) .messages-input-wrap input:focus,
+:root:not([data-theme='dark']) .messages-input-wrap input:focus-visible,
+:root:not([data-theme='dark']) .reply-page-form input,
+:root:not([data-theme='dark']) .reply-page-form input:hover,
+:root:not([data-theme='dark']) .reply-page-form input:focus,
+:root:not([data-theme='dark']) .reply-page-form input:focus-visible,
+[data-theme='light'] .messages-input-wrap input,
+[data-theme='light'] .messages-input-wrap input:hover,
+[data-theme='light'] .messages-input-wrap input:focus,
+[data-theme='light'] .messages-input-wrap input:focus-visible,
+[data-theme='light'] .reply-page-form input,
+[data-theme='light'] .reply-page-form input:hover,
+[data-theme='light'] .reply-page-form input:focus,
+[data-theme='light'] .reply-page-form input:focus-visible,
+[data-theme='dark'] .messages-input-wrap input,
+[data-theme='dark'] .messages-input-wrap input:hover,
+[data-theme='dark'] .messages-input-wrap input:focus,
+[data-theme='dark'] .messages-input-wrap input:focus-visible,
+[data-theme='dark'] .reply-page-form input,
+[data-theme='dark'] .reply-page-form input:hover,
+[data-theme='dark'] .reply-page-form input:focus,
+[data-theme='dark'] .reply-page-form input:focus-visible {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 .checkin-page #text-input {
   border: 1px solid var(--border) !important;
   border-radius: 22px !important;
