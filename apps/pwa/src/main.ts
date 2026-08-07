@@ -35,7 +35,8 @@ const isPrivateDevHost = devHost === 'localhost'
   || devHost.startsWith('192.168.')
   || devHost.startsWith('10.')
   || /^172\.(1[6-9]|2\d|3[01])\./.test(devHost);
-if ((import.meta as any).env?.DEV || isPrivateDevHost) {
+const isViteDev = Boolean((import.meta as any).env?.DEV);
+if (isViteDev || isPrivateDevHost) {
   initDevHelper();
 }
 
@@ -70,7 +71,16 @@ function initMemoriesInlineReactionPicker(): void {
 
 initMemoriesInlineReactionPicker();
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && isViteDev) {
+  // A production service worker can otherwise cache old Vite modules and make
+  // local UI work appear unchanged after a source edit.
+  navigator.serviceWorker.getRegistrations()
+    .then((registrations) => registrations.forEach((registration) => registration.unregister()))
+    .catch(() => {});
+  if ('caches' in window) {
+    caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
+  }
+} else if ('serviceWorker' in navigator) {
   const isAndroidWrapper = navigator.userAgent.includes('LoveCheckAndroidWrapper');
   if (isAndroidWrapper) {
     navigator.serviceWorker.getRegistrations().then((regs) => {

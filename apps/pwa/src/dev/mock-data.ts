@@ -6,6 +6,7 @@ import type {
   RandomHistoryItem,
   User,
 } from '../api/types';
+import { store } from '../store';
 
 export const MOCK_PREVIEW_TOKEN = 'mock_preview_token';
 const MOCK_DATA_KEY = 'lovecheck_dev_preview_data';
@@ -313,7 +314,8 @@ function clearMockOnboardingState(): void {
 }
 
 export function isMockNewUserMode(): boolean {
-  return localStorage.getItem('lovecheck_token') === MOCK_GOOGLE_NEW_USER_TOKEN;
+  return store.get().token === MOCK_GOOGLE_NEW_USER_TOKEN
+    || localStorage.getItem('lovecheck_token') === MOCK_GOOGLE_NEW_USER_TOKEN;
 }
 
 export function createMockNewGoogleUserResponse(): MockNewGoogleUserResponse {
@@ -370,7 +372,8 @@ export function clearMockNewUserData(): void {
 }
 
 export function isMockPreviewMode(): boolean {
-  return localStorage.getItem('lovecheck_token') === MOCK_PREVIEW_TOKEN;
+  return store.get().token === MOCK_PREVIEW_TOKEN
+    || localStorage.getItem('lovecheck_token') === MOCK_PREVIEW_TOKEN;
 }
 
 export function isMockLocalMode(): boolean {

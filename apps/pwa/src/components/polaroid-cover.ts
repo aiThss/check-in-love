@@ -280,57 +280,98 @@ function drawLoveFoil(
   ctx.globalCompositeOperation = 'source-over';
   ctx.clearRect(0, 0, width, height);
 
+  const roundedPath = (x: number, y: number, boxWidth: number, boxHeight: number, radius: number): void => {
+    const r = Math.min(radius, boxWidth / 2, boxHeight / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + boxWidth - r, y);
+    ctx.quadraticCurveTo(x + boxWidth, y, x + boxWidth, y + r);
+    ctx.lineTo(x + boxWidth, y + boxHeight - r);
+    ctx.quadraticCurveTo(x + boxWidth, y + boxHeight, x + boxWidth - r, y + boxHeight);
+    ctx.lineTo(x + r, y + boxHeight);
+    ctx.quadraticCurveTo(x, y + boxHeight, x, y + boxHeight - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  };
+
   const gradient = ctx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, '#ff2f7d');
-  gradient.addColorStop(0.34, '#ff82af');
-  gradient.addColorStop(0.66, '#b65cff');
-  gradient.addColorStop(1, '#6f5cff');
+  gradient.addColorStop(0, '#17172f');
+  gradient.addColorStop(0.28, '#43275f');
+  gradient.addColorStop(0.62, '#dc668f');
+  gradient.addColorStop(1, '#ffbf9c');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
   ctx.save();
-  ctx.globalAlpha = 0.2;
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1;
-  for (let x = -height; x < width + height; x += 18) {
+  const sunrise = ctx.createRadialGradient(width * 0.8, height * 0.14, 0, width * 0.8, height * 0.14, width * 0.8);
+  sunrise.addColorStop(0, 'rgba(255, 237, 192, 0.7)');
+  sunrise.addColorStop(0.25, 'rgba(255, 171, 182, 0.24)');
+  sunrise.addColorStop(1, 'rgba(255, 171, 182, 0)');
+  ctx.fillStyle = sunrise;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.13;
+  ctx.strokeStyle = '#fff7f0';
+  ctx.lineWidth = 0.8;
+  for (let x = -height; x < width + height; x += 22) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
-    ctx.lineTo(x - height, height);
+    ctx.lineTo(x - height * 0.72, height);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 0.12;
+  for (let y = height * 0.1; y < height; y += 28) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
     ctx.stroke();
   }
   ctx.restore();
 
-  const hearts = [
-    [0.16, 0.2, 22],
-    [0.82, 0.18, 16],
-    [0.73, 0.76, 24],
-    [0.2, 0.8, 14],
-  ] as const;
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  hearts.forEach(([x, y, size]) => {
-    ctx.save();
-    ctx.globalAlpha = 0.34;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `${size}px serif`;
-    ctx.fillText('♥', width * x, height * y);
-    ctx.restore();
-  });
+  const panelX = width * 0.09;
+  const panelY = height * 0.22;
+  const panelWidth = width * 0.82;
+  const panelHeight = height * 0.54;
+  ctx.save();
+  roundedPath(panelX, panelY, panelWidth, panelHeight, 28);
+  ctx.fillStyle = 'rgba(25, 18, 46, 0.34)';
+  ctx.shadowColor = 'rgba(19, 10, 34, 0.32)';
+  ctx.shadowBlur = 24;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(255, 247, 240, 0.52)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  roundedPath(panelX + 10, panelY + 10, panelWidth - 20, panelHeight - 20, 20);
+  ctx.strokeStyle = 'rgba(255, 247, 240, 0.2)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  ctx.restore();
 
   ctx.save();
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 0.78;
+  ctx.font = "800 10px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.letterSpacing = '2px';
+  ctx.fillText('GOOD MORNING  ·  LOVE DROP', width / 2, height * 0.14);
+  ctx.globalAlpha = 1;
+  ctx.font = '28px serif';
+  ctx.fillText('♥', width / 2, height * 0.3);
+
   const message = coverText.trim() || DEFAULT_COVER_TEXT;
   const words = message.split(/\s+/);
   const lines: string[] = [];
   let line = '';
-  const maxWidth = width * 0.74;
-  ctx.font = "800 18px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  const maxWidth = width * 0.66;
+  ctx.font = "800 19px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   words.forEach((word) => {
     const candidate = line ? `${line} ${word}` : word;
-    if (line && ctx.measureText(candidate).width > maxWidth && lines.length === 0) {
+    if (line && ctx.measureText(candidate).width > maxWidth && lines.length < 2) {
       lines.push(line);
       line = word;
     } else {
@@ -339,14 +380,17 @@ function drawLoveFoil(
   });
   if (line) lines.push(line);
   const visibleLines = lines.slice(0, 2);
-  const lineHeight = 24;
-  const titleStart = height / 2 - 8 - ((visibleLines.length - 1) * lineHeight) / 2;
+  const lineHeight = 25;
+  const titleStart = height * 0.48 - ((visibleLines.length - 1) * lineHeight) / 2;
   visibleLines.forEach((text, index) => {
     ctx.fillText(text, width / 2, titleStart + index * lineHeight);
   });
   ctx.globalAlpha = 0.82;
-  ctx.font = "700 11px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText('CÀO ĐỂ MỞ', width / 2, titleStart + visibleLines.length * lineHeight + 5);
+  ctx.font = "800 10px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText('CÀO NHẸ ĐỂ MỞ NGÀY MỚI', width / 2, height * 0.62);
+  ctx.globalAlpha = 0.5;
+  ctx.font = "700 9px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText('01  /  A LITTLE MOMENT FOR US', width / 2, height * 0.78);
   ctx.restore();
   ctx.restore();
 }
@@ -420,7 +464,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   backdrop.className = 'polaroid-modal-backdrop love-foil-modal';
 
   const modal = document.createElement('div');
-  modal.className = 'polaroid-modal-container';
+  modal.className = 'polaroid-modal-container polaroid-daily-card';
 
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
@@ -522,27 +566,30 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   const hud = document.createElement('div');
   hud.className = `polaroid-hud${revealed ? ' hidden' : ''}`;
   hud.innerHTML = `
-    <span class="polaroid-hud-text">Cào để mở</span>
+    <span class="polaroid-hud-text">Cào để chào ngày mới</span>
     <div class="polaroid-hud-progress" role="progressbar" aria-label="Tiến độ cào ảnh" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="polaroid-hud-bar"></div></div>
   `;
 
   const success = document.createElement('div');
   success.className = 'polaroid-success hidden';
-  success.innerHTML = '<span>♥</span><strong>Đã mở khóa!</strong>';
+  success.innerHTML = '<span>♥</span><strong>Đã mở ngày mới!</strong>';
 
   const footer = document.createElement('div');
   footer.className = 'polaroid-love-foil-footer';
 
   const copy = document.createElement('div');
+  const kicker = document.createElement('small');
+  kicker.className = 'polaroid-love-foil-kicker';
+  kicker.textContent = 'A LITTLE LOVE · THIS MORNING';
   const heading = document.createElement('strong');
   heading.textContent = title;
   const meta = document.createElement('span');
   meta.textContent = dateText;
-  copy.append(heading, meta);
+  copy.append(kicker, heading, meta);
 
   const status = document.createElement('span');
   status.className = `polaroid-love-foil-status${alreadyOpened && !restartScratch ? ' is-opened' : ''}`;
-  status.textContent = restartScratch ? 'Cào lại' : alreadyOpened ? 'Đã mở' : scratchEligible ? 'Bất ngờ mới' : 'Kỷ niệm';
+  status.textContent = restartScratch ? 'Cào lại' : alreadyOpened ? 'Đã mở' : scratchEligible ? 'Mở ngày mới' : 'Kỷ niệm';
 
   footer.append(copy, status);
   stage.append(image, canvas, hud, success);
