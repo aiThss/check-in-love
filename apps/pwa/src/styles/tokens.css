@@ -65,14 +65,17 @@
 
 /* ── Dark Theme ──────────────────────────────────────────────── */
 [data-theme='dark'] {
-  --bg: #151115;
-  --page-background: linear-gradient(180deg, #151115 0%, #151115 58%, #3a1d2b 100%);
-  --surface: rgba(27, 22, 25, 0.74);
-  --surface-solid: #211a1e;
+  --bg: #261824;
+  --page-background:
+    radial-gradient(circle at 86% 8%, rgba(255, 83, 145, 0.2), transparent 30%),
+    radial-gradient(circle at 8% 78%, rgba(142, 87, 218, 0.18), transparent 32%),
+    linear-gradient(180deg, #261824 0%, #342039 52%, #632d4d 100%);
+  --surface: rgba(58, 31, 48, 0.88);
+  --surface-solid: #3b2331;
   --text-primary: #ffffff;
   --text-secondary: #b6afb4;
   --text-tertiary: #91878d;
-  --border: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 164, 198, 0.2);
   --accent: #ff3b7f;
   --accent-soft: rgba(255, 59, 127, 0.18);
   --accent-glow: rgba(255, 59, 127, 0.28);
@@ -83,14 +86,17 @@
 /* ── System Dark Mode (fallback when theme is "system") ─────── */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #151115;
-    --page-background: linear-gradient(180deg, #151115 0%, #151115 58%, #3a1d2b 100%);
-    --surface: rgba(27, 22, 25, 0.74);
-    --surface-solid: #211a1e;
+    --bg: #261824;
+    --page-background:
+      radial-gradient(circle at 86% 8%, rgba(255, 83, 145, 0.2), transparent 30%),
+      radial-gradient(circle at 8% 78%, rgba(142, 87, 218, 0.18), transparent 32%),
+      linear-gradient(180deg, #261824 0%, #342039 52%, #632d4d 100%);
+    --surface: rgba(58, 31, 48, 0.88);
+    --surface-solid: #3b2331;
     --text-primary: #ffffff;
     --text-secondary: #b6afb4;
     --text-tertiary: #91878d;
-    --border: rgba(255, 255, 255, 0.1);
+    --border: rgba(255, 164, 198, 0.2);
     --accent: #ff3b7f;
     --accent-soft: rgba(255, 59, 127, 0.18);
     --accent-glow: rgba(255, 59, 127, 0.28);
