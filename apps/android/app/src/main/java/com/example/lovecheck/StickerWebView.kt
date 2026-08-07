@@ -22,6 +22,169 @@ import org.json.JSONObject
 @SuppressLint("ViewConstructor")
 class StickerWebView(context: Context) : WebView(context) {
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+
+        // Install the Android-only occasion-card workaround several times during
+        // startup. The first callback can run before the SPA has created <head>, while
+        // later callbacks make sure the guard survives a WebView navigation/reload.
+        CARD_FIX_DELAYS_MS.forEach { delayMs ->
+            postDelayed({ installAndroidOccasionCardFix() }, delayMs)
+        }
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (hasWindowFocus) {
+            post { installAndroidOccasionCardFix() }
+        }
+    }
+
+    private fun installAndroidOccasionCardFix() {
+        evaluateJavascript(
+            """
+            (function () {
+              if (!document || !document.documentElement) return;
+
+              var STYLE_ID = 'lovecheck-android-occasion-card-fix-v2';
+              var style = document.getElementById(STYLE_ID);
+              if (!style) {
+                style = document.createElement('style');
+                style.id = STYLE_ID;
+                style.textContent =
+                  '.android-wrapper .occasion-overlay{' +
+                    'overflow-x:hidden!important;overflow-y:auto!important;' +
+                    'align-items:flex-start!important;' +
+                    'padding-top:max(16px,var(--android-status-bar,0px))!important;' +
+                    'padding-bottom:max(16px,var(--android-nav-bar,0px))!important;' +
+                  '}' +
+                  '.android-wrapper .occasion-shell{' +
+                    'overflow:visible!important;max-height:none!important;' +
+                    'animation:none!important;transform:none!important;' +
+                    'flex:0 0 auto!important;' +
+                  '}' +
+                  '.android-wrapper .occasion-scratch{' +
+                    'display:block!important;' +
+                    'top:0!important;left:0!important;right:auto!important;bottom:auto!important;' +
+                    'max-width:none!important;max-height:none!important;' +
+                  '}';
+                (document.head || document.documentElement).appendChild(style);
+              }
+
+              var normalizeCard = function (root) {
+                var overlay = null;
+                if (root && root.nodeType === 1 && root.matches && root.matches('.occasion-overlay')) {
+                  overlay = root;
+                } else if (root && root.querySelector) {
+                  overlay = root.querySelector('.occasion-overlay');
+                }
+                if (!overlay) overlay = document.querySelector('.occasion-overlay');
+                if (!overlay) return;
+
+                var shell = overlay.querySelector('.occasion-shell');
+                var paper = overlay.querySelector('.occasion-paper');
+                var canvas = overlay.querySelector('.occasion-scratch');
+                if (!shell || !paper || !canvas) return;
+
+                // The broken Android WebView state visible on-device is a full-width
+                // canvas collapsed into a short horizontal strip. Percentage height on
+                // an absolutely positioned canvas inside an auto-height overflow
+                // container is the trigger. Give the scratch surface an explicit pixel
+                // box derived from the actual card instead of relying on height:100%.
+                shell.style.setProperty('overflow', 'visible', 'important');
+                shell.style.setProperty('max-height', 'none', 'important');
+                shell.style.setProperty('animation', 'none', 'important');
+                shell.style.setProperty('transform', 'none', 'important');
+
+                var shellRect = shell.getBoundingClientRect();
+                var paperRect = paper.getBoundingClientRect();
+                var width = Math.max(1, Math.round(shellRect.width || paperRect.width));
+                var height = Math.max(
+                  540,
+                  Math.round(shell.scrollHeight || 0),
+                  Math.round(paper.scrollHeight || 0),
+                  Math.round(shellRect.height || 0),
+                  Math.round(paperRect.height || 0)
+                );
+
+                var previousWidth = canvas.getAttribute('data-android-layout-width');
+                var previousHeight = canvas.getAttribute('data-android-layout-height');
+                if (previousWidth !== String(width) || previousHeight !== String(height)) {
+                  canvas.style.setProperty('position', 'absolute', 'important');
+                  canvas.style.setProperty('top', '0px', 'important');
+                  canvas.style.setProperty('left', '0px', 'important');
+                  canvas.style.setProperty('right', 'auto', 'important');
+                  canvas.style.setProperty('bottom', 'auto', 'important');
+                  canvas.style.setProperty('width', width + 'px', 'important');
+                  canvas.style.setProperty('height', height + 'px', 'important');
+                  canvas.setAttribute('data-android-layout-width', String(width));
+                  canvas.setAttribute('data-android-layout-height', String(height));
+
+                  // The PWA already owns redraw logic on window resize. Dispatching a
+                  // resize after fixing the CSS box makes that existing renderer redraw
+                  // against the corrected dimensions without modifying PWA source.
+                  requestAnimationFrame(function () {
+                    try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+                  });
+                }
+
+                // Force layout immediately so the PWA's next requestAnimationFrame
+                // retry observes the corrected rectangle.
+                canvas.getBoundingClientRect();
+              };
+
+              if (!window.__loveCheckAndroidOccasionObserverV2) {
+                window.__loveCheckAndroidOccasionObserverV2 = new MutationObserver(function (records) {
+                  records.forEach(function (record) {
+                    record.addedNodes.forEach(function (node) {
+                      if (node && node.nodeType === 1) normalizeCard(node);
+                    });
+                  });
+
+                  // Do not let a failed card render fill the whole screen with the same
+                  // error toast. Keep the first one only; this is an APK-side safety net.
+                  var matching = Array.prototype.filter.call(
+                    document.querySelectorAll('.toast'),
+                    function (toast) {
+                      var message = toast.querySelector('.toast-message');
+                      return message && message.textContent &&
+                        message.textContent.trim() === 'Thiệp chưa tải xong, bạn thử lại nhé.';
+                    }
+                  );
+                  matching.slice(1).forEach(function (toast) { toast.remove(); });
+                });
+                window.__loveCheckAndroidOccasionObserverV2.observe(
+                  document.documentElement,
+                  { childList: true, subtree: true }
+                );
+              }
+
+              if (!window.__loveCheckAndroidResizeFixV2) {
+                window.__loveCheckAndroidResizeFixV2 = function () { normalizeCard(document); };
+                window.addEventListener('orientationchange', window.__loveCheckAndroidResizeFixV2, { passive: true });
+              }
+
+              // The card component dispatches this event after a failed initialization,
+              // and its own listener immediately attempts to open the same card again.
+              // On Android that turned one layout failure into an endless toast loop.
+              // Swallow only this synthetic re-open signal in the wrapper; focus and
+              // pageshow still perform the normal occasion-card checks later.
+              if (!window.__loveCheckAndroidDispatchWrappedV2) {
+                window.__loveCheckAndroidDispatchWrappedV2 = true;
+                var originalDispatchEvent = window.dispatchEvent.bind(window);
+                window.dispatchEvent = function (event) {
+                  if (event && event.type === 'lovecheck:special-modal-closed') return true;
+                  return originalDispatchEvent(event);
+                };
+              }
+
+              normalizeCard(document);
+            })();
+            """.trimIndent(),
+            null,
+        )
+    }
+
     @Suppress("DEPRECATION")
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val baseConnection = super.onCreateInputConnection(outAttrs) ?: return null
@@ -166,6 +329,7 @@ class StickerWebView(context: Context) : WebView(context) {
             "image/jpeg",
             "image/*",
         )
+        private val CARD_FIX_DELAYS_MS = longArrayOf(100L, 300L, 700L, 1_500L, 3_000L)
         private const val MAX_STICKER_BYTES = 6 * 1024 * 1024
     }
 }
