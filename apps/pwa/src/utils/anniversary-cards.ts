@@ -436,15 +436,6 @@ function ensureStyles(): void {
       box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.15);
       background: #1a101b; animation: occasionRise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
-    .occasion-close {
-      position: absolute; top: 14px; right: 14px; z-index: 8;
-      width: 36px; height: 36px; border: 0; border-radius: 999px;
-      background: rgba(255, 255, 255, 0.92); color: #3e2233;
-      font-size: 20px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
-      cursor: pointer; transition: transform 0.2s ease, background 0.2s ease;
-    }
-    .occasion-close:active { transform: scale(0.92); }
-
     /* Revealed card: a theme-led paper surface with a calmer text panel. */
     .occasion-paper {
       --paper-start: #fffdf9;
@@ -638,8 +629,6 @@ function ensureStyles(): void {
     .occasion-picker-item { border: 1px solid var(--border, rgba(0, 0, 0, 0.1)); border-radius: 16px; padding: 13px; text-align: left; background: var(--surface, #fff); color: var(--text-primary, #222); cursor: pointer; }
     .occasion-picker-item span { display: block; font-size: 23px; margin-bottom: 7px; }
     .occasion-picker-item strong { display: block; font-size: 13px; }
-    .occasion-picker-close { width: 100%; margin-top: 12px; padding: 12px; border: 0; border-radius: 14px; background: var(--surface-solid, #eee); color: var(--text-primary, #222); font-weight: 700; }
-
     .birthday-settings-card { padding: 16px; display: flex; flex-direction: column; gap: 13px; }
     .birthday-settings-head { display: flex; gap: 12px; align-items: flex-start; }
     .birthday-settings-head>span { font-size: 21px; }
@@ -1314,7 +1303,6 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   overlay.className = 'occasion-overlay';
   overlay.innerHTML = `
     <section class="occasion-shell" role="dialog" aria-modal="true" aria-label="${escapeHtml(card.title)}" style="--occasion-a:${card.colors[0]};--occasion-b:${card.colors[1]}">
-      <button class="occasion-close" type="button" aria-label="Đóng">×</button>
       <article class="occasion-paper" data-pattern="${card.pattern}" data-card-id="${card.id}">
         <div class="occasion-border-frame"></div>
         <div class="occasion-corner top-left">✦</div>
@@ -1375,7 +1363,6 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     overlay.remove();
     window.dispatchEvent(new Event(SPECIAL_MODAL_CLOSED_EVENT));
   };
-  overlay.querySelector('.occasion-close')?.addEventListener('click', close);
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) close();
   });
@@ -1551,7 +1538,6 @@ function openPreviewPicker(me?: MeResponse): void {
           return `<button type="button" class="occasion-picker-item" data-card-id="${id}"><span>${card.icon}</span><strong>${escapeHtml(card.title)}</strong></button>`;
         }).join('')}
       </div>
-      <button type="button" class="occasion-picker-close">Đóng</button>
     </section>
   `;
   document.body.appendChild(overlay);
@@ -1562,7 +1548,6 @@ function openPreviewPicker(me?: MeResponse): void {
       openCard(buildCard(id, context));
     });
   });
-  overlay.querySelector('.occasion-picker-close')?.addEventListener('click', () => overlay.remove());
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) overlay.remove();
   });

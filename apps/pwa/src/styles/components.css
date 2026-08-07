@@ -1673,32 +1673,9 @@ textarea.input {
   pointer-events: auto;
 }
 
-/* Download button overlay — top-right of the media container */
-.download-btn {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.55);
-  color: #ffffff;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease),
-    opacity var(--duration-fast) var(--ease);
-  z-index: 2;
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.download-btn:active {
-  transform: scale(0.92);
-  opacity: 0.8;
+.android-long-press-download {
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .checkin-detail-caption,

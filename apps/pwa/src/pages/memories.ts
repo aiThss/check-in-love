@@ -62,6 +62,76 @@ function getCheckinPhotoUrl(item: CheckIn): string | undefined {
   );
 }
 
+function isAndroidWrapper(): boolean {
+  return typeof navigator !== 'undefined' && navigator.userAgent.includes('LoveCheckAndroidWrapper');
+}
+
+function installAndroidLongPressDownload(image: HTMLImageElement, item: CheckIn): void {
+  if (!isAndroidWrapper()) return;
+
+  const downloadUrl = getCheckinPhotoUrl(item);
+  if (!downloadUrl) return;
+
+  image.classList.add('android-long-press-download');
+  let timer: number | null = null;
+  let startX = 0;
+  let startY = 0;
+
+  const cancelTimer = (): void => {
+    if (timer === null) return;
+    window.clearTimeout(timer);
+    timer = null;
+  };
+
+  const onPointerDown = (event: PointerEvent): void => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+    cancelTimer();
+    startX = event.clientX;
+    startY = event.clientY;
+    timer = window.setTimeout(() => {
+      timer = null;
+      const createdAt = new Date(item.createdAt);
+      const pad = (value: number) => String(value).padStart(2, '0');
+      const fileName = `checkin-love-${createdAt.getFullYear()}-${pad(createdAt.getMonth() + 1)}-${pad(createdAt.getDate())}-${pad(createdAt.getHours())}-${pad(createdAt.getMinutes())}.jpg`;
+
+      try {
+        const bridge = (window as any).LoveCheckAndroid;
+        if (!bridge || typeof bridge.downloadFile !== 'function') throw new Error('DOWNLOAD_BRIDGE_UNAVAILABLE');
+        bridge.downloadFile(downloadUrl, fileName);
+        showToast('Đang lưu ảnh xuống...', 'loading-spark');
+      } catch {
+        showToast('Không thể lưu ảnh lúc này.', 'error');
+      }
+    }, 650);
+  };
+
+  const onPointerMove = (event: PointerEvent): void => {
+    if (Math.hypot(event.clientX - startX, event.clientY - startY) > 14) cancelTimer();
+  };
+
+  image.addEventListener('pointerdown', onPointerDown);
+  image.addEventListener('pointermove', onPointerMove);
+  image.addEventListener('pointerup', cancelTimer);
+  image.addEventListener('pointercancel', cancelTimer);
+  image.addEventListener('pointerleave', cancelTimer);
+  image.addEventListener('contextmenu', (event) => event.preventDefault());
+}
+
+function openMemoryPhotoCover(item: CheckIn, photoUrl: string, title: string, dateText: string): void {
+  openPolaroidCoverModal({
+    imageUrl: photoUrl,
+    title,
+    dateText,
+    coverText: item.surpriseText,
+    forceScratch: item.includeScratch !== false,
+    timerSeconds: 5,
+  });
+
+  const stageImage = document.querySelector<HTMLImageElement>('.polaroid-modal-backdrop .polaroid-stage-photo');
+  if (stageImage) installAndroidLongPressDownload(stageImage, item);
+}
+
 function formatTime(isoString: string): string {
   const date = new Date(isoString);
   const now = new Date();
@@ -722,14 +792,7 @@ export function renderMemoriesPage(): HTMLElement {
         if (consumeLongPress()) return;
         const photoUrl = getCheckinPhotoUrl(item);
         if (photoUrl) {
-          openPolaroidCoverModal({
-            imageUrl: photoUrl,
-            title: item.caption || `Kỷ niệm của ${item.ownerName} 💖`,
-            dateText: formatTime(item.createdAt),
-            coverText: item.surpriseText,
-            forceScratch: item.includeScratch !== false,
-            timerSeconds: 5,
-          });
+          openMemoryPhotoCover(item, photoUrl, item.caption || `Kỷ niệm của ${item.ownerName} 💖`, formatTime(item.createdAt));
         } else {
           showCheckinDetail(item);
         }
@@ -834,6 +897,9 @@ export function renderMemoriesPage(): HTMLElement {
         </div>
       `;
 
+      const detailImage = detail.querySelector<HTMLImageElement>('.checkin-detail-image');
+      if (detailImage && hasPhoto) installAndroidLongPressDownload(detailImage, item);
+
       const replyToggle = detail.querySelector<HTMLButtonElement>('.detail-reply-toggle');
       const replySection = detail.querySelector<HTMLElement>('.reply-section');
       if (replyToggle && replySection) {
@@ -844,94 +910,6 @@ export function renderMemoriesPage(): HTMLElement {
 
       const replyList = detail.querySelector<HTMLElement>('#reply-list');
       if (replyList) renderReplies(replyList, replies);
-
-      // Inject nút download vào media wrapper — chỉ khi có URL ảnh
-      if (hasPhoto) {
-        const mediaEl = detail.querySelector<HTMLElement>('.checkin-detail-media');
-        if (mediaEl) {
-          const dlBtn = document.createElement('button');
-          dlBtn.type = 'button';
-          dlBtn.className = 'download-btn';
-          dlBtn.setAttribute('aria-label', 'Tải ảnh xuống');
-          dlBtn.innerHTML = '&#x2193;'; // ↓ arrow icon
-
-          dlBtn.addEventListener('click', async () => {
-            // Dùng fallback URL — không hardcode item.photoUrl
-            const downloadUrl = getCheckinPhotoUrl(item);
-            if (!downloadUrl) return;
-
-            dlBtn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:#fff transparent transparent transparent;"></span>';
-            dlBtn.style.pointerEvents = 'none';
-
-            const ts = new Date(item.createdAt);
-            const pad = (n: number) => String(n).padStart(2, '0');
-            const fileName = `checkin-love-${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}-${pad(ts.getHours())}-${pad(ts.getMinutes())}.jpg`;
-
-            // 1. Android Native App Wrapper
-            const isAndroidWrapper = navigator.userAgent.includes('LoveCheckAndroidWrapper');
-            if (isAndroidWrapper && (window as any).LoveCheckAndroid && typeof (window as any).LoveCheckAndroid.downloadFile === 'function') {
-              try {
-                (window as any).LoveCheckAndroid.downloadFile(downloadUrl, fileName);
-                showToast('Đang tải ảnh xuống...', 'loading-spark');
-              } catch (e) {
-                window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-              } finally {
-                setTimeout(() => {
-                  dlBtn.innerHTML = '&#x2193;';
-                  dlBtn.style.pointerEvents = '';
-                }, 1000);
-              }
-              return;
-            }
-
-            // 2. Web / PWA (with iOS Web Share API fallback for files)
-            try {
-              const response = await fetch(downloadUrl, { mode: 'cors' });
-              const blob = await response.blob();
-
-              // On iOS (or browsers supporting file sharing), try Web Share API
-              const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-              if (isIOS && navigator.canShare && navigator.share) {
-                try {
-                  const file = new File([blob], fileName, { type: blob.type });
-                  if (navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                      files: [file],
-                      title: 'Ảnh check-in',
-                    });
-                    showToast('Đã mở trình chia sẻ', 'success');
-                    return;
-                  }
-                } catch (shareError) {
-                  console.log('Share failed, trying standard download:', shareError);
-                }
-              }
-
-              // Standard blob download
-              const objectUrl = URL.createObjectURL(blob);
-              const anchor = document.createElement('a');
-              anchor.href = objectUrl;
-              anchor.download = fileName;
-              anchor.style.display = 'none';
-              document.body.appendChild(anchor);
-              anchor.click();
-              document.body.removeChild(anchor);
-
-              showToast('Đã tải ảnh xuống thành công', 'success');
-              setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
-            } catch (err) {
-              console.error('Download failed:', err);
-              window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-              showToast('Mở ảnh trong tab mới. Hãy nhấn giữ để lưu.', 'info');
-            } finally {
-              dlBtn.innerHTML = '&#x2193;';
-              dlBtn.style.pointerEvents = '';
-            }
-          });
-
-          mediaEl.appendChild(dlBtn);
-        }
-      }
 
       const replyForm = detail.querySelector<HTMLFormElement>('#reply-form');
       const replySubmit = replyForm?.querySelector<HTMLButtonElement>('button[type="submit"]');
@@ -985,14 +963,7 @@ export function renderMemoriesPage(): HTMLElement {
       detail.querySelector<HTMLButtonElement>('.btn-polaroid-scratch-trigger')?.addEventListener('click', () => {
         const photoUrl = getCheckinPhotoUrl(item);
         if (!photoUrl) return;
-        openPolaroidCoverModal({
-           imageUrl: photoUrl,
-           title: item.caption || 'Kỷ niệm yêu thương 💖',
-           dateText: formatTime(item.createdAt),
-           coverText: item.surpriseText,
-           forceScratch: item.includeScratch !== false,
-           timerSeconds: 5,
-        });
+        openMemoryPhotoCover(item, photoUrl, item.caption || 'Kỷ niệm yêu thương 💖', formatTime(item.createdAt));
       });
     };
 
