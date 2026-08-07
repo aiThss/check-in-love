@@ -3469,20 +3469,12 @@ textarea.input {
                        inset 0 -1px 0 rgba(255, 255, 255, 0.15);
 }
 
-/* Áp dụng cho light mode: khi html không có data-theme="dark" hoặc có data-theme="light" */
-:root:not([data-theme='dark']) body,
+/* Áp dụng cho light mode khi theme đã được resolve rõ ràng. */
 [data-theme='light'] body {
   background: var(--bg) !important;
 }
 
 /* Giao diện Liquid Glass cho các card/mục trong Light Mode */
-:root:not([data-theme='dark']) .glass-surface,
-:root:not([data-theme='dark']) .glass-card,
-:root:not([data-theme='dark']) .glass-profile-card,
-:root:not([data-theme='dark']) .glass-modal,
-:root:not([data-theme='dark']) .card,
-:root:not([data-theme='dark']) .card-solid,
-:root:not([data-theme='dark']) .modal,
 [data-theme='light'] .glass-surface,
 [data-theme='light'] .glass-card,
 [data-theme='light'] .glass-profile-card,
@@ -3497,15 +3489,15 @@ textarea.input {
 
 
 /* Giao diện Glass cho các pills/buttons trong Light Mode */
-:root:not([data-theme='dark']) .glass-pill,
-:root:not([data-theme='dark']) .glass-action,
-:root:not([data-theme='dark']) .memory-reaction-summary:not(.has-reactions),
-:root:not([data-theme='dark']) .reaction-pill,
-:root:not([data-theme='dark']) .memory-reply-count,
-:root:not([data-theme='dark']) .reaction-option,
-:root:not([data-theme='dark']) .theme-choice,
-:root:not([data-theme='dark']) .reaction-detail-row,
-:root:not([data-theme='dark']) .reply-detail-item,
+[data-theme='light'] .glass-pill,
+[data-theme='light'] .glass-action,
+[data-theme='light'] .memory-reaction-summary:not(.has-reactions),
+[data-theme='light'] .reaction-pill,
+[data-theme='light'] .memory-reply-count,
+[data-theme='light'] .reaction-option,
+[data-theme='light'] .theme-choice,
+[data-theme='light'] .reaction-detail-row,
+[data-theme='light'] .reply-detail-item,
 [data-theme='light'] .glass-pill,
 [data-theme='light'] .glass-action,
 [data-theme='light'] .memory-reaction-summary:not(.has-reactions),
@@ -3522,10 +3514,10 @@ textarea.input {
 }
 
 /* Bo tròn 999px cho các pill */
-:root:not([data-theme='dark']) .glass-pill,
-:root:not([data-theme='dark']) .memory-reaction-summary:not(.has-reactions),
-:root:not([data-theme='dark']) .reaction-pill,
-:root:not([data-theme='dark']) .memory-reply-count,
+[data-theme='light'] .glass-pill,
+[data-theme='light'] .memory-reaction-summary:not(.has-reactions),
+[data-theme='light'] .reaction-pill,
+[data-theme='light'] .memory-reply-count,
 [data-theme='light'] .glass-pill,
 [data-theme='light'] .memory-reaction-summary:not(.has-reactions),
 [data-theme='light'] .reaction-pill,
@@ -3534,20 +3526,20 @@ textarea.input {
 }
 
 /* Bo tròn 16px cho glass actions */
-:root:not([data-theme='dark']) .glass-action,
+[data-theme='light'] .glass-action,
 [data-theme='light'] .glass-action {
   border-radius: 16px !important;
 }
 
 /* Option đang chọn / Trạng thái active trong Light Mode */
-:root:not([data-theme='dark']) .glass-pill.selected,
-:root:not([data-theme='dark']) .glass-action.primary,
-:root:not([data-theme='dark']) .memory-reaction-summary:not(.has-reactions):active,
-:root:not([data-theme='dark']) .reaction-pill.selected,
-:root:not([data-theme='dark']) .theme-choice.active,
-:root:not([data-theme='dark']) .reaction-option.selected,
-:root:not([data-theme='dark']) .reaction-detail-row.selected,
-:root:not([data-theme='dark']) .reply-detail-item.own,
+[data-theme='light'] .glass-pill.selected,
+[data-theme='light'] .glass-action.primary,
+[data-theme='light'] .memory-reaction-summary:not(.has-reactions):active,
+[data-theme='light'] .reaction-pill.selected,
+[data-theme='light'] .theme-choice.active,
+[data-theme='light'] .reaction-option.selected,
+[data-theme='light'] .reaction-detail-row.selected,
+[data-theme='light'] .reply-detail-item.own,
 [data-theme='light'] .glass-pill.selected,
 [data-theme='light'] .glass-action.primary,
 [data-theme='light'] .memory-reaction-summary:not(.has-reactions):active,
@@ -3569,13 +3561,13 @@ textarea.input {
 }
 
 /* Hiển thị số của reaction pill selected có màu hồng đậm hơn để dễ đọc */
-:root:not([data-theme='dark']) .reaction-pill.selected strong,
+[data-theme='light'] .reaction-pill.selected strong,
 [data-theme='light'] .reaction-pill.selected strong {
   color: var(--accent) !important;
 }
 
 /* Nút Chi tiết trong Light Mode */
-:root:not([data-theme='dark']) .memory-react-detail-btn,
+[data-theme='light'] .memory-react-detail-btn,
 [data-theme='light'] .memory-react-detail-btn {
   color: var(--accent) !important;
   background: rgba(255, 59, 127, 0.06) !important;
@@ -3584,7 +3576,7 @@ textarea.input {
 }
 
 /* Hộp chọn reaction (Reaction picker popup) trong Light Mode */
-:root:not([data-theme='dark']) .reaction-picker,
+[data-theme='light'] .reaction-picker,
 [data-theme='light'] .reaction-picker {
   background:
     linear-gradient(
@@ -3598,27 +3590,26 @@ textarea.input {
 }
 
 /* Tối ưu hóa Copy Code Box ở trang Profile trong Light Mode */
-:root:not([data-theme='dark']) #copy-code-container,
 [data-theme='light'] #copy-code-container {
   background: rgba(255, 255, 255, 0.75) !important;
   border: 1.5px solid rgba(255, 59, 127, 0.22) !important;
 }
 
-:root:not([data-theme='dark']) #copy-code-container span:last-child,
+[data-theme='light'] #copy-code-container span:last-child,
 [data-theme='light'] #copy-code-container span:last-child {
   background: rgba(255, 255, 255, 0.6) !important;
   border: 1px solid rgba(0, 0, 0, 0.05) !important;
 }
 
 /* Tối ưu hóa theme-segmented container trong Light Mode */
-:root:not([data-theme='dark']) .theme-segmented,
+[data-theme='light'] .theme-segmented,
 [data-theme='light'] .theme-segmented {
   background: rgba(255, 255, 255, 0.3) !important;
   border: 1px solid rgba(255, 255, 255, 0.5) !important;
 }
 
 /* Style cho No reply pill trong Light Mode */
-:root:not([data-theme='dark']) .memory-reply-count.empty,
+[data-theme='light'] .memory-reply-count.empty,
 [data-theme='light'] .memory-reply-count.empty {
   color: var(--text-secondary) !important;
   opacity: 0.75;

@@ -3,13 +3,13 @@
    the light glass theme without changing buttons throughout the signed-in app. */
 
 /* ─── Light Mode Input & Button Overrides ────────────────────────────── */
-:root:not([data-theme='dark']) input,
-:root:not([data-theme='dark']) input.input,
-:root:not([data-theme='dark']) .input,
-:root:not([data-theme='dark']) .onboarding-step .input,
-:root:not([data-theme='dark']) .login-page-pwa .input,
-:root:not([data-theme='dark']) .onboarding-step .otp-input,
-:root:not([data-theme='dark']) .login-page-pwa .otp-input,
+[data-theme='light'] input,
+[data-theme='light'] input.input,
+[data-theme='light'] .input,
+[data-theme='light'] .onboarding-step .input,
+[data-theme='light'] .login-page-pwa .input,
+[data-theme='light'] .onboarding-step .otp-input,
+[data-theme='light'] .login-page-pwa .otp-input,
 [data-theme='light'] input,
 [data-theme='light'] input.input,
 [data-theme='light'] .input,
@@ -32,22 +32,22 @@
     transform 160ms ease;
 }
 
-:root:not([data-theme='dark']) input::placeholder,
-:root:not([data-theme='dark']) .input::placeholder,
+[data-theme='light'] input::placeholder,
+[data-theme='light'] .input::placeholder,
 [data-theme='light'] input::placeholder,
 [data-theme='light'] .input::placeholder {
   color: rgba(103, 76, 88, 0.55) !important;
 }
 
-:root:not([data-theme='dark']) .input:hover,
-:root:not([data-theme='dark']) .login-page-pwa .input:hover,
+[data-theme='light'] .input:hover,
+[data-theme='light'] .login-page-pwa .input:hover,
 [data-theme='light'] .input:hover,
 [data-theme='light'] .login-page-pwa .input:hover {
   border-color: rgba(255, 59, 127, 0.36) !important;
 }
 
-:root:not([data-theme='dark']) .input:focus,
-:root:not([data-theme='dark']) .login-page-pwa .input:focus,
+[data-theme='light'] .input:focus,
+[data-theme='light'] .login-page-pwa .input:focus,
 [data-theme='light'] .input:focus,
 [data-theme='light'] .login-page-pwa .input:focus {
   border-color: var(--accent) !important;
@@ -59,9 +59,9 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.96) !important;
 }
 
-:root:not([data-theme='dark']) .btn-ghost,
-:root:not([data-theme='dark']) .onboarding-step .btn-ghost,
-:root:not([data-theme='dark']) .login-page-pwa .btn-ghost,
+[data-theme='light'] .btn-ghost,
+[data-theme='light'] .onboarding-step .btn-ghost,
+[data-theme='light'] .login-page-pwa .btn-ghost,
 [data-theme='light'] .btn-ghost,
 [data-theme='light'] .onboarding-step .btn-ghost,
 [data-theme='light'] .login-page-pwa .btn-ghost {
@@ -75,8 +75,8 @@
     0 9px 24px rgba(80, 42, 59, 0.06) !important;
 }
 
-:root:not([data-theme='dark']) .btn-ghost:active,
-:root:not([data-theme='dark']) .onboarding-step .btn-ghost:active,
+[data-theme='light'] .btn-ghost:active,
+[data-theme='light'] .onboarding-step .btn-ghost:active,
 [data-theme='light'] .btn-ghost:active,
 [data-theme='light'] .onboarding-step .btn-ghost:active {
   border-color: rgba(255, 59, 127, 0.5) !important;
@@ -236,10 +236,10 @@
 
 /* ─── Modern Login V2 Redesign Styles ─────────────────────────────────────── */
 
-:root:not([data-theme='dark']) .rm-inline-composer input,
-:root:not([data-theme='dark']) .rm-inline-composer input:hover,
-:root:not([data-theme='dark']) .rm-inline-composer input:focus,
-:root:not([data-theme='dark']) .rm-inline-composer input:focus-visible,
+[data-theme='light'] .rm-inline-composer input,
+[data-theme='light'] .rm-inline-composer input:hover,
+[data-theme='light'] .rm-inline-composer input:focus,
+[data-theme='light'] .rm-inline-composer input:focus-visible,
 [data-theme='light'] .rm-inline-composer input,
 [data-theme='light'] .rm-inline-composer input:hover,
 [data-theme='light'] .rm-inline-composer input:focus,
@@ -256,14 +256,14 @@
 }
 
 /* Keep the message and reply composers consistent with the borderless inline composer. */
-:root:not([data-theme='dark']) .messages-input-wrap input,
-:root:not([data-theme='dark']) .messages-input-wrap input:hover,
-:root:not([data-theme='dark']) .messages-input-wrap input:focus,
-:root:not([data-theme='dark']) .messages-input-wrap input:focus-visible,
-:root:not([data-theme='dark']) .reply-page-form input,
-:root:not([data-theme='dark']) .reply-page-form input:hover,
-:root:not([data-theme='dark']) .reply-page-form input:focus,
-:root:not([data-theme='dark']) .reply-page-form input:focus-visible,
+[data-theme='light'] .messages-input-wrap input,
+[data-theme='light'] .messages-input-wrap input:hover,
+[data-theme='light'] .messages-input-wrap input:focus,
+[data-theme='light'] .messages-input-wrap input:focus-visible,
+[data-theme='light'] .reply-page-form input,
+[data-theme='light'] .reply-page-form input:hover,
+[data-theme='light'] .reply-page-form input:focus,
+[data-theme='light'] .reply-page-form input:focus-visible,
 [data-theme='light'] .messages-input-wrap input,
 [data-theme='light'] .messages-input-wrap input:hover,
 [data-theme='light'] .messages-input-wrap input:focus,
@@ -767,27 +767,27 @@
   opacity: 1 !important;
 }
 
-:root:not([data-theme='dark']) .login-page-pwa .auth-tabs-wrap,
+[data-theme='light'] .login-page-pwa .auth-tabs-wrap,
 [data-theme='light'] .login-page-pwa .auth-tabs-wrap {
   background: #f7e6ed !important;
   border-color: rgba(255, 59, 127, 0.22) !important;
 }
 
-:root:not([data-theme='dark']) .login-page-pwa .auth-form-card,
+[data-theme='light'] .login-page-pwa .auth-form-card,
 [data-theme='light'] .login-page-pwa .auth-form-card {
   background: #ffffff !important;
   border-color: rgba(255, 59, 127, 0.22) !important;
 }
 
-:root:not([data-theme='dark']) .login-page-pwa .google-login-intro-v2,
+[data-theme='light'] .login-page-pwa .google-login-intro-v2,
 [data-theme='light'] .login-page-pwa .google-login-intro-v2 {
   background: #fff7fa !important;
   border-color: rgba(255, 59, 127, 0.22) !important;
 }
 
-:root:not([data-theme='dark']) .login-page-pwa .auth-back-btn,
 [data-theme='light'] .login-page-pwa .auth-back-btn,
-:root:not([data-theme='dark']) .login-page-pwa .auth-footer-action .btn-ghost,
+[data-theme='light'] .login-page-pwa .auth-back-btn,
+[data-theme='light'] .login-page-pwa .auth-footer-action .btn-ghost,
 [data-theme='light'] .login-page-pwa .auth-footer-action .btn-ghost {
   background: #fff4f7 !important;
   border-color: rgba(255, 59, 127, 0.22) !important;

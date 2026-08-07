@@ -586,8 +586,8 @@ export function renderProfilePage(): HTMLElement {
       </div>
 
       <div style="
-        background:#ffffff;
-        border:1px solid rgba(248, 57, 19, 0.12);
+        background:var(--surface-solid);
+        border:1px solid var(--border);
         border-radius:16px;
         padding:10px 14px;
         display:flex;
@@ -596,7 +596,7 @@ export function renderProfilePage(): HTMLElement {
         width:100%;
         font-size:13px;
         cursor:pointer;
-        box-shadow:0 2px 6px rgba(0, 0, 0, 1);
+        box-shadow:var(--shadow);
       " id="copy-code-container">
         <span style="color:var(--text-secondary);font-weight:500;">Couple Code:</span>
         <strong style="color:var(--accent);font-family:monospace;font-size:16px;letter-spacing:1.5px;font-weight:700;">${couple?.code || (couple as any)?.coupleCode || 'LOVE123'}</strong>

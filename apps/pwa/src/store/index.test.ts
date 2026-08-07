@@ -50,6 +50,7 @@ describe('in-memory store', () => {
 
     expect(store.isAuthenticated()).toBe(false);
     expect(store.get().hasNewCheckin).toBe(false);
+    expect(document.documentElement.dataset.theme).toBe('light');
     expect(localStorage.getItem('lovecheck_state')).toBeNull();
     expect(localStorage.getItem('lovecheck_token')).toBeNull();
   });

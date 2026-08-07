@@ -74,7 +74,8 @@ function syncMountedStreakBadges(nextState: AppState): void {
 }
 
 export function applyTheme(theme: AppState['theme']): void {
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const prefersDark = typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-color-scheme: dark)').matches;
   document.documentElement.setAttribute(
     'data-theme',
     theme === 'dark' || (theme === 'system' && prefersDark) ? 'dark' : 'light',
@@ -119,7 +120,10 @@ export const store = {
     state = { ...defaultState };
     localStorage.removeItem(STATE_KEY);
     localStorage.removeItem(TOKEN_KEY);
-    document.documentElement.removeAttribute('data-theme');
+    // Keep a resolved theme after clearing private state. Without this,
+    // system dark mode receives dark tokens while light-only CSS selectors
+    // still match because data-theme is missing.
+    applyTheme(state.theme);
     publish(state, previousState);
   },
 
