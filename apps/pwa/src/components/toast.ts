@@ -93,7 +93,7 @@ export function createSuccessHeartMarkupLight(): string {
   <path
     class="toast-success-checkmark"
     d="M8 12L11.5 15.5L16.5 9"
-    stroke="#e05263"
+    stroke="#FF0000"
     stroke-width="2.4"
     stroke-linecap="round"
     stroke-linejoin="round"
