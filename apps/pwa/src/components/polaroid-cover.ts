@@ -1,6 +1,8 @@
 import '../styles/polaroid-cover.css';
 import { showToast } from './toast';
 
+export type ScratchTheme = 'love-foil' | 'birthday-foil';
+
 export interface PolaroidCoverOptions {
   imageUrl: string;
   title?: string;
@@ -15,6 +17,8 @@ export interface PolaroidCoverOptions {
   coverText?: string;
   /** Starts a fresh scratch session even if this image was opened before. */
   restartScratch?: boolean;
+  /** Theme: 'love-foil' (default) or 'birthday-foil' */
+  theme?: ScratchTheme;
   onRevealed?: () => void;
 }
 
@@ -310,6 +314,195 @@ function installLatestCheckinLoveFoil(): void {
   schedulePillSync();
 }
 
+// ============================================================
+// 🎂 BIRTHDAY FOIL DRAWER
+// ============================================================
+function drawBirthdayFoil(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  coverText: string,
+): void {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, width, height);
+
+  // 1. Base gradient: warm gold → pink → coral → purple
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, '#FFD700');
+  gradient.addColorStop(0.22, '#FF6B9D');
+  gradient.addColorStop(0.48, '#FF8E53');
+  gradient.addColorStop(0.72, '#C44569');
+  gradient.addColorStop(1, '#8B5CF6');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Diagonal stripes (party vibe)
+  ctx.save();
+  ctx.globalAlpha = 0.07;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  for (let x = -height; x < width + height; x += 26) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x - height, height);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 3. Confetti rectangles
+  const confetti: Array<readonly [number, number, number, string, number]> = [
+    [0.10, 0.06, 16, '#FFD700', 40],
+    [0.90, 0.10, 13, '#FF6B9D', -25],
+    [0.78, 0.32, 18, '#00D9FF', 55],
+    [0.18, 0.38, 11, '#FF8E53', -20],
+    [0.95, 0.50, 20, '#FFD700', 15],
+    [0.05, 0.58, 12, '#FF6B9D', -50],
+    [0.70, 0.72, 16, '#00D9FF', 30],
+    [0.30, 0.82, 14, '#FF8E53', -35],
+    [0.55, 0.12, 10, '#ffffff', 5],
+    [0.42, 0.65, 19, '#FFD700', 45],
+    [0.12, 0.25, 13, '#FF8E53', -30],
+    [0.88, 0.88, 15, '#FF6B9D', 35],
+    [0.25, 0.55, 11, '#00D9FF', 60],
+    [0.65, 0.18, 14, '#FF8E53', -15],
+    [0.48, 0.45, 17, '#FFD700', 25],
+  ];
+  confetti.forEach(([nx, ny, size, color, rot]) => {
+    ctx.save();
+    ctx.translate(width * nx, height * ny);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(-size / 2, -size / 3.5, size, size * 0.55, 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // 4. Floating balloons with shine + string
+  const balloons: Array<readonly [number, number, number, string]> = [
+    [0.15, 0.18, 30, '#FF6B9D'],
+    [0.85, 0.15, 24, '#FFD700'],
+    [0.75, 0.70, 34, '#00D9FF'],
+    [0.20, 0.75, 22, '#FF8E53'],
+    [0.50, 0.28, 18, '#C44569'],
+    [0.35, 0.90, 26, '#8B5CF6'],
+  ];
+  balloons.forEach(([nx, ny, r, color]) => {
+    ctx.save();
+    ctx.globalAlpha = 0.32;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(width * nx, height * ny, r, r * 1.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Shine
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(
+      width * nx - r * 0.25,
+      height * ny - r * 0.3,
+      r * 0.22,
+      r * 0.32,
+      -0.4,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    // String
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(width * nx, height * ny + r * 1.15);
+    ctx.quadraticCurveTo(
+      width * nx + 8,
+      height * ny + r * 1.15 + 20,
+      width * nx,
+      height * ny + r * 1.15 + 36,
+    );
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // 5. Stars / sparkles
+  const stars: Array<readonly [number, number, number]> = [
+    [0.28, 0.12, 20],
+    [0.62, 0.25, 15],
+    [0.88, 0.45, 22],
+    [0.10, 0.50, 12],
+    [0.38, 0.55, 17],
+    [0.78, 0.62, 11],
+    [0.55, 0.80, 24],
+    [0.15, 0.92, 14],
+    [0.92, 0.92, 16],
+    [0.50, 0.50, 28],
+    [0.68, 0.42, 13],
+    [0.22, 0.68, 18],
+  ];
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  stars.forEach(([nx, ny, size]) => {
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `${size}px serif`;
+    ctx.fillText('★', width * nx, height * ny);
+    ctx.restore();
+  });
+
+  // 6. Center message
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetY = 5;
+
+  const message = coverText.trim() || DEFAULT_COVER_TEXT;
+  const words = message.split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+  const maxWidth = width * 0.74;
+  ctx.font = "800 20px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  words.forEach((word) => {
+    const candidate = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(candidate).width > maxWidth && lines.length === 0) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
+    }
+  });
+  if (line) lines.push(line);
+  const visibleLines = lines.slice(0, 2);
+  const lineHeight = 28;
+  const titleStart = height / 2 - 8 - ((visibleLines.length - 1) * lineHeight) / 2;
+  visibleLines.forEach((text, index) => {
+    ctx.fillText(text, width / 2, titleStart + index * lineHeight);
+  });
+
+  ctx.globalAlpha = 0.88;
+  ctx.font = "700 12px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText('CÀO ĐỂ MỞ QUÀ 🎁', width / 2, titleStart + visibleLines.length * lineHeight + 10);
+  ctx.restore();
+
+  // 7. Cake icon bottom
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.font = '72px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('🎂', width * 0.5, height * 0.88);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// ============================================================
+// 💕 ORIGINAL LOVE FOIL DRAWER (giữ nguyên để backward compat)
+// ============================================================
 function drawLoveFoil(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -362,23 +555,23 @@ function drawLoveFoil(
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const message = coverText.trim() || DEFAULT_COVER_TEXT;
-  const words = message.split(/\s+/);
-  const lines: string[] = [];
-  let line = '';
-  const maxWidth = width * 0.74;
+  const loveMessage = coverText.trim() || DEFAULT_COVER_TEXT;
+  const loveWords = loveMessage.split(/\s+/);
+  const loveLines: string[] = [];
+  let loveLine = '';
+  const loveMaxWidth = width * 0.74;
   ctx.font = "800 18px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  words.forEach((word) => {
-    const candidate = line ? `${line} ${word}` : word;
-    if (line && ctx.measureText(candidate).width > maxWidth && lines.length === 0) {
-      lines.push(line);
-      line = word;
+  loveWords.forEach((word) => {
+    const candidate = loveLine ? `${loveLine} ${word}` : word;
+    if (loveLine && ctx.measureText(candidate).width > loveMaxWidth && loveLines.length === 0) {
+      loveLines.push(loveLine);
+      loveLine = word;
     } else {
-      line = candidate;
+      loveLine = candidate;
     }
   });
-  if (line) lines.push(line);
-  const visibleLines = lines.slice(0, 2);
+  if (loveLine) loveLines.push(loveLine);
+  const visibleLines = loveLines.slice(0, 2);
   const lineHeight = 24;
   const titleStart = height / 2 - 8 - ((visibleLines.length - 1) * lineHeight) / 2;
   visibleLines.forEach((text, index) => {
@@ -389,6 +582,99 @@ function drawLoveFoil(
   ctx.fillText('CÀO ĐỂ MỞ', width / 2, titleStart + visibleLines.length * lineHeight + 5);
   ctx.restore();
   ctx.restore();
+}
+
+// ============================================================
+// 🎊 CONFETTI ANIMATION (chỉ chạy khi theme = birthday)
+// ============================================================
+interface ConfettiParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  rot: number;
+  vRot: number;
+  size: number;
+  color: string;
+  alpha: number;
+  shape: 'rect' | 'circle';
+}
+
+function startConfettiAnimation(
+  cCtx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  dpr: number,
+  onDone: () => void,
+): () => void {
+  const colors = ['#FFD700', '#FF6B9D', '#FF8E53', '#00D9FF', '#C44569', '#8B5CF6', '#ffffff'];
+  const particles: ConfettiParticle[] = [];
+  for (let i = 0; i < 80; i++) {
+    particles.push({
+      x: (Math.random() * width * dpr),
+      y: -20 - Math.random() * 60,
+      vx: (Math.random() - 0.5) * 3,
+      vy: 2 + Math.random() * 4,
+      rot: Math.random() * Math.PI * 2,
+      vRot: (Math.random() - 0.5) * 0.2,
+      size: (6 + Math.random() * 10) * dpr,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      alpha: 0.7 + Math.random() * 0.3,
+      shape: Math.random() > 0.4 ? 'rect' : 'circle',
+    });
+  }
+
+  let frame: number | null = null;
+  let startTime: number | null = null;
+  const duration = 2200;
+
+  function tick(ts: number): void {
+    if (startTime === null) startTime = ts;
+    const elapsed = ts - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    cCtx.clearRect(0, 0, width * dpr, height * dpr);
+
+    for (const p of particles) {
+      p.x += p.vx * dpr;
+      p.y += p.vy * dpr;
+      p.rot += p.vRot;
+      p.alpha = Math.max(0, p.alpha - 0.003);
+
+      if (p.y > height * dpr + 20) {
+        p.y = -20;
+        p.x = Math.random() * width * dpr;
+      }
+
+      cCtx.save();
+      cCtx.globalAlpha = p.alpha * (1 - Math.max(0, progress - 0.7) / 0.3);
+      cCtx.fillStyle = p.color;
+      cCtx.translate(p.x, p.y);
+      cCtx.rotate(p.rot);
+
+      if (p.shape === 'circle') {
+        cCtx.beginPath();
+        cCtx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+        cCtx.fill();
+      } else {
+        cCtx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.5);
+      }
+      cCtx.restore();
+    }
+
+    if (progress < 1) {
+      frame = requestAnimationFrame(tick);
+    } else {
+      cCtx.clearRect(0, 0, width * dpr, height * dpr);
+      onDone();
+    }
+  }
+
+  frame = requestAnimationFrame(tick);
+  return () => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    cCtx.clearRect(0, 0, width * dpr, height * dpr);
+  };
 }
 
 function hasHomeAutoOpened(imageUrl: string): boolean {
@@ -463,8 +749,11 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     forceScratch,
     coverText = DEFAULT_COVER_TEXT,
     restartScratch = false,
+    theme = 'love-foil',
     onRevealed,
   } = options;
+
+  const isBirthday = theme === 'birthday-foil';
 
   const latestImage = isLatestSurpriseImage(imageUrl);
   const scratchEligible = forceScratch ?? latestImage;
@@ -478,10 +767,10 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   let height = 0;
 
   const backdrop = document.createElement('div');
-  backdrop.className = 'polaroid-modal-backdrop love-foil-modal';
+  backdrop.className = `polaroid-modal-backdrop love-foil-modal${isBirthday ? ' birthday-foil-modal' : ''}`;
 
   const modal = document.createElement('div');
-  modal.className = 'polaroid-modal-container';
+  modal.className = `polaroid-modal-container${isBirthday ? ' birthday-modal-container' : ''}`;
 
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
@@ -568,7 +857,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   });
 
   const stage = document.createElement('div');
-  stage.className = 'polaroid-stage-view';
+  stage.className = `polaroid-stage-view${isBirthday ? ' birthday-stage-view' : ''}`;
   stage.classList.toggle('is-revealed', revealed);
 
   const image = document.createElement('img');
@@ -578,7 +867,15 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
   const canvas = document.createElement('canvas');
   canvas.className = 'polaroid-stage-canvas';
-  canvas.setAttribute('aria-label', 'Cào lớp Love Foil để mở ảnh');
+  canvas.setAttribute('aria-label', isBirthday ? 'Cào lớp Birthday Foil để mở ảnh' : 'Cào lớp Love Foil để mở ảnh');
+
+  // Confetti canvas (birthday only)
+  const confettiCanvas = isBirthday ? document.createElement('canvas') : null;
+  if (confettiCanvas) {
+    confettiCanvas.className = 'polaroid-confetti-canvas';
+    confettiCanvas.setAttribute('aria-hidden', 'true');
+  }
+  let stopConfetti: (() => void) | null = null;
 
   const hud = document.createElement('div');
   hud.className = `polaroid-hud${revealed ? ' hidden' : ''}`;
@@ -606,7 +903,11 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   status.textContent = restartScratch ? 'Cào lại' : alreadyOpened ? 'Đã mở' : scratchEligible ? 'Bất ngờ mới' : 'Kỷ niệm';
 
   footer.append(copy, status);
-  stage.append(image, canvas, hud, success);
+  if (confettiCanvas) {
+    stage.append(image, canvas, confettiCanvas, hud, success);
+  } else {
+    stage.append(image, canvas, hud, success);
+  }
   modal.append(closeButton, downloadButton, stage, footer);
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
@@ -645,10 +946,20 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     canvas.height = Math.round(height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    // Resize confetti canvas to match stage
+    if (confettiCanvas) {
+      confettiCanvas.width = Math.round(width * dpr);
+      confettiCanvas.height = Math.round(height * dpr);
+    }
+
     if (!revealed) {
       ctx.save();
       clipToStage(ctx, width, height);
-      drawLoveFoil(ctx, width, height, coverText);
+      if (isBirthday) {
+        drawBirthdayFoil(ctx, width, height, coverText);
+      } else {
+        drawLoveFoil(ctx, width, height, coverText);
+      }
       ctx.restore();
       updateProgress(0);
     }
@@ -686,6 +997,25 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     status.classList.add('is-opened');
     status.textContent = 'Đã mở';
     syncScratchPills();
+
+    // Birthday confetti burst on reveal
+    if (isBirthday && confettiCanvas) {
+      const cCtx = confettiCanvas.getContext('2d');
+      if (cCtx) {
+        confettiCanvas.classList.add('active');
+        stopConfetti = startConfettiAnimation(
+          cCtx,
+          width,
+          height,
+          dpr,
+          () => {
+            confettiCanvas.classList.remove('active');
+            stopConfetti = null;
+          },
+        );
+      }
+    }
+
     onRevealed?.();
   }
 
@@ -787,6 +1117,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   function destroy(): void {
     if (ratioFrame !== null) cancelAnimationFrame(ratioFrame);
     if (ratioTimer !== null) clearTimeout(ratioTimer);
+    stopConfetti?.();
     resizeObserver?.disconnect();
     window.removeEventListener('resize', resize);
     window.removeEventListener('keydown', onEscape);

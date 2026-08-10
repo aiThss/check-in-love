@@ -431,3 +431,64 @@ html.android-wrapper .polaroid-modal-container {
     transition: none;
   }
 }
+
+/* ============================================================
+   🎂 BIRTHDAY FOIL THEME OVERRIDES
+   ============================================================ */
+
+.birthday-foil-modal {
+  background: rgba(18, 8, 12, 0.9);
+}
+
+.birthday-modal-container {
+  max-width: 420px;
+}
+
+.birthday-stage-view {
+  aspect-ratio: 2 / 3;
+  border-radius: 28px;
+  background: #1a1018;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+/* Confetti canvas overlay */
+.polaroid-confetti-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+  border-radius: inherit;
+}
+
+.polaroid-confetti-canvas.active {
+  opacity: 1;
+}
+
+/* Birthday success badge */
+.birthday-stage-view .polaroid-success {
+  border-color: rgba(255, 215, 0, 0.55);
+  background: rgba(60, 30, 20, 0.82);
+}
+
+/* Birthday HUD progress bar gradient */
+.birthday-stage-view .polaroid-hud-bar {
+  background: linear-gradient(90deg, #FFD700, #FF6B9D, #FF8E53);
+}
+
+/* Birthday status pill */
+.birthday-stage-view + .polaroid-love-foil-footer .polaroid-love-foil-status {
+  border-color: rgba(255, 142, 83, 0.35);
+  background: rgba(255, 142, 83, 0.14);
+  color: #FF8E53 !important;
+}
+
+/* Responsive for birthday 2:3 cards */
+@media (max-width: 420px) {
+  .birthday-modal-container {
+    width: calc(100vw - 20px);
+  }
+}
