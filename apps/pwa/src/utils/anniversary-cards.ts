@@ -564,8 +564,8 @@ function ensureStyles(): void {
       animation: occasionFade 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .occasion-shell {
-      position: relative; width: min(330px, 100%); height: 480px;
-      max-height: calc(100dvh - 24px); overflow: auto;
+      position: relative; width: min(340px, calc(100vw - 32px)); height: auto;
+      max-height: calc(100dvh - 24px); overflow: visible;
       border-radius: 26px;
       box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.15);
       background: #1a101b; animation: occasionRise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -592,7 +592,7 @@ function ensureStyles(): void {
       --paper-line: rgba(161, 76, 115, 0.26);
       --panel: rgba(255, 255, 255, 0.58);
       --hint-bg: rgba(39, 17, 38, 0.74);
-      position: relative; min-height: 480px; padding: 28px 16px 20px;
+      position: relative; min-height: 0; padding: 26px 16px 20px;
       overflow: hidden; border-radius: 26px;
       background:
         radial-gradient(circle at 84% 8%, var(--paper-glow), transparent 28%),
@@ -1098,7 +1098,9 @@ function drawPattern(ctx: CanvasRenderingContext2D, width: number, height: numbe
 }
 
 function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): CanvasRenderingContext2D | null {
-  const rect = canvas.getBoundingClientRect();
+  const paper = canvas.previousElementSibling as HTMLElement | null;
+  const paperRect = paper ? paper.getBoundingClientRect() : null;
+  const rect = (paperRect && paperRect.height > 0) ? paperRect : canvas.getBoundingClientRect();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.max(1, Math.round(rect.width * dpr));
   canvas.height = Math.max(1, Math.round(rect.height * dpr));
