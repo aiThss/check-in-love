@@ -992,52 +992,165 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     ctx.restore();
   };
 
-  const gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
-  gradient.addColorStop(0, card.colors[0]);
-  gradient.addColorStop(0.52, card.colors[1]);
-  gradient.addColorStop(1, card.colors[2]);
-  roundedPath(ctx, rect.width, rect.height, 30);
-  ctx.fillStyle = gradient;
-  ctx.fill();
+  if (card.id === 'birthday') {
+    // 🎂 Birthday Foil Theme background: warm gold → pink → coral → purple
+    const bgGrad = ctx.createLinearGradient(0, 0, rect.width, rect.height);
+    bgGrad.addColorStop(0, '#FFD700');
+    bgGrad.addColorStop(0.22, '#FF6B9D');
+    bgGrad.addColorStop(0.48, '#FF8E53');
+    bgGrad.addColorStop(0.72, '#C44569');
+    bgGrad.addColorStop(1, '#8B5CF6');
+    roundedPath(ctx, rect.width, rect.height, 30);
+    ctx.fillStyle = bgGrad;
+    ctx.fill();
 
-  if (card.id === 'day-100' && card.coverImage) {
-    const img = new Image();
-    img.src = card.coverImage;
-    if (img.complete && img.naturalWidth > 0) drawFullCoverImage(img);
-    else img.onload = () => drawFullCoverImage(img);
-    return ctx;
-  }
+    ctx.save();
+    roundedPath(ctx, rect.width, rect.height, 30);
+    ctx.clip();
 
-  // Soft colour blooms make the cover feel like a small illustrated object,
-  // while the deterministic seed keeps every redraw stable during resize.
-  ctx.save();
-  roundedPath(ctx, rect.width, rect.height, 30);
-  ctx.clip();
-  const blooms = [
-    [rect.width * 0.08, rect.height * 0.12, rect.width * 0.52, card.colors[0], 0.48],
-    [rect.width * 0.92, rect.height * 0.24, rect.width * 0.44, card.colors[1], 0.34],
-    [rect.width * 0.72, rect.height * 0.96, rect.width * 0.62, card.colors[2], 0.3],
-  ] as const;
-  blooms.forEach(([x, y, radius, color, alpha]) => {
-    const bloom = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    bloom.addColorStop(0, hexToRgba(color, alpha));
-    bloom.addColorStop(1, hexToRgba(color, 0));
-    ctx.fillStyle = bloom;
-    ctx.fillRect(0, 0, rect.width, rect.height);
-  });
-  ctx.globalAlpha = 0.13;
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 0.8;
-  for (let index = 0; index < 120; index += 1) {
-    const x = seeded(index * 5 + 5) * rect.width;
-    const y = seeded(index * 5 + 6) * rect.height;
-    const length = 7 + seeded(index * 5 + 7) * 18;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + length, y - length * 0.18);
-    ctx.stroke();
+    // 1. Diagonal party stripes
+    ctx.save();
+    ctx.globalAlpha = 0.07;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    for (let x = -rect.height; x < rect.width + rect.height; x += 26) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x - rect.height, rect.height);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 2. Confetti rectangles
+    const confettiList: Array<readonly [number, number, number, string, number]> = [
+      [0.10, 0.06, 16, '#FFD700', 40],
+      [0.90, 0.10, 13, '#FF6B9D', -25],
+      [0.78, 0.32, 18, '#00D9FF', 55],
+      [0.18, 0.38, 11, '#FF8E53', -20],
+      [0.95, 0.50, 20, '#FFD700', 15],
+      [0.05, 0.58, 12, '#FF6B9D', -50],
+      [0.70, 0.72, 16, '#00D9FF', 30],
+      [0.30, 0.82, 14, '#FF8E53', -35],
+      [0.55, 0.12, 10, '#ffffff', 5],
+      [0.42, 0.65, 19, '#FFD700', 45],
+      [0.12, 0.25, 13, '#FF8E53', -30],
+      [0.88, 0.88, 15, '#FF6B9D', 35],
+      [0.25, 0.55, 11, '#00D9FF', 60],
+      [0.65, 0.18, 14, '#FF8E53', -15],
+      [0.48, 0.45, 17, '#FFD700', 25],
+    ];
+    confettiList.forEach(([nx, ny, size, color, rot]) => {
+      ctx.save();
+      ctx.translate(rect.width * nx, rect.height * ny);
+      ctx.rotate((rot * Math.PI) / 180);
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      roundedRectAt(ctx, -size / 2, -size / 3.5, size, size * 0.55, 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // 3. Floating balloons with shine + string
+    const balloons: Array<readonly [number, number, number, string]> = [
+      [0.15, 0.18, 30, '#FF6B9D'],
+      [0.85, 0.15, 24, '#FFD700'],
+      [0.75, 0.70, 34, '#00D9FF'],
+      [0.20, 0.75, 22, '#FF8E53'],
+      [0.50, 0.28, 18, '#C44569'],
+      [0.35, 0.90, 26, '#8B5CF6'],
+    ];
+    balloons.forEach(([nx, ny, r, color]) => {
+      ctx.save();
+      ctx.globalAlpha = 0.32;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(rect.width * nx, rect.height * ny, r, r * 1.18, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Shine
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.ellipse(rect.width * nx - r * 0.25, rect.height * ny - r * 0.3, r * 0.22, r * 0.32, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      // String
+      ctx.globalAlpha = 0.22;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(rect.width * nx, rect.height * ny + r * 1.15);
+      ctx.quadraticCurveTo(rect.width * nx + 8, rect.height * ny + r * 1.15 + 20, rect.width * nx, rect.height * ny + r * 1.15 + 36);
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    // 4. Stars / sparkles
+    const stars: Array<readonly [number, number, number]> = [
+      [0.28, 0.12, 20], [0.62, 0.25, 15], [0.88, 0.45, 22],
+      [0.10, 0.50, 12], [0.38, 0.55, 17], [0.78, 0.62, 11],
+      [0.55, 0.80, 24], [0.15, 0.92, 14], [0.92, 0.92, 16],
+      [0.50, 0.50, 28], [0.68, 0.42, 13], [0.22, 0.68, 18],
+    ];
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    stars.forEach(([nx, ny, size]) => {
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `${size}px serif`;
+      ctx.fillText('★', rect.width * nx, rect.height * ny);
+      ctx.restore();
+    });
+
+    ctx.restore();
+  } else {
+    const gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
+    gradient.addColorStop(0, card.colors[0]);
+    gradient.addColorStop(0.52, card.colors[1]);
+    gradient.addColorStop(1, card.colors[2]);
+    roundedPath(ctx, rect.width, rect.height, 30);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    if (card.id === 'day-100' && card.coverImage) {
+      const img = new Image();
+      img.src = card.coverImage;
+      if (img.complete && img.naturalWidth > 0) drawFullCoverImage(img);
+      else img.onload = () => drawFullCoverImage(img);
+      return ctx;
+    }
+
+    // Soft colour blooms make the cover feel like a small illustrated object,
+    // while the deterministic seed keeps every redraw stable during resize.
+    ctx.save();
+    roundedPath(ctx, rect.width, rect.height, 30);
+    ctx.clip();
+    const blooms = [
+      [rect.width * 0.08, rect.height * 0.12, rect.width * 0.52, card.colors[0], 0.48],
+      [rect.width * 0.92, rect.height * 0.24, rect.width * 0.44, card.colors[1], 0.34],
+      [rect.width * 0.72, rect.height * 0.96, rect.width * 0.62, card.colors[2], 0.3],
+    ] as const;
+    blooms.forEach(([x, y, radius, color, alpha]) => {
+      const bloom = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      bloom.addColorStop(0, hexToRgba(color, alpha));
+      bloom.addColorStop(1, hexToRgba(color, 0));
+      ctx.fillStyle = bloom;
+      ctx.fillRect(0, 0, rect.width, rect.height);
+    });
+    ctx.globalAlpha = 0.13;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 0.8;
+    for (let index = 0; index < 120; index += 1) {
+      const x = seeded(index * 5 + 5) * rect.width;
+      const y = seeded(index * 5 + 6) * rect.height;
+      const length = 7 + seeded(index * 5 + 7) * 18;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + length, y - length * 0.18);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   ctx.save();
   roundedPath(ctx, rect.width, rect.height, 30);
@@ -1298,7 +1411,7 @@ function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement):
 }
 
 // ============================================================
-// 🎊 BIRTHDAY CONFETTI — 3 waves, fades out over ~2.8 s
+// 🎊 BIRTHDAY CONFETTI — 4 waves, falling over ~3.6 s
 // ============================================================
 interface OccasionParticle {
   x: number; y: number;
@@ -1319,42 +1432,58 @@ function startOccasionConfetti(
   const H = height * dpr;
   const colors = ['#FFD700', '#FF6B9D', '#FF8E53', '#00D9FF', '#C44569', '#8B5CF6', '#ffffff', '#ff3b7f'];
 
-  // 3 launch origins: top-left, top-center, top-right
-  const origins = [
-    { x: W * 0.15, y: -10 },
-    { x: W * 0.50, y: -10 },
-    { x: W * 0.85, y: -10 },
-  ];
-
   const particles: OccasionParticle[] = [];
 
   const spawnWave = (waveIndex: number) => {
-    const ox = origins[waveIndex % origins.length];
-    for (let i = 0; i < 28; i++) {
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.1;
-      const speed = (3 + Math.random() * 5) * dpr;
+    let count = 35;
+    let ox = W * 0.5;
+
+    if (waveIndex === 0) {
+      // Wave 0: Left & Right bursts
+      count = 50;
+    } else if (waveIndex === 1) {
+      // Wave 1: Center burst
+      count = 40;
+      ox = W * 0.5;
+    } else if (waveIndex === 2) {
+      // Wave 2: Outer corners
+      count = 50;
+    } else {
+      // Wave 3: Full width rain
+      count = 70;
+    }
+
+    for (let i = 0; i < count; i++) {
+      const spawnX = (waveIndex === 0 || waveIndex === 2)
+        ? (i % 2 === 0 ? W * 0.15 + (Math.random() - 0.5) * 30 : W * 0.85 + (Math.random() - 0.5) * 30)
+        : (waveIndex === 3 ? Math.random() * W : ox + (Math.random() - 0.5) * 60);
+
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.2;
+      const speed = (2.5 + Math.random() * 5.5) * dpr;
+
       particles.push({
-        x: ox.x + (Math.random() - 0.5) * 40,
-        y: ox.y,
+        x: spawnX,
+        y: -10 - Math.random() * 20,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         rot: Math.random() * Math.PI * 2,
-        vRot: (Math.random() - 0.5) * 0.22,
-        size: (5 + Math.random() * 9) * dpr,
+        vRot: (Math.random() - 0.5) * 0.24,
+        size: (5.5 + Math.random() * 9.5) * dpr,
         color: colors[Math.floor(Math.random() * colors.length)],
         alpha: 0.85 + Math.random() * 0.15,
-        shape: Math.random() > 0.38 ? 'rect' : 'circle',
+        shape: Math.random() > 0.35 ? 'rect' : 'circle',
         wave: waveIndex,
       });
     }
   };
 
-  // Fire wave 0 immediately, wave 1 at 180ms, wave 2 at 360ms
+  // Fire 4 waves at 0ms, 220ms, 480ms, 750ms
   spawnWave(0);
-  const t1 = window.setTimeout(() => spawnWave(1), 180);
-  const t2 = window.setTimeout(() => spawnWave(2), 360);
+  const t1 = window.setTimeout(() => spawnWave(1), 220);
+  const t2 = window.setTimeout(() => spawnWave(2), 480);
+  const t3 = window.setTimeout(() => spawnWave(3), 750);
 
-  const DURATION = 2800;
+  const DURATION = 3600;
   let startTime: number | null = null;
   let frame: number | null = null;
 
@@ -1362,7 +1491,7 @@ function startOccasionConfetti(
     if (startTime === null) startTime = ts;
     const elapsed = ts - startTime;
     const progress = Math.min(elapsed / DURATION, 1);
-    const fadeStart = 0.65;
+    const fadeStart = 0.72;
     const globalFade = progress < fadeStart
       ? 1
       : 1 - (progress - fadeStart) / (1 - fadeStart);
@@ -1371,12 +1500,12 @@ function startOccasionConfetti(
 
     for (const p of particles) {
       p.x += p.vx;
-      p.vy += 0.18 * dpr; // gravity
+      p.vy += 0.16 * dpr; // gravity
       p.y += p.vy;
       p.rot += p.vRot;
       p.vx *= 0.992;
 
-      if (p.y > H + 20) continue; // off-screen
+      if (p.y > H + 30) continue; // off-screen
 
       cCtx.save();
       cCtx.globalAlpha = p.alpha * globalFade;
