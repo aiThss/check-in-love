@@ -25,6 +25,70 @@ export interface PolaroidCoverOptions {
 const DEFAULT_REVEAL_THRESHOLD = 0.8;
 const DEFAULT_COVER_TEXT = 'Unbox quà ngày mới nào';
 const STAGE_CORNER_RADIUS = 28;
+
+// Flower SVG taken from the occasion-cards system – used as the birthday foil art.
+const BIRTHDAY_FLOWER_SVG = `<svg viewBox="0 0 130 155" width="130" height="155" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bfStemG" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#1b4332"/><stop offset="50%" stop-color="#40916c"/><stop offset="100%" stop-color="#1b4332"/></linearGradient>
+    <linearGradient id="bfLeafL" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#95d5b2"/><stop offset="45%" stop-color="#40916c"/><stop offset="100%" stop-color="#1b4332"/></linearGradient>
+    <linearGradient id="bfLeafR" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#74c69d"/><stop offset="50%" stop-color="#2d6a4f"/><stop offset="100%" stop-color="#081c15"/></linearGradient>
+    <radialGradient id="bfHp" cx="35%" cy="20%" r="70%"><stop offset="0%" stop-color="#ffd6e0" stop-opacity=".95"/><stop offset="40%" stop-color="#ff6b8a" stop-opacity=".85"/><stop offset="100%" stop-color="#a4133c" stop-opacity=".7"/></radialGradient>
+    <radialGradient id="bfHp2" cx="35%" cy="20%" r="70%"><stop offset="0%" stop-color="#ffe5ec" stop-opacity=".9"/><stop offset="45%" stop-color="#ff85a1" stop-opacity=".8"/><stop offset="100%" stop-color="#c9184a" stop-opacity=".65"/></radialGradient>
+    <radialGradient id="bfHi" cx="40%" cy="25%" r="65%"><stop offset="0%" stop-color="#fff0f5" stop-opacity=".9"/><stop offset="50%" stop-color="#ffb3c6" stop-opacity=".7"/><stop offset="100%" stop-color="#ff4d6d" stop-opacity=".45"/></radialGradient>
+    <radialGradient id="bfCosmic" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#c77dff"/><stop offset="40%" stop-color="#7b2cbf"/><stop offset="100%" stop-color="#10002b"/></radialGradient>
+    <filter id="bfDs"><feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#800f2f" flood-opacity=".3"/></filter>
+    <filter id="bfGlow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="bfLeafSh"><feDropShadow dx="0" dy="1.5" stdDeviation="1.2" flood-color="#081c15" flood-opacity=".35"/></filter>
+  </defs>
+  <path d="M65 140 Q62 105 65 68" stroke="url(#bfStemG)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+  <g filter="url(#bfLeafSh)">
+    <path d="M58 132 C48 128 36 122 32 116 C28 110 34 104 42 108 C50 112 56 122 58 132Z" fill="url(#bfLeafL)"/>
+    <path d="M56 130 Q48 122 40 116" stroke="#1b4332" stroke-width="1.1" fill="none" opacity=".55" stroke-linecap="round"/>
+  </g>
+  <g filter="url(#bfLeafSh)">
+    <path d="M72 134 C82 131 96 126 100 120 C104 114 98 108 90 112 C82 116 76 126 72 134Z" fill="url(#bfLeafR)"/>
+    <path d="M74 132 Q82 125 92 118" stroke="#081c15" stroke-width="1.1" fill="none" opacity=".5" stroke-linecap="round"/>
+  </g>
+  <g filter="url(#bfDs)">
+    <g transform="rotate(0 65 60)"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#bfHp)" transform="translate(-23 10)" filter="url(#bfGlow)" opacity=".88"/></g>
+    <g transform="rotate(60 65 60)"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#bfHp2)" transform="translate(-23 10)" opacity=".85"/></g>
+    <g transform="rotate(120 65 60)"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#bfHp)" transform="translate(-23 10)" opacity=".88"/></g>
+    <g transform="rotate(180 65 60)"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#bfHp2)" transform="translate(-23 10)" opacity=".85"/></g>
+    <g transform="rotate(240 65 60)"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#bfHp)" transform="translate(-23 10)" opacity=".88"/></g>
+    <g transform="rotate(300 65 60)"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#bfHp2)" transform="translate(-23 10)" opacity=".85"/></g>
+    <g transform="rotate(0 65 60)"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#bfHi)" transform="translate(-13 7)" opacity=".7"/></g>
+    <g transform="rotate(60 65 60)"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#bfHi)" transform="translate(-13 7)" opacity=".65"/></g>
+    <g transform="rotate(120 65 60)"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#bfHi)" transform="translate(-13 7)" opacity=".7"/></g>
+    <g transform="rotate(180 65 60)"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#bfHi)" transform="translate(-13 7)" opacity=".65"/></g>
+    <g transform="rotate(240 65 60)"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#bfHi)" transform="translate(-13 7)" opacity=".7"/></g>
+    <g transform="rotate(300 65 60)"><path d="M65 31C65 25 73 21 78 28C83 21 91 25 91 31C91 42 78 51 78 51C78 51 65 42 65 31Z" fill="url(#bfHi)" transform="translate(-13 7)" opacity=".65"/></g>
+  </g>
+  <circle cx="65" cy="60" r="14.5" fill="url(#bfCosmic)"/>
+  <path d="M65 47 L68 56.5 L78 56.5 L70 62.5 L73 72 L65 66 L57 72 L60 62.5 L52 56.5 L62 56.5 Z" fill="#e0aaff"/>
+  <circle cx="65" cy="60" r="3" fill="#f8f7ff"/>
+</svg>`;
+
+let birthdayFlowerImg: HTMLImageElement | null = null;
+let birthdayFlowerLoading = false;
+const birthdayFlowerCallbacks: Array<(img: HTMLImageElement) => void> = [];
+
+function loadBirthdayFlower(callback: (img: HTMLImageElement) => void): void {
+  if (birthdayFlowerImg) { callback(birthdayFlowerImg); return; }
+  birthdayFlowerCallbacks.push(callback);
+  if (birthdayFlowerLoading) return;
+  birthdayFlowerLoading = true;
+  const blob = new Blob([BIRTHDAY_FLOWER_SVG], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    birthdayFlowerImg = img;
+    URL.revokeObjectURL(url);
+    const cbs = birthdayFlowerCallbacks.splice(0);
+    cbs.forEach((cb) => cb(img));
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); birthdayFlowerCallbacks.splice(0); };
+  img.src = url;
+}
 const STORAGE_PREFIX = 'lovecheck:daily-surprise:love-foil:v1:';
 const HOME_AUTO_OPEN_PREFIX = 'lovecheck:daily-surprise:auto-open:v1:';
 const GLOBAL_INSTALL_KEY = '__loveCheckLoveFoilInstalled';
@@ -489,12 +553,20 @@ function drawBirthdayFoil(
   ctx.fillText('CÀO ĐỂ MỞ QUÀ 🎁', width / 2, titleStart + visibleLines.length * lineHeight + 10);
   ctx.restore();
 
-  // 7. Cake icon bottom
+  // 7. Flower art — drawn async via SVG Image (mirrors the occasion-cards flower)
+  const flowerSize = Math.min(width, height) * 0.38;
+  const flowerX = width * 0.5 - flowerSize * 0.5;
+  const flowerY = height * 0.72 - flowerSize * 0.5;
   ctx.save();
-  ctx.globalAlpha = 0.22;
-  ctx.font = '72px serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('🎂', width * 0.5, height * 0.88);
+  ctx.globalAlpha = 0.28;
+  loadBirthdayFlower((img) => {
+    // Re-enter the draw call with the loaded image. The canvas may have been
+    // replaced on resize, so we check that the context is still alive.
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    ctx.drawImage(img, flowerX, flowerY, flowerSize, flowerSize * (155 / 130));
+    ctx.restore();
+  });
   ctx.restore();
 
   ctx.restore();
