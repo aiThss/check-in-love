@@ -1187,7 +1187,7 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   // The 100-day cover stays intentionally open in the middle. Its reference
   // artwork contains a faded flower there, so do not place either that asset
   // or another central badge on this milestone's scratch surface.
-  if (card.id !== 'day-100') {
+  if (card.id !== 'day-100' && card.id !== 'birthday') {
     ctx.save();
     ctx.fillStyle = 'rgba(24, 8, 26, 0.2)';
     ctx.shadowColor = 'rgba(18, 4, 22, 0.32)';
@@ -1213,38 +1213,41 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     ctx.restore();
   }
 
-  // Keep the existing cover copy verbatim, but give it a soft reading plate.
   const isHundredDay = card.id === 'day-100';
-  const copyTop = isHundredDay ? rect.height / 2 + 4 : rect.height / 2 - 4;
-  const copyHeight = isHundredDay ? 92 : 116;
-  ctx.save();
-  roundedRectAt(ctx, rect.width * (isHundredDay ? 0.14 : 0.09), copyTop, rect.width * (isHundredDay ? 0.72 : 0.82), copyHeight, 22);
-  const copyPlate = ctx.createLinearGradient(0, copyTop, 0, copyTop + copyHeight);
-  copyPlate.addColorStop(0, 'rgba(26, 8, 28, 0.28)');
-  copyPlate.addColorStop(1, isHundredDay ? 'rgba(26, 8, 28, 0.48)' : 'rgba(26, 8, 28, 0.56)');
-  ctx.fillStyle = copyPlate;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.restore();
 
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-  ctx.shadowBlur = isHundredDay ? 7 : 10;
-  ctx.font = isHundredDay
-    ? '700 21px "Dancing Script", "Brush Script MT", cursive'
-    : '800 16.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
-  wrapCanvasText(
-    ctx,
-    card.coverText,
-    rect.width / 2,
-    isHundredDay ? rect.height / 2 + 42 : rect.height / 2 + 18,
-    rect.width * (isHundredDay ? 0.66 : 0.76),
-    isHundredDay ? 26 : 24,
-  );
+  if (card.id !== 'birthday') {
+    // Keep the existing cover copy verbatim, but give it a soft reading plate.
+    const copyTop = isHundredDay ? rect.height / 2 + 4 : rect.height / 2 - 4;
+    const copyHeight = isHundredDay ? 92 : 116;
+    ctx.save();
+    roundedRectAt(ctx, rect.width * (isHundredDay ? 0.14 : 0.09), copyTop, rect.width * (isHundredDay ? 0.72 : 0.82), copyHeight, 22);
+    const copyPlate = ctx.createLinearGradient(0, copyTop, 0, copyTop + copyHeight);
+    copyPlate.addColorStop(0, 'rgba(26, 8, 28, 0.28)');
+    copyPlate.addColorStop(1, isHundredDay ? 'rgba(26, 8, 28, 0.48)' : 'rgba(26, 8, 28, 0.56)');
+    ctx.fillStyle = copyPlate;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = isHundredDay ? 7 : 10;
+    ctx.font = isHundredDay
+      ? '700 21px "Dancing Script", "Brush Script MT", cursive'
+      : '800 16.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
+    wrapCanvasText(
+      ctx,
+      card.coverText,
+      rect.width / 2,
+      isHundredDay ? rect.height / 2 + 42 : rect.height / 2 + 18,
+      rect.width * (isHundredDay ? 0.66 : 0.76),
+      isHundredDay ? 26 : 24,
+    );
+  }
 
   ctx.shadowBlur = 0;
   ctx.globalAlpha = 0.92;

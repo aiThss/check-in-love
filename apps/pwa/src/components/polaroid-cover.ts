@@ -516,57 +516,17 @@ function drawBirthdayFoil(
     ctx.restore();
   });
 
-  // 6. Center message
+  // 6. Center instruction text
   ctx.save();
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 20;
-  ctx.shadowOffsetY = 5;
-
-  const message = coverText.trim() || DEFAULT_COVER_TEXT;
-  const words = message.split(/\s+/);
-  const lines: string[] = [];
-  let line = '';
-  const maxWidth = width * 0.74;
-  ctx.font = "800 20px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  words.forEach((word) => {
-    const candidate = line ? `${line} ${word}` : word;
-    if (line && ctx.measureText(candidate).width > maxWidth && lines.length === 0) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = candidate;
-    }
-  });
-  if (line) lines.push(line);
-  const visibleLines = lines.slice(0, 2);
-  const lineHeight = 28;
-  const titleStart = height / 2 - 8 - ((visibleLines.length - 1) * lineHeight) / 2;
-  visibleLines.forEach((text, index) => {
-    ctx.fillText(text, width / 2, titleStart + index * lineHeight);
-  });
-
-  ctx.globalAlpha = 0.88;
-  ctx.font = "700 12px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText('CÀO ĐỂ MỞ QUÀ 🎁', width / 2, titleStart + visibleLines.length * lineHeight + 10);
-  ctx.restore();
-
-  // 7. Flower art — drawn async via SVG Image (mirrors the occasion-cards flower)
-  const flowerSize = Math.min(width, height) * 0.38;
-  const flowerX = width * 0.5 - flowerSize * 0.5;
-  const flowerY = height * 0.72 - flowerSize * 0.5;
-  ctx.save();
-  ctx.globalAlpha = 0.28;
-  loadBirthdayFlower((img) => {
-    // Re-enter the draw call with the loaded image. The canvas may have been
-    // replaced on resize, so we check that the context is still alive.
-    ctx.save();
-    ctx.globalAlpha = 0.28;
-    ctx.drawImage(img, flowerX, flowerY, flowerSize, flowerSize * (155 / 130));
-    ctx.restore();
-  });
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 4;
+  ctx.globalAlpha = 0.95;
+  ctx.font = "800 16px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText('CÀO ĐỂ MỞ QUÀ 🎁', width / 2, height / 2);
   ctx.restore();
 
   ctx.restore();
