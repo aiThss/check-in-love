@@ -174,8 +174,8 @@ const BIRTHDAY_CAKE_SVG = `
       60%{transform:scaleY(.9) scaleX(1.1);opacity:1}
     }
     @keyframes c2StarFly{
-      0%,100%{opacity:.35;transform:translate(0,0) scale(.75) rotate(0deg)}
-      50%{opacity:1;transform:translate(0,-6px) scale(1.15) rotate(25deg)}
+      0%,100%{opacity:.78;transform:translate(0,0) scale(.85) rotate(0deg)}
+      50%{opacity:1;transform:translate(0,-7px) scale(1.25) rotate(25deg)}
     }
     @keyframes c2Bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.8px)}}
     @keyframes c2Drip{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.05)}}
@@ -230,11 +230,11 @@ const BIRTHDAY_CAKE_SVG = `
         <ellipse cx="85.7" cy="29" rx="1.3" ry="3" fill="url(#c2FlameIn)"/>
       </g>
     </g>
-    <path class="c2-star c2-s1" d="M24 52 L25.5 56.5 L30 58 L25.5 59.5 L24 64 L22.5 59.5 L18 58 L22.5 56.5 Z" fill="#ffd60a"/>
-    <path class="c2-star c2-s2" d="M106 48 L107.3 51.8 L111 53 L107.3 54.2 L106 58 L104.7 54.2 L101 53 L104.7 51.8 Z" fill="#fff"/>
-    <path class="c2-star c2-s3" d="M18 98 L19.4 102 L23 103.2 L19.4 104.4 L18 108.4 L16.6 104.4 L13 103.2 L16.6 102 Z" fill="#ff8fa3"/>
-    <path class="c2-star c2-s4" d="M112 102 L113.4 105.8 L117 107 L113.4 108.2 L112 112 L110.6 108.2 L107 107 L110.6 105.8 Z" fill="#ffd60a"/>
-    <path class="c2-star c2-s5" d="M65 12 L66.2 15.5 L69.5 16.5 L66.2 17.5 L65 21 L63.8 17.5 L60.5 16.5 L63.8 15.5 Z" fill="#fff"/>
+    <path class="c2-star c2-s1" d="M24 52 L25.5 56.5 L30 58 L25.5 59.5 L24 64 L22.5 59.5 L18 58 L22.5 56.5 Z" fill="#d97706"/>
+    <path class="c2-star c2-s2" d="M106 48 L107.3 51.8 L111 53 L107.3 54.2 L106 58 L104.7 54.2 L101 53 L104.7 51.8 Z" fill="#1e3a8a"/>
+    <path class="c2-star c2-s3" d="M18 98 L19.4 102 L23 103.2 L19.4 104.4 L18 108.4 L16.6 104.4 L13 103.2 L16.6 102 Z" fill="#c026d3"/>
+    <path class="c2-star c2-s4" d="M112 102 L113.4 105.8 L117 107 L113.4 108.2 L112 112 L110.6 108.2 L107 107 L110.6 105.8 Z" fill="#0284c7"/>
+    <path class="c2-star c2-s5" d="M65 12 L66.2 15.5 L69.5 16.5 L66.2 17.5 L65 21 L63.8 17.5 L60.5 16.5 L63.8 15.5 Z" fill="#b91c1c"/>
   </g>
 </svg>`;
 
@@ -1227,18 +1227,18 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     });
 
     // 4. Stars / sparkles
-    const stars: Array<readonly [number, number, number]> = [
-      [0.28, 0.12, 20], [0.62, 0.25, 15], [0.88, 0.45, 22],
-      [0.10, 0.50, 12], [0.38, 0.55, 17], [0.78, 0.62, 11],
-      [0.55, 0.80, 24], [0.15, 0.92, 14], [0.92, 0.92, 16],
-      [0.50, 0.50, 28], [0.68, 0.42, 13], [0.22, 0.68, 18],
+    const stars: Array<readonly [number, number, number, string]> = [
+      [0.28, 0.12, 20, '#FFD700'], [0.62, 0.25, 15, '#FF3366'], [0.88, 0.45, 22, '#00E5FF'],
+      [0.10, 0.50, 12, '#FFD700'], [0.38, 0.55, 17, '#9D4EDD'], [0.78, 0.62, 11, '#FF3366'],
+      [0.55, 0.80, 24, '#FFD700'], [0.15, 0.92, 14, '#00E5FF'], [0.92, 0.92, 16, '#FF9E00'],
+      [0.50, 0.50, 28, '#FFFFFF'], [0.68, 0.42, 13, '#9D4EDD'], [0.22, 0.68, 18, '#FF3366'],
     ];
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    stars.forEach(([nx, ny, size]) => {
+    stars.forEach(([nx, ny, size, color]) => {
       ctx.save();
-      ctx.globalAlpha = 0.45;
-      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = color;
       ctx.font = `${size}px serif`;
       ctx.fillText('★', rect.width * nx, rect.height * ny);
       ctx.restore();
