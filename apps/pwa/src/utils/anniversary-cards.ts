@@ -1411,7 +1411,7 @@ function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement):
 }
 
 // ============================================================
-// 🎊 BIRTHDAY CONFETTI — 4 waves, falling over ~3.6 s
+// 🎊 BIRTHDAY CONFETTI — 4 distinct waves (0ms, 280ms, 600ms, 950ms)
 // ============================================================
 interface OccasionParticle {
   x: number; y: number;
@@ -1426,70 +1426,70 @@ function startOccasionConfetti(
   cCtx: CanvasRenderingContext2D,
   width: number,
   height: number,
-): void {
+): () => void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = width * dpr;
   const H = height * dpr;
-  const colors = ['#FFD700', '#FF6B9D', '#FF8E53', '#00D9FF', '#C44569', '#8B5CF6', '#ffffff', '#ff3b7f'];
+  const colors = ['#FFD700', '#FF6B9D', '#FF8E53', '#00D9FF', '#C44569', '#8B5CF6', '#ffffff', '#ff3b7f', '#50e3c2'];
 
   const particles: OccasionParticle[] = [];
+  const spawnedWaves = new Set<number>();
 
   const spawnWave = (waveIndex: number) => {
-    let count = 35;
-    let ox = W * 0.5;
+    if (spawnedWaves.has(waveIndex)) return;
+    spawnedWaves.add(waveIndex);
 
-    if (waveIndex === 0) {
-      // Wave 0: Left & Right bursts
-      count = 50;
-    } else if (waveIndex === 1) {
-      // Wave 1: Center burst
-      count = 40;
-      ox = W * 0.5;
-    } else if (waveIndex === 2) {
-      // Wave 2: Outer corners
-      count = 50;
-    } else {
-      // Wave 3: Full width rain
-      count = 70;
-    }
+    let count = 40;
+    if (waveIndex === 0) count = 55;      // Wave 1: Left & Right pops
+    else if (waveIndex === 1) count = 45; // Wave 2: Center pop
+    else if (waveIndex === 2) count = 55; // Wave 3: Wide side pops
+    else if (waveIndex === 3) count = 75; // Wave 4: Massive top shower
 
     for (let i = 0; i < count; i++) {
-      const spawnX = (waveIndex === 0 || waveIndex === 2)
-        ? (i % 2 === 0 ? W * 0.15 + (Math.random() - 0.5) * 30 : W * 0.85 + (Math.random() - 0.5) * 30)
-        : (waveIndex === 3 ? Math.random() * W : ox + (Math.random() - 0.5) * 60);
+      let spawnX = W * 0.5;
+      if (waveIndex === 0 || waveIndex === 2) {
+        spawnX = (i % 2 === 0)
+          ? W * 0.18 + (Math.random() - 0.5) * 40
+          : W * 0.82 + (Math.random() - 0.5) * 40;
+      } else if (waveIndex === 3) {
+        spawnX = Math.random() * W;
+      } else {
+        spawnX = W * 0.5 + (Math.random() - 0.5) * 60;
+      }
 
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.2;
-      const speed = (2.5 + Math.random() * 5.5) * dpr;
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * (waveIndex === 3 ? Math.PI * 0.8 : Math.PI * 1.2);
+      const speed = (3.5 + Math.random() * 6) * dpr;
 
       particles.push({
         x: spawnX,
-        y: -10 - Math.random() * 20,
+        y: -10 - Math.random() * 15,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         rot: Math.random() * Math.PI * 2,
-        vRot: (Math.random() - 0.5) * 0.24,
+        vRot: (Math.random() - 0.5) * 0.25,
         size: (5.5 + Math.random() * 9.5) * dpr,
         color: colors[Math.floor(Math.random() * colors.length)],
-        alpha: 0.85 + Math.random() * 0.15,
+        alpha: 0.9 + Math.random() * 0.1,
         shape: Math.random() > 0.35 ? 'rect' : 'circle',
         wave: waveIndex,
       });
     }
   };
 
-  // Fire 4 waves at 0ms, 220ms, 480ms, 750ms
-  spawnWave(0);
-  const t1 = window.setTimeout(() => spawnWave(1), 220);
-  const t2 = window.setTimeout(() => spawnWave(2), 480);
-  const t3 = window.setTimeout(() => spawnWave(3), 750);
-
-  const DURATION = 3600;
+  const DURATION = 3800;
   let startTime: number | null = null;
   let frame: number | null = null;
 
   const tick = (ts: number) => {
     if (startTime === null) startTime = ts;
     const elapsed = ts - startTime;
+
+    // Time-triggered 4 waves
+    if (elapsed >= 0) spawnWave(0);
+    if (elapsed >= 280) spawnWave(1);
+    if (elapsed >= 600) spawnWave(2);
+    if (elapsed >= 950) spawnWave(3);
+
     const progress = Math.min(elapsed / DURATION, 1);
     const fadeStart = 0.72;
     const globalFade = progress < fadeStart
@@ -1500,12 +1500,12 @@ function startOccasionConfetti(
 
     for (const p of particles) {
       p.x += p.vx;
-      p.vy += 0.16 * dpr; // gravity
+      p.vy += 0.18 * dpr; // gravity
       p.y += p.vy;
       p.rot += p.vRot;
-      p.vx *= 0.992;
+      p.vx *= 0.99; // drag
 
-      if (p.y > H + 30) continue; // off-screen
+      if (p.y > H + 40) continue;
 
       cCtx.save();
       cCtx.globalAlpha = p.alpha * globalFade;
@@ -1623,13 +1623,15 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   let checkTimer: number | null = null;
   let revealed = false;
 
+  let stopConfettiFn: (() => void) | null = null;
+
   const reveal = () => {
     if (revealed) return;
     revealed = true;
     canvas.classList.add('revealed');
     shell.classList.add('is-revealed');
 
-    // 🎊 Birthday confetti burst
+    // 🎊 Birthday confetti burst (4 waves)
     if (card.id === 'birthday') {
       const confettiCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-confetti');
       if (confettiCanvas && shell) {
@@ -1637,7 +1639,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
         confettiCanvas.width = Math.round(shellRect.width * Math.min(window.devicePixelRatio || 1, 2));
         confettiCanvas.height = Math.round(shellRect.height * Math.min(window.devicePixelRatio || 1, 2));
         const cCtx = confettiCanvas.getContext('2d');
-        if (cCtx) startOccasionConfetti(cCtx, shellRect.width, shellRect.height);
+        if (cCtx) stopConfettiFn = startOccasionConfetti(cCtx, shellRect.width, shellRect.height);
       }
     }
 
@@ -1702,6 +1704,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', resize);
     if (checkTimer !== null) window.clearTimeout(checkTimer);
+    stopConfettiFn?.();
     cleanupSealScratch();
   };
 }
