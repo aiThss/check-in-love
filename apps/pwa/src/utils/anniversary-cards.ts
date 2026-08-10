@@ -627,6 +627,7 @@ function ensureStyles(): void {
       letter-spacing: 0.12em; white-space: nowrap; color: rgba(255, 255, 255, 0.92); pointer-events: none; transition: opacity 0.2s ease;
     }
     .occasion-shell.is-revealed .occasion-hint { opacity: 0; }
+    .occasion-confetti { position: absolute; inset: 0; z-index: 25; width: 100%; height: 100%; pointer-events: none; }
 
     .occasion-preview-button { position: fixed; right: 16px; bottom: calc(var(--safe-bottom, 0px) + 92px); z-index: 4500; width: 52px; height: 52px; border: 0; border-radius: 18px; background: linear-gradient(145deg, #ff7ca8, #9c5bda); color: #fff; font-size: 24px; box-shadow: 0 12px 30px rgba(118, 58, 126, 0.35); cursor: pointer; }
     .occasion-picker-overlay { position: fixed; inset: 0; z-index: 4900; display: flex; align-items: flex-end; justify-content: center; background: rgba(18, 12, 20, 0.58); backdrop-filter: blur(8px); }
@@ -1296,23 +1297,127 @@ function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement):
   return sampled ? cleared / sampled : 0;
 }
 
-function openCard(card: OccasionCard, onRevealed?: () => void): void {
-  // Birthday card is handled by the unified polaroid scratch system.
-  if (card.id === 'birthday') {
-    void import('../components/polaroid-cover').then(({ openPolaroidCoverModal }) => {
-      openPolaroidCoverModal({
-        imageUrl: '/design/birthday-placeholder.jpg',
-        title: card.title,
-        dateText: card.eyebrow,
-        coverText: card.coverText,
-        theme: 'birthday-foil',
-        forceScratch: true,
-        restartScratch: true,
-        onRevealed,
+// ============================================================
+// 🎊 BIRTHDAY CONFETTI — 3 waves, fades out over ~2.8 s
+// ============================================================
+interface OccasionParticle {
+  x: number; y: number;
+  vx: number; vy: number;
+  rot: number; vRot: number;
+  size: number; color: string;
+  alpha: number; shape: 'rect' | 'circle';
+  wave: number;
+}
+
+function startOccasionConfetti(
+  cCtx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): void {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = width * dpr;
+  const H = height * dpr;
+  const colors = ['#FFD700', '#FF6B9D', '#FF8E53', '#00D9FF', '#C44569', '#8B5CF6', '#ffffff', '#ff3b7f'];
+
+  // 3 launch origins: top-left, top-center, top-right
+  const origins = [
+    { x: W * 0.15, y: -10 },
+    { x: W * 0.50, y: -10 },
+    { x: W * 0.85, y: -10 },
+  ];
+
+  const particles: OccasionParticle[] = [];
+
+  const spawnWave = (waveIndex: number) => {
+    const ox = origins[waveIndex % origins.length];
+    for (let i = 0; i < 28; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.1;
+      const speed = (3 + Math.random() * 5) * dpr;
+      particles.push({
+        x: ox.x + (Math.random() - 0.5) * 40,
+        y: ox.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        rot: Math.random() * Math.PI * 2,
+        vRot: (Math.random() - 0.5) * 0.22,
+        size: (5 + Math.random() * 9) * dpr,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 0.85 + Math.random() * 0.15,
+        shape: Math.random() > 0.38 ? 'rect' : 'circle',
+        wave: waveIndex,
       });
-    });
-    return;
-  }
+    }
+  };
+
+  // Fire wave 0 immediately, wave 1 at 180ms, wave 2 at 360ms
+  spawnWave(0);
+  const t1 = window.setTimeout(() => spawnWave(1), 180);
+  const t2 = window.setTimeout(() => spawnWave(2), 360);
+
+  const DURATION = 2800;
+  let startTime: number | null = null;
+  let frame: number | null = null;
+
+  const tick = (ts: number) => {
+    if (startTime === null) startTime = ts;
+    const elapsed = ts - startTime;
+    const progress = Math.min(elapsed / DURATION, 1);
+    const fadeStart = 0.65;
+    const globalFade = progress < fadeStart
+      ? 1
+      : 1 - (progress - fadeStart) / (1 - fadeStart);
+
+    cCtx.clearRect(0, 0, W, H);
+
+    for (const p of particles) {
+      p.x += p.vx;
+      p.vy += 0.18 * dpr; // gravity
+      p.y += p.vy;
+      p.rot += p.vRot;
+      p.vx *= 0.992;
+
+      if (p.y > H + 20) continue; // off-screen
+
+      cCtx.save();
+      cCtx.globalAlpha = p.alpha * globalFade;
+      cCtx.fillStyle = p.color;
+      cCtx.translate(p.x, p.y);
+      cCtx.rotate(p.rot);
+
+      if (p.shape === 'circle') {
+        cCtx.beginPath();
+        cCtx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+        cCtx.fill();
+      } else {
+        // Thin ribbon shape
+        cCtx.fillRect(-p.size / 2, -p.size * 0.22, p.size, p.size * 0.44);
+      }
+      cCtx.restore();
+    }
+
+    if (progress < 1) {
+      frame = requestAnimationFrame(tick);
+    } else {
+      cCtx.clearRect(0, 0, W, H);
+    }
+  };
+
+  frame = requestAnimationFrame(tick);
+
+  // Safety cleanup after animation ends
+  window.setTimeout(() => {
+    if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
+    cCtx.clearRect(0, 0, W, H);
+  }, DURATION + 200);
+
+  // Cleanup if user closes early
+  window.setTimeout(() => {
+    window.clearTimeout(t1);
+    window.clearTimeout(t2);
+  }, 0);
+}
+
+function openCard(card: OccasionCard, onRevealed?: () => void): void {
   ensureStyles();
   document.querySelector('.occasion-overlay')?.remove();
   const overlay = document.createElement('div');
@@ -1339,7 +1444,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
           </div>
           <p class="occasion-message">${escapeHtml(card.message)}</p>
           <div class="occasion-signature-wrap">
-            <p class="occasion-signature${(card.id as string) === 'birthday' ? ' occasion-signature--birthday' : ''}">${formatOccasionSignature(card)}</p>
+            <p class="occasion-signature${card.id === 'birthday' ? ' occasion-signature--birthday' : ''}">${formatOccasionSignature(card)}</p>
             <div class="occasion-stamp-wrap">
               <div class="occasion-stamp">LOVE SEAL</div>
               <canvas class="occasion-seal-scratch" aria-label="Cào nhẹ để mở Love Seal"></canvas>
@@ -1351,6 +1456,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
       <div class="occasion-hint">
         <span>Cào để mở bí mật</span>
       </div>
+      ${card.id === 'birthday' ? '<canvas class="occasion-confetti" aria-hidden="true"></canvas>' : ''}
     </section>
   `;
   document.body.appendChild(overlay);
@@ -1393,6 +1499,19 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     revealed = true;
     canvas.classList.add('revealed');
     shell.classList.add('is-revealed');
+
+    // 🎊 Birthday confetti burst
+    if (card.id === 'birthday') {
+      const confettiCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-confetti');
+      if (confettiCanvas && shell) {
+        const shellRect = shell.getBoundingClientRect();
+        confettiCanvas.width = Math.round(shellRect.width * Math.min(window.devicePixelRatio || 1, 2));
+        confettiCanvas.height = Math.round(shellRect.height * Math.min(window.devicePixelRatio || 1, 2));
+        const cCtx = confettiCanvas.getContext('2d');
+        if (cCtx) startOccasionConfetti(cCtx, shellRect.width, shellRect.height);
+      }
+    }
+
     onRevealed?.();
   };
   const check = () => {
