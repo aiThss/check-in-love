@@ -1339,7 +1339,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
           </div>
           <p class="occasion-message">${escapeHtml(card.message)}</p>
           <div class="occasion-signature-wrap">
-            <p class="occasion-signature${card.id === 'birthday' ? ' occasion-signature--birthday' : ''}">${formatOccasionSignature(card)}</p>
+            <p class="occasion-signature${(card.id as string) === 'birthday' ? ' occasion-signature--birthday' : ''}">${formatOccasionSignature(card)}</p>
             <div class="occasion-stamp-wrap">
               <div class="occasion-stamp">LOVE SEAL</div>
               <canvas class="occasion-seal-scratch" aria-label="Cào nhẹ để mở Love Seal"></canvas>
