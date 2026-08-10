@@ -103,6 +103,141 @@ const OCCASION_ART_SVG = `
   </g>
 </svg>`;
 
+const BIRTHDAY_CAKE_SVG = `
+<svg class="occasion-art cake-art" viewBox="0 0 130 155" width="160" height="185" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="c2Plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff"/>
+      <stop offset="100%" stop-color="#ced4da"/>
+    </linearGradient>
+    <linearGradient id="c2Body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff5f7"/>
+      <stop offset="100%" stop-color="#ffd6e0"/>
+    </linearGradient>
+    <linearGradient id="c2Top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#ffe5ec"/>
+    </linearGradient>
+    <linearGradient id="c2Drip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff8fa3"/>
+      <stop offset="100%" stop-color="#ff4d6d"/>
+    </linearGradient>
+    <linearGradient id="c2Choco" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d4a373"/>
+      <stop offset="100%" stop-color="#a98467"/>
+    </linearGradient>
+    <radialGradient id="c2Flame" cx="50%" cy="80%" r="55%">
+      <stop offset="0%" stop-color="#fffef5"/>
+      <stop offset="40%" stop-color="#ffd60a"/>
+      <stop offset="100%" stop-color="#e85d04"/>
+    </radialGradient>
+    <radialGradient id="c2FlameIn" cx="50%" cy="65%" r="45%">
+      <stop offset="0%" stop-color="#fff"/>
+      <stop offset="100%" stop-color="#ffe066"/>
+    </radialGradient>
+    <linearGradient id="c2Candle" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#fff3b0"/>
+      <stop offset="50%" stop-color="#ffd60a"/>
+      <stop offset="100%" stop-color="#f4a261"/>
+    </linearGradient>
+    <filter id="c2Sh">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="2.2" flood-color="#6c757d" flood-opacity=".22"/>
+    </filter>
+    <filter id="c2Glow">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="c2FlameG">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <style>
+    .c2-wrap{transform-origin:65px 145px;animation:c2Sway 4.5s ease-in-out infinite}
+    .c2-flame{animation:c2Flicker .85s ease-in-out infinite}
+    .c2-f1{animation-delay:0s}
+    .c2-f2{animation-delay:.18s}
+    .c2-f3{animation-delay:.36s}
+    .c2-star{animation:c2StarFly 3.2s ease-in-out infinite}
+    .c2-s1{animation-delay:0s}
+    .c2-s2{animation-delay:.5s}
+    .c2-s3{animation-delay:1s}
+    .c2-s4{animation-delay:1.5s}
+    .c2-s5{animation-delay:.75s}
+    .c2-berry{animation:c2Bob 2.4s ease-in-out infinite}
+    .c2-b1{animation-delay:0s}.c2-b2{animation-delay:.3s}.c2-b3{animation-delay:.6s}
+    .c2-drip{animation:c2Drip 3.2s ease-in-out infinite}
+    @keyframes c2Sway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+    @keyframes c2Flicker{
+      0%,100%{transform:scaleY(1) scaleX(1);opacity:1}
+      30%{transform:scaleY(1.15) scaleX(.9);opacity:.92}
+      60%{transform:scaleY(.9) scaleX(1.1);opacity:1}
+    }
+    @keyframes c2StarFly{
+      0%,100%{opacity:.35;transform:translate(0,0) scale(.75) rotate(0deg)}
+      50%{opacity:1;transform:translate(0,-6px) scale(1.15) rotate(25deg)}
+    }
+    @keyframes c2Bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.8px)}}
+    @keyframes c2Drip{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.05)}}
+  </style>
+  <g class="c2-wrap">
+    <ellipse cx="65" cy="148" rx="50" ry="7" fill="url(#c2Plate)" filter="url(#c2Sh)"/>
+    <ellipse cx="65" cy="146" rx="46" ry="4.5" fill="#fff" opacity=".7"/>
+    <g filter="url(#c2Sh)">
+      <path d="M32 100 L98 100 Q108 100 108 110 L108 138 Q108 148 98 148 L32 148 Q22 148 22 138 L22 110 Q22 100 32 100Z" fill="url(#c2Body)"/>
+      <rect x="22" y="118" width="86" height="8" rx="1" fill="url(#c2Choco)" opacity=".9"/>
+      <path d="M32 100 L98 100 Q108 100 108 110 Q102 116 96 110 Q90 104 84 110 Q78 116 72 110 Q66 104 60 110 Q54 116 48 110 Q42 104 36 110 Q30 116 22 110 Q22 100 32 100Z" fill="url(#c2Top)"/>
+    </g>
+    <g filter="url(#c2Sh)">
+      <path d="M36 100 L36 68 Q36 60 46 60 L84 60 Q94 60 94 68 L94 100Z" fill="url(#c2Top)"/>
+      <g class="c2-drip">
+        <path d="M36 72 Q36 60 46 60 L84 60 Q94 60 94 72 Q88 78 84 74 Q78 68 72 76 Q68 82 65 76 Q62 70 58 76 Q52 82 46 74 Q42 68 36 72Z" fill="url(#c2Drip)" opacity=".9"/>
+      </g>
+    </g>
+    <g class="c2-berry c2-b1">
+      <path d="M48 58 C48 52 54 48 58 52 C62 48 68 52 68 58 C68 64 58 70 58 70 C58 70 48 64 48 58Z" fill="#e63946" transform="translate(-8 -2)" filter="url(#c2Glow)"/>
+      <path d="M50 50 Q52 46 54 48" stroke="#2d6a4f" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    </g>
+    <g class="c2-berry c2-b2">
+      <path d="M65 54 C65 49 70 46 73 50 C76 46 81 49 81 54 C81 59 73 64 73 64 C73 64 65 59 65 54Z" fill="#ff4d6d" transform="translate(-8 0)" filter="url(#c2Glow)"/>
+      <path d="M65 47 Q67 43 70 45" stroke="#40916c" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    </g>
+    <g class="c2-berry c2-b3">
+      <path d="M78 58 C78 52 84 48 88 52 C92 48 98 52 98 58 C98 64 88 70 88 70 C88 70 78 64 78 58Z" fill="#e63946" transform="translate(-8 -2)" filter="url(#c2Glow)"/>
+      <path d="M80 50 Q82 46 84 48" stroke="#2d6a4f" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    </g>
+    <g>
+      <rect x="42" y="36" width="4.5" height="20" rx="1" fill="url(#c2Candle)" filter="url(#c2Sh)"/>
+      <rect x="43.2" y="34" width="2" height="3" fill="#fff3b0"/>
+      <g class="c2-flame c2-f1" style="transform-origin:44.2px 34px">
+        <ellipse cx="44.2" cy="27.5" rx="3" ry="6.5" fill="url(#c2Flame)" filter="url(#c2FlameG)"/>
+        <ellipse cx="44.2" cy="29" rx="1.3" ry="3" fill="url(#c2FlameIn)"/>
+      </g>
+    </g>
+    <g>
+      <rect x="62.75" y="32" width="4.5" height="22" rx="1" fill="url(#c2Candle)" filter="url(#c2Sh)"/>
+      <rect x="64" y="30" width="2" height="3" fill="#fff3b0"/>
+      <g class="c2-flame c2-f2" style="transform-origin:65px 30px">
+        <ellipse cx="65" cy="23" rx="3.3" ry="7" fill="url(#c2Flame)" filter="url(#c2FlameG)"/>
+        <ellipse cx="65" cy="24.5" rx="1.4" ry="3.2" fill="url(#c2FlameIn)"/>
+      </g>
+    </g>
+    <g>
+      <rect x="83.5" y="36" width="4.5" height="20" rx="1" fill="url(#c2Candle)" filter="url(#c2Sh)"/>
+      <rect x="84.7" y="34" width="2" height="3" fill="#fff3b0"/>
+      <g class="c2-flame c2-f3" style="transform-origin:85.7px 34px">
+        <ellipse cx="85.7" cy="27.5" rx="3" ry="6.5" fill="url(#c2Flame)" filter="url(#c2FlameG)"/>
+        <ellipse cx="85.7" cy="29" rx="1.3" ry="3" fill="url(#c2FlameIn)"/>
+      </g>
+    </g>
+    <path class="c2-star c2-s1" d="M24 52 L25.5 56.5 L30 58 L25.5 59.5 L24 64 L22.5 59.5 L18 58 L22.5 56.5 Z" fill="#ffd60a"/>
+    <path class="c2-star c2-s2" d="M106 48 L107.3 51.8 L111 53 L107.3 54.2 L106 58 L104.7 54.2 L101 53 L104.7 51.8 Z" fill="#fff"/>
+    <path class="c2-star c2-s3" d="M18 98 L19.4 102 L23 103.2 L19.4 104.4 L18 108.4 L16.6 104.4 L13 103.2 L16.6 102 Z" fill="#ff8fa3"/>
+    <path class="c2-star c2-s4" d="M112 102 L113.4 105.8 L117 107 L113.4 108.2 L112 112 L110.6 108.2 L107 107 L110.6 105.8 Z" fill="#ffd60a"/>
+    <path class="c2-star c2-s5" d="M65 12 L66.2 15.5 L69.5 16.5 L66.2 17.5 L65 21 L63.8 17.5 L60.5 16.5 L63.8 15.5 Z" fill="#fff"/>
+  </g>
+</svg>`;
+
 export type OccasionCardId =
   | 'day-100'
   | 'day-500'
@@ -429,17 +564,17 @@ function ensureStyles(): void {
       animation: occasionFade 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .occasion-shell {
-      position: relative; width: min(390px, 100%);
-      max-height: calc(100dvh - 32px); overflow: auto;
-      border-radius: 30px;
+      position: relative; width: min(300px, 100%); height: 500px;
+      max-height: calc(100dvh - 24px); overflow: auto;
+      border-radius: 26px;
       box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.15);
       background: #1a101b; animation: occasionRise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .occasion-close {
-      position: absolute; top: 14px; right: 14px; z-index: 8;
-      width: 36px; height: 36px; border: 0; border-radius: 999px;
+      position: absolute; top: 10px; right: 10px; z-index: 8;
+      width: 32px; height: 32px; border: 0; border-radius: 999px;
       background: rgba(255, 255, 255, 0.92); color: #3e2233;
-      font-size: 20px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+      font-size: 18px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
       cursor: pointer; transition: transform 0.2s ease, background 0.2s ease;
     }
     .occasion-close:active { transform: scale(0.92); }
@@ -457,8 +592,8 @@ function ensureStyles(): void {
       --paper-line: rgba(161, 76, 115, 0.26);
       --panel: rgba(255, 255, 255, 0.58);
       --hint-bg: rgba(39, 17, 38, 0.74);
-      position: relative; min-height: 540px; padding: 46px 24px 28px;
-      overflow: hidden; border-radius: 30px;
+      position: relative; min-height: 500px; padding: 24px 14px 18px;
+      overflow: hidden; border-radius: 26px;
       background:
         radial-gradient(circle at 84% 8%, var(--paper-glow), transparent 28%),
         radial-gradient(circle at 10% 94%, var(--paper-glow-2), transparent 31%),
@@ -523,33 +658,33 @@ function ensureStyles(): void {
       --paper-line: rgba(69, 132, 180, 0.25);
     }
     .occasion-border-frame {
-      position: absolute; inset: 12px; z-index: 1; pointer-events: none;
-      border: 1px solid var(--paper-line); border-radius: 22px;
+      position: absolute; inset: 10px; z-index: 1; pointer-events: none;
+      border: 1px solid var(--paper-line); border-radius: 20px;
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
     }
     .occasion-corner {
-      position: absolute; z-index: 2; width: 24px; height: 24px;
+      position: absolute; z-index: 2; width: 20px; height: 20px;
       color: transparent; font-size: 0; pointer-events: none; line-height: 1;
     }
     .occasion-corner.top-left { border-top: 1px solid var(--paper-accent); border-left: 1px solid var(--paper-accent); }
     .occasion-corner.top-right { border-top: 1px solid var(--paper-accent); border-right: 1px solid var(--paper-accent); }
     .occasion-corner.bottom-left { border-bottom: 1px solid var(--paper-accent); border-left: 1px solid var(--paper-accent); }
     .occasion-corner.bottom-right { border-bottom: 1px solid var(--paper-accent); border-right: 1px solid var(--paper-accent); }
-    .occasion-corner.top-left { top: 16px; left: 16px; }
-    .occasion-corner.top-right { top: 16px; right: 16px; }
-    .occasion-corner.bottom-left { bottom: 16px; left: 16px; }
-    .occasion-corner.bottom-right { bottom: 16px; right: 16px; }
+    .occasion-corner.top-left { top: 13px; left: 13px; }
+    .occasion-corner.top-right { top: 13px; right: 13px; }
+    .occasion-corner.bottom-left { bottom: 13px; left: 13px; }
+    .occasion-corner.bottom-right { bottom: 13px; right: 13px; }
 
     .occasion-inner {
-      position: relative; z-index: 2; padding: 18px 18px 20px; text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.68); border-radius: 25px;
+      position: relative; z-index: 2; padding: 14px 12px 14px; text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.68); border-radius: 22px;
       background: linear-gradient(145deg, var(--panel), rgba(255, 255, 255, 0.24));
       box-shadow: 0 14px 32px rgba(72, 26, 59, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
       -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
     }
     .occasion-art-wrap {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 92px; height: 98px; margin-bottom: 13px; border-radius: 25px;
+      width: 74px; height: 80px; margin-bottom: 8px; border-radius: 20px;
       background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.3));
       box-shadow: 0 14px 28px rgba(78, 32, 70, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
       transform: rotate(-3deg); transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -559,24 +694,24 @@ function ensureStyles(): void {
     .occasion-art { display: block; width: 100%; height: 100%; overflow: visible; }
     .occasion-eyebrow {
       font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-      font-size: 11px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
-      color: var(--paper-accent); margin-bottom: 8px; opacity: 0.9;
+      font-size: 10px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--paper-accent); margin-bottom: 6px; opacity: 0.9;
     }
     .occasion-title {
       font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
-      font-size: 27px; font-weight: 700; line-height: 1.25; color: var(--paper-strong);
-      max-width: 100%; margin: 0 0 16px; white-space: nowrap;
-      letter-spacing: -0.035em; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
+      font-size: 22px; font-weight: 700; line-height: 1.2; color: var(--paper-strong);
+      max-width: 100%; margin: 0 0 10px; white-space: nowrap;
+      letter-spacing: -0.03em; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
     }
     .occasion-divider {
-      display: flex; align-items: center; justify-content: center; gap: 12px;
-      width: 140px; margin: 0 auto 18px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 120px; margin: 0 auto 12px;
     }
     .divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--paper-accent), transparent); }
-    .divider-heart { font-size: 12px; color: var(--paper-accent); opacity: 0.8; }
+    .divider-heart { font-size: 11px; color: var(--paper-accent); opacity: 0.8; }
     .occasion-message {
       font-family: 'Cormorant Garamond', Georgia, serif;
-      font-size: 19.5px; font-weight: 600; line-height: 1.72; color: var(--paper-ink); margin: 0;
+      font-size: 16px; font-weight: 600; line-height: 1.58; color: var(--paper-ink); margin: 0;
       letter-spacing: 0.01em;
     }
     .occasion-signature-wrap {
@@ -1559,7 +1694,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
         <div class="occasion-corner bottom-right">✦</div>
         <div class="occasion-inner">
           <div class="occasion-art-wrap">
-            ${OCCASION_ART_SVG}
+            ${(card.id as string) === 'birthday' ? BIRTHDAY_CAKE_SVG : OCCASION_ART_SVG}
           </div>
           <div class="occasion-eyebrow"><span>◆ ${escapeHtml(card.eyebrow)} ◆</span></div>
           <h2 class="occasion-title">${escapeHtml(card.title)}</h2>

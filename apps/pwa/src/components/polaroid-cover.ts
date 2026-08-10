@@ -533,90 +533,6 @@ function drawBirthdayFoil(
 }
 
 // ============================================================
-// 💕 ORIGINAL LOVE FOIL DRAWER (giữ nguyên để backward compat)
-// ============================================================
-function drawLoveFoil(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  coverText: string,
-): void {
-  ctx.save();
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.clearRect(0, 0, width, height);
-
-  const gradient = ctx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, '#ff2f7d');
-  gradient.addColorStop(0.34, '#ff82af');
-  gradient.addColorStop(0.66, '#b65cff');
-  gradient.addColorStop(1, '#6f5cff');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.save();
-  ctx.globalAlpha = 0.2;
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1;
-  for (let x = -height; x < width + height; x += 18) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x - height, height);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  const hearts = [
-    [0.16, 0.2, 22],
-    [0.82, 0.18, 16],
-    [0.73, 0.76, 24],
-    [0.2, 0.8, 14],
-  ] as const;
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  hearts.forEach(([x, y, size]) => {
-    ctx.save();
-    ctx.globalAlpha = 0.34;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `${size}px serif`;
-    ctx.fillText('♥', width * x, height * y);
-    ctx.restore();
-  });
-
-  ctx.save();
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const loveMessage = coverText.trim() || DEFAULT_COVER_TEXT;
-  const loveWords = loveMessage.split(/\s+/);
-  const loveLines: string[] = [];
-  let loveLine = '';
-  const loveMaxWidth = width * 0.74;
-  ctx.font = "800 18px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  loveWords.forEach((word) => {
-    const candidate = loveLine ? `${loveLine} ${word}` : word;
-    if (loveLine && ctx.measureText(candidate).width > loveMaxWidth && loveLines.length === 0) {
-      loveLines.push(loveLine);
-      loveLine = word;
-    } else {
-      loveLine = candidate;
-    }
-  });
-  if (loveLine) loveLines.push(loveLine);
-  const visibleLines = loveLines.slice(0, 2);
-  const lineHeight = 24;
-  const titleStart = height / 2 - 8 - ((visibleLines.length - 1) * lineHeight) / 2;
-  visibleLines.forEach((text, index) => {
-    ctx.fillText(text, width / 2, titleStart + index * lineHeight);
-  });
-  ctx.globalAlpha = 0.82;
-  ctx.font = "700 11px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  ctx.fillText('CÀO ĐỂ MỞ', width / 2, titleStart + visibleLines.length * lineHeight + 5);
-  ctx.restore();
-  ctx.restore();
-}
-
-// ============================================================
 // 🎊 CONFETTI ANIMATION (chỉ chạy khi theme = birthday)
 // ============================================================
 interface ConfettiParticle {
@@ -781,11 +697,11 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     forceScratch,
     coverText = DEFAULT_COVER_TEXT,
     restartScratch = false,
-    theme = 'love-foil',
+    theme = 'birthday-foil',
     onRevealed,
   } = options;
 
-  const isBirthday = theme === 'birthday-foil';
+  const isBirthday = true;
 
   const latestImage = isLatestSurpriseImage(imageUrl);
   const scratchEligible = forceScratch ?? latestImage;
@@ -987,11 +903,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     if (!revealed) {
       ctx.save();
       clipToStage(ctx, width, height);
-      if (isBirthday) {
-        drawBirthdayFoil(ctx, width, height, coverText);
-      } else {
-        drawLoveFoil(ctx, width, height, coverText);
-      }
+      drawBirthdayFoil(ctx, width, height, coverText);
       ctx.restore();
       updateProgress(0);
     }
