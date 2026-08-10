@@ -748,6 +748,7 @@ function ensureStyles(): void {
     .occasion-scratch {
       position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4;
       touch-action: none; cursor: grab; transition: opacity 0.65s ease;
+      border-radius: 26px; overflow: hidden;
     }
     .occasion-scratch.scratching { cursor: grabbing; }
     .occasion-scratch.revealed { opacity: 0; pointer-events: none; }
@@ -1135,12 +1136,12 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     bgGrad.addColorStop(0.48, '#FF8E53');
     bgGrad.addColorStop(0.72, '#C44569');
     bgGrad.addColorStop(1, '#8B5CF6');
-    roundedPath(ctx, rect.width, rect.height, 30);
+    roundedPath(ctx, rect.width, rect.height, 26);
     ctx.fillStyle = bgGrad;
     ctx.fill();
 
     ctx.save();
-    roundedPath(ctx, rect.width, rect.height, 30);
+    roundedPath(ctx, rect.width, rect.height, 26);
     ctx.clip();
 
     // 1. Diagonal party stripes
