@@ -1540,21 +1540,7 @@ function startOccasionConfetti(
 }
 
 function openCard(card: OccasionCard, onRevealed?: () => void): void {
-  if (card.id === 'birthday') {
-    void import('../components/polaroid-cover').then(({ openPolaroidCoverModal }) => {
-      openPolaroidCoverModal({
-        imageUrl: card.coverImage || '/design/birthday-placeholder.jpg',
-        title: card.title,
-        dateText: card.eyebrow,
-        coverText: card.coverText,
-        theme: 'birthday-foil',
-        forceScratch: true,
-        restartScratch: true,
-        onRevealed,
-      });
-    });
-    return;
-  }
+
   ensureStyles();
   document.querySelector('.occasion-overlay')?.remove();
   const overlay = document.createElement('div');
