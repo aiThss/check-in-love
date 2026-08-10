@@ -691,8 +691,8 @@ function ensureStyles(): void {
       overflow: visible;
     }
     .occasion-paper[data-card-id='birthday'] .occasion-art-wrap {
-      background: linear-gradient(145deg, #a0c4ff, #4ea8de);
-      box-shadow: 0 14px 28px rgba(30, 90, 180, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.85);
+      background: linear-gradient(145deg, #e0f2fe, #7dd3fc);
+      box-shadow: 0 14px 28px rgba(56, 189, 248, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.95);
     }
     .occasion-art-wrap:hover { transform: rotate(2deg) translateY(-2px); }
     .occasion-art { display: block; width: 100%; height: 100%; overflow: visible; }
