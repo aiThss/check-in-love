@@ -564,17 +564,17 @@ function ensureStyles(): void {
       animation: occasionFade 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .occasion-shell {
-      position: relative; width: min(300px, 100%); height: 500px;
+      position: relative; width: min(330px, 100%); height: 480px;
       max-height: calc(100dvh - 24px); overflow: auto;
       border-radius: 26px;
       box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.15);
       background: #1a101b; animation: occasionRise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .occasion-close {
-      position: absolute; top: 10px; right: 10px; z-index: 8;
-      width: 32px; height: 32px; border: 0; border-radius: 999px;
+      position: absolute; top: 12px; right: 12px; z-index: 8;
+      width: 34px; height: 34px; border: 0; border-radius: 999px;
       background: rgba(255, 255, 255, 0.92); color: #3e2233;
-      font-size: 18px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+      font-size: 19px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
       cursor: pointer; transition: transform 0.2s ease, background 0.2s ease;
     }
     .occasion-close:active { transform: scale(0.92); }
@@ -592,7 +592,7 @@ function ensureStyles(): void {
       --paper-line: rgba(161, 76, 115, 0.26);
       --panel: rgba(255, 255, 255, 0.58);
       --hint-bg: rgba(39, 17, 38, 0.74);
-      position: relative; min-height: 500px; padding: 24px 14px 18px;
+      position: relative; min-height: 480px; padding: 28px 16px 20px;
       overflow: hidden; border-radius: 26px;
       background:
         radial-gradient(circle at 84% 8%, var(--paper-glow), transparent 28%),
@@ -689,6 +689,10 @@ function ensureStyles(): void {
       box-shadow: 0 14px 28px rgba(78, 32, 70, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
       transform: rotate(-3deg); transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
       overflow: visible;
+    }
+    .occasion-paper[data-card-id='birthday'] .occasion-art-wrap {
+      background: linear-gradient(145deg, #a0c4ff, #4ea8de);
+      box-shadow: 0 14px 28px rgba(30, 90, 180, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.85);
     }
     .occasion-art-wrap:hover { transform: rotate(2deg) translateY(-2px); }
     .occasion-art { display: block; width: 100%; height: 100%; overflow: visible; }
@@ -1351,7 +1355,33 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
 
   const isHundredDay = card.id === 'day-100';
 
-  if (card.id !== 'birthday') {
+  if (card.id === 'birthday') {
+    // 🎂 Glassmorphic Pill Frame for "Chúc Mừng Sinh Nhật"
+    const plateW = rect.width * 0.78;
+    const plateH = 44;
+    const plateX = (rect.width - plateW) / 2;
+    const plateY = (rect.height - plateH) / 2;
+
+    ctx.save();
+    roundedRectAt(ctx, plateX, plateY, plateW, plateH, 999);
+    const glassPlate = ctx.createLinearGradient(plateX, plateY, plateX, plateY + plateH);
+    glassPlate.addColorStop(0, 'rgba(255, 255, 255, 0.28)');
+    glassPlate.addColorStop(1, 'rgba(255, 255, 255, 0.12)');
+    ctx.fillStyle = glassPlate;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(20, 5, 22, 0.35)';
+    ctx.shadowBlur = 12;
+    ctx.font = '800 13.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
+    ctx.fillText('🎂 Chúc Mừng Sinh Nhật 🎂', rect.width / 2, rect.height / 2);
+    ctx.restore();
+  } else {
     // Keep the existing cover copy verbatim, but give it a soft reading plate.
     const copyTop = isHundredDay ? rect.height / 2 + 4 : rect.height / 2 - 4;
     const copyHeight = isHundredDay ? 92 : 116;
@@ -1388,7 +1418,7 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   ctx.shadowBlur = 0;
   ctx.globalAlpha = 0.92;
   ctx.font = '800 10.5px "Plus Jakarta Sans", Inter, sans-serif';
-  if (!isHundredDay) ctx.fillText('✦ DÙNG TAY CÀO ĐỂ MỞ BÍ MẬT ✦', rect.width / 2, rect.height / 2 + 82);
+  if (!isHundredDay && card.id !== 'birthday') ctx.fillText('✦ DÙNG TAY CÀO ĐỂ MỞ BÍ MẬT ✦', rect.width / 2, rect.height / 2 + 82);
   ctx.globalAlpha = 1;
 
   if (card.coverImage && card.id !== 'day-100') {
