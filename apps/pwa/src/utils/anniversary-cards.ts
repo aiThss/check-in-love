@@ -7,9 +7,7 @@ const VIETNAM_TIMEZONE = 'Asia/Ho_Chi_Minh';
 const SEEN_PREFIX = 'lovecheck:occasion-card:seen:v1:';
 const PREVIEW_QUERY = 'cardPreview';
 const SCRATCH_THRESHOLD = 0.88;
-const BIRTHDAY_NOTICE_PREFIX = 'lovecheck:birthday-setup-notice:v1:';
 let birthdaySettingsLoading = false;
-const birthdayNoticeSession = new Set<string>();
 
 const OCCASION_ART_SVG = `
 <svg class="occasion-art" viewBox="0 0 130 155" width="160" height="185" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -106,135 +104,33 @@ const OCCASION_ART_SVG = `
 const BIRTHDAY_CAKE_SVG = `
 <svg class="occasion-art cake-art" viewBox="0 0 130 155" width="160" height="185" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
-    <linearGradient id="c2Plate" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#fff"/>
-      <stop offset="100%" stop-color="#ced4da"/>
-    </linearGradient>
-    <linearGradient id="c2Body" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#fff5f7"/>
-      <stop offset="100%" stop-color="#ffd6e0"/>
-    </linearGradient>
-    <linearGradient id="c2Top" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#ffe5ec"/>
-    </linearGradient>
-    <linearGradient id="c2Drip" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ff8fa3"/>
-      <stop offset="100%" stop-color="#ff4d6d"/>
-    </linearGradient>
-    <linearGradient id="c2Choco" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#d4a373"/>
-      <stop offset="100%" stop-color="#a98467"/>
-    </linearGradient>
-    <radialGradient id="c2Flame" cx="50%" cy="80%" r="55%">
-      <stop offset="0%" stop-color="#fffef5"/>
-      <stop offset="40%" stop-color="#ffd60a"/>
-      <stop offset="100%" stop-color="#e85d04"/>
-    </radialGradient>
-    <radialGradient id="c2FlameIn" cx="50%" cy="65%" r="45%">
-      <stop offset="0%" stop-color="#fff"/>
-      <stop offset="100%" stop-color="#ffe066"/>
-    </radialGradient>
-    <linearGradient id="c2Candle" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#fff3b0"/>
-      <stop offset="50%" stop-color="#ffd60a"/>
-      <stop offset="100%" stop-color="#f4a261"/>
-    </linearGradient>
-    <filter id="c2Sh">
-      <feDropShadow dx="0" dy="2.5" stdDeviation="2.2" flood-color="#6c757d" flood-opacity=".22"/>
-    </filter>
-    <filter id="c2Glow">
-      <feGaussianBlur stdDeviation="2" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <filter id="c2FlameG">
-      <feGaussianBlur stdDeviation="2.2" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
+    <linearGradient id="c2Plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#ced4da"/></linearGradient>
+    <linearGradient id="c2Body" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff5f7"/><stop offset="100%" stop-color="#ffd6e0"/></linearGradient>
+    <linearGradient id="c2Top" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#ffe5ec"/></linearGradient>
+    <linearGradient id="c2Drip" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff8fa3"/><stop offset="100%" stop-color="#ff4d6d"/></linearGradient>
+    <linearGradient id="c2Choco" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d4a373"/><stop offset="100%" stop-color="#a98467"/></linearGradient>
+    <radialGradient id="c2Flame" cx="50%" cy="80%" r="55%"><stop offset="0%" stop-color="#fffef5"/><stop offset="40%" stop-color="#ffd60a"/><stop offset="100%" stop-color="#e85d04"/></radialGradient>
+    <radialGradient id="c2FlameIn" cx="50%" cy="65%" r="45%"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#ffe066"/></radialGradient>
+    <linearGradient id="c2Candle" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#fff3b0"/><stop offset="50%" stop-color="#ffd60a"/><stop offset="100%" stop-color="#f4a261"/></linearGradient>
+    <filter id="c2Sh"><feDropShadow dx="0" dy="2.5" stdDeviation="2.2" flood-color="#6c757d" flood-opacity=".22"/></filter>
+    <filter id="c2Glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="c2FlameG"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
   <style>
-    .c2-wrap{transform-origin:65px 145px;animation:c2Sway 4.5s ease-in-out infinite}
-    .c2-flame{animation:c2Flicker .85s ease-in-out infinite}
-    .c2-f1{animation-delay:0s}
-    .c2-f2{animation-delay:.18s}
-    .c2-f3{animation-delay:.36s}
-    .c2-star{animation:c2StarFly 3.2s ease-in-out infinite}
-    .c2-s1{animation-delay:0s}
-    .c2-s2{animation-delay:.5s}
-    .c2-s3{animation-delay:1s}
-    .c2-s4{animation-delay:1.5s}
-    .c2-s5{animation-delay:.75s}
-    .c2-berry{animation:c2Bob 2.4s ease-in-out infinite}
-    .c2-b1{animation-delay:0s}.c2-b2{animation-delay:.3s}.c2-b3{animation-delay:.6s}
-    .c2-drip{animation:c2Drip 3.2s ease-in-out infinite}
-    @keyframes c2Sway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
-    @keyframes c2Flicker{
-      0%,100%{transform:scaleY(1) scaleX(1);opacity:1}
-      30%{transform:scaleY(1.15) scaleX(.9);opacity:.92}
-      60%{transform:scaleY(.9) scaleX(1.1);opacity:1}
-    }
-    @keyframes c2StarFly{
-      0%,100%{opacity:.78;transform:translate(0,0) scale(.85) rotate(0deg)}
-      50%{opacity:1;transform:translate(0,-7px) scale(1.25) rotate(25deg)}
-    }
-    @keyframes c2Bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.8px)}}
-    @keyframes c2Drip{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.05)}}
+    .c2-wrap{transform-origin:65px 145px;animation:c2Sway 4.5s ease-in-out infinite}.c2-flame{animation:c2Flicker .85s ease-in-out infinite}.c2-f1{animation-delay:0s}.c2-f2{animation-delay:.18s}.c2-f3{animation-delay:.36s}.c2-star{animation:c2StarFly 3.2s ease-in-out infinite}.c2-s1{animation-delay:0s}.c2-s2{animation-delay:.5s}.c2-s3{animation-delay:1s}.c2-s4{animation-delay:1.5s}.c2-s5{animation-delay:.75s}.c2-berry{animation:c2Bob 2.4s ease-in-out infinite}.c2-b1{animation-delay:0s}.c2-b2{animation-delay:.3s}.c2-b3{animation-delay:.6s}.c2-drip{animation:c2Drip 3.2s ease-in-out infinite}
+    @keyframes c2Sway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}@keyframes c2Flicker{0%,100%{transform:scaleY(1) scaleX(1);opacity:1}30%{transform:scaleY(1.15) scaleX(.9);opacity:.92}60%{transform:scaleY(.9) scaleX(1.1);opacity:1}}@keyframes c2StarFly{0%,100%{opacity:.78;transform:translate(0,0) scale(.85) rotate(0deg)}50%{opacity:1;transform:translate(0,-7px) scale(1.25) rotate(25deg)}}@keyframes c2Bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.8px)}}@keyframes c2Drip{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.05)}}
   </style>
   <g class="c2-wrap">
-    <ellipse cx="65" cy="148" rx="50" ry="7" fill="url(#c2Plate)" filter="url(#c2Sh)"/>
-    <ellipse cx="65" cy="146" rx="46" ry="4.5" fill="#fff" opacity=".7"/>
-    <g filter="url(#c2Sh)">
-      <path d="M32 100 L98 100 Q108 100 108 110 L108 138 Q108 148 98 148 L32 148 Q22 148 22 138 L22 110 Q22 100 32 100Z" fill="url(#c2Body)"/>
-      <rect x="22" y="118" width="86" height="8" rx="1" fill="url(#c2Choco)" opacity=".9"/>
-      <path d="M32 100 L98 100 Q108 100 108 110 Q102 116 96 110 Q90 104 84 110 Q78 116 72 110 Q66 104 60 110 Q54 116 48 110 Q42 104 36 110 Q30 116 22 110 Q22 100 32 100Z" fill="url(#c2Top)"/>
-    </g>
-    <g filter="url(#c2Sh)">
-      <path d="M36 100 L36 68 Q36 60 46 60 L84 60 Q94 60 94 68 L94 100Z" fill="url(#c2Top)"/>
-      <g class="c2-drip">
-        <path d="M36 72 Q36 60 46 60 L84 60 Q94 60 94 72 Q88 78 84 74 Q78 68 72 76 Q68 82 65 76 Q62 70 58 76 Q52 82 46 74 Q42 68 36 72Z" fill="url(#c2Drip)" opacity=".9"/>
-      </g>
-    </g>
-    <g class="c2-berry c2-b1">
-      <path d="M48 58 C48 52 54 48 58 52 C62 48 68 52 68 58 C68 64 58 70 58 70 C58 70 48 64 48 58Z" fill="#e63946" transform="translate(-8 -2)" filter="url(#c2Glow)"/>
-      <path d="M50 50 Q52 46 54 48" stroke="#2d6a4f" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-    </g>
-    <g class="c2-berry c2-b2">
-      <path d="M65 54 C65 49 70 46 73 50 C76 46 81 49 81 54 C81 59 73 64 73 64 C73 64 65 59 65 54Z" fill="#ff4d6d" transform="translate(-8 0)" filter="url(#c2Glow)"/>
-      <path d="M65 47 Q67 43 70 45" stroke="#40916c" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-    </g>
-    <g class="c2-berry c2-b3">
-      <path d="M78 58 C78 52 84 48 88 52 C92 48 98 52 98 58 C98 64 88 70 88 70 C88 70 78 64 78 58Z" fill="#e63946" transform="translate(-8 -2)" filter="url(#c2Glow)"/>
-      <path d="M80 50 Q82 46 84 48" stroke="#2d6a4f" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-    </g>
-    <g>
-      <rect x="42" y="36" width="4.5" height="20" rx="1" fill="url(#c2Candle)" filter="url(#c2Sh)"/>
-      <rect x="43.2" y="34" width="2" height="3" fill="#fff3b0"/>
-      <g class="c2-flame c2-f1" style="transform-origin:44.2px 34px">
-        <ellipse cx="44.2" cy="27.5" rx="3" ry="6.5" fill="url(#c2Flame)" filter="url(#c2FlameG)"/>
-        <ellipse cx="44.2" cy="29" rx="1.3" ry="3" fill="url(#c2FlameIn)"/>
-      </g>
-    </g>
-    <g>
-      <rect x="62.75" y="32" width="4.5" height="22" rx="1" fill="url(#c2Candle)" filter="url(#c2Sh)"/>
-      <rect x="64" y="30" width="2" height="3" fill="#fff3b0"/>
-      <g class="c2-flame c2-f2" style="transform-origin:65px 30px">
-        <ellipse cx="65" cy="23" rx="3.3" ry="7" fill="url(#c2Flame)" filter="url(#c2FlameG)"/>
-        <ellipse cx="65" cy="24.5" rx="1.4" ry="3.2" fill="url(#c2FlameIn)"/>
-      </g>
-    </g>
-    <g>
-      <rect x="83.5" y="36" width="4.5" height="20" rx="1" fill="url(#c2Candle)" filter="url(#c2Sh)"/>
-      <rect x="84.7" y="34" width="2" height="3" fill="#fff3b0"/>
-      <g class="c2-flame c2-f3" style="transform-origin:85.7px 34px">
-        <ellipse cx="85.7" cy="27.5" rx="3" ry="6.5" fill="url(#c2Flame)" filter="url(#c2FlameG)"/>
-        <ellipse cx="85.7" cy="29" rx="1.3" ry="3" fill="url(#c2FlameIn)"/>
-      </g>
-    </g>
-    <path class="c2-star c2-s1" d="M24 52 L25.5 56.5 L30 58 L25.5 59.5 L24 64 L22.5 59.5 L18 58 L22.5 56.5 Z" fill="#d97706"/>
-    <path class="c2-star c2-s2" d="M106 48 L107.3 51.8 L111 53 L107.3 54.2 L106 58 L104.7 54.2 L101 53 L104.7 51.8 Z" fill="#1e3a8a"/>
-    <path class="c2-star c2-s3" d="M18 98 L19.4 102 L23 103.2 L19.4 104.4 L18 108.4 L16.6 104.4 L13 103.2 L16.6 102 Z" fill="#c026d3"/>
-    <path class="c2-star c2-s4" d="M112 102 L113.4 105.8 L117 107 L113.4 108.2 L112 112 L110.6 108.2 L107 107 L110.6 105.8 Z" fill="#0284c7"/>
-    <path class="c2-star c2-s5" d="M65 12 L66.2 15.5 L69.5 16.5 L66.2 17.5 L65 21 L63.8 17.5 L60.5 16.5 L63.8 15.5 Z" fill="#b91c1c"/>
+    <ellipse cx="65" cy="148" rx="50" ry="7" fill="url(#c2Plate)" filter="url(#c2Sh)"/><ellipse cx="65" cy="146" rx="46" ry="4.5" fill="#fff" opacity=".7"/>
+    <g filter="url(#c2Sh)"><path d="M32 100 L98 100 Q108 100 108 110 L108 138 Q108 148 98 148 L32 148 Q22 148 22 138 L22 110 Q22 100 32 100Z" fill="url(#c2Body)"/><rect x="22" y="118" width="86" height="8" rx="1" fill="url(#c2Choco)" opacity=".9"/><path d="M32 100 L98 100 Q108 100 108 110 Q102 116 96 110 Q90 104 84 110 Q78 116 72 110 Q66 104 60 110 Q54 116 48 110 Q42 104 36 110 Q30 116 22 110 Q22 100 32 100Z" fill="url(#c2Top)"/></g>
+    <g filter="url(#c2Sh)"><path d="M36 100 L36 68 Q36 60 46 60 L84 60 Q94 60 94 68 L94 100Z" fill="url(#c2Top)"/><g class="c2-drip"><path d="M36 72 Q36 60 46 60 L84 60 Q94 60 94 72 Q88 78 84 74 Q78 68 72 76 Q68 82 65 76 Q62 70 58 76 Q52 82 46 74 Q42 68 36 72Z" fill="url(#c2Drip)" opacity=".9"/></g></g>
+    <g class="c2-berry c2-b1"><path d="M48 58 C48 52 54 48 58 52 C62 48 68 52 68 58 C68 64 58 70 58 70 C58 70 48 64 48 58Z" fill="#e63946" transform="translate(-8 -2)" filter="url(#c2Glow)"/><path d="M50 50 Q52 46 54 48" stroke="#2d6a4f" stroke-width="1.2" fill="none" stroke-linecap="round"/></g>
+    <g class="c2-berry c2-b2"><path d="M65 54 C65 49 70 46 73 50 C76 46 81 49 81 54 C81 59 73 64 73 64 C73 64 65 59 65 54Z" fill="#ff4d6d" transform="translate(-8 0)" filter="url(#c2Glow)"/><path d="M65 47 Q67 43 70 45" stroke="#40916c" stroke-width="1.2" fill="none" stroke-linecap="round"/></g>
+    <g class="c2-berry c2-b3"><path d="M78 58 C78 52 84 48 88 52 C92 48 98 52 98 58 C98 64 88 70 88 70 C88 70 78 64 78 58Z" fill="#e63946" transform="translate(-8 -2)" filter="url(#c2Glow)"/><path d="M80 50 Q82 46 84 48" stroke="#2d6a4f" stroke-width="1.2" fill="none" stroke-linecap="round"/></g>
+    <g><rect x="42" y="36" width="4.5" height="20" rx="1" fill="url(#c2Candle)" filter="url(#c2Sh)"/><rect x="43.2" y="34" width="2" height="3" fill="#fff3b0"/><g class="c2-flame c2-f1" style="transform-origin:44.2px 34px"><ellipse cx="44.2" cy="27.5" rx="3" ry="6.5" fill="url(#c2Flame)" filter="url(#c2FlameG)"/><ellipse cx="44.2" cy="29" rx="1.3" ry="3" fill="url(#c2FlameIn)"/></g></g>
+    <g><rect x="62.75" y="32" width="4.5" height="22" rx="1" fill="url(#c2Candle)" filter="url(#c2Sh)"/><rect x="64" y="30" width="2" height="3" fill="#fff3b0"/><g class="c2-flame c2-f2" style="transform-origin:65px 30px"><ellipse cx="65" cy="23" rx="3.3" ry="7" fill="url(#c2Flame)" filter="url(#c2FlameG)"/><ellipse cx="65" cy="24.5" rx="1.4" ry="3.2" fill="url(#c2FlameIn)"/></g></g>
+    <g><rect x="83.5" y="36" width="4.5" height="20" rx="1" fill="url(#c2Candle)" filter="url(#c2Sh)"/><rect x="84.7" y="34" width="2" height="3" fill="#fff3b0"/><g class="c2-flame c2-f3" style="transform-origin:85.7px 34px"><ellipse cx="85.7" cy="27.5" rx="3" ry="6.5" fill="url(#c2Flame)" filter="url(#c2FlameG)"/><ellipse cx="85.7" cy="29" rx="1.3" ry="3" fill="url(#c2FlameIn)"/></g></g>
+    <path class="c2-star c2-s1" d="M24 52 L25.5 56.5 L30 58 L25.5 59.5 L24 64 L22.5 59.5 L18 58 L22.5 56.5 Z" fill="#d97706"/><path class="c2-star c2-s2" d="M106 48 L107.3 51.8 L111 53 L107.3 54.2 L106 58 L104.7 54.2 L101 53 L104.7 51.8 Z" fill="#1e3a8a"/><path class="c2-star c2-s3" d="M18 98 L19.4 102 L23 103.2 L19.4 104.4 L18 108.4 L16.6 104.4 L13 103.2 L16.6 102 Z" fill="#c026d3"/><path class="c2-star c2-s4" d="M112 102 L113.4 105.8 L117 107 L113.4 108.2 L112 112 L110.6 108.2 L107 107 L110.6 102 Z" fill="#0284c7"/><path class="c2-star c2-s5" d="M65 12 L66.2 15.5 L69.5 16.5 L66.2 17.5 L65 21 L63.8 17.5 L60.5 16.5 L63.8 15.5 Z" fill="#b91c1c"/>
   </g>
 </svg>`;
 
@@ -565,16 +461,16 @@ function ensureStyles(): void {
     }
     .occasion-shell {
       position: relative; width: min(340px, calc(100vw - 32px)); height: auto;
-      max-height: calc(100dvh - 24px); overflow: visible;
-      border-radius: 26px;
+      overflow: visible;
+      border-radius: 30px;
       box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.15);
       background: #1a101b; animation: occasionRise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .occasion-close {
-      position: absolute; top: 12px; right: 12px; z-index: 8;
-      width: 34px; height: 34px; border: 0; border-radius: 999px;
+      position: absolute; top: 14px; right: 14px; z-index: 8;
+      width: 36px; height: 36px; border: 0; border-radius: 999px;
       background: rgba(255, 255, 255, 0.92); color: #3e2233;
-      font-size: 19px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+      font-size: 20px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
       cursor: pointer; transition: transform 0.2s ease, background 0.2s ease;
     }
     .occasion-close:active { transform: scale(0.92); }
@@ -592,8 +488,8 @@ function ensureStyles(): void {
       --paper-line: rgba(161, 76, 115, 0.26);
       --panel: rgba(255, 255, 255, 0.58);
       --hint-bg: rgba(39, 17, 38, 0.74);
-      position: relative; min-height: 0; padding: 26px 16px 20px;
-      overflow: hidden; border-radius: 26px;
+      position: relative; min-height: 0; padding: 46px 24px 28px;
+      overflow: hidden; border-radius: 30px;
       background:
         radial-gradient(circle at 84% 8%, var(--paper-glow), transparent 28%),
         radial-gradient(circle at 10% 94%, var(--paper-glow-2), transparent 31%),
@@ -658,64 +554,60 @@ function ensureStyles(): void {
       --paper-line: rgba(69, 132, 180, 0.25);
     }
     .occasion-border-frame {
-      position: absolute; inset: 10px; z-index: 1; pointer-events: none;
-      border: 1px solid var(--paper-line); border-radius: 20px;
+      position: absolute; inset: 12px; z-index: 1; pointer-events: none;
+      border: 1px solid var(--paper-line); border-radius: 22px;
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
     }
     .occasion-corner {
-      position: absolute; z-index: 2; width: 20px; height: 20px;
+      position: absolute; z-index: 2; width: 24px; height: 24px;
       color: transparent; font-size: 0; pointer-events: none; line-height: 1;
     }
     .occasion-corner.top-left { border-top: 1px solid var(--paper-accent); border-left: 1px solid var(--paper-accent); }
     .occasion-corner.top-right { border-top: 1px solid var(--paper-accent); border-right: 1px solid var(--paper-accent); }
     .occasion-corner.bottom-left { border-bottom: 1px solid var(--paper-accent); border-left: 1px solid var(--paper-accent); }
     .occasion-corner.bottom-right { border-bottom: 1px solid var(--paper-accent); border-right: 1px solid var(--paper-accent); }
-    .occasion-corner.top-left { top: 13px; left: 13px; }
-    .occasion-corner.top-right { top: 13px; right: 13px; }
-    .occasion-corner.bottom-left { bottom: 13px; left: 13px; }
-    .occasion-corner.bottom-right { bottom: 13px; right: 13px; }
+    .occasion-corner.top-left { top: 16px; left: 16px; }
+    .occasion-corner.top-right { top: 16px; right: 16px; }
+    .occasion-corner.bottom-left { bottom: 16px; left: 16px; }
+    .occasion-corner.bottom-right { bottom: 16px; right: 16px; }
 
     .occasion-inner {
-      position: relative; z-index: 2; padding: 14px 12px 14px; text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.68); border-radius: 22px;
+      position: relative; z-index: 2; padding: 18px 18px 20px; text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.68); border-radius: 25px;
       background: linear-gradient(145deg, var(--panel), rgba(255, 255, 255, 0.24));
       box-shadow: 0 14px 32px rgba(72, 26, 59, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
       -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
     }
     .occasion-art-wrap {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 74px; height: 80px; margin-bottom: 8px; border-radius: 20px;
+      width: 92px; height: 98px; margin-bottom: 13px; border-radius: 25px;
       background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.3));
       box-shadow: 0 14px 28px rgba(78, 32, 70, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
       transform: rotate(-3deg); transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
       overflow: visible;
     }
-    .occasion-paper[data-card-id='birthday'] .occasion-art-wrap {
-      background: linear-gradient(145deg, #e0f2fe, #7dd3fc);
-      box-shadow: 0 14px 28px rgba(56, 189, 248, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.95);
-    }
     .occasion-art-wrap:hover { transform: rotate(2deg) translateY(-2px); }
     .occasion-art { display: block; width: 100%; height: 100%; overflow: visible; }
     .occasion-eyebrow {
       font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-      font-size: 10px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase;
-      color: var(--paper-accent); margin-bottom: 6px; opacity: 0.9;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--paper-accent); margin-bottom: 8px; opacity: 0.9;
     }
     .occasion-title {
       font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
-      font-size: 22px; font-weight: 700; line-height: 1.2; color: var(--paper-strong);
-      max-width: 100%; margin: 0 0 10px; white-space: nowrap;
-      letter-spacing: -0.03em; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
+      font-size: 27px; font-weight: 700; line-height: 1.25; color: var(--paper-strong);
+      max-width: 100%; margin: 0 0 16px; white-space: nowrap;
+      letter-spacing: -0.035em; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
     }
     .occasion-divider {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      width: 120px; margin: 0 auto 12px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      width: 140px; margin: 0 auto 18px;
     }
     .divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--paper-accent), transparent); }
-    .divider-heart { font-size: 11px; color: var(--paper-accent); opacity: 0.8; }
+    .divider-heart { font-size: 12px; color: var(--paper-accent); opacity: 0.8; }
     .occasion-message {
       font-family: 'Cormorant Garamond', Georgia, serif;
-      font-size: 16px; font-weight: 600; line-height: 1.58; color: var(--paper-ink); margin: 0;
+      font-size: 19.5px; font-weight: 600; line-height: 1.72; color: var(--paper-ink); margin: 0;
       letter-spacing: 0.01em;
     }
     .occasion-signature-wrap {
@@ -764,9 +656,47 @@ function ensureStyles(): void {
       background: var(--hint-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       box-shadow: 0 14px 30px rgba(21, 7, 20, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
       font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10.5px; font-weight: 800;
-      letter-spacing: 0.12em; white-space: nowrap; color: rgba(255, 255, 255, 0.92); pointer-events: none; transition: opacity 0.2s ease;
+      letter-spacing: 0.12em; color: rgba(255, 255, 255, 0.92); pointer-events: none; transition: opacity 0.2s ease;
     }
+    .occasion-quick-reveal {
+      flex: 0 0 auto; padding: 7px 10px; border: 1px solid rgba(255, 255, 255, 0.32);
+      border-radius: 999px; background: rgba(255, 255, 255, 0.95); color: #4c213e;
+      font: 800 10px/1 'Plus Jakarta Sans', sans-serif; letter-spacing: 0.02em;
+      cursor: pointer; pointer-events: auto; transition: transform 160ms ease, background 160ms ease;
+    }
+    .occasion-quick-reveal:hover { background: #fff; transform: translateY(-1px); }
+    .occasion-quick-reveal:active { transform: scale(0.95); }
+    .occasion-quick-reveal:focus-visible { outline: 2px solid rgba(255, 224, 238, 0.9); outline-offset: 2px; }
+    .occasion-quick-reveal[hidden] { display: none; }
     .occasion-shell.is-revealed .occasion-hint { opacity: 0; }
+
+    /* Preserve the compact e62 birthday card while all other occasions keep
+       the a847 layout, motion and scratch behaviour. */
+    .occasion-shell--birthday {
+      width: min(340px, calc(100vw - 32px)); height: auto;
+      max-height: calc(100dvh - 24px); overflow: visible; border-radius: 26px;
+    }
+    .occasion-shell--birthday .occasion-close { top: 12px; right: 12px; width: 34px; height: 34px; font-size: 19px; }
+    .occasion-shell--birthday .occasion-paper { min-height: 0; padding: 26px 16px 20px; border-radius: 26px; }
+    .occasion-shell--birthday .occasion-border-frame { inset: 10px; border-radius: 20px; }
+    .occasion-shell--birthday .occasion-corner { width: 20px; height: 20px; }
+    .occasion-shell--birthday .occasion-corner.top-left { top: 13px; left: 13px; }
+    .occasion-shell--birthday .occasion-corner.top-right { top: 13px; right: 13px; }
+    .occasion-shell--birthday .occasion-corner.bottom-left { bottom: 13px; left: 13px; }
+    .occasion-shell--birthday .occasion-corner.bottom-right { bottom: 13px; right: 13px; }
+    .occasion-shell--birthday .occasion-inner { padding: 14px 12px; border-radius: 22px; }
+    .occasion-shell--birthday .occasion-art-wrap {
+      width: 74px; height: 80px; margin-bottom: 8px; border-radius: 20px;
+      background: linear-gradient(145deg, #a0c4ff, #4ea8de);
+      box-shadow: 0 14px 28px rgba(56, 189, 248, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.95);
+    }
+    .occasion-shell--birthday .occasion-eyebrow { font-size: 10px; letter-spacing: 0.2em; margin-bottom: 6px; }
+    .occasion-shell--birthday .occasion-title { font-size: 22px; line-height: 1.2; margin-bottom: 10px; letter-spacing: -0.03em; }
+    .occasion-shell--birthday .occasion-divider { gap: 10px; width: 120px; margin-bottom: 12px; }
+    .occasion-shell--birthday .divider-heart { font-size: 11px; }
+    .occasion-shell--birthday .occasion-message { font-size: 16px; line-height: 1.58; }
+    .occasion-shell--birthday .occasion-scratch { border-radius: 26px; overflow: hidden; }
+    .occasion-shell--birthday .occasion-hint { padding: 7px 10px; }
     .occasion-confetti { position: absolute; inset: 0; z-index: 25; width: 100%; height: 100%; pointer-events: none; }
 
     .occasion-preview-button { position: fixed; right: 16px; bottom: calc(var(--safe-bottom, 0px) + 92px); z-index: 4500; width: 52px; height: 52px; border: 0; border-radius: 18px; background: linear-gradient(145deg, #ff7ca8, #9c5bda); color: #fff; font-size: 24px; box-shadow: 0 12px 30px rgba(118, 58, 126, 0.35); cursor: pointer; }
@@ -784,10 +714,12 @@ function ensureStyles(): void {
     .birthday-settings-head { display: flex; gap: 12px; align-items: flex-start; }
     .birthday-settings-head>span { font-size: 21px; }
     .birthday-settings-head strong { display: block; font-size: 14px; }
+    .birthday-settings-head small { display: block; margin-top: 3px; color: var(--text-secondary); line-height: 1.4; }
     .birthday-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .birthday-field { display: flex; flex-direction: column; gap: 6px; }
     .birthday-field label { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
     .birthday-field input { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text-primary); }
+    .birthday-age { min-height: 16px; font-size: 10px; color: var(--text-secondary); }
     .birthday-save { align-self: flex-end; border: 0; border-radius: 12px; padding: 9px 13px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; }
     .birthday-save:disabled { opacity: 0.55; }
 
@@ -797,7 +729,9 @@ function ensureStyles(): void {
       .occasion-message { font-size: 18px; }
       .occasion-signature { font-size: 20px; }
       .occasion-signature--birthday { max-width: 156px; }
-      .occasion-hint { padding: 7px 10px; font-size: 9px; letter-spacing: 0.08em; }
+      .occasion-hint { gap: 6px; padding: 7px 7px 7px 10px; font-size: 9px; letter-spacing: 0.08em; }
+      .occasion-quick-reveal { padding: 7px 8px; font-size: 9px; }
+      .birthday-settings-grid { grid-template-columns: 1fr; }
     }
     @keyframes occasionFade { from { opacity: 0; } to { opacity: 1; } }
     @keyframes occasionRise { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
@@ -1098,9 +1032,9 @@ function drawPattern(ctx: CanvasRenderingContext2D, width: number, height: numbe
 }
 
 function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): CanvasRenderingContext2D | null {
-  const paper = canvas.previousElementSibling as HTMLElement | null;
-  const paperRect = paper ? paper.getBoundingClientRect() : null;
-  const rect = (paperRect && paperRect.height > 0) ? paperRect : canvas.getBoundingClientRect();
+  const paper = card.id === 'birthday' ? canvas.previousElementSibling as HTMLElement | null : null;
+  const paperRect = paper?.getBoundingClientRect();
+  const rect = paperRect && paperRect.height > 0 ? paperRect : canvas.getBoundingClientRect();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.max(1, Math.round(rect.width * dpr));
   canvas.height = Math.max(1, Math.round(rect.height * dpr));
@@ -1135,7 +1069,6 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   };
 
   if (card.id === 'birthday') {
-    // 🎂 Birthday Foil Theme background: warm gold → pink → coral → purple
     const bgGrad = ctx.createLinearGradient(0, 0, rect.width, rect.height);
     bgGrad.addColorStop(0, '#FFD700');
     bgGrad.addColorStop(0.22, '#FF6B9D');
@@ -1149,8 +1082,6 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     ctx.save();
     roundedPath(ctx, rect.width, rect.height, 26);
     ctx.clip();
-
-    // 1. Diagonal party stripes
     ctx.save();
     ctx.globalAlpha = 0.07;
     ctx.strokeStyle = '#ffffff';
@@ -1163,22 +1094,14 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     }
     ctx.restore();
 
-    // 2. Confetti rectangles
     const confettiList: Array<readonly [number, number, number, string, number]> = [
-      [0.10, 0.06, 16, '#FFD700', 40],
-      [0.90, 0.10, 13, '#FF6B9D', -25],
-      [0.78, 0.32, 18, '#00D9FF', 55],
-      [0.18, 0.38, 11, '#FF8E53', -20],
-      [0.95, 0.50, 20, '#FFD700', 15],
-      [0.05, 0.58, 12, '#FF6B9D', -50],
-      [0.70, 0.72, 16, '#00D9FF', 30],
-      [0.30, 0.82, 14, '#FF8E53', -35],
-      [0.55, 0.12, 10, '#ffffff', 5],
-      [0.42, 0.65, 19, '#FFD700', 45],
-      [0.12, 0.25, 13, '#FF8E53', -30],
-      [0.88, 0.88, 15, '#FF6B9D', 35],
-      [0.25, 0.55, 11, '#00D9FF', 60],
-      [0.65, 0.18, 14, '#FF8E53', -15],
+      [0.10, 0.06, 16, '#FFD700', 40], [0.90, 0.10, 13, '#FF6B9D', -25],
+      [0.78, 0.32, 18, '#00D9FF', 55], [0.18, 0.38, 11, '#FF8E53', -20],
+      [0.95, 0.50, 20, '#FFD700', 15], [0.05, 0.58, 12, '#FF6B9D', -50],
+      [0.70, 0.72, 16, '#00D9FF', 30], [0.30, 0.82, 14, '#FF8E53', -35],
+      [0.55, 0.12, 10, '#ffffff', 5], [0.42, 0.65, 19, '#FFD700', 45],
+      [0.12, 0.25, 13, '#FF8E53', -30], [0.88, 0.88, 15, '#FF6B9D', 35],
+      [0.25, 0.55, 11, '#00D9FF', 60], [0.65, 0.18, 14, '#FF8E53', -15],
       [0.48, 0.45, 17, '#FFD700', 25],
     ];
     confettiList.forEach(([nx, ny, size, color, rot]) => {
@@ -1193,40 +1116,33 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
       ctx.restore();
     });
 
-    // 3. Floating balloons with shine + string
     const balloons: Array<readonly [number, number, number, string]> = [
-      [0.15, 0.18, 30, '#FF6B9D'],
-      [0.85, 0.15, 24, '#FFD700'],
-      [0.75, 0.70, 34, '#00D9FF'],
-      [0.20, 0.75, 22, '#FF8E53'],
-      [0.50, 0.28, 18, '#C44569'],
-      [0.35, 0.90, 26, '#8B5CF6'],
+      [0.15, 0.18, 30, '#FF6B9D'], [0.85, 0.15, 24, '#FFD700'],
+      [0.75, 0.70, 34, '#00D9FF'], [0.20, 0.75, 22, '#FF8E53'],
+      [0.50, 0.28, 18, '#C44569'], [0.35, 0.90, 26, '#8B5CF6'],
     ];
-    balloons.forEach(([nx, ny, r, color]) => {
+    balloons.forEach(([nx, ny, radius, color]) => {
       ctx.save();
       ctx.globalAlpha = 0.32;
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.ellipse(rect.width * nx, rect.height * ny, r, r * 1.18, 0, 0, Math.PI * 2);
+      ctx.ellipse(rect.width * nx, rect.height * ny, radius, radius * 1.18, 0, 0, Math.PI * 2);
       ctx.fill();
-      // Shine
       ctx.globalAlpha = 0.18;
       ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.ellipse(rect.width * nx - r * 0.25, rect.height * ny - r * 0.3, r * 0.22, r * 0.32, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(rect.width * nx - radius * 0.25, rect.height * ny - radius * 0.3, radius * 0.22, radius * 0.32, -0.4, 0, Math.PI * 2);
       ctx.fill();
-      // String
       ctx.globalAlpha = 0.22;
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(rect.width * nx, rect.height * ny + r * 1.15);
-      ctx.quadraticCurveTo(rect.width * nx + 8, rect.height * ny + r * 1.15 + 20, rect.width * nx, rect.height * ny + r * 1.15 + 36);
+      ctx.moveTo(rect.width * nx, rect.height * ny + radius * 1.15);
+      ctx.quadraticCurveTo(rect.width * nx + 8, rect.height * ny + radius * 1.15 + 20, rect.width * nx, rect.height * ny + radius * 1.15 + 36);
       ctx.stroke();
       ctx.restore();
     });
 
-    // 4. Stars / sparkles
     const stars: Array<readonly [number, number, number, string]> = [
       [0.28, 0.12, 20, '#FFD700'], [0.62, 0.25, 15, '#FF3366'], [0.88, 0.45, 22, '#00E5FF'],
       [0.10, 0.50, 12, '#FFD700'], [0.38, 0.55, 17, '#9D4EDD'], [0.78, 0.62, 11, '#FF3366'],
@@ -1243,55 +1159,54 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
       ctx.fillText('★', rect.width * nx, rect.height * ny);
       ctx.restore();
     });
-
     ctx.restore();
   } else {
-    const gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
-    gradient.addColorStop(0, card.colors[0]);
-    gradient.addColorStop(0.52, card.colors[1]);
-    gradient.addColorStop(1, card.colors[2]);
-    roundedPath(ctx, rect.width, rect.height, 30);
-    ctx.fillStyle = gradient;
-    ctx.fill();
+  const gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
+  gradient.addColorStop(0, card.colors[0]);
+  gradient.addColorStop(0.52, card.colors[1]);
+  gradient.addColorStop(1, card.colors[2]);
+  roundedPath(ctx, rect.width, rect.height, 30);
+  ctx.fillStyle = gradient;
+  ctx.fill();
 
-    if (card.id === 'day-100' && card.coverImage) {
-      const img = new Image();
-      img.src = card.coverImage;
-      if (img.complete && img.naturalWidth > 0) drawFullCoverImage(img);
-      else img.onload = () => drawFullCoverImage(img);
-      return ctx;
-    }
+  if (card.id === 'day-100' && card.coverImage) {
+    const img = new Image();
+    img.src = card.coverImage;
+    if (img.complete && img.naturalWidth > 0) drawFullCoverImage(img);
+    else img.onload = () => drawFullCoverImage(img);
+    return ctx;
+  }
 
-    // Soft colour blooms make the cover feel like a small illustrated object,
-    // while the deterministic seed keeps every redraw stable during resize.
-    ctx.save();
-    roundedPath(ctx, rect.width, rect.height, 30);
-    ctx.clip();
-    const blooms = [
-      [rect.width * 0.08, rect.height * 0.12, rect.width * 0.52, card.colors[0], 0.48],
-      [rect.width * 0.92, rect.height * 0.24, rect.width * 0.44, card.colors[1], 0.34],
-      [rect.width * 0.72, rect.height * 0.96, rect.width * 0.62, card.colors[2], 0.3],
-    ] as const;
-    blooms.forEach(([x, y, radius, color, alpha]) => {
-      const bloom = ctx.createRadialGradient(x, y, 0, x, y, radius);
-      bloom.addColorStop(0, hexToRgba(color, alpha));
-      bloom.addColorStop(1, hexToRgba(color, 0));
-      ctx.fillStyle = bloom;
-      ctx.fillRect(0, 0, rect.width, rect.height);
-    });
-    ctx.globalAlpha = 0.13;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 0.8;
-    for (let index = 0; index < 120; index += 1) {
-      const x = seeded(index * 5 + 5) * rect.width;
-      const y = seeded(index * 5 + 6) * rect.height;
-      const length = 7 + seeded(index * 5 + 7) * 18;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + length, y - length * 0.18);
-      ctx.stroke();
-    }
-    ctx.restore();
+  // Soft colour blooms make the cover feel like a small illustrated object,
+  // while the deterministic seed keeps every redraw stable during resize.
+  ctx.save();
+  roundedPath(ctx, rect.width, rect.height, 30);
+  ctx.clip();
+  const blooms = [
+    [rect.width * 0.08, rect.height * 0.12, rect.width * 0.52, card.colors[0], 0.48],
+    [rect.width * 0.92, rect.height * 0.24, rect.width * 0.44, card.colors[1], 0.34],
+    [rect.width * 0.72, rect.height * 0.96, rect.width * 0.62, card.colors[2], 0.3],
+  ] as const;
+  blooms.forEach(([x, y, radius, color, alpha]) => {
+    const bloom = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    bloom.addColorStop(0, hexToRgba(color, alpha));
+    bloom.addColorStop(1, hexToRgba(color, 0));
+    ctx.fillStyle = bloom;
+    ctx.fillRect(0, 0, rect.width, rect.height);
+  });
+  ctx.globalAlpha = 0.13;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 0.8;
+  for (let index = 0; index < 120; index += 1) {
+    const x = seeded(index * 5 + 5) * rect.width;
+    const y = seeded(index * 5 + 6) * rect.height;
+    const length = 7 + seeded(index * 5 + 7) * 18;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + length, y - length * 0.18);
+    ctx.stroke();
+  }
+  ctx.restore();
   }
 
   ctx.save();
@@ -1356,17 +1271,14 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   }
 
   const isHundredDay = card.id === 'day-100';
-
   if (card.id === 'birthday') {
-    // 🎂 Glassmorphic Pill Frame for "Chúc Mừng Sinh Nhật"
-    const plateW = rect.width * 0.78;
-    const plateH = 44;
-    const plateX = (rect.width - plateW) / 2;
-    const plateY = (rect.height - plateH) / 2;
-
+    const plateWidth = rect.width * 0.78;
+    const plateHeight = 44;
+    const plateX = (rect.width - plateWidth) / 2;
+    const plateY = (rect.height - plateHeight) / 2;
     ctx.save();
-    roundedRectAt(ctx, plateX, plateY, plateW, plateH, 999);
-    const glassPlate = ctx.createLinearGradient(plateX, plateY, plateX, plateY + plateH);
+    roundedRectAt(ctx, plateX, plateY, plateWidth, plateHeight, 999);
+    const glassPlate = ctx.createLinearGradient(plateX, plateY, plateX, plateY + plateHeight);
     glassPlate.addColorStop(0, 'rgba(255, 255, 255, 0.28)');
     glassPlate.addColorStop(1, 'rgba(255, 255, 255, 0.12)');
     ctx.fillStyle = glassPlate;
@@ -1374,7 +1286,6 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
     ctx.lineWidth = 1.2;
     ctx.stroke();
-
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1384,7 +1295,6 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     ctx.fillText('🎂 Chúc Mừng Sinh Nhật 🎂', rect.width / 2, rect.height / 2);
     ctx.restore();
   } else {
-    // Keep the existing cover copy verbatim, but give it a soft reading plate.
     const copyTop = isHundredDay ? rect.height / 2 + 4 : rect.height / 2 - 4;
     const copyHeight = isHundredDay ? 92 : 116;
     ctx.save();
@@ -1398,7 +1308,6 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
-
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1407,14 +1316,7 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
     ctx.font = isHundredDay
       ? '700 21px "Dancing Script", "Brush Script MT", cursive'
       : '800 16.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
-    wrapCanvasText(
-      ctx,
-      card.coverText,
-      rect.width / 2,
-      isHundredDay ? rect.height / 2 + 42 : rect.height / 2 + 18,
-      rect.width * (isHundredDay ? 0.66 : 0.76),
-      isHundredDay ? 26 : 24,
-    );
+    wrapCanvasText(ctx, card.coverText, rect.width / 2, isHundredDay ? rect.height / 2 + 42 : rect.height / 2 + 18, rect.width * (isHundredDay ? 0.66 : 0.76), isHundredDay ? 26 : 24);
   }
 
   ctx.shadowBlur = 0;
@@ -1581,143 +1483,93 @@ function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement):
   return sampled ? cleared / sampled : 0;
 }
 
-// ============================================================
-// 🎊 BIRTHDAY CONFETTI — 4 distinct waves (0ms, 280ms, 600ms, 950ms)
-// ============================================================
 interface OccasionParticle {
   x: number; y: number;
   vx: number; vy: number;
   rot: number; vRot: number;
   size: number; color: string;
   alpha: number; shape: 'rect' | 'circle';
-  wave: number;
 }
 
-function startOccasionConfetti(
-  cCtx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-): () => void {
+function startOccasionConfetti(cCtx: CanvasRenderingContext2D, width: number, height: number): () => void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = width * dpr;
   const H = height * dpr;
   const colors = ['#FFD700', '#FF6B9D', '#FF8E53', '#00D9FF', '#C44569', '#8B5CF6', '#ffffff', '#ff3b7f', '#50e3c2'];
-
   const particles: OccasionParticle[] = [];
   const spawnedWaves = new Set<number>();
-
   const spawnWave = (waveIndex: number) => {
     if (spawnedWaves.has(waveIndex)) return;
     spawnedWaves.add(waveIndex);
-
-    let count = 40;
-    if (waveIndex === 0) count = 55;      // Wave 1: Left & Right pops
-    else if (waveIndex === 1) count = 45; // Wave 2: Center pop
-    else if (waveIndex === 2) count = 55; // Wave 3: Wide side pops
-    else if (waveIndex === 3) count = 75; // Wave 4: Massive top shower
-
-    for (let i = 0; i < count; i++) {
-      let spawnX = W * 0.5;
+    const count = [55, 45, 55, 75][waveIndex] ?? 40;
+    for (let index = 0; index < count; index += 1) {
+      let spawnX: number;
       if (waveIndex === 0 || waveIndex === 2) {
-        spawnX = (i % 2 === 0)
-          ? W * 0.18 + (Math.random() - 0.5) * 40
-          : W * 0.82 + (Math.random() - 0.5) * 40;
-      } else if (waveIndex === 3) {
-        spawnX = Math.random() * W;
-      } else {
-        spawnX = W * 0.5 + (Math.random() - 0.5) * 60;
-      }
-
+        spawnX = index % 2 === 0 ? W * 0.18 + (Math.random() - 0.5) * 40 : W * 0.82 + (Math.random() - 0.5) * 40;
+      } else if (waveIndex === 3) spawnX = Math.random() * W;
+      else spawnX = W * 0.5 + (Math.random() - 0.5) * 60;
       const angle = -Math.PI / 2 + (Math.random() - 0.5) * (waveIndex === 3 ? Math.PI * 0.8 : Math.PI * 1.2);
       const speed = (3.5 + Math.random() * 6) * dpr;
-
       particles.push({
-        x: spawnX,
-        y: -10 - Math.random() * 15,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        rot: Math.random() * Math.PI * 2,
-        vRot: (Math.random() - 0.5) * 0.25,
+        x: spawnX, y: -10 - Math.random() * 15,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        rot: Math.random() * Math.PI * 2, vRot: (Math.random() - 0.5) * 0.25,
         size: (5.5 + Math.random() * 9.5) * dpr,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        alpha: 0.9 + Math.random() * 0.1,
+        color: colors[Math.floor(Math.random() * colors.length)], alpha: 0.9 + Math.random() * 0.1,
         shape: Math.random() > 0.35 ? 'rect' : 'circle',
-        wave: waveIndex,
       });
     }
   };
-
-  const DURATION = 3800;
+  const duration = 3800;
   let startTime: number | null = null;
   let frame: number | null = null;
-
-  const tick = (ts: number) => {
-    if (startTime === null) startTime = ts;
-    const elapsed = ts - startTime;
-
-    // Time-triggered 4 waves
+  const tick = (timestamp: number) => {
+    if (startTime === null) startTime = timestamp;
+    const elapsed = timestamp - startTime;
     if (elapsed >= 0) spawnWave(0);
     if (elapsed >= 280) spawnWave(1);
     if (elapsed >= 600) spawnWave(2);
     if (elapsed >= 950) spawnWave(3);
-
-    const progress = Math.min(elapsed / DURATION, 1);
-    const fadeStart = 0.72;
-    const globalFade = progress < fadeStart
-      ? 1
-      : 1 - (progress - fadeStart) / (1 - fadeStart);
-
+    const progress = Math.min(elapsed / duration, 1);
+    const globalFade = progress < 0.72 ? 1 : 1 - (progress - 0.72) / 0.28;
     cCtx.clearRect(0, 0, W, H);
-
-    for (const p of particles) {
-      p.x += p.vx;
-      p.vy += 0.18 * dpr; // gravity
-      p.y += p.vy;
-      p.rot += p.vRot;
-      p.vx *= 0.99; // drag
-
-      if (p.y > H + 40) continue;
-
+    for (const particle of particles) {
+      particle.x += particle.vx;
+      particle.vy += 0.18 * dpr;
+      particle.y += particle.vy;
+      particle.rot += particle.vRot;
+      particle.vx *= 0.99;
+      if (particle.y > H + 40) continue;
       cCtx.save();
-      cCtx.globalAlpha = p.alpha * globalFade;
-      cCtx.fillStyle = p.color;
-      cCtx.translate(p.x, p.y);
-      cCtx.rotate(p.rot);
-
-      if (p.shape === 'circle') {
+      cCtx.globalAlpha = particle.alpha * globalFade;
+      cCtx.fillStyle = particle.color;
+      cCtx.translate(particle.x, particle.y);
+      cCtx.rotate(particle.rot);
+      if (particle.shape === 'circle') {
         cCtx.beginPath();
-        cCtx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+        cCtx.arc(0, 0, particle.size / 2, 0, Math.PI * 2);
         cCtx.fill();
-      } else {
-        // Thin ribbon shape
-        cCtx.fillRect(-p.size / 2, -p.size * 0.22, p.size, p.size * 0.44);
-      }
+      } else cCtx.fillRect(-particle.size / 2, -particle.size * 0.22, particle.size, particle.size * 0.44);
       cCtx.restore();
     }
-
-    if (progress < 1) {
-      frame = requestAnimationFrame(tick);
-    } else {
-      cCtx.clearRect(0, 0, W, H);
-    }
+    if (progress < 1) frame = requestAnimationFrame(tick);
+    else cCtx.clearRect(0, 0, W, H);
   };
-
   frame = requestAnimationFrame(tick);
-
   return () => {
-    if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
+    if (frame !== null) cancelAnimationFrame(frame);
     cCtx.clearRect(0, 0, W, H);
   };
 }
 
 function openCard(card: OccasionCard, onRevealed?: () => void): void {
-
   ensureStyles();
+  const showQuickReveal = isCardPreviewMode() && card.id !== 'day-100' && card.id !== 'birthday';
   document.querySelector('.occasion-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.className = 'occasion-overlay';
   overlay.innerHTML = `
-    <section class="occasion-shell" role="dialog" aria-modal="true" aria-label="${escapeHtml(card.title)}" style="--occasion-a:${card.colors[0]};--occasion-b:${card.colors[1]}">
+    <section class="occasion-shell${card.id === 'birthday' ? ' occasion-shell--birthday' : ''}" role="dialog" aria-modal="true" aria-label="${escapeHtml(card.title)}" style="--occasion-a:${card.colors[0]};--occasion-b:${card.colors[1]}">
       <button class="occasion-close" type="button" aria-label="Đóng">×</button>
       <article class="occasion-paper" data-pattern="${card.pattern}" data-card-id="${card.id}">
         <div class="occasion-border-frame"></div>
@@ -1727,7 +1579,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
         <div class="occasion-corner bottom-right">✦</div>
         <div class="occasion-inner">
           <div class="occasion-art-wrap">
-            ${(card.id as string) === 'birthday' ? BIRTHDAY_CAKE_SVG : OCCASION_ART_SVG}
+            ${card.id === 'birthday' ? BIRTHDAY_CAKE_SVG : OCCASION_ART_SVG}
           </div>
           <div class="occasion-eyebrow"><span>◆ ${escapeHtml(card.eyebrow)} ◆</span></div>
           <h2 class="occasion-title">${escapeHtml(card.title)}</h2>
@@ -1738,7 +1590,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
           </div>
           <p class="occasion-message">${escapeHtml(card.message)}</p>
           <div class="occasion-signature-wrap">
-            <p class="occasion-signature${(card.id as string) === 'birthday' ? ' occasion-signature--birthday' : ''}">${formatOccasionSignature(card)}</p>
+            <p class="occasion-signature${card.id === 'birthday' ? ' occasion-signature--birthday' : ''}">${formatOccasionSignature(card)}</p>
             <div class="occasion-stamp-wrap">
               <div class="occasion-stamp">LOVE SEAL</div>
               <canvas class="occasion-seal-scratch" aria-label="Cào nhẹ để mở Love Seal"></canvas>
@@ -1748,9 +1600,10 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
       </article>
       <canvas class="occasion-scratch" aria-label="Lớp phủ cào để mở thiệp"></canvas>
       <div class="occasion-hint">
-        <span>Cào để mở bí mật</span>
+        <span>${card.id === 'birthday' ? 'Cào để mở bí mật' : '✦ CÀO ĐỂ MỞ BÍ MẬT ✦'}</span>
+        <button class="occasion-quick-reveal" type="button"${showQuickReveal ? '' : ' hidden'}>Cào nhanh</button>
       </div>
-      ${(card.id as string) === 'birthday' ? '<canvas class="occasion-confetti" aria-hidden="true"></canvas>' : ''}
+      ${card.id === 'birthday' ? '<canvas class="occasion-confetti" aria-hidden="true"></canvas>' : ''}
     </section>
   `;
   document.body.appendChild(overlay);
@@ -1781,35 +1634,34 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   if (!canvas || !shell) return;
   let ctx = drawScratchCover(canvas, card);
   if (!ctx) return;
+  const quickRevealButton = overlay.querySelector<HTMLButtonElement>('.occasion-quick-reveal');
   const sealScratchCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-seal-scratch');
   const cleanupSealScratch = sealScratchCanvas ? installSealScratch(sealScratchCanvas) : () => {};
   let drawing = false;
   let lastPoint: { x: number; y: number } | null = null;
   let checkTimer: number | null = null;
   let revealed = false;
-
-  let stopConfettiFn: (() => void) | null = null;
+  let stopConfetti: (() => void) | null = null;
 
   const reveal = () => {
     if (revealed) return;
     revealed = true;
     canvas.classList.add('revealed');
     shell.classList.add('is-revealed');
-
-    // 🎊 Birthday confetti burst (4 waves)
     if (card.id === 'birthday') {
       const confettiCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-confetti');
-      if (confettiCanvas && shell) {
+      if (confettiCanvas) {
         const shellRect = shell.getBoundingClientRect();
-        confettiCanvas.width = Math.round(shellRect.width * Math.min(window.devicePixelRatio || 1, 2));
-        confettiCanvas.height = Math.round(shellRect.height * Math.min(window.devicePixelRatio || 1, 2));
-        const cCtx = confettiCanvas.getContext('2d');
-        if (cCtx) stopConfettiFn = startOccasionConfetti(cCtx, shellRect.width, shellRect.height);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        confettiCanvas.width = Math.round(shellRect.width * dpr);
+        confettiCanvas.height = Math.round(shellRect.height * dpr);
+        const confettiContext = confettiCanvas.getContext('2d');
+        if (confettiContext) stopConfetti = startOccasionConfetti(confettiContext, shellRect.width, shellRect.height);
       }
     }
-
     onRevealed?.();
   };
+  quickRevealButton?.addEventListener('click', reveal);
   const check = () => {
     if (checkTimer !== null || revealed) return;
     checkTimer = window.setTimeout(() => {
@@ -1869,7 +1721,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', resize);
     if (checkTimer !== null) window.clearTimeout(checkTimer);
-    stopConfettiFn?.();
+    stopConfetti?.();
     cleanupSealScratch();
   };
 }
@@ -1891,6 +1743,12 @@ function seenKey(card: OccasionCard, context: OccasionContext, userId: string): 
 
 function isPreviewEnabled(): boolean {
   return new URLSearchParams(window.location.search).get(PREVIEW_QUERY) === '1';
+}
+
+function isCardPreviewMode(): boolean {
+  return window.location.pathname === '/preview/cards'
+    || window.location.hostname === 'preview.babyress.games'
+    || isPreviewEnabled();
 }
 
 function mountPreviewButton(getLatestMe: () => MeResponse | undefined): void {
@@ -1948,30 +1806,12 @@ export function needsBirthdaySetup(me: Pick<MeResponse, 'user' | 'partnerUser'>)
   return !me.user.birthday || !(me.user.partnerBirthday || me.partnerUser?.birthday);
 }
 
-function notifyMissingBirthday(me: MeResponse): void {
-  if (!needsBirthdaySetup(me)) return;
-
-  const key = `${BIRTHDAY_NOTICE_PREFIX}${me.user.id}`;
-  if (birthdayNoticeSession.has(key)) return;
-
-  try {
-    if (sessionStorage.getItem(key) === '1') {
-      birthdayNoticeSession.add(key);
-      return;
-    }
-    sessionStorage.setItem(key, '1');
-  } catch {
-    // The in-memory guard still prevents duplicate notices if storage is unavailable.
-  }
-
-  birthdayNoticeSession.add(key);
-  window.setTimeout(() => {
-    showToast('Bạn chưa lưu đủ Birthday. Thêm ngày đặc biệt để giữ bất ngờ nhé 🎂', 'info');
-  }, 700);
+function ageLabel(value: string): string {
+  const age = calculateAge(value || undefined);
+  return age === undefined ? 'Chưa có tuổi hiển thị' : `${age} tuổi`;
 }
 
 async function mountBirthdaySettings(): Promise<void> {
-  ensureStyles();
   const page = document.querySelector<HTMLElement>('.profile-page');
   if (!page || page.querySelector('.birthday-settings-card') || birthdaySettingsLoading) return;
   const editRow = Array.from(page.querySelectorAll<HTMLElement>('.card-solid')).find((row) =>
@@ -1993,46 +1833,49 @@ async function mountBirthdaySettings(): Promise<void> {
   card.className = 'card-solid birthday-settings-card';
   card.innerHTML = `
     <div class="birthday-settings-head">
-      <span class="birthday-settings-icon">🎂</span>
-      <div>
-        <span class="birthday-settings-title">Ngày sinh nhật</span>
-        <span class="birthday-settings-subtitle">Cập nhật sinh nhật hai bạn để nhận thiệp chúc mừng tự động</span>
-      </div>
+      <span>🎂</span>
+      <div><strong>Sinh nhật và tuổi</strong><small>Lưu ngày sinh để hai đứa tự nhận thiệp đúng ngày. Tuổi được tính tự động.</small></div>
     </div>
     <div class="birthday-settings-grid">
       <div class="birthday-field">
-        <label for="birthday-self">Birthday của bạn</label>
+        <label for="birthday-self">Sinh nhật của bạn</label>
         <input id="birthday-self" type="date" value="${toInputDate(me.user.birthday)}" />
+        <span class="birthday-age" data-age-self>${ageLabel(toInputDate(me.user.birthday))}</span>
       </div>
       <div class="birthday-field">
-        <label for="birthday-partner">Birthday người ấy</label>
+        <label for="birthday-partner">Sinh nhật người ấy</label>
         <input id="birthday-partner" type="date" value="${toInputDate(me.user.partnerBirthday || me.partnerUser?.birthday)}" />
+        <span class="birthday-age" data-age-partner>${ageLabel(toInputDate(me.user.partnerBirthday || me.partnerUser?.birthday))}</span>
       </div>
     </div>
-    <button type="button" class="birthday-save">Lưu Birthday</button>
+    <button type="button" class="birthday-save">Lưu ngày sinh</button>
   `;
   editRow.insertAdjacentElement('afterend', card);
   const selfInput = card.querySelector<HTMLInputElement>('#birthday-self');
   const partnerInput = card.querySelector<HTMLInputElement>('#birthday-partner');
+  const selfAge = card.querySelector<HTMLElement>('[data-age-self]');
+  const partnerAge = card.querySelector<HTMLElement>('[data-age-partner]');
   const save = card.querySelector<HTMLButtonElement>('.birthday-save');
   const max = toDateKey(getCalendarDate(new Date()));
   if (selfInput) selfInput.max = max;
   if (partnerInput) partnerInput.max = max;
+  selfInput?.addEventListener('input', () => { if (selfAge) selfAge.textContent = ageLabel(selfInput.value); });
+  partnerInput?.addEventListener('input', () => { if (partnerAge) partnerAge.textContent = ageLabel(partnerInput.value); });
   save?.addEventListener('click', async () => {
     save.disabled = true;
-    save.textContent = '⏳ Đang lưu...';
+    save.textContent = 'Đang lưu...';
     try {
       await updateProfile({
         birthday: selfInput?.value || null,
         partnerBirthday: partnerInput?.value || null,
       });
       await getMe();
-      showToast('Đã lưu Birthday!', 'success');
-      save.textContent = '✨ Đã lưu';
-      window.setTimeout(() => { save.textContent = 'Lưu Birthday'; }, 1200);
+      showToast('Đã lưu ngày sinh và cập nhật tuổi!', 'success');
+      save.textContent = 'Đã lưu';
+      window.setTimeout(() => { save.textContent = 'Lưu ngày sinh'; }, 1200);
     } catch (error) {
-      showToast(`Không lưu được Birthday: ${(error as Error).message}`, 'error');
-      save.textContent = '🔄 Thử lại';
+      showToast(`Không lưu được ngày sinh: ${(error as Error).message}`, 'error');
+      save.textContent = 'Thử lại';
     } finally {
       save.disabled = false;
     }
@@ -2051,7 +1894,7 @@ declare global {
 export function initAnniversaryCards(): void {
   let latestMe: MeResponse | undefined;
   let checking = false;
-  let checkedSessionKey: string | null = null;
+  let checkedToken: string | null = null;
   let mountTimer: number | null = null;
 
   const scheduleProfileMount = () => {
@@ -2065,14 +1908,11 @@ export function initAnniversaryCards(): void {
 
   const checkToday = async (force = false) => {
     const token = store.getToken();
-    const todayKey = toDateKey(getCalendarDate(new Date()));
-    const sessionKey = token ? `${token}:${todayKey}` : null;
-    if (!token || checking || (!force && checkedSessionKey === sessionKey)) return;
+    if (!token || checking || (!force && checkedToken === token)) return;
     checking = true;
     try {
       latestMe = await getMe();
-      checkedSessionKey = sessionKey;
-      notifyMissingBirthday(latestMe);
+      checkedToken = token;
       const card = resolveOccasionCard(latestMe);
       if (!card) return;
       const context = createContext(latestMe);
@@ -2095,10 +1935,7 @@ export function initAnniversaryCards(): void {
     if (state.token && state.token !== previous.token) void checkToday(true);
     scheduleProfileMount();
   });
-  window.addEventListener('popstate', () => {
-    scheduleProfileMount();
-    void checkToday();
-  });
+  window.addEventListener('popstate', scheduleProfileMount);
   window.addEventListener('focus', () => void checkToday(true));
   window.addEventListener('pageshow', () => void checkToday(true));
   window.LoveCheckCards = {
