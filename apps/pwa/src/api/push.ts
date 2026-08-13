@@ -1,6 +1,7 @@
 import { apiFetch } from './client';
 import { logger } from '../utils/logger';
 import { isMockLocalMode } from '../dev/mock-data';
+import { store } from '../store';
 
 interface PushConfig {
   enabled: boolean;
@@ -160,6 +161,9 @@ export async function registerFcmToken(fcmToken: string): Promise<void> {
   await apiFetch<void>('/push/subscribe-fcm', {
     method: 'POST',
     body: JSON.stringify({ fcmToken }),
+    // Token registration is optional background work. It must not clear an
+    // otherwise valid session if it races a WebView reload or login restore.
+    preserveSessionOnUnauthorized: true,
   });
 }
 
@@ -175,24 +179,64 @@ declare global {
 }
 
 export function setupAndroidFcm(): void {
-  // Lắng nghe sự kiện callback từ native
-  window.onFcmTokenReceived = (token: string) => {
-    if (token) {
-      registerFcmToken(token).catch((err) => {
-        logger.warn('[FCM] Register fcm token failed', err);
-      });
+  let latestToken: string | null = null;
+  let registeredSessionKey: string | null = null;
+  let registrationInFlight: Promise<void> | null = null;
+
+  const getStoredToken = (): string | null => {
+    try {
+      const token = window.LoveCheckAndroid?.getFcmToken?.().trim();
+      return token || null;
+    } catch {
+      return null;
     }
   };
 
-  // Chủ động lấy token nếu bridge đã sẵn sàng
-  try {
-    const token = window.LoveCheckAndroid?.getFcmToken?.();
-    if (token) {
-      registerFcmToken(token).catch((err) => {
-        logger.warn('[FCM] Pull and register fcm token failed', err);
+  const syncToken = (candidate = latestToken): void => {
+    const token = candidate?.trim();
+    const sessionToken = store.getToken();
+    if (!token || !sessionToken) return;
+
+    const sessionKey = `${sessionToken}:${token}`;
+    if (registeredSessionKey === sessionKey || registrationInFlight) return;
+
+    registrationInFlight = registerFcmToken(token)
+      .then(() => {
+        registeredSessionKey = sessionKey;
+      })
+      .catch((err) => {
+        logger.warn('[FCM] Register fcm token failed', err);
+      })
+      .finally(() => {
+        registrationInFlight = null;
+        const nextToken = latestToken?.trim();
+        const nextSessionToken = store.getToken();
+        const nextSessionKey = nextToken && nextSessionToken
+          ? `${nextSessionToken}:${nextToken}`
+          : null;
+        if (nextSessionKey && nextSessionKey !== sessionKey && registeredSessionKey !== nextSessionKey) {
+          syncToken(nextToken);
+        }
       });
+  };
+
+  // Listen for tokens pushed while the native activity is already open.
+  window.onFcmTokenReceived = (token: string) => {
+    latestToken = token.trim() || null;
+    syncToken();
+  };
+
+  // Pull the retained token as a durable fallback when the native callback
+  // arrived before this module had installed its listener.
+  latestToken = getStoredToken();
+  syncToken();
+
+  // Authentication can finish after the token callback. Register the retained
+  // token for the new account as soon as a session becomes available.
+  store.subscribe((state, previousState) => {
+    if (state.token && state.token !== previousState.token) {
+      latestToken = getStoredToken() ?? latestToken;
+      syncToken();
     }
-  } catch (_err) {
-    // Ignore if bridge is not loaded yet
-  }
+  });
 }

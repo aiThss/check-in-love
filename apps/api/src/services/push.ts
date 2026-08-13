@@ -15,6 +15,19 @@ interface ServiceAccount {
 
 let cachedAccessToken: { token: string; expiry: number } | null = null;
 
+function hasFcmCredentials(): boolean {
+  return Boolean(
+    env.FCM_SERVICE_ACCOUNT_JSON ||
+    env.FCM_SERVICE_ACCOUNT_FILE ||
+    env.FCM_SERVER_KEY,
+  );
+}
+
+function fcmTokenReference(token: string): string {
+  if (token.length <= 12) return 'redacted';
+  return `${token.slice(0, 6)}...${token.slice(-6)}`;
+}
+
 async function getFcmAccessToken(): Promise<{ accessToken: string; projectId: string } | null> {
   try {
     let serviceAccount: ServiceAccount | null = null;
@@ -167,14 +180,36 @@ export async function sendPushToUser(
               });
               if (!res.ok) {
                 const text = await res.text();
-                logger.error('[push] FCM v1 send error for token', null, { token, details: text });
+                logger.error('[push] FCM v1 send error for token', null, {
+                  fcmToken: fcmTokenReference(token),
+                  details: text,
+                });
+                if (text.includes('UNREGISTERED')) {
+                  await User.findByIdAndUpdate(userId, {
+                    $pull: { fcmTokens: token },
+                  });
+                  logger.info('[push] Removed unregistered FCM token', {
+                    userId,
+                    fcmToken: fcmTokenReference(token),
+                  });
+                }
               }
             } catch (err) {
-              logger.error('[push] FCM v1 network error for token', err, { token });
+              logger.error('[push] FCM v1 network error for token', err, {
+                fcmToken: fcmTokenReference(token),
+              });
             }
           });
           await Promise.allSettled(fcmRequests);
+        } else {
+          logger.warn('[push] Android FCM skipped: recipient has no registered device token', {
+            userId,
+          });
         }
+      } else {
+        logger.error('[push] Android FCM skipped: service-account credentials are unavailable', null, {
+          userId,
+        });
       }
     } catch (err) {
       logger.error('[push] Error sending FCM v1 message', err);
@@ -219,6 +254,11 @@ export async function sendPushToUser(
     } catch (err) {
       logger.error('[push] Error querying user for FCM tokens', err);
     }
+  } else if (!hasFcmCredentials()) {
+    logger.warn('[push] Android FCM skipped: no server credential is configured', {
+      userId,
+      expected: 'FCM_SERVICE_ACCOUNT_JSON, FCM_SERVICE_ACCOUNT_FILE, or FCM_SERVER_KEY',
+    });
   }
 
   // 2. Send Web Push (for iOS PWA / Chrome PWA)

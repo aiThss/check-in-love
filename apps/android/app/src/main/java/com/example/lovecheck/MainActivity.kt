@@ -131,6 +131,19 @@ class LoveCheckBridge(
     fun signInWithGoogle() {
         mainHandler.post(onGoogleSignInRequested)
     }
+
+    /**
+     * Returns the latest FCM token retained by Android. The PWA can pull this
+     * after its JavaScript listener and session are ready, rather than relying
+     * on a single page-load callback from the native activity.
+     */
+    @JavascriptInterface
+    fun getFcmToken(): String {
+        return context
+            .getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
+            .getString("fcm_token", "")
+            .orEmpty()
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -529,9 +542,9 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val escaped = token.replace("'", "\\'")
+        val escaped = JSONObject.quote(token)
         webView?.evaluateJavascript(
-            "if (typeof window.onFcmTokenReceived === 'function') { window.onFcmTokenReceived('$escaped'); }",
+            "if (typeof window.onFcmTokenReceived === 'function') { window.onFcmTokenReceived($escaped); }",
             null,
         )
     }
