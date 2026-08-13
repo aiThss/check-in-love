@@ -6,6 +6,7 @@ After completing a user-requested change, stage the files that belong to that ch
 
 - **Quy chuẩn Kích thước & Giao diện Thiệp (`anniversary-cards.ts`)**:
   - Khung thiệp (`.occasion-shell`) sử dụng chiều rộng `min(340px, calc(100vw - 32px))` và chiều cao tự nhiên `height: auto` (`overflow: visible`), **tuyệt đối không được tạo thanh cuộn (scrollbar) hay khung cuộn bên trong thiệp**.
+  - Kích thước phải dựa trên CSS viewport (`vw`/`dvh`), không dựa theo số inch quảng cáo của điện thoại. Với các thiệp không phải sinh nhật trên trình duyệt hỗ trợ `dvh`, dùng `min(100vw - 32px, clamp(328px, 42dvh, 360px))`: giữ đúng width 328px ở 360×720, lớn dần trên màn hình cao/rộng hơn, và không vượt quá vùng hiển thị. Giữ nguyên size e62 của thiệp sinh nhật.
   - Thiệp giấy bên dưới (`.occasion-paper`) để `min-height: 0`, ôm tự nhiên theo độ dài nội dung thực tế.
   - Ba lớp `.occasion-shell`, `.occasion-paper` và `.occasion-scratch` luôn phải có cùng rendered rectangle (cùng `top`, `left`, `width`, `height`) cho mọi loại thiệp. Ở viewport 360×720, width chuẩn là 328px; chiều cao tự nhiên theo nội dung, không giới hạn bằng `max-height`.
   - Lớp cào canvas (`.occasion-scratch`) luôn đo kích thước thật của `.occasion-paper` bằng `paper.getBoundingClientRect()` cho **mọi** thiệp, rồi đồng bộ cả CSS `inset/width/height` lẫn bitmap canvas. Cài `border-radius: 26px; overflow: hidden;` để phủ khớp 100%, không hở hoặc lệch góc.

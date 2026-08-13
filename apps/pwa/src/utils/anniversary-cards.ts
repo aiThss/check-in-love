@@ -466,6 +466,15 @@ function ensureStyles(): void {
       box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.15);
       background: #1a101b; animation: occasionRise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
+    /* Keep the approved 328px card at 360x720, then grow only when the
+       available portrait viewport is genuinely larger. Physical screen
+       inches are not exposed to the web, so CSS viewport dimensions are the
+       stable signal for both browser and Android WebView. */
+    @supports (height: 1dvh) {
+      .occasion-shell:not(.occasion-shell--birthday) {
+        width: min(calc(100vw - 32px), clamp(328px, 42dvh, 360px));
+      }
+    }
     .occasion-close {
       position: absolute; top: 14px; right: 14px; z-index: 8;
       width: 36px; height: 36px; border: 0; border-radius: 999px;
