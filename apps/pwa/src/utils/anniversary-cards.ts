@@ -1032,9 +1032,18 @@ function drawPattern(ctx: CanvasRenderingContext2D, width: number, height: numbe
 }
 
 function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): CanvasRenderingContext2D | null {
-  const paper = card.id === 'birthday' ? canvas.previousElementSibling as HTMLElement | null : null;
+  // The paper is the single source of truth for every occasion. Keeping the
+  // CSS box and backing bitmap in lockstep prevents a scratch edge from
+  // exposing the paper beneath it after content, font or viewport changes.
+  const previous = canvas.previousElementSibling;
+  const paper = previous instanceof HTMLElement && previous.matches('.occasion-paper')
+    ? previous
+    : null;
   const paperRect = paper?.getBoundingClientRect();
   const rect = paperRect && paperRect.height > 0 ? paperRect : canvas.getBoundingClientRect();
+  canvas.style.inset = '0';
+  canvas.style.width = `${rect.width}px`;
+  canvas.style.height = `${rect.height}px`;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.max(1, Math.round(rect.width * dpr));
   canvas.height = Math.max(1, Math.round(rect.height * dpr));
@@ -1617,6 +1626,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     document.fonts?.ready.then(fitTitle).catch(() => {});
   }
   const shell = overlay.querySelector<HTMLElement>('.occasion-shell');
+  const paper = overlay.querySelector<HTMLElement>('.occasion-paper');
   const canvas = overlay.querySelector<HTMLCanvasElement>('.occasion-scratch');
   let cleanup = () => {};
   const close = () => {
@@ -1716,10 +1726,20 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     if (revealed) return;
     ctx = drawScratchCover(canvas, card);
   };
+  const paperResizeObserver = paper && typeof ResizeObserver !== 'undefined'
+    ? new ResizeObserver(resize)
+    : null;
+  if (paperResizeObserver && paper) paperResizeObserver.observe(paper);
+  const syncAfterOpeningAnimation = (event: AnimationEvent) => {
+    if (event.target === shell && event.animationName === 'occasionRise') resize();
+  };
+  shell.addEventListener('animationend', syncAfterOpeningAnimation);
   window.addEventListener('resize', resize, { passive: true });
   cleanup = () => {
+    shell.removeEventListener('animationend', syncAfterOpeningAnimation);
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', resize);
+    paperResizeObserver?.disconnect();
     if (checkTimer !== null) window.clearTimeout(checkTimer);
     stopConfetti?.();
     cleanupSealScratch();
