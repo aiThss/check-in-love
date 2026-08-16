@@ -12,6 +12,8 @@ import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -21,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import java.util.concurrent.atomic.AtomicInteger
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
@@ -105,9 +108,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         try {
             val channelId = "realtime_interactions"
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
             // Create high importance channel for sound and banner popup
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val audioAttributes = AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
+                    .build()
+
                 val channel = NotificationChannel(
                     channelId,
                     "Tương tác thời gian thực",
@@ -118,6 +127,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     enableVibration(true)
                     vibrationPattern = longArrayOf(0, 250, 150, 250)
                     lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                    setSound(defaultSoundUri, audioAttributes)
                 }
                 notificationManager.createNotificationChannel(channel)
             }
@@ -136,7 +146,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             }
             val pendingIntent = PendingIntent.getActivity(
                 this,
-                (System.currentTimeMillis() % 100000).toInt(),
+                notificationIdGenerator.incrementAndGet(),
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -174,8 +184,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 .setColor(ContextCompat.getColor(this, R.color.notification_color))
                 .setContentTitle(title)
                 .setContentText(body)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setSound(defaultSoundUri)
+                .setVibrate(longArrayOf(0, 250, 150, 250))
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -197,7 +209,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 builder.setStyle(bigTextStyle)
             }
 
-            notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
+            notificationManager.notify(notificationIdGenerator.incrementAndGet(), builder.build())
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show messaging notification", e)
         }
@@ -246,5 +258,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "LoveCheckFCM"
+        private val notificationIdGenerator = AtomicInteger(1000)
     }
 }

@@ -203,65 +203,70 @@ declare global {
   }
 }
 
+export async function syncAndroidFcmNow(tokenCandidate?: string | null): Promise<boolean> {
+  const token = (tokenCandidate ?? window.LoveCheckAndroid?.getFcmToken?.())?.trim();
+  const sessionToken = store.getToken() || localStorage.getItem('lovecheck_token');
+  if (!token || !sessionToken) return false;
+
+  try {
+    await registerFcmToken(token);
+    logger.info('[FCM] Token synchronized successfully', { tokenPrefix: token.slice(0, 8) });
+    return true;
+  } catch (err) {
+    logger.warn('[FCM] Token synchronization failed', err);
+    return false;
+  }
+}
+
 export function setupAndroidFcm(): void {
   let latestToken: string | null = null;
-  let registeredSessionKey: string | null = null;
-  let registrationInFlight: Promise<void> | null = null;
+  let registeredToken: string | null = null;
+  let inFlight = false;
 
-  const getStoredToken = (): string | null => {
+  const sync = async (tokenCandidate?: string | null) => {
+    if (tokenCandidate) {
+      latestToken = tokenCandidate.trim();
+    }
+    if (inFlight) return;
+    const token = (latestToken ?? window.LoveCheckAndroid?.getFcmToken?.())?.trim();
+    const sessionToken = store.getToken() || localStorage.getItem('lovecheck_token');
+    if (!token || !sessionToken) return;
+
+    const key = `${sessionToken}:${token}`;
+    if (registeredToken === key) return;
+
+    inFlight = true;
     try {
-      const token = window.LoveCheckAndroid?.getFcmToken?.().trim();
-      return token || null;
-    } catch {
-      return null;
+      await registerFcmToken(token);
+      registeredToken = key;
+    } catch (err) {
+      logger.warn('[FCM] Setup sync failed', err);
+    } finally {
+      inFlight = false;
     }
   };
 
-  const syncToken = (candidate = latestToken): void => {
-    const token = candidate?.trim();
-    const sessionToken = store.getToken();
-    if (!token || !sessionToken) return;
-
-    const sessionKey = `${sessionToken}:${token}`;
-    if (registeredSessionKey === sessionKey || registrationInFlight) return;
-
-    registrationInFlight = registerFcmToken(token)
-      .then(() => {
-        registeredSessionKey = sessionKey;
-      })
-      .catch((err) => {
-        logger.warn('[FCM] Register fcm token failed', err);
-      })
-      .finally(() => {
-        registrationInFlight = null;
-        const nextToken = latestToken?.trim();
-        const nextSessionToken = store.getToken();
-        const nextSessionKey = nextToken && nextSessionToken
-          ? `${nextSessionToken}:${nextToken}`
-          : null;
-        if (nextSessionKey && nextSessionKey !== sessionKey && registeredSessionKey !== nextSessionKey) {
-          syncToken(nextToken);
-        }
-      });
-  };
-
-  // Listen for tokens pushed while the native activity is already open.
   window.onFcmTokenReceived = (token: string) => {
     latestToken = token.trim() || null;
-    syncToken();
+    void sync(token);
   };
 
-  // Pull the retained token as a durable fallback when the native callback
-  // arrived before this module had installed its listener.
-  latestToken = getStoredToken();
-  syncToken();
+  // Immediate sync attempt
+  latestToken = window.LoveCheckAndroid?.getFcmToken?.()?.trim() || null;
+  void sync();
 
-  // Authentication can finish after the token callback. Register the retained
-  // token for the new account as soon as a session becomes available.
+  // Retry schedule to catch asynchronous Google Play Services token generation
+  const retryIntervals = [800, 2000, 4000, 8000, 15000];
+  retryIntervals.forEach((delay) => {
+    setTimeout(() => {
+      void sync();
+    }, delay);
+  });
+
   store.subscribe((state, previousState) => {
     if (state.token && state.token !== previousState.token) {
-      latestToken = getStoredToken() ?? latestToken;
-      syncToken();
+      latestToken = latestToken || window.LoveCheckAndroid?.getFcmToken?.()?.trim() || null;
+      void sync();
     }
   });
 }

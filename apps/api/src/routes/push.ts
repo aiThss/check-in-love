@@ -154,7 +154,7 @@ export default async function pushRoutes(app: FastifyInstance): Promise<void> {
       const userName = user?.displayName || 'Bạn';
 
       try {
-        await sendPushToUser(request.user.id, {
+        const result = await sendPushToUser(request.user.id, {
           title: 'Kiểm tra thông báo 💕',
           body: `Xin chào ${userName}! Thông báo Check IN Love đang hoạt động rất tốt ✨`,
           senderName: 'Check IN Love',
@@ -163,10 +163,46 @@ export default async function pushRoutes(app: FastifyInstance): Promise<void> {
           targetUrl: '/app/home',
           url: '/app/home',
         });
-        return reply.status(200).send({ success: true, message: 'Đã gửi thông báo thử nghiệm thành công' });
-      } catch (err) {
+
+        if (result.fcm.tokensFound === 0 && result.webPush.attempted === 0) {
+          return reply.status(400).send({
+            error: 'Thiết bị này chưa đăng ký FCM token với máy chủ. Vui lòng mở lại app Android để tự động đăng ký token.',
+            code: 'NO_DEVICE_TOKEN',
+            details: result,
+          });
+        }
+
+        if (!result.fcm.hasCredentials && result.webPush.attempted === 0) {
+          return reply.status(500).send({
+            error: 'Máy chủ chưa cấu hình Firebase Service Account (FCM_SERVICE_ACCOUNT_JSON).',
+            code: 'MISSING_FCM_CREDENTIALS',
+            details: result,
+          });
+        }
+
+        if (result.fcm.tokensFound > 0 && result.fcm.sent === 0 && result.webPush.sent === 0) {
+          return reply.status(500).send({
+            error: `Gửi thông báo thất bại: ${result.fcm.errors.join('; ') || 'Google FCM từ chối'}`,
+            code: 'FCM_SEND_ERROR',
+            details: result,
+          });
+        }
+
+        const targets: string[] = [];
+        if (result.fcm.sent > 0) targets.push(`${result.fcm.sent} app Android`);
+        if (result.webPush.sent > 0) targets.push(`${result.webPush.sent} web browser`);
+
+        return reply.status(200).send({
+          success: true,
+          message: `Đã gửi thông báo thành công tới ${targets.join(' và ') || 'thiết bị'}! ✨`,
+          details: result,
+        });
+      } catch (err: any) {
         app.log.error({ err }, 'Failed to send test push notification');
-        return reply.status(500).send({ error: 'Không thể gửi thông báo thử nghiệm', code: 'PUSH_ERROR' });
+        return reply.status(500).send({
+          error: err?.message || 'Không thể gửi thông báo thử nghiệm',
+          code: 'PUSH_ERROR',
+        });
       }
     },
   );

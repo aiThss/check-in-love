@@ -129,10 +129,42 @@ export interface PushPayload {
   photoUrl?: string;
 }
 
+export interface PushResult {
+  fcm: {
+    attempted: number;
+    sent: number;
+    failed: number;
+    tokensFound: number;
+    hasCredentials: boolean;
+    errors: string[];
+  };
+  webPush: {
+    attempted: number;
+    sent: number;
+    failed: number;
+  };
+}
+
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
-): Promise<void> {
+): Promise<PushResult> {
+  const result: PushResult = {
+    fcm: {
+      attempted: 0,
+      sent: 0,
+      failed: 0,
+      tokensFound: 0,
+      hasCredentials: hasFcmCredentials(),
+      errors: [],
+    },
+    webPush: {
+      attempted: 0,
+      sent: 0,
+      failed: 0,
+    },
+  };
+
   // Sync fields
   if (payload.kind && !payload.actionType) {
     payload.actionType = payload.kind;
@@ -153,8 +185,12 @@ export async function sendPushToUser(
       if (authData) {
         const { accessToken, projectId } = authData;
         const user = await User.findById(userId).lean();
-        if (user && user.fcmTokens && user.fcmTokens.length > 0) {
-          const fcmRequests = user.fcmTokens.map(async (token) => {
+        const fcmTokens = user?.fcmTokens || [];
+        result.fcm.tokensFound = fcmTokens.length;
+
+        if (fcmTokens.length > 0) {
+          const fcmRequests = fcmTokens.map(async (token) => {
+            result.fcm.attempted++;
             const fcmPayload = {
               message: {
                 token: token,
@@ -196,6 +232,8 @@ export async function sendPushToUser(
               });
               if (!res.ok) {
                 const text = await res.text();
+                result.fcm.failed++;
+                result.fcm.errors.push(text);
                 logger.error('[push] FCM v1 send error for token', null, {
                   fcmToken: fcmTokenReference(token),
                   details: text,
@@ -209,8 +247,12 @@ export async function sendPushToUser(
                     fcmToken: fcmTokenReference(token),
                   });
                 }
+              } else {
+                result.fcm.sent++;
               }
-            } catch (err) {
+            } catch (err: any) {
+              result.fcm.failed++;
+              result.fcm.errors.push(err?.message || 'Network error');
               logger.error('[push] FCM v1 network error for token', err, {
                 fcmToken: fcmTokenReference(token),
               });
@@ -223,19 +265,25 @@ export async function sendPushToUser(
           });
         }
       } else {
+        result.fcm.errors.push('Firebase Service Account authentication failed');
         logger.error('[push] Android FCM skipped: service-account credentials are unavailable', null, {
           userId,
         });
       }
-    } catch (err) {
+    } catch (err: any) {
+      result.fcm.errors.push(err?.message || 'FCM v1 dispatch error');
       logger.error('[push] Error sending FCM v1 message', err);
     }
   } else if (env.FCM_SERVER_KEY) {
     try {
       const user = await User.findById(userId).lean();
-      if (user && user.fcmTokens && user.fcmTokens.length > 0) {
+      const fcmTokens = user?.fcmTokens || [];
+      result.fcm.tokensFound = fcmTokens.length;
+
+      if (fcmTokens.length > 0) {
+        result.fcm.attempted += fcmTokens.length;
         const fcmPayload = {
-          registration_ids: user.fcmTokens,
+          registration_ids: fcmTokens,
           notification: {
             title: payload.title,
             body: payload.body,
@@ -255,28 +303,29 @@ export async function sendPushToUser(
           priority: 'high',
         };
 
-        fetch('https://fcm.googleapis.com/fcm/send', {
+        const res = await fetch('https://fcm.googleapis.com/fcm/send', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `key=${env.FCM_SERVER_KEY}`,
           },
           body: JSON.stringify(fcmPayload),
-        })
-          .then(async (res) => {
-            if (!res.ok) {
-              const text = await res.text();
-              logger.error('[push] FCM legacy server response error', null, { details: text });
-            }
-          })
-          .catch((err) => {
-            logger.error('[push] FCM legacy fetch network error', err);
-          });
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          result.fcm.failed += fcmTokens.length;
+          result.fcm.errors.push(text);
+          logger.error('[push] FCM legacy server response error', null, { details: text });
+        } else {
+          result.fcm.sent += fcmTokens.length;
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
+      result.fcm.errors.push(err?.message || 'FCM legacy error');
       logger.error('[push] Error querying user for FCM tokens', err);
     }
   } else if (!hasFcmCredentials()) {
+    result.fcm.errors.push('No FCM credentials configured on server');
     logger.warn('[push] Android FCM skipped: no server credential is configured', {
       userId,
       expected: 'FCM_SERVICE_ACCOUNT_JSON, FCM_SERVICE_ACCOUNT_FILE, or FCM_SERVER_KEY',
@@ -288,19 +337,20 @@ export async function sendPushToUser(
     logger.warn(
       '[push] VAPID keys not configured — skipping Web Push notification',
     );
-    return;
+    return result;
   }
 
   initVapid();
 
   const subscriptions = await PushSubscription.find({ userId }).lean();
   if (subscriptions.length === 0) {
-    return;
+    return result;
   }
 
   const payloadStr = JSON.stringify(payload);
 
   const tasks = subscriptions.map(async (sub) => {
+    result.webPush.attempted++;
     try {
       await webpush.sendNotification(
         {
@@ -312,7 +362,9 @@ export async function sendPushToUser(
         },
         payloadStr,
       );
+      result.webPush.sent++;
     } catch (err: unknown) {
+      result.webPush.failed++;
       const webErr = err as { statusCode?: number };
       if (webErr.statusCode === 410) {
         // Subscription is no longer valid — clean it up
@@ -325,4 +377,5 @@ export async function sendPushToUser(
   });
 
   await Promise.allSettled(tasks);
+  return result;
 }

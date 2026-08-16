@@ -7,7 +7,7 @@ import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { openCamera, openGallery, CameraResult } from '../components/camera';
 import { apiFetch } from '../api/client';
-import { ensurePushSubscription, isAndroidApp, testPushNotification } from '../api/push';
+import { ensurePushSubscription, isAndroidApp, testPushNotification, syncAndroidFcmNow } from '../api/push';
 import type { User, Couple } from '../api/types';
 import { isMockPreviewMode } from '../dev/mock-data';
 
@@ -307,13 +307,16 @@ function buildReminderCard(): HTMLElement {
       const btn = testRow.querySelector<HTMLButtonElement>('#btn-test-push');
       if (btn) {
         btn.disabled = true;
-        btn.textContent = 'Đang gửi...';
+        btn.textContent = 'Đang kiểm tra & gửi...';
       }
       try {
+        if (isAndroidApp()) {
+          await syncAndroidFcmNow().catch(() => {});
+        }
         const res = await testPushNotification();
         showToast(res.message || 'Đã gửi thông báo thử nghiệm thành công! ✨', 'success');
       } catch (err: any) {
-        showToast(err?.message || 'Không gửi được thông báo, vui lòng thử lại', 'error');
+        showToast(err?.message || err?.error || 'Không gửi được thông báo, vui lòng thử lại', 'error');
       } finally {
         if (btn) {
           btn.disabled = false;
