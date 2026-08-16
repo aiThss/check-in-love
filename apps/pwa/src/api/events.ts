@@ -51,6 +51,7 @@ export function initRealtimeEvents(): void {
               data.body,
               data.targetUrl || '/app/home',
               data.photoUrl || null,
+              data.senderAvatar || null,
             );
           }
         } catch (err) {

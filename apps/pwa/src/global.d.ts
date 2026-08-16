@@ -11,6 +11,7 @@ declare global {
         body: string,
         targetUrl: string,
         photoUrl: string | null,
+        senderAvatar?: string | null,
       ) => void;
       signInWithGoogle?: () => void;
     };

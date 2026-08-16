@@ -13,7 +13,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.net.Uri
@@ -62,6 +68,8 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -159,71 +167,161 @@ class LoveCheckBridge(
         return "{\"token\":$escapedToken,\"error\":$escapedError}"
     }
 
+    private fun getBitmapFromUrl(urlStr: String): Bitmap? {
+        return try {
+            val url = URL(urlStr)
+            val connection = url.openConnection() as HttpsURLConnection
+            connection.doInput = true
+            connection.connectTimeout = 2500
+            connection.readTimeout = 2500
+            connection.connect()
+            val input = connection.inputStream
+            val bitmap = BitmapFactory.decodeStream(input)
+            input.close()
+            connection.disconnect()
+            bitmap
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun getCircleBitmap(bitmap: Bitmap): Bitmap? {
+        return try {
+            val minSize = Math.min(bitmap.width, bitmap.height)
+            if (minSize <= 0) return null
+
+            val output = Bitmap.createBitmap(minSize, minSize, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(output)
+            val paint = Paint()
+            val rect = Rect(0, 0, minSize, minSize)
+            paint.isAntiAlias = true
+            canvas.drawARGB(0, 0, 0, 0)
+            paint.color = 0xff424242.toInt()
+
+            val radius = (minSize / 2).toFloat()
+            canvas.drawCircle(radius, radius, radius, paint)
+            paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+            canvas.drawBitmap(bitmap, rect, rect, paint)
+            output
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    @JavascriptInterface
+    fun showLocalNotification(
+        title: String,
+        body: String,
+        targetUrl: String,
+        photoUrl: String?,
+        senderAvatar: String?
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val channelId = "realtime_interactions"
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val audioAttributes = AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
+                        .build()
+
+                    val channel = NotificationChannel(
+                        channelId,
+                        "Tương tác thời gian thực",
+                        NotificationManager.IMPORTANCE_HIGH
+                    ).apply {
+                        description = "Thông báo react, reply, tin nhắn và check-in thời gian thực"
+                        enableLights(true)
+                        enableVibration(true)
+                        vibrationPattern = longArrayOf(0, 250, 150, 250)
+                        lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                        setSound(defaultSoundUri, audioAttributes)
+                    }
+                    notificationManager.createNotificationChannel(channel)
+                }
+
+                val fullTargetUrl = if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+                    targetUrl
+                } else {
+                    "https://couple.io.vn${if (targetUrl.startsWith("/")) "" else "/"}$targetUrl"
+                }
+
+                val intent = Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    data = Uri.parse(fullTargetUrl)
+                    putExtra("targetUrl", targetUrl)
+                }
+                val pendingIntent = PendingIntent.getActivity(
+                    context,
+                    (System.currentTimeMillis() % 100000).toInt(),
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+
+                // Download and crop sender avatar safely to circular icon
+                var avatarBitmap: Bitmap? = null
+                if (!senderAvatar.isNullOrBlank()) {
+                    val resolvedAvatarUrl = if (senderAvatar.startsWith("/")) {
+                        "https://couple.io.vn$senderAvatar"
+                    } else {
+                        senderAvatar
+                    }
+                    val bitmap = getBitmapFromUrl(resolvedAvatarUrl)
+                    if (bitmap != null) {
+                        avatarBitmap = getCircleBitmap(bitmap)
+                    }
+                }
+
+                val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
+
+                // Download photo preview if attached
+                var photoBitmap: Bitmap? = null
+                if (!photoUrl.isNullOrBlank()) {
+                    val resolvedPhotoUrl = if (photoUrl.startsWith("/")) {
+                        "https://couple.io.vn$photoUrl"
+                    } else {
+                        photoUrl
+                    }
+                    photoBitmap = getBitmapFromUrl(resolvedPhotoUrl)
+                }
+
+                val builder = NotificationCompat.Builder(context, channelId)
+                    .setSmallIcon(R.drawable.ic_notification)
+                    .setLargeIcon(largeIcon)
+                    .setColor(0xFFFF3B7F.toInt())
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    .setDefaults(NotificationCompat.DEFAULT_ALL)
+                    .setSound(defaultSoundUri)
+                    .setVibrate(longArrayOf(0, 250, 150, 250))
+                    .setAutoCancel(true)
+                    .setContentIntent(pendingIntent)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+                if (photoBitmap != null) {
+                    builder.setStyle(
+                        NotificationCompat.BigPictureStyle()
+                            .bigPicture(photoBitmap)
+                            .setSummaryText(body)
+                    )
+                } else {
+                    builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                }
+
+                notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     @JavascriptInterface
     fun showLocalNotification(title: String, body: String, targetUrl: String, photoUrl: String?) {
-        try {
-            val channelId = "realtime_interactions"
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val audioAttributes = AudioAttributes.Builder()
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
-                    .build()
-
-                val channel = NotificationChannel(
-                    channelId,
-                    "Tương tác thời gian thực",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "Thông báo react, reply, tin nhắn và check-in thời gian thực"
-                    enableLights(true)
-                    enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 250, 150, 250)
-                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                    setSound(defaultSoundUri, audioAttributes)
-                }
-                notificationManager.createNotificationChannel(channel)
-            }
-
-            val fullTargetUrl = if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
-                targetUrl
-            } else {
-                "https://couple.io.vn${if (targetUrl.startsWith("/")) "" else "/"}$targetUrl"
-            }
-
-            val intent = Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                data = Uri.parse(fullTargetUrl)
-                putExtra("targetUrl", targetUrl)
-            }
-            val pendingIntent = PendingIntent.getActivity(
-                context,
-                (System.currentTimeMillis() % 100000).toInt(),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            val builder = NotificationCompat.Builder(context, channelId)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
-                .setColor(0xFFFF3B7F.toInt())
-                .setContentTitle(title)
-                .setContentText(body)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setSound(defaultSoundUri)
-                .setVibrate(longArrayOf(0, 250, 150, 250))
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-
-            notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        showLocalNotification(title, body, targetUrl, photoUrl, null)
     }
 }
 
