@@ -178,22 +178,50 @@ export function renderMessagesPage(): RoutePage {
   }
 
   function updateIndicator(): void {
+    if (scrollState.isNearBottom && scrollState.pendingIncomingCount === 0) {
+      indicator.hidden = true;
+      return;
+    }
+
     const count = scrollState.pendingIncomingCount;
-    indicator.hidden = count === 0;
-    indicator.textContent = count === 1 ? '1 tin nhắn mới' : `${count} tin nhắn mới`;
+    const isScrolledUp = distanceFromBottom() > 160;
+
+    if (count > 0) {
+      indicator.hidden = false;
+      indicator.classList.add('has-badge');
+      indicator.innerHTML = `
+        <span class="indicator-badge">${count}</span>
+        <span class="indicator-text">${count === 1 ? '1 tin nhắn mới' : `${count} tin nhắn mới`}</span>
+        <svg class="indicator-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      `;
+    } else if (isScrolledUp && !scrollState.isNearBottom) {
+      indicator.hidden = false;
+      indicator.classList.remove('has-badge');
+      indicator.innerHTML = `
+        <svg class="indicator-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+      `;
+    } else {
+      indicator.hidden = true;
+    }
   }
 
   function setNearBottom(nextValue: boolean): void {
     scrollState.isNearBottom = nextValue;
-    if (nextValue && scrollState.pendingIncomingCount > 0) {
+    if (nextValue) {
       scrollState.pendingIncomingCount = 0;
-      updateIndicator();
     }
+    updateIndicator();
   }
 
   function scrollToBottom(mode: 'initial' | 'follow' | 'send' = 'follow'): void {
     const top = thread.scrollHeight;
     setNearBottom(true);
+    indicator.hidden = true;
     if (mode === 'initial' || isReducedMotion() || typeof thread.scrollTo !== 'function') {
       thread.scrollTop = top;
       return;
@@ -560,6 +588,7 @@ export function renderMessagesPage(): RoutePage {
     scrollFrame = window.requestAnimationFrame(() => {
       scrollFrame = null;
       setNearBottom(distanceFromBottom() <= NEAR_BOTTOM_DISTANCE);
+      updateIndicator();
       if (thread.scrollTop <= 32) void loadOlderMessages();
     });
   }
