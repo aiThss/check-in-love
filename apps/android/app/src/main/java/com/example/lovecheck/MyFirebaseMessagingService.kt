@@ -48,6 +48,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val senderAvatar: String?
         val actionType: String
         val targetUrl: String
+        val photoUrl: String?
 
         if (data.isNotEmpty()) {
             title = data["title"] ?: notification?.title ?: "Check IN Love 💕"
@@ -56,6 +57,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             senderAvatar = data["senderAvatar"]
             actionType = data["actionType"] ?: "reminder"
             targetUrl = data["targetUrl"] ?: "/app/home"
+            photoUrl = data["photoUrl"]
         } else if (notification != null) {
             title = notification.title ?: "Check IN Love 💕"
             body = notification.body ?: ""
@@ -63,23 +65,23 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             senderAvatar = null
             actionType = "reminder"
             targetUrl = "/app/home"
+            photoUrl = null
         } else {
             return
         }
 
-        showMessagingNotification(title, body, senderName, senderAvatar, actionType, targetUrl)
+        showMessagingNotification(title, body, senderName, senderAvatar, actionType, targetUrl, photoUrl)
 
         // Update home screen widget on new checkins or message interactions
         try {
-            if (actionType == "checkin" || actionType == "reaction" || actionType == "reply") {
+            if (actionType == "checkin" || actionType == "reaction" || actionType == "reply" || actionType == "message") {
                 LoveCheckWidgetProvider.updateWidgetNotification(this, senderName, title, body, targetUrl)
 
-                if (actionType == "checkin") {
-                    val photoUrl = data["photoUrl"]
+                if (actionType == "checkin" && !photoUrl.isNullOrEmpty()) {
                     LoveCheckQuickWidgetProvider.updatePartnerCheckin(
                         this,
                         senderName,
-                        if (!photoUrl.isNullOrEmpty()) "photo" else "text",
+                        "photo",
                         body,
                         photoUrl,
                         null
@@ -97,7 +99,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         senderName: String,
         senderAvatar: String?,
         actionType: String,
-        targetUrl: String
+        targetUrl: String,
+        photoUrl: String? = null
     ) {
         try {
             val channelId = "realtime_interactions"
@@ -154,6 +157,17 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
             val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
 
+            // Check if photo is attached (for photo checkins or photo messages)
+            var photoBitmap: Bitmap? = null
+            if (!photoUrl.isNullOrBlank()) {
+                val resolvedPhotoUrl = if (photoUrl.startsWith("/")) {
+                    "https://couple.io.vn$photoUrl"
+                } else {
+                    photoUrl
+                }
+                photoBitmap = getBitmapFromUrl(resolvedPhotoUrl)
+            }
+
             val builder = NotificationCompat.Builder(this, channelId)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setLargeIcon(largeIcon)
@@ -165,30 +179,22 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setCategory(
+                    if (actionType == "message") NotificationCompat.CATEGORY_MESSAGE
+                    else NotificationCompat.CATEGORY_EVENT
+                )
 
-            if (actionType == "message") {
-                val userIcon = if (avatarBitmap != null) {
-                    IconCompat.createWithBitmap(avatarBitmap)
-                } else {
-                    null
-                }
-                // In MessagingStyle:
-                // constructor argument is the CURRENT DEVICE OWNER (recipient)
-                // addMessage sender is the OTHER PERSON (partner)
-                val me = Person.Builder().setName("Tôi").build()
-                val partner = Person.Builder()
-                    .setName(senderName)
-                    .setIcon(userIcon)
-                    .build()
-
-                val messagingStyle = NotificationCompat.MessagingStyle(me)
-                    .addMessage(body, System.currentTimeMillis(), partner)
-
-                builder.setStyle(messagingStyle)
-                builder.setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            if (photoBitmap != null) {
+                val bigPictureStyle = NotificationCompat.BigPictureStyle()
+                    .bigPicture(photoBitmap)
+                    .setBigContentTitle(title)
+                    .setSummaryText(body)
+                builder.setStyle(bigPictureStyle)
             } else {
-                builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
-                builder.setCategory(NotificationCompat.CATEGORY_EVENT)
+                val bigTextStyle = NotificationCompat.BigTextStyle()
+                    .setBigContentTitle(title)
+                    .bigText(body)
+                builder.setStyle(bigTextStyle)
             }
 
             notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
@@ -202,11 +208,14 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val url = java.net.URL(urlStr)
             val connection = url.openConnection() as java.net.HttpURLConnection
             connection.doInput = true
-            connection.connectTimeout = 2500
-            connection.readTimeout = 2500
+            connection.connectTimeout = 1500
+            connection.readTimeout = 1500
             connection.connect()
             val input = connection.inputStream
-            BitmapFactory.decodeStream(input)
+            val bitmap = BitmapFactory.decodeStream(input)
+            input.close()
+            connection.disconnect()
+            bitmap
         } catch (e: Exception) {
             null
         }

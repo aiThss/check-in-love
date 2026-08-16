@@ -438,6 +438,7 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
         url: '/app/messages',
         senderName: user.displayName,
         senderAvatar: user.avatarUrl,
+        photoUrl: imageUrl || '',
       });
     }
 
