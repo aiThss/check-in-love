@@ -139,10 +139,18 @@ class LoveCheckBridge(
      */
     @JavascriptInterface
     fun getFcmToken(): String {
-        return context
-            .getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
-            .getString("fcm_token", "")
-            .orEmpty()
+        val prefs = context.getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
+        return prefs.getString("fcm_token", "").orEmpty()
+    }
+
+    @JavascriptInterface
+    fun getFcmDebugInfo(): String {
+        val prefs = context.getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
+        val token = prefs.getString("fcm_token", "").orEmpty()
+        val error = prefs.getString("fcm_error", "").orEmpty()
+        val escapedToken = JSONObject.quote(token)
+        val escapedError = JSONObject.quote(error)
+        return "{\"token\":$escapedToken,\"error\":$escapedError}"
     }
 }
 
@@ -195,6 +203,37 @@ class MainActivity : ComponentActivity() {
         cameraPhotoFile = null
     }
 
+    private fun fetchFcmTokenWithRetry(retryCount: Int = 0) {
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                val prefs = getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
+                if (task.isSuccessful) {
+                    val token = task.result
+                    Log.i("LoveCheckFCM", "FCM token fetched successfully: $token")
+                    prefs.edit()
+                        .putString("fcm_token", token)
+                        .putString("fcm_error", "")
+                        .apply()
+                    runOnUiThread { injectFcmToken(token) }
+                } else {
+                    val errorMsg = task.exception?.message ?: "Unknown error"
+                    Log.e("LoveCheckFCM", "Failed to fetch FCM token (attempt $retryCount): $errorMsg", task.exception)
+                    prefs.edit().putString("fcm_error", errorMsg).apply()
+                    if (retryCount < 4) {
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            fetchFcmTokenWithRetry(retryCount + 1)
+                        }, 2500L * (retryCount + 1))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            val errorMsg = e.message ?: "Exception calling FirebaseMessaging"
+            Log.e("LoveCheckFCM", "Exception calling FirebaseMessaging", e)
+            val prefs = getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
+            prefs.edit().putString("fcm_error", errorMsg).apply()
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -206,18 +245,7 @@ class MainActivity : ComponentActivity() {
             registerReceiver(fcmReceiver, filter)
         }
 
-        try {
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val token = task.result
-                    val prefs = getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
-                    prefs.edit().putString("fcm_token", token).apply()
-                    runOnUiThread { injectFcmToken(token) }
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        fetchFcmTokenWithRetry(0)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(

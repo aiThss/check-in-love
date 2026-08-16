@@ -17,6 +17,7 @@ nav3Core = "1.0.1"
 lifecycleViewmodelNav3 = "2.10.0"
 firebaseBom = "33.1.0"
 coil = "3.2.0"
+googleServices = "4.4.2"
 
 
 [libraries]
@@ -54,3 +55,4 @@ coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

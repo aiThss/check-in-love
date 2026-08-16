@@ -311,7 +311,19 @@ function buildReminderCard(): HTMLElement {
       }
       try {
         if (isAndroidApp()) {
-          await syncAndroidFcmNow().catch(() => {});
+          const synced = await syncAndroidFcmNow().catch(() => false);
+          if (!synced) {
+            try {
+              const rawDebug = (window.LoveCheckAndroid as any)?.getFcmDebugInfo?.();
+              if (rawDebug) {
+                const debug = JSON.parse(rawDebug);
+                if (debug.error) {
+                  showToast(`Lỗi Firebase Native: ${debug.error}`, 'error');
+                  return;
+                }
+              }
+            } catch {}
+          }
         }
         const res = await testPushNotification();
         showToast(res.message || 'Đã gửi thông báo thử nghiệm thành công! ✨', 'success');
