@@ -85,8 +85,21 @@ function renderReplyThread(content: HTMLElement, checkin: CheckIn): void {
         <span class="reply-page-thread-hint">Nhắn như Messenger</span>
       </div>
       <div class="reply-page-list"></div>
-      <form class="reply-page-form">
-        <input maxlength="500" aria-label="Viết phản hồi" placeholder="Viết phản hồi..." />
+      <form class="reply-page-form" autocomplete="off">
+        <input
+          type="text"
+          name="reply_text_input"
+          maxlength="500"
+          aria-label="Viết phản hồi"
+          placeholder="Viết phản hồi..."
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="sentences"
+          spellcheck="false"
+          data-lpignore="true"
+          data-form-type="other"
+          data-1p-ignore="true"
+        />
         <button type="submit" aria-label="Gửi phản hồi">↑</button>
       </form>
     </section>

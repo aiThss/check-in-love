@@ -1,3 +1,4 @@
+import { openPolaroidCoverModal } from '../components/polaroid-cover';
 import { createMessage, getMessageContext, getMessages } from '../api/messages';
 import { createCheckin } from '../api/checkins';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
@@ -221,7 +222,7 @@ export function renderMessagesPage(): RoutePage {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'message-referenced-checkin';
-    card.setAttribute('aria-label', 'Mở kỷ niệm được tham chiếu');
+    card.setAttribute('aria-label', 'Xem ảnh kỷ niệm');
     if (reference.imageUrl) {
       const image = document.createElement('img');
       image.src = reference.imageUrl;
@@ -236,9 +237,39 @@ export function renderMessagesPage(): RoutePage {
     detail.textContent = `${reference.ownerName} · ${reference.caption || reference.mood || 'Khoảnh khắc đã chia sẻ'}`;
     copy.append(label, detail);
     card.appendChild(copy);
+
     card.addEventListener('click', (event) => {
       event.stopPropagation();
-      navigate('/app/memories');
+      // 1. Check if the matching photo is already visible in the current chat thread
+      let targetView: MessageView | undefined;
+      if (reference.imageUrl) {
+        for (const view of messageViews.values()) {
+          if (view.item.id !== item.id && view.item.imageUrl && view.item.imageUrl === reference.imageUrl) {
+            targetView = view;
+            break;
+          }
+        }
+      }
+
+      if (targetView) {
+        // Smoothly scroll to the photo inside the chat!
+        targetView.element.scrollIntoView({
+          behavior: isReducedMotion() ? 'auto' : 'smooth',
+          block: 'center',
+        });
+        targetView.element.classList.add('message-highlight');
+        window.setTimeout(() => targetView?.element.classList.remove('message-highlight'), 1_500);
+      } else if (reference.imageUrl) {
+        // If not in chat thread, open the clean Polaroid photo viewer without scratch
+        openPolaroidCoverModal({
+          imageUrl: reference.imageUrl,
+          title: reference.caption || `Kỷ niệm của ${reference.ownerName} 💖`,
+          dateText: `${reference.ownerName} · Kỷ niệm`,
+          forceScratch: false,
+        });
+      } else {
+        navigate('/app/memories');
+      }
     });
     return card;
   }
@@ -377,6 +408,15 @@ export function renderMessagesPage(): RoutePage {
       image.addEventListener('load', () => {
         // The fixed aspect ratio prevents layout shift; never force-scroll a reader upward in history.
         if (scrollState.isNearBottom) scrollToBottom('follow');
+      });
+      image.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openPolaroidCoverModal({
+          imageUrl: item.imageUrl!,
+          title: item.text || `Ảnh từ ${item.senderName} 💖`,
+          dateText: formatMessageTime(item.createdAt),
+          forceScratch: false,
+        });
       });
       bubble.appendChild(image);
     }

@@ -11,8 +11,12 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   processImage: vi.fn(),
   revokePreviewUrl: vi.fn(),
+  openPolaroidCoverModal: vi.fn(),
 }));
 
+vi.mock('../components/polaroid-cover', () => ({
+  openPolaroidCoverModal: mocks.openPolaroidCoverModal,
+}));
 vi.mock('../api/messages', () => ({
   getMessages: mocks.getMessages,
   createMessage: mocks.createMessage,
@@ -260,17 +264,24 @@ describe('Messages scroll and reply behavior', () => {
     expect(mocks.getMessages).toHaveBeenCalledTimes(1);
   });
 
-  it('renders a referenced memory card and opens Memories when it is selected', async () => {
+  it('renders a referenced memory card and scrolls to chat photo when it is selected', async () => {
+    const photoMsg = message('photo-msg');
+    photoMsg.type = 'image';
+    photoMsg.imageUrl = '/photo.jpg';
+
     const shared = message('shared');
     shared.referencedCheckin = {
       checkinId: 'memory-1', ownerId: 'partner', ownerName: 'Partner', type: 'photo', caption: 'Ngày đầu tiên', imageUrl: '/photo.jpg', createdAt: shared.createdAt,
     };
-    const routePage = await mount([shared]);
+    const routePage = await mount([photoMsg, shared]);
+    const photoElement = routePage.element.querySelector<HTMLElement>('[data-message-id="photo-msg"]')!;
+    photoElement.scrollIntoView = vi.fn();
+
     const card = routePage.element.querySelector<HTMLButtonElement>('.message-referenced-checkin')!;
     expect(card.textContent).toContain('Kỷ niệm');
     expect(card.querySelector('img')?.getAttribute('src')).toBe('/photo.jpg');
     card.click();
-    expect(mocks.navigate).toHaveBeenCalledWith('/app/memories');
+    expect(photoElement.scrollIntoView).toHaveBeenCalledOnce();
   });
 
   it('sends a chat photo through CheckIn so the returned topic appears in both domains', async () => {

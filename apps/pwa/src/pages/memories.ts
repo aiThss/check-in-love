@@ -124,7 +124,7 @@ function openMemoryPhotoCover(item: CheckIn, photoUrl: string, title: string, da
     title,
     dateText,
     coverText: item.surpriseText,
-    forceScratch: item.includeScratch !== false,
+    forceScratch: false,
     timerSeconds: 5,
   });
 
@@ -256,8 +256,22 @@ function buildSocialRow(
   row.className = 'memory-social-row';
   const form = document.createElement('form');
   form.className = 'rm-inline-composer memory-mini-composer';
+  form.setAttribute('autocomplete', 'off');
   form.innerHTML = `
-    <input aria-label="Gửi tin nhắn cho ảnh này" maxlength="500" placeholder="Gửi tin nhắn..." />
+    <input
+      type="text"
+      name="memory_chat_msg"
+      aria-label="Gửi tin nhắn cho ảnh này"
+      maxlength="500"
+      placeholder="Gửi tin nhắn..."
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="sentences"
+      spellcheck="false"
+      data-lpignore="true"
+      data-form-type="other"
+      data-1p-ignore="true"
+    />
     <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
     <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
   `;
@@ -789,7 +803,12 @@ export function renderMemoriesPage(): HTMLElement {
 
       card.addEventListener('click', () => {
         if (consumeLongPress()) return;
-        showCheckinDetail(item);
+        const photoUrl = getCheckinPhotoUrl(item);
+        if (photoUrl) {
+          openMemoryPhotoCover(item, photoUrl, item.caption || `Kỷ niệm của ${item.ownerName} 💖`, formatTime(item.createdAt));
+        } else {
+          showCheckinDetail(item);
+        }
       });
 
       tile.appendChild(card);
@@ -882,8 +901,21 @@ export function renderMemoriesPage(): HTMLElement {
             <span>${replies.length}</span>
           </div>
           <div id="reply-list" class="reply-detail-list"></div>
-          <form id="reply-form" class="inline-reply-form">
-            <input id="reply-input" maxlength="500" placeholder="Viết reply..." />
+          <form id="reply-form" class="inline-reply-form" autocomplete="off">
+            <input
+              id="reply-input"
+              type="text"
+              name="memory_reply_msg"
+              maxlength="500"
+              placeholder="Viết reply..."
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="sentences"
+              spellcheck="false"
+              data-lpignore="true"
+              data-form-type="other"
+              data-1p-ignore="true"
+            />
             <button type="button" class="memory-quick-reply memory-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
             <button type="submit">Gửi</button>
           </form>

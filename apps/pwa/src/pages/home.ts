@@ -453,7 +453,14 @@ function buildRecentMemoriesSection(): HTMLElement {
           `;
           photoWrap.addEventListener('click', (event) => {
             event.stopPropagation();
-            navigate('/app/memories');
+            openPolaroidCoverModal({
+              imageUrl: photoUrl,
+              title: item.caption || `Kỷ niệm của ${item.ownerName} 💖`,
+              dateText: formatTime(item.createdAt),
+              coverText: item.surpriseText,
+              forceScratch: false,
+              timerSeconds: 5,
+            });
           });
           card.appendChild(photoWrap);
         } else if (item.type === 'mood') {
@@ -533,8 +540,22 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         const replyForm = document.createElement('form');
         replyForm.className = 'rm-inline-composer';
+        replyForm.setAttribute('autocomplete', 'off');
         replyForm.innerHTML = `
-          <input aria-label="Gửi tin nhắn cho ảnh này" maxlength="500" placeholder="Gửi tin nhắn..." />
+          <input
+            type="text"
+            name="home_chat_msg"
+            aria-label="Gửi tin nhắn cho ảnh này"
+            maxlength="500"
+            placeholder="Gửi tin nhắn..."
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="sentences"
+            spellcheck="false"
+            data-lpignore="true"
+            data-form-type="other"
+            data-1p-ignore="true"
+          />
           <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
           <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
         `;

@@ -31,6 +31,7 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -438,6 +439,10 @@ class MainActivity : ComponentActivity() {
                 factory = { context ->
                     StickerWebView(context).apply {
                         webView = this
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+                        }
 
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true

@@ -405,7 +405,20 @@ export function renderCheckinPage(): HTMLElement {
     capGroup.className = 'input-group';
     capGroup.innerHTML = `
       <label class="input-label">Mô tả (Không bắt buộc)</label>
-      <input type="text" id="caption-input" class="input" placeholder="Viết vài dòng ngọt ngào..." maxlength="280" />
+      <input
+        type="text"
+        id="caption-input"
+        class="input"
+        placeholder="Viết vài dòng ngọt ngào..."
+        maxlength="280"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="sentences"
+        spellcheck="false"
+        data-lpignore="true"
+        data-form-type="other"
+        data-1p-ignore="true"
+      />
     `;
     compactCaptionGroup(capGroup);
     const captionInput = capGroup.querySelector<HTMLInputElement>('#caption-input');
@@ -459,7 +472,20 @@ export function renderCheckinPage(): HTMLElement {
       surpriseTextGroup.id = 'surprise-text-group';
       surpriseTextGroup.innerHTML = `
         <label class="input-label">Lời nhắn (tuỳ chọn)</label>
-        <input type="text" id="surprise-text-input" class="input" placeholder="Một lời nhắn nhỏ..." maxlength="120" />
+        <input
+          type="text"
+          id="surprise-text-input"
+          class="input"
+          placeholder="Một lời nhắn nhỏ..."
+          maxlength="120"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="sentences"
+          spellcheck="false"
+          data-lpignore="true"
+          data-form-type="other"
+          data-1p-ignore="true"
+        />
       `;
       compactCaptionGroup(surpriseTextGroup);
       const surpriseTextInput = surpriseTextGroup.querySelector<HTMLInputElement>('#surprise-text-input');
