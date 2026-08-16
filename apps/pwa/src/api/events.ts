@@ -1,23 +1,6 @@
 import { store } from '../store';
 import { logger } from '../utils/logger';
 
-declare global {
-  interface Window {
-    LoveCheckAndroid?: {
-      updateWidget?: (streak: number, partnerName: string) => void;
-      getFcmToken?: () => string;
-      getFcmDebugInfo?: () => string;
-      showLocalNotification?: (
-        title: string,
-        body: string,
-        targetUrl: string,
-        photoUrl: string | null,
-      ) => void;
-      signInWithGoogle?: () => void;
-    };
-  }
-}
-
 export interface RealtimeEventData {
   type: 'message' | 'checkin' | 'reaction' | 'reply' | 'reminder' | 'connected';
   title?: string;

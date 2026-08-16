@@ -13,17 +13,6 @@ export type StoreListener = (state: AppState, previousState: AppState) => void;
 const STATE_KEY = 'lovecheck_state';
 const TOKEN_KEY = 'lovecheck_token';
 
-declare global {
-  interface Window {
-    LoveCheckAndroid?: {
-      updateWidget?: (streak: number, partnerName: string) => void;
-      getFcmToken?: () => string;
-      signInWithGoogle?: () => void;
-    };
-    onFcmTokenReceived?: (token: string) => void;
-  }
-}
-
 const defaultState: AppState = {
   token: null,
   user: null,

@@ -192,17 +192,6 @@ export async function registerFcmToken(fcmToken: string): Promise<void> {
   });
 }
 
-declare global {
-  interface Window {
-    LoveCheckAndroid?: {
-      updateWidget?: (streak: number, partnerName: string) => void;
-      getFcmToken?: () => string;
-      signInWithGoogle?: () => void;
-    };
-    onFcmTokenReceived?: (token: string) => void;
-  }
-}
-
 export async function syncAndroidFcmNow(tokenCandidate?: string | null): Promise<boolean> {
   const token = (tokenCandidate ?? window.LoveCheckAndroid?.getFcmToken?.())?.trim();
   const sessionToken = store.getToken() || localStorage.getItem('lovecheck_token');
