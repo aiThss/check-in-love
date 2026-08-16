@@ -752,8 +752,7 @@ export function renderMemoriesPage(): HTMLElement {
       if (item.type === 'photo' || (item as any).photoUrl) {
         card.style.cssText = 'position:relative;border-radius:20px;overflow:hidden;aspect-ratio:1;cursor:pointer;';
         card.innerHTML = `
-            <img src="${escapeHtml((item as any).photoUrl)}" data-scratch-enabled="${item.includeScratch !== false ? 'true' : 'false'}" style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
-          <span class="polaroid-scratch-pill">✨ Polaroid Cover</span>
+          <img src="${escapeHtml((item as any).photoUrl)}" style="width:100%;height:100%;object-fit:cover;" loading="lazy" />
           <div class="memory-item-info">
             <span style="font-size:11px;opacity:0.9;color:#fff;">${escapeHtml(item.ownerName)}</span>
             <span class="memory-item-info-text" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -790,12 +789,7 @@ export function renderMemoriesPage(): HTMLElement {
 
       card.addEventListener('click', () => {
         if (consumeLongPress()) return;
-        const photoUrl = getCheckinPhotoUrl(item);
-        if (photoUrl) {
-          openMemoryPhotoCover(item, photoUrl, item.caption || `Kỷ niệm của ${item.ownerName} 💖`, formatTime(item.createdAt));
-        } else {
-          showCheckinDetail(item);
-        }
+        showCheckinDetail(item);
       });
 
       tile.appendChild(card);
@@ -837,7 +831,6 @@ export function renderMemoriesPage(): HTMLElement {
               alt="Ảnh check-in"
               loading="eager"
             />
-            ${item.includeScratch !== false ? '<button type="button" class="btn-polaroid-scratch-trigger">Mở lớp cào</button>' : ''}
           </div>
           ${item.caption ? `<p class="checkin-detail-caption">${escapeHtml(item.caption)}</p>` : ''}
         `;
@@ -958,12 +951,6 @@ export function renderMemoriesPage(): HTMLElement {
 
       detail.querySelector<HTMLButtonElement>('.memory-reaction-choice')?.addEventListener('click', () => {
         detailReactionPicker.classList.toggle('open');
-      });
-
-      detail.querySelector<HTMLButtonElement>('.btn-polaroid-scratch-trigger')?.addEventListener('click', () => {
-        const photoUrl = getCheckinPhotoUrl(item);
-        if (!photoUrl) return;
-        openMemoryPhotoCover(item, photoUrl, item.caption || 'Kỷ niệm yêu thương 💖', formatTime(item.createdAt));
       });
     };
 
