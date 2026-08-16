@@ -1,5 +1,15 @@
 /** Keep fixed chat controls aligned with the mobile browser's visual viewport. */
 export function initKeyboardViewport(): void {
+  const isIOS =
+    typeof navigator !== 'undefined' &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+  const root = document.documentElement;
+  if (isIOS) {
+    root.classList.add('is-ios');
+  }
+
   const viewport = window.visualViewport;
   if (!viewport) return;
 
@@ -25,10 +35,13 @@ export function initKeyboardViewport(): void {
 
     const keyboardHeight = Math.max(0, largestViewportHeight - viewport.height - viewport.offsetTop);
     const isKeyboardOpen = isTextInputFocused() && keyboardHeight > 80;
-    const root = document.documentElement;
 
     root.style.setProperty('--app-viewport-height', `${largestViewportHeight}px`);
-    root.style.setProperty('--keyboard-offset', `${isKeyboardOpen ? keyboardHeight : 0}px`);
+    // On iOS Safari / WebKit, fixed elements are anchored to the visual viewport automatically
+    // or panned up by Safari when focused. Applying the full keyboardHeight causes double lift.
+    const effectiveOffset = isIOS ? 0 : keyboardHeight;
+    root.style.setProperty('--keyboard-offset', `${isKeyboardOpen ? effectiveOffset : 0}px`);
+    root.style.setProperty('--ios-keyboard-height', `${isKeyboardOpen ? keyboardHeight : 0}px`);
     root.classList.toggle('keyboard-open', isKeyboardOpen);
   };
 

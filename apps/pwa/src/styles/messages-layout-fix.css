@@ -185,9 +185,19 @@
   scroll-padding-bottom: calc(86px + var(--keyboard-offset));
 }
 
+:root.is-ios.keyboard-open .messages-thread {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
 :root.keyboard-open .messages-page.has-message-reply .messages-thread {
   padding-bottom: calc(146px + var(--keyboard-offset));
   scroll-padding-bottom: calc(146px + var(--keyboard-offset));
+}
+
+:root.is-ios.keyboard-open .messages-page.has-message-reply .messages-thread {
+  padding-bottom: calc(156px + env(safe-area-inset-bottom, 0px));
+  scroll-padding-bottom: calc(156px + env(safe-area-inset-bottom, 0px));
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -5262,6 +5262,11 @@ textarea:focus-visible,
   transform: translateZ(0);
 }
 
+:root.is-ios.keyboard-open .messages-page > .messages-composer {
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  transform: translateZ(0);
+}
+
 :root.keyboard-open .bottom-nav {
   display: none;
 }

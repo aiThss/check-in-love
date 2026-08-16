@@ -102,7 +102,7 @@ export function renderMessagesPage(): RoutePage {
     </header>
     <main class="messages-thread" aria-live="polite" aria-label="Cuộc trò chuyện"></main>
     <button class="messages-new-indicator" type="button" hidden aria-live="polite"></button>
-    <form class="messages-composer">
+    <form class="messages-composer" autocomplete="off">
       <div class="messages-reply-preview" hidden></div>
       <div class="messages-composer-row">
         <input id="message-photo" type="file" accept="image/*" hidden />
@@ -113,7 +113,21 @@ export function renderMessagesPage(): RoutePage {
         </div>
         <div class="messages-input-wrap">
           <span class="messages-photo-preview" hidden>Ảnh đã chọn</span>
-          <input id="message-input" maxlength="280" placeholder="Gửi tin nhắn..." aria-label="Nội dung tin nhắn" />
+          <input
+            id="message-input"
+            type="text"
+            name="chat_message_input"
+            maxlength="280"
+            placeholder="Gửi tin nhắn..."
+            aria-label="Nội dung tin nhắn"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="sentences"
+            spellcheck="false"
+            data-lpignore="true"
+            data-form-type="other"
+            data-1p-ignore="true"
+          />
         </div>
         <button class="messages-send" type="submit" aria-label="Gửi tin nhắn">↑</button>
       </div>
@@ -627,6 +641,11 @@ export function renderMessagesPage(): RoutePage {
     scrollToBottom('follow');
   });
   form.addEventListener('submit', sendMessage);
+  messageInput.addEventListener('focus', () => {
+    window.setTimeout(() => {
+      scrollToBottom('follow');
+    }, 280);
+  });
   page.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && pendingReply) clearPendingReply();
   });
