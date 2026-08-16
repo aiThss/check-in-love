@@ -818,7 +818,11 @@ export function renderProfilePage(): HTMLElement {
     });
     settingsContainer.appendChild(themeRow);
 
-    // 3. APK Update Row
+    // 3. Check-in Reminder Row & Notification Test
+    const reminderCard = buildReminderCard();
+    settingsContainer.appendChild(reminderCard);
+
+    // 4. APK Update Row
     const updateRow = document.createElement('div');
     updateRow.className = 'card-solid';
     updateRow.style.cssText = 'padding:16px;display:flex;flex-direction:column;gap:12px;';
@@ -854,10 +858,6 @@ export function renderProfilePage(): HTMLElement {
       });
     }
     settingsContainer.appendChild(updateRow);
-
-    // 3b. Check-in Reminder Row
-    const reminderCard = buildReminderCard();
-    settingsContainer.appendChild(reminderCard);
 
     // 4. Logout Row
     const logoutRow = document.createElement('div');

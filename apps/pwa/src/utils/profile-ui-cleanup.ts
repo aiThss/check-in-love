@@ -1,12 +1,9 @@
-const PROFILE_REMINDER_SELECTOR = '.profile-page .reminder-card';
 const AVATAR_EDIT_BADGE_SELECTORS = [
   '#my-avatar-container > div',
   '#partner-avatar-container > div',
 ].join(',');
 
 function removeProfileUi(root: ParentNode = document): void {
-  root.querySelectorAll<HTMLElement>(PROFILE_REMINDER_SELECTOR).forEach((card) => card.remove());
-
   root.querySelectorAll<HTMLElement>(AVATAR_EDIT_BADGE_SELECTORS).forEach((badge) => {
     if (badge.textContent?.trim() === 'Sửa') badge.remove();
   });
