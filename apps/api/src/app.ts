@@ -57,6 +57,21 @@ export async function buildApp(): Promise<FastifyInstance> {
         : false,
   });
 
+  // Gracefully handle empty JSON body when Content-Type: application/json is sent
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    if (!body || (typeof body === 'string' && body.trim() === '')) {
+      done(null, {});
+      return;
+    }
+    try {
+      const json = JSON.parse(body as string);
+      done(null, json);
+    } catch (err: any) {
+      err.statusCode = 400;
+      done(err, undefined);
+    }
+  });
+
   // ─── Security ───────────────────────────────────────────────────────────────
   await app.register(fastifyHelmet, {
     crossOriginResourcePolicy: { policy: 'cross-origin' },

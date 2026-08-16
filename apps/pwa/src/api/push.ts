@@ -178,6 +178,7 @@ export async function getPushSetupState(): Promise<PushSetupResult> {
 export async function testPushNotification(): Promise<{ success: boolean; message?: string }> {
   return apiFetch<{ success: boolean; message?: string }>('/push/test', {
     method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 

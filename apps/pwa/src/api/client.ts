@@ -84,9 +84,15 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   const { preserveSessionOnUnauthorized = false, ...requestOptions } = options;
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(requestOptions.headers as Record<string, string>),
   };
+
+  // Only set Content-Type for non-empty bodies that are not FormData
+  if (requestOptions.body !== undefined && requestOptions.body !== null) {
+    if (!(requestOptions.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+  }
 
   // Don't set Content-Type for FormData — browser sets it with boundary
   if (requestOptions.body instanceof FormData) {
