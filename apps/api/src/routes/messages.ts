@@ -12,6 +12,7 @@ import { User } from '../db/models/User';
 import { authenticate } from '../middleware/auth';
 import { sendPushToUser } from '../services/push';
 import { storageService } from '../services/storage';
+import { emitRealtimeEvent } from './events';
 
 const LEGACY_SYNC_LIMIT = 250;
 
@@ -426,6 +427,16 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
     const couple = await Couple.findById(coupleId).lean();
     const partnerId = couple?.memberIds.find((id) => id.toString() !== request.user.id);
     if (partnerId) {
+      emitRealtimeEvent(partnerId.toString(), {
+        type: 'message',
+        title: `${user.displayName} đã nhắn cho bạn`,
+        body: snippet({ type, text, imageUrl }),
+        targetUrl: '/app/messages',
+        photoUrl: imageUrl || '',
+        senderName: user.displayName,
+        senderAvatar: user.avatarUrl,
+      });
+
       void sendPushToUser(partnerId.toString(), {
         title: `${user.displayName} đã nhắn cho bạn`,
         body: snippet({ type, text, imageUrl }),

@@ -6,6 +6,7 @@ import { PushSubscription } from '../db/models/PushSubscription';
 import { User } from '../db/models/User';
 import { authenticate } from '../middleware/auth';
 import { sendPushToUser } from '../services/push';
+import { emitRealtimeEvent } from './events';
 
 const subscribeBodySchema = z.object({
   endpoint: z.string().url(),
@@ -154,6 +155,15 @@ export default async function pushRoutes(app: FastifyInstance): Promise<void> {
       const userName = user?.displayName || 'Bạn';
 
       try {
+        emitRealtimeEvent(request.user.id, {
+          type: 'reminder',
+          title: 'Kiểm tra thông báo 💕',
+          body: `Xin chào ${userName}! Thông báo Check IN Love đang hoạt động rất tốt ✨`,
+          targetUrl: '/app/home',
+          senderName: 'Check IN Love',
+          senderAvatar: user?.avatarUrl || '',
+        });
+
         const result = await sendPushToUser(request.user.id, {
           title: 'Kiểm tra thông báo 💕',
           body: `Xin chào ${userName}! Thông báo Check IN Love đang hoạt động rất tốt ✨`,
@@ -164,37 +174,15 @@ export default async function pushRoutes(app: FastifyInstance): Promise<void> {
           url: '/app/home',
         });
 
-        if (result.fcm.tokensFound === 0 && result.webPush.attempted === 0) {
-          return reply.status(400).send({
-            error: 'Thiết bị này chưa đăng ký FCM token với máy chủ. Vui lòng mở lại app Android để tự động đăng ký token.',
-            code: 'NO_DEVICE_TOKEN',
-            details: result,
-          });
-        }
-
-        if (!result.fcm.hasCredentials && result.webPush.attempted === 0) {
-          return reply.status(500).send({
-            error: 'Máy chủ chưa cấu hình Firebase Service Account (FCM_SERVICE_ACCOUNT_JSON).',
-            code: 'MISSING_FCM_CREDENTIALS',
-            details: result,
-          });
-        }
-
-        if (result.fcm.tokensFound > 0 && result.fcm.sent === 0 && result.webPush.sent === 0) {
-          return reply.status(500).send({
-            error: `Gửi thông báo thất bại: ${result.fcm.errors.join('; ') || 'Google FCM từ chối'}`,
-            code: 'FCM_SEND_ERROR',
-            details: result,
-          });
-        }
-
         const targets: string[] = [];
-        if (result.fcm.sent > 0) targets.push(`${result.fcm.sent} app Android`);
+        if (result.fcm.sent > 0) targets.push(`${result.fcm.sent} app Android (FCM)`);
         if (result.webPush.sent > 0) targets.push(`${result.webPush.sent} web browser`);
 
         return reply.status(200).send({
           success: true,
-          message: `Đã gửi thông báo thành công tới ${targets.join(' và ') || 'thiết bị'}! ✨`,
+          message: targets.length > 0
+            ? `Đã gửi thông báo thành công tới ${targets.join(' và ')}! ✨`
+            : 'Đã gửi thông báo tức thời tới ứng dụng của bạn! ✨',
           details: result,
         });
       } catch (err: any) {

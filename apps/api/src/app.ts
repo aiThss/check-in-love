@@ -16,6 +16,7 @@ import messageStickerRoutes from './routes/message-stickers';
 import passwordResetRoutes from './routes/password-reset';
 import pushRoutes from './routes/push';
 import randomRoutes from './routes/random';
+import { eventRoutes } from './routes/events';
 import { installCheckinReplyMessageSync } from './services/checkin-reply-message-sync';
 
 function isDevelopmentOrigin(origin: string): boolean {
@@ -140,6 +141,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(messageStickerRoutes, { prefix: '/api' });
   await app.register(randomRoutes, { prefix: '/api' });
   await app.register(pushRoutes, { prefix: '/api' });
+  await app.register(eventRoutes, { prefix: '/api' });
   await app.register(adminRoutes, { prefix: '/api' });
 
   // ─── 404 Handler ─────────────────────────────────────────────────────────────

@@ -5,12 +5,17 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.DownloadManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -39,6 +44,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
@@ -151,6 +157,73 @@ class LoveCheckBridge(
         val escapedToken = JSONObject.quote(token)
         val escapedError = JSONObject.quote(error)
         return "{\"token\":$escapedToken,\"error\":$escapedError}"
+    }
+
+    @JavascriptInterface
+    fun showLocalNotification(title: String, body: String, targetUrl: String, photoUrl: String?) {
+        try {
+            val channelId = "realtime_interactions"
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val audioAttributes = AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
+                    .build()
+
+                val channel = NotificationChannel(
+                    channelId,
+                    "Tương tác thời gian thực",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Thông báo react, reply, tin nhắn và check-in thời gian thực"
+                    enableLights(true)
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 250, 150, 250)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                    setSound(defaultSoundUri, audioAttributes)
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val fullTargetUrl = if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+                targetUrl
+            } else {
+                "https://couple.io.vn${if (targetUrl.startsWith("/")) "" else "/"}$targetUrl"
+            }
+
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                data = Uri.parse(fullTargetUrl)
+                putExtra("targetUrl", targetUrl)
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                (System.currentTimeMillis() % 100000).toInt(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val builder = NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
+                .setColor(0xFFFF3B7F.toInt())
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setSound(defaultSoundUri)
+                .setVibrate(longArrayOf(0, 250, 150, 250))
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+            notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
 

@@ -44,6 +44,23 @@ async function getFcmAccessToken(): Promise<{ accessToken: string; projectId: st
         serviceAccount = JSON.parse(fs.readFileSync(filePath, 'utf8'));
       }
     }
+    if (!serviceAccount) {
+      const candidates = [
+        path.resolve(process.cwd(), 'firebase-service-account.json'),
+        path.resolve(process.cwd(), 'check-in-couple-firebase-adminsdk-fbsvc-a9244a86c4.json'),
+        path.resolve(__dirname, '../../../../firebase-service-account.json'),
+        path.resolve(__dirname, '../../../../check-in-couple-firebase-adminsdk-fbsvc-a9244a86c4.json'),
+        '/app/firebase-service-account.json',
+      ];
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          try {
+            serviceAccount = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+            if (serviceAccount && serviceAccount.private_key) break;
+          } catch {}
+        }
+      }
+    }
 
     if (!serviceAccount) {
       return null;

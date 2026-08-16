@@ -17,6 +17,7 @@ import { initProfileCopyright } from './utils/profile-copyright';
 import { initProfileUiCleanup } from './utils/profile-ui-cleanup';
 import { initAnniversaryCards } from './utils/anniversary-cards';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
+import { initRealtimeEvents } from './api/events';
 import { showModal } from './components/modal';
 import { initDevHelper } from './components/dev-helper';
 
@@ -29,6 +30,8 @@ initMessageThreadEnhancements();
 initProfileCopyright();
 initProfileUiCleanup();
 initAnniversaryCards();
+initRealtimeEvents();
+
 const devHost = window.location.hostname;
 const isPrivateDevHost = devHost === 'localhost'
   || devHost === '127.0.0.1'

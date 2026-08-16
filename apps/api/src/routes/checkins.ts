@@ -12,6 +12,7 @@ import { authenticate } from '../middleware/auth';
 import { sendPushToUser } from '../services/push';
 import { storageService } from '../services/storage';
 import { updateStreak } from '../services/streak';
+import { emitRealtimeEvent } from './events';
 
 const createCheckInBodySchema = z.object({
   type: z.enum(['text', 'mood']),
@@ -461,6 +462,16 @@ export default async function checkinsRoutes(
           (id) => id.toString() !== request.user.id,
         );
         if (partnerId) {
+          emitRealtimeEvent(partnerId.toString(), {
+            type: photoTopic ? 'message' : 'checkin',
+            title: photoTopic ? `${user.displayName} đã gửi ảnh mới 📸` : `${user.displayName} đã check-in! 💕`,
+            body: checkInData.caption ?? checkInData.quickMessage ?? 'Xem ngay nào!',
+            targetUrl: photoTopic ? '/app/messages' : '/app/home',
+            photoUrl: checkInData.imageUrl || '',
+            senderName: user.displayName,
+            senderAvatar: user.avatarUrl,
+          });
+
           sendPushToUser(partnerId.toString(), {
             title: photoTopic ? `${user.displayName} đã gửi ảnh mới` : `${user.displayName} đã check-in! 💕`,
             body: checkInData.caption ?? checkInData.quickMessage ?? 'Xem ngay nào!',
@@ -539,6 +550,15 @@ export default async function checkinsRoutes(
 
       if (existingIdx === -1 && checkIn.ownerId.toString() !== request.user.id) {
         const reactor = await User.findById(request.user.id).lean();
+        emitRealtimeEvent(checkIn.ownerId.toString(), {
+          type: 'reaction',
+          title: `${reactor?.displayName ?? 'Người ấy'} đã react check-in của bạn 💕`,
+          body: 'Mở app để xem reaction mới',
+          targetUrl: '/app/memories',
+          senderName: reactor?.displayName || 'Người ấy',
+          senderAvatar: reactor?.avatarUrl,
+        });
+
         sendPushToUser(checkIn.ownerId.toString(), {
           title: `${reactor?.displayName ?? 'Người ấy'} đã react check-in của bạn`,
           body: 'Mở app để xem reaction mới',
@@ -607,6 +627,15 @@ export default async function checkinsRoutes(
       await checkIn.save();
 
       if (checkIn.ownerId.toString() !== request.user.id) {
+        emitRealtimeEvent(checkIn.ownerId.toString(), {
+          type: 'reply',
+          title: `${user.displayName} đã reply check-in của bạn`,
+          body: parsed.data.message,
+          targetUrl: '/app/messages',
+          senderName: user.displayName,
+          senderAvatar: user.avatarUrl,
+        });
+
         sendPushToUser(checkIn.ownerId.toString(), {
           title: `${user.displayName} đã reply check-in của bạn`,
           body: parsed.data.message,

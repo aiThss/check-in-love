@@ -12,20 +12,7 @@
           "package_name": "com.example.lovecheck"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "894898478385-su4cj7lftgn797r49edudsuvhpuq5m9s.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.lovecheck",
-            "certificate_hash": "03ade2e0d65208fab98832723ab08a4cb8454613"
-          }
-        },
-        {
-          "client_id": "894898478385-g6e1nfj90upono5559an4r443f13ds9s.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
           "current_key": "AIzaSyAQATrAFn6oRkbZwMulehVIIjjEhCiw6bY"
@@ -33,12 +20,7 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "894898478385-g6e1nfj90upono5559an4r443f13ds9s.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }
