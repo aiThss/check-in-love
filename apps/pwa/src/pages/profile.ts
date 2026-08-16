@@ -7,7 +7,7 @@ import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { openCamera, openGallery, CameraResult } from '../components/camera';
 import { apiFetch } from '../api/client';
-import { ensurePushSubscription } from '../api/push';
+import { ensurePushSubscription, isAndroidApp, testPushNotification } from '../api/push';
 import type { User, Couple } from '../api/types';
 import { isMockPreviewMode } from '../dev/mock-data';
 
@@ -210,6 +210,9 @@ async function saveRemoteReminderSettings(settings: ReminderSettings): Promise<R
 export function restoreReminderOnLoad(): void {}
 
 function getPermissionStatus(): { label: string; cls: string } {
+  if (isAndroidApp()) {
+    return { label: 'Thông báo ứng dụng Android đã sẵn sàng', cls: 'granted' };
+  }
   if (!('Notification' in window)) {
     return { label: 'Nhắc server đã sẵn sàng', cls: 'granted' };
   }
@@ -284,8 +287,40 @@ function buildReminderCard(): HTMLElement {
     // The API scheduler owns delivery; the browser only stores the user's permission.
     const disclaimer = document.createElement('p');
     disclaimer.className = 'reminder-disclaimer';
-    disclaimer.textContent = 'Nhắc giờ được gửi từ server qua push. Cần cấp quyền thông báo và thiết bị có kết nối mạng.';
+    disclaimer.textContent = isAndroidApp()
+      ? 'Nhắc nhở và tương tác sẽ được gửi thông báo trực tiếp qua ứng dụng Android.'
+      : 'Nhắc giờ được gửi từ server qua push. Cần cấp quyền thông báo và thiết bị có kết nối mạng.';
     card.appendChild(disclaimer);
+
+    // Test Push Row
+    const testRow = document.createElement('div');
+    testRow.className = 'reminder-test-row';
+    testRow.style.cssText = 'margin-top: 14px; display: flex; justify-content: flex-end;';
+    testRow.innerHTML = `
+      <button type="button" id="btn-test-push" class="btn-ghost" style="font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);">
+        🔔 Thử gửi thông báo
+      </button>
+    `;
+    card.appendChild(testRow);
+
+    testRow.querySelector('#btn-test-push')?.addEventListener('click', async () => {
+      const btn = testRow.querySelector<HTMLButtonElement>('#btn-test-push');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Đang gửi...';
+      }
+      try {
+        const res = await testPushNotification();
+        showToast(res.message || 'Đã gửi thông báo thử nghiệm thành công! ✨', 'success');
+      } catch (err: any) {
+        showToast(err?.message || 'Không gửi được thông báo, vui lòng thử lại', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🔔 Thử gửi thông báo';
+        }
+      }
+    });
 
     // ── Event handlers ──
 
@@ -296,7 +331,7 @@ function buildReminderCard(): HTMLElement {
       const nowEnabled = toggleInput.checked;
 
       if (nowEnabled) {
-        if (!('Notification' in window)) {
+        if (isAndroidApp() || !('Notification' in window)) {
           const savedTime = timeInput?.value || settings.time;
           try {
             const newSettings: ReminderSettings = { enabled: true, time: savedTime, timezone: 'Asia/Ho_Chi_Minh' };

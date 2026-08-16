@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { PushSubscription } from '../db/models/PushSubscription';
 import { User } from '../db/models/User';
 import { authenticate } from '../middleware/auth';
+import { sendPushToUser } from '../services/push';
 
 const subscribeBodySchema = z.object({
   endpoint: z.string().url(),
@@ -139,6 +140,34 @@ export default async function pushRoutes(app: FastifyInstance): Promise<void> {
       );
 
       return reply.status(200).send({ success: true });
+    },
+  );
+
+  /**
+   * POST /push/test — Send a test push notification to the current user
+   */
+  app.post(
+    '/push/test',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const user = await User.findById(request.user.id).lean();
+      const userName = user?.displayName || 'Bạn';
+
+      try {
+        await sendPushToUser(request.user.id, {
+          title: 'Kiểm tra thông báo 💕',
+          body: `Xin chào ${userName}! Thông báo Check IN Love đang hoạt động rất tốt ✨`,
+          senderName: 'Check IN Love',
+          senderAvatar: user?.avatarUrl || '',
+          actionType: 'reminder',
+          targetUrl: '/app/home',
+          url: '/app/home',
+        });
+        return reply.status(200).send({ success: true, message: 'Đã gửi thông báo thử nghiệm thành công' });
+      } catch (err) {
+        app.log.error({ err }, 'Failed to send test push notification');
+        return reply.status(500).send({ error: 'Không thể gửi thông báo thử nghiệm', code: 'PUSH_ERROR' });
+      }
     },
   );
 }

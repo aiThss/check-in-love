@@ -14,6 +14,7 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.ContextCompat
@@ -25,10 +26,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        // Store FCM token in SharedPreferences
         val prefs = getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
         prefs.edit().putString("fcm_token", token).apply()
-        
+
         // Notify MainActivity if active
         val intent = Intent("com.example.lovecheck.FCM_TOKEN_UPDATE").apply {
             putExtra("token", token)
@@ -39,9 +39,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
 
-        // Server sends data-only FCM messages (no notification block) so that
-        // onMessageReceived is always called even when the app is in background.
-        // We also handle notification payload here as a fallback for compatibility.
         val data = remoteMessage.data
         val notification = remoteMessage.notification
 
@@ -60,7 +57,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             actionType = data["actionType"] ?: "reminder"
             targetUrl = data["targetUrl"] ?: "/app/home"
         } else if (notification != null) {
-            // Notification-only message (e.g., sent via Firebase Console)
             title = notification.title ?: "Check IN Love 💕"
             body = notification.body ?: ""
             senderName = "Người ấy"
@@ -74,20 +70,24 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         showMessagingNotification(title, body, senderName, senderAvatar, actionType, targetUrl)
 
         // Update home screen widget on new checkins or message interactions
-        if (actionType == "checkin" || actionType == "reaction" || actionType == "reply") {
-            LoveCheckWidgetProvider.updateWidgetNotification(this, senderName, title, body, targetUrl)
+        try {
+            if (actionType == "checkin" || actionType == "reaction" || actionType == "reply") {
+                LoveCheckWidgetProvider.updateWidgetNotification(this, senderName, title, body, targetUrl)
 
-            if (actionType == "checkin") {
-                val photoUrl = data["photoUrl"]
-                LoveCheckQuickWidgetProvider.updatePartnerCheckin(
-                    this,
-                    senderName,
-                    if (!photoUrl.isNullOrEmpty()) "photo" else "text",
-                    body,
-                    photoUrl,
-                    null
-                )
+                if (actionType == "checkin") {
+                    val photoUrl = data["photoUrl"]
+                    LoveCheckQuickWidgetProvider.updatePartnerCheckin(
+                        this,
+                        senderName,
+                        if (!photoUrl.isNullOrEmpty()) "photo" else "text",
+                        body,
+                        photoUrl,
+                        null
+                    )
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Widget update failed", e)
         }
     }
 
@@ -99,77 +99,102 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         actionType: String,
         targetUrl: String
     ) {
-        val channelId = "realtime_interactions"
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        try {
+            val channelId = "realtime_interactions"
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // Create high importance channel for sound and banner popup
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Tương tác thời gian thực",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Thông báo react, reply và check-in thời gian thực"
-                enableLights(true)
-                enableVibration(true)
+            // Create high importance channel for sound and banner popup
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "Tương tác thời gian thực",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Thông báo react, reply, tin nhắn và check-in thời gian thực"
+                    enableLights(true)
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 250, 150, 250)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                }
+                notificationManager.createNotificationChannel(channel)
             }
-            notificationManager.createNotificationChannel(channel)
-        }
 
-        // Setup click intent to navigate inside WebView
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            data = Uri.parse("https://couple.io.vn$targetUrl")
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            System.currentTimeMillis().toInt(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Download and crop sender avatar
-        var avatarBitmap: Bitmap? = null
-        if (!senderAvatar.isNullOrEmpty()) {
-            val bitmap = getBitmapFromUrl(senderAvatar)
-            if (bitmap != null) {
-                avatarBitmap = getCircleBitmap(bitmap)
+            // Setup click intent to navigate inside WebView
+            val fullTargetUrl = if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+                targetUrl
+            } else {
+                "https://couple.io.vn${if (targetUrl.startsWith("/")) "" else "/"}$targetUrl"
             }
+
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                data = Uri.parse(fullTargetUrl)
+                putExtra("targetUrl", targetUrl)
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                (System.currentTimeMillis() % 100000).toInt(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Download and crop sender avatar safely
+            var avatarBitmap: Bitmap? = null
+            if (!senderAvatar.isNullOrBlank()) {
+                val resolvedAvatarUrl = if (senderAvatar.startsWith("/")) {
+                    "https://couple.io.vn$senderAvatar"
+                } else {
+                    senderAvatar
+                }
+                val bitmap = getBitmapFromUrl(resolvedAvatarUrl)
+                if (bitmap != null) {
+                    avatarBitmap = getCircleBitmap(bitmap)
+                }
+            }
+
+            val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+
+            val builder = NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setLargeIcon(largeIcon)
+                .setColor(ContextCompat.getColor(this, R.color.notification_color))
+                .setContentTitle(title)
+                .setContentText(body)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+            if (actionType == "message") {
+                val userIcon = if (avatarBitmap != null) {
+                    IconCompat.createWithBitmap(avatarBitmap)
+                } else {
+                    null
+                }
+                // In MessagingStyle:
+                // constructor argument is the CURRENT DEVICE OWNER (recipient)
+                // addMessage sender is the OTHER PERSON (partner)
+                val me = Person.Builder().setName("Tôi").build()
+                val partner = Person.Builder()
+                    .setName(senderName)
+                    .setIcon(userIcon)
+                    .build()
+
+                val messagingStyle = NotificationCompat.MessagingStyle(me)
+                    .addMessage(body, System.currentTimeMillis(), partner)
+
+                builder.setStyle(messagingStyle)
+                builder.setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            } else {
+                builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                builder.setCategory(NotificationCompat.CATEGORY_EVENT)
+            }
+
+            notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to show messaging notification", e)
         }
-
-        // Setup Person for MessagingStyle
-        val userIcon = if (avatarBitmap != null) {
-            IconCompat.createWithBitmap(avatarBitmap)
-        } else {
-            null
-        }
-
-        val sender = Person.Builder()
-            .setName(senderName)
-            .setIcon(userIcon)
-            .build()
-
-        val messagingStyle = NotificationCompat.MessagingStyle(sender)
-            .addMessage(body, System.currentTimeMillis(), sender)
-            .setConversationTitle(if (actionType == "checkin") title else null)
-
-        val largeIcon = if (avatarBitmap != null) {
-            avatarBitmap
-        } else {
-            BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
-        }
-
-        val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setLargeIcon(largeIcon)
-            .setColor(ContextCompat.getColor(this, R.color.notification_color))
-            .setStyle(messagingStyle)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-
-        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
     }
 
     private fun getBitmapFromUrl(urlStr: String): Bitmap? {
@@ -177,30 +202,40 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val url = java.net.URL(urlStr)
             val connection = url.openConnection() as java.net.HttpURLConnection
             connection.doInput = true
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
+            connection.connectTimeout = 2500
+            connection.readTimeout = 2500
             connection.connect()
             val input = connection.inputStream
             BitmapFactory.decodeStream(input)
         } catch (e: Exception) {
-            e.printStackTrace()
             null
         }
     }
 
-    private fun getCircleBitmap(bitmap: Bitmap): Bitmap {
-        val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(output)
-        val paint = Paint()
-        val rect = Rect(0, 0, bitmap.width, bitmap.height)
-        paint.isAntiAlias = true
-        canvas.drawARGB(0, 0, 0, 0)
-        paint.color = 0xff424242.toInt()
-        
-        val radius = (Math.min(bitmap.width, bitmap.height) / 2).toFloat()
-        canvas.drawCircle((bitmap.width / 2).toFloat(), (bitmap.height / 2).toFloat(), radius, paint)
-        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
-        canvas.drawBitmap(bitmap, rect, rect, paint)
-        return output
+    private fun getCircleBitmap(bitmap: Bitmap): Bitmap? {
+        return try {
+            val minSize = Math.min(bitmap.width, bitmap.height)
+            if (minSize <= 0) return null
+
+            val output = Bitmap.createBitmap(minSize, minSize, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(output)
+            val paint = Paint()
+            val rect = Rect(0, 0, minSize, minSize)
+            paint.isAntiAlias = true
+            canvas.drawARGB(0, 0, 0, 0)
+            paint.color = 0xff424242.toInt()
+
+            val radius = (minSize / 2).toFloat()
+            canvas.drawCircle(radius, radius, radius, paint)
+            paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+            canvas.drawBitmap(bitmap, rect, rect, paint)
+            output
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    companion object {
+        private const val TAG = "LoveCheckFCM"
     }
 }

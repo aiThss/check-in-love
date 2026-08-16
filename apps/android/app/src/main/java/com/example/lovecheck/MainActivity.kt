@@ -396,7 +396,10 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        webView?.loadUrl(initialUrlFromIntent(intent))
+        val url = initialUrlFromIntent(intent)
+        if (url != APP_URL) {
+            webView?.loadUrl(url)
+        }
     }
 
     private fun parseFileChooserResult(data: Intent?): Array<Uri>? {
@@ -470,6 +473,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun initialUrlFromIntent(intent: Intent?): String {
+        val targetUrl = intent?.getStringExtra("targetUrl")
+            ?: intent?.extras?.getString("targetUrl")
+            ?: intent?.getStringExtra("url")
+            ?: intent?.extras?.getString("url")
+
+        if (!targetUrl.isNullOrBlank()) {
+            val fullUrl = if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+                targetUrl
+            } else {
+                "$APP_URL${if (targetUrl.startsWith("/")) "" else "/"}$targetUrl"
+            }
+            val uri = Uri.parse(fullUrl)
+            if (isAllowedInWebView(uri)) return fullUrl
+        }
+
         val data = intent?.data ?: return APP_URL
         return if (isAllowedInWebView(data)) data.toString() else APP_URL
     }

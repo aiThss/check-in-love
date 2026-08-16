@@ -141,7 +141,12 @@ export async function sendPushToUser(
     payload.targetUrl = payload.url;
   }
 
-  // 1. Send FCM Data Message (for Android APK Native Webview Wrapper)
+  const rawAvatar = payload.senderAvatar || payload.icon || '';
+  const senderAvatar = rawAvatar.startsWith('/')
+    ? `${(env.PUBLIC_BASE_URL || 'https://couple.io.vn').replace(/\/$/, '')}${rawAvatar}`
+    : rawAvatar;
+
+  // 1. Send FCM Message (for Android APK Native Webview Wrapper)
   if (env.FCM_SERVICE_ACCOUNT_JSON || env.FCM_SERVICE_ACCOUNT_FILE) {
     try {
       const authData = await getFcmAccessToken();
@@ -153,18 +158,29 @@ export async function sendPushToUser(
             const fcmPayload = {
               message: {
                 token: token,
+                notification: {
+                  title: payload.title,
+                  body: payload.body,
+                },
                 data: {
                   title: payload.title,
                   body: payload.body,
                   senderName: payload.senderName || '',
-                  senderAvatar: payload.senderAvatar || '',
+                  senderAvatar: senderAvatar,
                   actionType: payload.actionType || 'reminder',
                   targetUrl: payload.targetUrl || '/app/home',
                   checkinId: payload.checkinId || '',
                   photoUrl: payload.photoUrl || '',
                 },
                 android: {
-                  priority: 'high',
+                  priority: 'HIGH',
+                  notification: {
+                    channel_id: 'realtime_interactions',
+                    sound: 'default',
+                    default_sound: true,
+                    default_vibrate_timings: true,
+                    notification_priority: 'PRIORITY_HIGH',
+                  },
                 },
               },
             };
@@ -220,11 +236,17 @@ export async function sendPushToUser(
       if (user && user.fcmTokens && user.fcmTokens.length > 0) {
         const fcmPayload = {
           registration_ids: user.fcmTokens,
+          notification: {
+            title: payload.title,
+            body: payload.body,
+            sound: 'default',
+            channel_id: 'realtime_interactions',
+          },
           data: {
             title: payload.title,
             body: payload.body,
             senderName: payload.senderName || '',
-            senderAvatar: payload.senderAvatar || '',
+            senderAvatar: senderAvatar,
             actionType: payload.actionType || 'reminder',
             targetUrl: payload.targetUrl || '/app/home',
             checkinId: payload.checkinId || '',

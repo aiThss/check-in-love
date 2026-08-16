@@ -90,9 +90,13 @@ class MainApplication : Application() {
             val channelReminders = NotificationChannel(
                 "lovecheck_reminders",
                 "Nhắc nhở hàng ngày",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Nhắc nhở cập nhật check-in tình yêu mỗi ngày"
+                enableLights(true)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 150, 250)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
             notificationManager.createNotificationChannel(channelReminders)
 
@@ -102,9 +106,11 @@ class MainApplication : Application() {
                 "Tương tác thời gian thực",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Thông báo react, reply và check-in thời gian thực"
+                description = "Thông báo react, reply, tin nhắn và check-in thời gian thực"
                 enableLights(true)
                 enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 150, 250)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
             notificationManager.createNotificationChannel(channelRealtime)
         }

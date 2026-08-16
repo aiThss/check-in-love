@@ -34,7 +34,16 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+export function isAndroidApp(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    (Boolean(window.LoveCheckAndroid) ||
+      navigator.userAgent.includes('LoveCheckAndroidWrapper'))
+  );
+}
+
 export function isPushSupported(): boolean {
+  if (isAndroidApp()) return true;
   return (
     'serviceWorker' in navigator &&
     'PushManager' in window &&
@@ -76,6 +85,11 @@ export async function ensurePushSubscription(
 ): Promise<PushSetupResult> {
   if (isMockLocalMode()) {
     return { status: 'disabled', message: 'Thông báo đang tắt trong dữ liệu demo local' };
+  }
+
+  // Android APK wrapper uses native FCM notifications instead of web push service worker
+  if (isAndroidApp()) {
+    return { status: 'subscribed' };
   }
 
   if (!isPushSupported()) {
@@ -137,6 +151,10 @@ export async function ensurePushSubscription(
 export async function getPushSetupState(): Promise<PushSetupResult> {
   if (isMockLocalMode()) return { status: 'disabled' };
 
+  if (isAndroidApp()) {
+    return { status: 'subscribed' };
+  }
+
   if (!isPushSupported()) {
     return { status: 'unsupported' };
   }
@@ -155,6 +173,12 @@ export async function getPushSetupState(): Promise<PushSetupResult> {
   }
 
   return { status: 'prompt' };
+}
+
+export async function testPushNotification(): Promise<{ success: boolean; message?: string }> {
+  return apiFetch<{ success: boolean; message?: string }>('/push/test', {
+    method: 'POST',
+  });
 }
 
 export async function registerFcmToken(fcmToken: string): Promise<void> {
