@@ -136,7 +136,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val fullTargetUrl = if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
                 targetUrl
             } else {
-                "https://couple.io.vn\${if (targetUrl.startsWith("/")) "" else "/"}$targetUrl"
+                "https://couple.io.vn${if (targetUrl.startsWith("/")) "" else "/"}$targetUrl"
             }
 
             val intent = Intent(this, MainActivity::class.java).apply {
