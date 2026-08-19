@@ -157,6 +157,8 @@ export function revokePreviewUrl(preview?: string | null): void {
   }
 }
 
+const ANDROID_CAMERA_CANCEL_GRACE_MS = 2000;
+
 async function handleFileSelection(
   input: HTMLInputElement,
   onResult: (result: CameraResult) => void,
@@ -164,15 +166,31 @@ async function handleFileSelection(
 ): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
-    // Track whether Android already popped the dummy state so cleanup doesn't double-back
+    // Track whether Android already popped the dummy state so cleanup doesn't double-back.
     let dummyStatePopped = false;
+    let cancelFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    const androidCamera = isCamera && isAndroidApp();
+
+    const clearCancelFallback = () => {
+      if (cancelFallbackTimer !== null) {
+        clearTimeout(cancelFallbackTimer);
+        cancelFallbackTimer = null;
+      }
+    };
 
     const cleanup = () => {
+      clearCancelFallback();
+
       if (document.body.contains(input)) {
         document.body.removeChild(input);
       }
-      // Pop the dummy history state only if Android hasn't already done so
-      if (isCamera && !dummyStatePopped && (history.state as Record<string, unknown>)?.cameraOpen) {
+
+      // Only pop the Android dummy entry if the native side has not already done it.
+      if (
+        androidCamera &&
+        !dummyStatePopped &&
+        (history.state as Record<string, unknown>)?.cameraOpen
+      ) {
         dummyStatePopped = true;
         history.back();
       }
@@ -186,27 +204,28 @@ async function handleFileSelection(
       }
     };
 
-    // On Android WebView, push a dummy history entry so when the native camera
-    // activity closes and Android triggers onBackPressed → webView.goBack(),
-    // it consumes this dummy entry instead of popping the real SPA route.
-    if (isCamera && isAndroidApp()) {
+    // Keep the dummy entry Android-only. The native back guard prevents a chooser
+    // result from being followed by a second real SPA back navigation.
+    if (androidCamera) {
       history.pushState({ cameraOpen: true }, '');
 
-      // When Android pops the dummy state (camera close), just mark it as popped.
-      // Do NOT resolve here — wait for input.onchange to deliver the file.
+      // A camera app may deliver the result after the WebView has already emitted
+      // popstate. Give onchange time to receive the file before removing the input.
       const onPop = () => {
         window.removeEventListener('popstate', onPop);
         dummyStatePopped = true;
-        // If camera was cancelled (no file will come), resolve after a short grace period
-        // to give onchange/oncancel a chance to fire first.
-        setTimeout(() => {
+        clearCancelFallback();
+        cancelFallbackTimer = setTimeout(() => {
+          cancelFallbackTimer = null;
           if (!settled) settle();
-        }, 300);
+        }, ANDROID_CAMERA_CANCEL_GRACE_MS);
       };
       window.addEventListener('popstate', onPop);
     }
 
     input.onchange = async () => {
+      clearCancelFallback();
+
       const file = input.files?.[0];
       input.value = '';
 
@@ -215,15 +234,15 @@ async function handleFileSelection(
       }
 
       if (!file) {
-        if (!settled) { settled = true; resolve(); }
+        settle();
         return;
       }
 
       settled = true;
 
       // For camera captures, skip pre-processing here and return the raw file
-      // directly — the caller (applyPhotoTransform) will do the single processing
-      // pass with correct aspect-ratio / quality params.
+      // directly — the caller (applyPhotoTransform) does the single processing
+      // pass with the correct aspect-ratio / quality params.
       // Full-resolution camera shots (12–48 MP) are very slow to process twice.
       if (isCamera) {
         onResult({ file, preview: URL.createObjectURL(file) });
@@ -231,7 +250,7 @@ async function handleFileSelection(
         return;
       }
 
-      // Gallery / non-camera: pre-process to a reasonable size
+      // Gallery / non-camera: pre-process to a reasonable size.
       try {
         onResult(await processImage(file));
       } catch {

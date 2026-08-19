@@ -329,6 +329,8 @@ class LoveCheckBridge(
 class MainActivity : ComponentActivity() {
 
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+    private var fileChooserActive = false
+    private var suppressWebBackUntil = 0L
     private var cameraPhotoUri: Uri? = null
     private var cameraPhotoFile: File? = null
     private var webView: WebView? = null
@@ -355,6 +357,10 @@ class MainActivity : ComponentActivity() {
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
+        fileChooserActive = false
+        suppressWebBackUntil =
+            android.os.SystemClock.elapsedRealtime() + FILE_CHOOSER_BACK_GUARD_MS
+
         val callback = fileUploadCallback
         fileUploadCallback = null
 
@@ -548,6 +554,8 @@ class MainActivity : ComponentActivity() {
                                 filePathCallback: ValueCallback<Array<Uri>>,
                                 fileChooserParams: FileChooserParams,
                             ): Boolean {
+                                fileChooserActive = true
+                                suppressWebBackUntil = 0L
                                 fileUploadCallback?.onReceiveValue(null)
                                 fileUploadCallback = filePathCallback
 
@@ -582,6 +590,16 @@ class MainActivity : ComponentActivity() {
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
+                    if (
+                        fileChooserActive ||
+                        android.os.SystemClock.elapsedRealtime() < suppressWebBackUntil
+                    ) {
+                        // Returning from the native camera/file picker can deliver one
+                        // extra Back event to the host Activity. Do not let it pop the
+                        // previous SPA tab after the chooser has already returned.
+                        return
+                    }
+
                     val currentWebView = webView ?: return
 
                     // Route every system/predictive Back gesture through the web history.
@@ -1064,6 +1082,7 @@ class MainActivity : ComponentActivity() {
         private const val RETRY_SCHEME = "lovecheck"
         private const val STICKER_PATCH_VERSION = "1.1.10"
         private const val UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000L
+        private const val FILE_CHOOSER_BACK_GUARD_MS = 1200L
 
         private val allowedHosts = setOf(
             "couple.io.vn",

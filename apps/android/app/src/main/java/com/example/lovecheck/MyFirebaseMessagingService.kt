@@ -136,7 +136,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val fullTargetUrl = if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
                 targetUrl
             } else {
-                "https://couple.io.vn${if (targetUrl.startsWith("/")) "" else "/"}$targetUrl"
+                "https://couple.io.vn\${if (targetUrl.startsWith("/")) "" else "/"}$targetUrl"
             }
 
             val intent = Intent(this, MainActivity::class.java).apply {
@@ -144,75 +144,120 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 data = Uri.parse(fullTargetUrl)
                 putExtra("targetUrl", targetUrl)
             }
+
+            // Use one id for both the PendingIntent and the notification update.
+            val notificationId = notificationIdGenerator.incrementAndGet()
             val pendingIntent = PendingIntent.getActivity(
                 this,
-                notificationIdGenerator.incrementAndGet(),
+                notificationId,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Download and crop sender avatar safely
-            var avatarBitmap: Bitmap? = null
-            if (!senderAvatar.isNullOrBlank()) {
-                val resolvedAvatarUrl = if (senderAvatar.startsWith("/")) {
-                    "https://couple.io.vn$senderAvatar"
-                } else {
-                    senderAvatar
-                }
-                val bitmap = getBitmapFromUrl(resolvedAvatarUrl)
-                if (bitmap != null) {
-                    avatarBitmap = getCircleBitmap(bitmap)
-                }
+            // Publish a plain notification before doing any network I/O. This keeps
+            // high-priority data-only FCM delivery inside the Android time budget.
+            notificationManager.notify(
+                notificationId,
+                buildMessagingNotification(
+                    channelId = channelId,
+                    title = title,
+                    body = body,
+                    actionType = actionType,
+                    defaultSoundUri = defaultSoundUri,
+                    pendingIntent = pendingIntent,
+                    avatarBitmap = null,
+                    photoBitmap = null,
+                ).build(),
+            )
+
+            // Enrich the already-visible notification in the background. If the
+            // avatar/photo request is slow or unavailable, the notification itself
+            // is still delivered instead of being lost while onMessageReceived waits.
+            if (!senderAvatar.isNullOrBlank() || !photoUrl.isNullOrBlank()) {
+                Thread {
+                    try {
+                        val avatarBitmap = loadRemoteBitmap(senderAvatar)?.let { getCircleBitmap(it) }
+                        val photoBitmap = loadRemoteBitmap(photoUrl)
+
+                        if (avatarBitmap != null || photoBitmap != null) {
+                            notificationManager.notify(
+                                notificationId,
+                                buildMessagingNotification(
+                                    channelId = channelId,
+                                    title = title,
+                                    body = body,
+                                    actionType = actionType,
+                                    defaultSoundUri = defaultSoundUri,
+                                    pendingIntent = pendingIntent,
+                                    avatarBitmap = avatarBitmap,
+                                    photoBitmap = photoBitmap,
+                                ).build(),
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Notification rich media update failed", e)
+                    }
+                }.start()
             }
-
-            val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
-
-            // Check if photo is attached (for photo checkins or photo messages)
-            var photoBitmap: Bitmap? = null
-            if (!photoUrl.isNullOrBlank()) {
-                val resolvedPhotoUrl = if (photoUrl.startsWith("/")) {
-                    "https://couple.io.vn$photoUrl"
-                } else {
-                    photoUrl
-                }
-                photoBitmap = getBitmapFromUrl(resolvedPhotoUrl)
-            }
-
-            val builder = NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setLargeIcon(largeIcon)
-                .setColor(ContextCompat.getColor(this, R.color.notification_color))
-                .setContentTitle(title)
-                .setContentText(body)
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setSound(defaultSoundUri)
-                .setVibrate(longArrayOf(0, 250, 150, 250))
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setCategory(
-                    if (actionType == "message") NotificationCompat.CATEGORY_MESSAGE
-                    else NotificationCompat.CATEGORY_EVENT
-                )
-
-            if (photoBitmap != null) {
-                val bigPictureStyle = NotificationCompat.BigPictureStyle()
-                    .bigPicture(photoBitmap)
-                    .setBigContentTitle(title)
-                    .setSummaryText(body)
-                builder.setStyle(bigPictureStyle)
-            } else {
-                val bigTextStyle = NotificationCompat.BigTextStyle()
-                    .setBigContentTitle(title)
-                    .bigText(body)
-                builder.setStyle(bigTextStyle)
-            }
-
-            notificationManager.notify(notificationIdGenerator.incrementAndGet(), builder.build())
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show messaging notification", e)
         }
+    }
+
+    private fun buildMessagingNotification(
+        channelId: String,
+        title: String,
+        body: String,
+        actionType: String,
+        defaultSoundUri: Uri,
+        pendingIntent: PendingIntent,
+        avatarBitmap: Bitmap?,
+        photoBitmap: Bitmap?,
+    ): NotificationCompat.Builder {
+        val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+
+        val builder = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(largeIcon)
+            .setColor(ContextCompat.getColor(this, R.color.notification_color))
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setSound(defaultSoundUri)
+            .setVibrate(longArrayOf(0, 250, 150, 250))
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setCategory(
+                if (actionType == "message") NotificationCompat.CATEGORY_MESSAGE
+                else NotificationCompat.CATEGORY_EVENT
+            )
+
+        if (photoBitmap != null) {
+            val bigPictureStyle = NotificationCompat.BigPictureStyle()
+                .bigPicture(photoBitmap)
+                .setBigContentTitle(title)
+                .setSummaryText(body)
+            builder.setStyle(bigPictureStyle)
+        } else {
+            val bigTextStyle = NotificationCompat.BigTextStyle()
+                .setBigContentTitle(title)
+                .bigText(body)
+            builder.setStyle(bigTextStyle)
+        }
+
+        return builder
+    }
+
+    private fun loadRemoteBitmap(remoteUrl: String?): Bitmap? {
+        if (remoteUrl.isNullOrBlank()) return null
+        val resolvedUrl = if (remoteUrl.startsWith("/")) {
+            "https://couple.io.vn$remoteUrl"
+        } else {
+            remoteUrl
+        }
+        return getBitmapFromUrl(resolvedUrl)
     }
 
     private fun getBitmapFromUrl(urlStr: String): Bitmap? {
