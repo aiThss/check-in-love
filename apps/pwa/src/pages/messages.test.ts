@@ -12,10 +12,14 @@ const mocks = vi.hoisted(() => ({
   processImage: vi.fn(),
   revokePreviewUrl: vi.fn(),
   openPolaroidCoverModal: vi.fn(),
+  openMessageImageViewer: vi.fn(),
 }));
 
 vi.mock('../components/polaroid-cover', () => ({
   openPolaroidCoverModal: mocks.openPolaroidCoverModal,
+}));
+vi.mock('../components/message-image-viewer', () => ({
+  openMessageImageViewer: mocks.openMessageImageViewer,
 }));
 vi.mock('../api/messages', () => ({
   getMessages: mocks.getMessages,
@@ -96,6 +100,7 @@ describe('Messages scroll and reply behavior', () => {
     mocks.navigate.mockReset();
     mocks.processImage.mockReset();
     mocks.revokePreviewUrl.mockReset();
+    mocks.openMessageImageViewer.mockReset();
   });
 
   afterEach(() => vi.useRealTimers());
@@ -323,10 +328,7 @@ describe('Messages scroll and reply behavior', () => {
     const routePage = await mount([photo]);
     routePage.element.querySelector<HTMLImageElement>('[data-message-id="photo"] .chat-bubble.has-photo > img')?.click();
 
-    expect(mocks.openPolaroidCoverModal).toHaveBeenCalledWith(expect.objectContaining({
-      imageUrl: '/uploads/photo.jpg',
-      forceScratch: false,
-    }));
+    expect(mocks.openMessageImageViewer).toHaveBeenCalledWith('/uploads/photo.jpg', 'photo');
   });
 
   it('scrolls to an already loaded quoted original and cleans polling on destroy', async () => {

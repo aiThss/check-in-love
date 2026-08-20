@@ -1,0 +1,60 @@
+.message-image-viewer-backdrop {
+  position: fixed;
+  z-index: 100000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding:
+    calc(18px + env(safe-area-inset-top, 0px))
+    calc(10px + env(safe-area-inset-right, 0px))
+    calc(18px + env(safe-area-inset-bottom, 0px))
+    calc(10px + env(safe-area-inset-left, 0px));
+  background: rgba(0, 0, 0, .94);
+  animation: messageImageViewerIn 160ms ease-out both;
+}
+
+.message-image-viewer-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100dvh - 36px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.message-image-viewer-close {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  right: calc(10px + env(safe-area-inset-right, 0px));
+  z-index: 1;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 50%;
+  background: rgba(30, 30, 30, .72);
+  color: #fff;
+  cursor: pointer;
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.message-image-viewer-close:hover,
+.message-image-viewer-close:focus-visible {
+  background: rgba(255, 255, 255, .2);
+  outline: 2px solid rgba(255, 255, 255, .8);
+  outline-offset: 2px;
+}
+
+@keyframes messageImageViewerIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-image-viewer-backdrop { animation: none; }
+}

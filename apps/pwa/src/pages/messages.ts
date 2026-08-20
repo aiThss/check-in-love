@@ -1,4 +1,5 @@
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
+import { openMessageImageViewer } from '../components/message-image-viewer';
 import { createMessage, getMessageContext, getMessages } from '../api/messages';
 import * as messageApi from '../api/messages';
 import { enqueueMessage, flushMessageOutbox, type QueuedMessage } from '../api/message-outbox';
@@ -784,12 +785,7 @@ export function renderMessagesPage(): RoutePage {
       });
       image.addEventListener('click', (event) => {
         event.stopPropagation();
-        openPolaroidCoverModal({
-          imageUrl: item.imageUrl!,
-          title: item.text || `Ảnh từ ${item.senderName} 💖`,
-          dateText: formatMessageTime(item.createdAt),
-          forceScratch: false,
-        });
+        openMessageImageViewer(item.imageUrl!, item.text || `Ảnh từ ${item.senderName}`);
       });
       bubble.appendChild(image);
     }
@@ -1266,12 +1262,7 @@ export function renderMessagesPage(): RoutePage {
   photoButton.addEventListener('click', () => { attachMenu.hidden = !attachMenu.hidden; });
   preview.addEventListener('click', () => {
     if (!previewUrl) return;
-    openPolaroidCoverModal({
-      imageUrl: previewUrl,
-      title: 'Ảnh đã chọn',
-      dateText: 'Ảnh xem trước',
-      forceScratch: false,
-    });
+    openMessageImageViewer(previewUrl, 'Ảnh đã chọn');
   });
   attachMenu.querySelector('[data-attach="gallery"]')?.addEventListener('click', () => {
     attachMenu.hidden = true;
