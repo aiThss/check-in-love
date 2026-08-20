@@ -523,6 +523,39 @@ export function renderMessagesPage(): RoutePage {
     return newIncoming;
   }
 
+  async function focusReplyFromQuery(): Promise<void> {
+    const messageId = new URLSearchParams(window.location.search).get('replyTo');
+    if (!messageId || !active) return;
+
+    let target = messages.get(messageId);
+    if (!target) {
+      try {
+        const context = await getMessageContext(messageId);
+        if (active && context.length > 0) {
+          mergeMessages(context, 'older');
+          target = messages.get(messageId);
+        }
+      } catch {
+        // The notification can still open the conversation if the context is unavailable.
+      }
+    }
+
+    if (target) {
+      beginReply(target);
+      const view = messageViews.get(messageId);
+      view?.element.scrollIntoView({
+        behavior: isReducedMotion() ? 'auto' : 'smooth',
+        block: 'center',
+      });
+    } else {
+      showToast('Không tìm thấy tin nhắn cần trả lời', 'info');
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('replyTo');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  }
+
   async function loadInitialMessages(): Promise<void> {
     thread.replaceChildren(document.createElement('div'));
     thread.firstElementChild?.classList.add('messages-loading', 'skeleton');
@@ -770,10 +803,12 @@ export function renderMessagesPage(): RoutePage {
     element: page,
     activate: () => {
       active = true;
-      if (!scrollState.initialized) void loadInitialMessages();
-      else {
+      if (!scrollState.initialized) {
+        void loadInitialMessages().then(() => focusReplyFromQuery());
+      } else {
         startPolling();
         void refreshMessages();
+        void focusReplyFromQuery();
       }
       startPolling();
     },

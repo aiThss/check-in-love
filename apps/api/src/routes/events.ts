@@ -10,6 +10,7 @@ export interface RealtimeEvent {
   photoUrl?: string;
   senderName?: string;
   senderAvatar?: string;
+  messageId?: string;
   timestamp?: number;
 }
 

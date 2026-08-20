@@ -137,6 +137,7 @@ export interface PushPayload {
   badge?: string;
   url?: string;
   tag?: string;
+  messageId?: string;
   kind?: 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message';
   checkinId?: string;
   senderName?: string;
@@ -220,6 +221,7 @@ export async function sendPushToUser(
                   targetUrl: payload.targetUrl || '/app/home',
                   checkinId: payload.checkinId || '',
                   photoUrl: payload.photoUrl || '',
+                  messageId: payload.messageId || '',
                 },
                 android: {
                   priority: 'HIGH',
@@ -299,6 +301,7 @@ export async function sendPushToUser(
             targetUrl: payload.targetUrl || '/app/home',
             checkinId: payload.checkinId || '',
             photoUrl: payload.photoUrl || '',
+            messageId: payload.messageId || '',
           },
           priority: 'high',
         };

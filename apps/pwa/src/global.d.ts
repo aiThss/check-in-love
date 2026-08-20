@@ -12,7 +12,9 @@ declare global {
         targetUrl: string,
         photoUrl: string | null,
         senderAvatar?: string | null,
+        messageId?: string | null,
       ) => void;
+      setAuthToken?: (token: string) => void;
       signInWithGoogle?: () => void;
     };
     onFcmTokenReceived?: (token: string) => void;

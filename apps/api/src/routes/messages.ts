@@ -429,6 +429,7 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
     if (partnerId) {
       emitRealtimeEvent(partnerId.toString(), {
         type: 'message',
+        messageId: message._id.toString(),
         title: `${user.displayName} đã nhắn cho bạn`,
         body: snippet({ type, text, imageUrl }),
         targetUrl: '/app/messages',
@@ -444,6 +445,7 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
         badge: '/icons/icon-192.png',
         tag: `message-${message._id}`,
         kind: 'message',
+        messageId: message._id.toString(),
         actionType: 'message',
         targetUrl: '/app/messages',
         url: '/app/messages',

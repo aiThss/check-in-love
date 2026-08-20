@@ -52,6 +52,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val actionType: String
         val targetUrl: String
         val photoUrl: String?
+        val messageId: String?
 
         if (data.isNotEmpty()) {
             title = data["title"] ?: notification?.title ?: "Check in Love"
@@ -61,6 +62,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             actionType = data["actionType"] ?: "reminder"
             targetUrl = data["targetUrl"] ?: "/app/home"
             photoUrl = data["photoUrl"]
+            messageId = data["messageId"]
         } else if (notification != null) {
             title = notification.title ?: "Check in Love"
             body = notification.body ?: ""
@@ -69,11 +71,12 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             actionType = "reminder"
             targetUrl = "/app/home"
             photoUrl = null
+            messageId = null
         } else {
             return
         }
 
-        showMessagingNotification(title, body, senderName, senderAvatar, actionType, targetUrl, photoUrl)
+        showMessagingNotification(title, body, senderName, senderAvatar, actionType, targetUrl, photoUrl, messageId)
 
         // Update home screen widget on new checkins or message interactions
         try {
@@ -103,7 +106,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         senderAvatar: String?,
         actionType: String,
         targetUrl: String,
-        photoUrl: String? = null
+        photoUrl: String? = null,
+        messageId: String? = null
     ) {
         try {
             val channelId = "realtime_interactions"
@@ -174,6 +178,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     pendingIntent = pendingIntent,
                     avatarBitmap = null,
                     photoBitmap = null,
+                    notificationId = notificationId,
+                    messageId = messageId,
                 ).build(),
             )
 
@@ -198,6 +204,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                                     pendingIntent = pendingIntent,
                                     avatarBitmap = avatarBitmap,
                                     photoBitmap = photoBitmap,
+                                    notificationId = notificationId,
+                                    messageId = messageId,
                                 ).build(),
                             )
                         }
@@ -220,6 +228,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         pendingIntent: PendingIntent,
         avatarBitmap: Bitmap?,
         photoBitmap: Bitmap?,
+        notificationId: Int,
+        messageId: String?,
     ): NotificationCompat.Builder {
         val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
 
@@ -254,6 +264,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             builder.setStyle(bigTextStyle)
         }
 
+        addNotificationReplyAction(this, builder, notificationId, messageId)
         return builder
     }
 

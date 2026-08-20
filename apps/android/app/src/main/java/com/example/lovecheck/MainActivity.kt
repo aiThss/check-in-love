@@ -159,6 +159,14 @@ class LoveCheckBridge(
     }
 
     @JavascriptInterface
+    fun setAuthToken(token: String?) {
+        val prefs = context.getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            if (token.isNullOrBlank()) remove("auth_token") else putString("auth_token", token)
+        }.apply()
+    }
+
+    @JavascriptInterface
     fun getFcmDebugInfo(): String {
         val prefs = context.getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
         val token = prefs.getString("fcm_token", "").orEmpty()
@@ -253,7 +261,8 @@ class LoveCheckBridge(
         body: String,
         targetUrl: String,
         photoUrl: String?,
-        senderAvatar: String?
+        senderAvatar: String?,
+        messageId: String?
     ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -353,7 +362,9 @@ class LoveCheckBridge(
                     builder.setStyle(NotificationCompat.BigTextStyle().bigText(displayBody))
                 }
 
-                notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
+                val notificationId = (System.currentTimeMillis() % 100000).toInt()
+                addNotificationReplyAction(context, builder, notificationId, messageId)
+                notificationManager.notify(notificationId, builder.build())
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -361,8 +372,19 @@ class LoveCheckBridge(
     }
 
     @JavascriptInterface
+    fun showLocalNotification(
+        title: String,
+        body: String,
+        targetUrl: String,
+        photoUrl: String?,
+        senderAvatar: String?
+    ) {
+        showLocalNotification(title, body, targetUrl, photoUrl, senderAvatar, null)
+    }
+
+    @JavascriptInterface
     fun showLocalNotification(title: String, body: String, targetUrl: String, photoUrl: String?) {
-        showLocalNotification(title, body, targetUrl, photoUrl, null)
+        showLocalNotification(title, body, targetUrl, photoUrl, null, null)
     }
 }
 

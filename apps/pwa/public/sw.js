@@ -226,12 +226,19 @@ self.addEventListener('push', (event) => {
       url: targetUrl,
       kind: actionType,
       checkinId: data.checkinId,
+      messageId: data.messageId || '',
       dateOfArrival: Date.now(),
     },
-    actions: [
-      { action: 'open', title: 'Xem ngay 💕' },
-      { action: 'close', title: 'Để sau' },
-    ],
+    actions: actionType === 'message'
+      ? [
+          { action: 'reply', title: 'Trả lời' },
+          { action: 'open', title: 'Mở cuộc trò chuyện' },
+          { action: 'close', title: 'Để sau' },
+        ]
+      : [
+          { action: 'open', title: 'Xem ngay 💕' },
+          { action: 'close', title: 'Để sau' },
+        ],
   };
 
   event.waitUntil(self.registration.showNotification(displayTitle, options));
@@ -243,11 +250,16 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'close') return;
 
-  // Reminder notifications always open the check-in page
+  // Reply uses the existing composer on the messages page. Web/PWA
+  // notification actions cannot host a text field themselves.
+  const notificationData = event.notification.data || {};
+  const messageId = notificationData.messageId;
   const isReminder = event.notification.tag === 'lovecheck-reminder';
-  const targetUrl = isReminder
-    ? '/app/checkin'
-    : (event.notification.data?.url || '/app/home');
+  const targetUrl = event.action === 'reply' && messageId
+    ? '/app/messages?replyTo=' + encodeURIComponent(messageId)
+    : isReminder
+      ? '/app/checkin'
+      : (notificationData.url || '/app/home');
 
   event.waitUntil(
     self.clients
