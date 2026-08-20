@@ -83,9 +83,9 @@
 }
 
 /* Native image dragging can swallow pointer moves in Android WebView. The bubble
- * remains interactive, while its direct image becomes a visual-only child. */
+ * remains interactive, while the image itself stays clickable for the full-size viewer. */
 .chat-bubble.has-photo > img {
-  pointer-events: none;
+  pointer-events: auto;
   -webkit-user-drag: none;
   -webkit-user-select: none;
   user-select: none;

@@ -5169,9 +5169,10 @@ textarea:focus-visible,
 
 .chat-checkin .chat-bubble.has-photo {
   position: relative;
-  width: min(76vw, 320px);
-  max-width: calc(100% - 32px);
-  aspect-ratio: 1 / 1;
+  width: fit-content;
+  max-width: min(76vw, 320px);
+  height: auto;
+  aspect-ratio: auto;
   margin-inline: auto;
 }
 
@@ -5192,9 +5193,11 @@ textarea:focus-visible,
 
 .chat-bubble.has-photo img {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: auto;
+  height: auto;
+  max-width: min(76vw, 320px);
+  max-height: 320px;
+  object-fit: contain;
 }
 
 .chat-bubble.has-photo p {
@@ -5435,15 +5438,32 @@ textarea {
 .messages-photo-preview {
   display: inline-flex;
   align-items: center;
-  width: auto;
-  height: 28px;
+  max-width: 118px;
+  height: 32px;
   margin-right: 7px;
-  padding: 0 8px;
+  padding: 2px 5px;
   border-radius: 9px;
+  border: 0;
   background: var(--accent-soft);
   color: var(--accent);
+  cursor: pointer;
   font-size: 11px;
   white-space: nowrap;
+}
+
+.messages-photo-preview img {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.messages-photo-preview span {
+  max-width: 76px;
+  margin-left: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .messages-photo-preview[hidden] {

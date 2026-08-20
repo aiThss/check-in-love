@@ -92,6 +92,7 @@ interface LeanMessageRecord {
   clientMutationId?: string;
   deletedAt?: Date;
   editedAt?: Date;
+  editHistory?: Array<{ text: string; editedAt: Date }>;
   readBy?: Types.ObjectId[];
   reactions?: Array<{ type: string; userIds: Types.ObjectId[] }>;
   createdAt: Date;
@@ -532,8 +533,16 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
       return reply.status(403).send({ error: 'Forbidden', code: 'FORBIDDEN' });
     }
 
+    const editedAt = new Date();
+    const previousText = message.text?.trim();
+    if (previousText && previousText !== parsed.data.text) {
+      message.editHistory = [
+        ...(message.editHistory ?? []),
+        { text: previousText, editedAt: message.editedAt ?? editedAt },
+      ].slice(-20);
+    }
     message.text = parsed.data.text;
-    message.editedAt = new Date();
+    message.editedAt = editedAt;
     await message.save();
 
     const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);

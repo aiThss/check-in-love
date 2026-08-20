@@ -37,6 +37,8 @@ interface MessageView {
   content: HTMLParagraphElement;
   time: HTMLTimeElement;
   quote: HTMLButtonElement | null;
+  editedTag: HTMLButtonElement;
+  editHistory: HTMLElement;
   reactions: HTMLElement;
   readStatus: HTMLElement;
   replyKeys: Set<string>;
@@ -179,7 +181,7 @@ export function renderMessagesPage(): RoutePage {
           <button type="button" data-attach="camera">Chụp check-in</button>
         </div>
         <div class="messages-input-wrap">
-          <span class="messages-photo-preview" hidden>Ảnh đã chọn</span>
+          <button class="messages-photo-preview" type="button" hidden aria-label="Xem ảnh đã chọn"></button>
           <input
             id="message-input"
             type="text"
@@ -464,6 +466,56 @@ export function renderMessagesPage(): RoutePage {
     view.readStatus.textContent = visible ? 'Đã đọc' : '';
   }
 
+  function renderEditHistory(view: MessageView, item: ChatMessage): void {
+    const edited = Boolean(item.editedAt);
+    view.editedTag.hidden = !edited;
+    view.editedTag.setAttribute('aria-expanded', edited && !view.editHistory.hidden ? 'true' : 'false');
+    if (!edited) {
+      view.editHistory.hidden = true;
+      view.editHistory.replaceChildren();
+      return;
+    }
+
+    const wasOpen = !view.editHistory.hidden;
+    view.editHistory.replaceChildren();
+    const heading = document.createElement('small');
+    heading.className = 'message-edit-history-title';
+    heading.textContent = 'Lịch sử chỉnh sửa';
+    view.editHistory.appendChild(heading);
+
+    const history = item.editHistory ?? [];
+    if (history.length === 0) {
+      const empty = document.createElement('span');
+      empty.className = 'message-edit-history-empty';
+      empty.textContent = 'Chưa có bản lưu trước đó';
+      view.editHistory.appendChild(empty);
+    } else {
+      history.slice().reverse().forEach((entry) => {
+        const row = document.createElement('div');
+        row.className = 'message-edit-history-item';
+        const text = document.createElement('span');
+        text.textContent = entry.text;
+        const time = document.createElement('time');
+        time.dateTime = entry.editedAt;
+        time.textContent = formatMessageTime(entry.editedAt);
+        row.append(text, time);
+        view.editHistory.appendChild(row);
+      });
+    }
+
+    const hide = document.createElement('button');
+    hide.type = 'button';
+    hide.className = 'message-edit-history-hide';
+    hide.textContent = 'Ẩn lịch sử chỉnh sửa';
+    hide.addEventListener('click', (event) => {
+      event.stopPropagation();
+      view.editHistory.hidden = true;
+      view.editedTag.setAttribute('aria-expanded', 'false');
+    });
+    view.editHistory.appendChild(hide);
+    view.editHistory.hidden = !wasOpen;
+  }
+
   function openReactionPicker(view: MessageView): void {
     const existing = view.bubble.querySelector('.message-reaction-picker');
     if (existing) {
@@ -567,6 +619,7 @@ export function renderMessagesPage(): RoutePage {
     view.time.textContent = formatMessageTime(item.createdAt);
     view.time.dateTime = item.createdAt;
     view.time.title = new Date(item.createdAt).toLocaleString('vi-VN');
+    renderEditHistory(view, item);
     const image = view.bubble.querySelector<HTMLImageElement>('img');
     if (image && item.imageUrl && image.src !== item.imageUrl) image.src = item.imageUrl;
 
@@ -679,6 +732,22 @@ export function renderMessagesPage(): RoutePage {
       primary.className = 'chat-checkin';
       element.appendChild(primary);
     }
+    const editedTag = document.createElement('button');
+    editedTag.type = 'button';
+    editedTag.className = 'message-edited-tag';
+    editedTag.textContent = 'Đã chỉnh sửa';
+    editedTag.hidden = true;
+    editedTag.setAttribute('aria-expanded', 'false');
+    const editHistory = document.createElement('div');
+    editHistory.className = 'message-edit-history';
+    editHistory.hidden = true;
+    editedTag.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (editedTag.hidden) return;
+      editHistory.hidden = !editHistory.hidden;
+      editedTag.setAttribute('aria-expanded', editHistory.hidden ? 'false' : 'true');
+    });
+    primary.append(editedTag, editHistory);
     const bubble = document.createElement('div');
     bubble.className = hasPhoto ? 'chat-bubble has-photo' : 'chat-text-bubble';
     const quote = createQuote(item);
@@ -691,7 +760,7 @@ export function renderMessagesPage(): RoutePage {
       image.alt = 'Ảnh tin nhắn';
       image.loading = 'lazy';
       image.addEventListener('load', () => {
-        // The fixed aspect ratio prevents layout shift; never force-scroll a reader upward in history.
+        // Never force-scroll a reader upward in history while the image settles.
         if (scrollState.isNearBottom) scrollToBottom('follow');
       });
       image.addEventListener('click', (event) => {
@@ -726,9 +795,13 @@ export function renderMessagesPage(): RoutePage {
     readStatus.hidden = true;
     primary.appendChild(readStatus);
 
-    const view: MessageView = { item, element, bubble, content, time, quote, reactions, readStatus, replyKeys: new Set() };
+    const view: MessageView = {
+      item, element, bubble, content, time, quote, editedTag, editHistory, reactions, readStatus,
+      replyKeys: new Set(),
+    };
     renderReactions(view, item);
     renderReadStatus(view, item);
+    renderEditHistory(view, item);
     let longPressTimer: number | null = null;
     bubble.addEventListener('pointerdown', () => {
       longPressTimer = window.setTimeout(() => openReactionPicker(view), 560);
@@ -1018,8 +1091,22 @@ export function renderMessagesPage(): RoutePage {
     revokePreviewUrl(previewUrl);
     previewUrl = null;
     preview.hidden = true;
-    preview.textContent = '';
+    preview.replaceChildren();
     photoInput.value = '';
+  }
+
+  function setSelectedPhoto(file: File, previewSource: string): void {
+    clearSelectedPhoto();
+    selectedPhoto = file;
+    previewUrl = previewSource;
+    const thumbnail = document.createElement('img');
+    thumbnail.src = previewSource;
+    thumbnail.alt = 'Ảnh đã chọn';
+    thumbnail.loading = 'lazy';
+    const label = document.createElement('span');
+    label.textContent = 'Ảnh đã chọn';
+    preview.append(thumbnail, label);
+    preview.hidden = false;
   }
 
   async function sendMessage(event: SubmitEvent): Promise<void> {
@@ -1158,6 +1245,15 @@ export function renderMessagesPage(): RoutePage {
     if (event.key === 'Escape' && pendingReply) clearPendingReply();
   });
   photoButton.addEventListener('click', () => { attachMenu.hidden = !attachMenu.hidden; });
+  preview.addEventListener('click', () => {
+    if (!previewUrl) return;
+    openPolaroidCoverModal({
+      imageUrl: previewUrl,
+      title: 'Ảnh đã chọn',
+      dateText: 'Ảnh xem trước',
+      forceScratch: false,
+    });
+  });
   attachMenu.querySelector('[data-attach="gallery"]')?.addEventListener('click', () => {
     attachMenu.hidden = true;
     photoInput.click();
@@ -1167,12 +1263,9 @@ export function renderMessagesPage(): RoutePage {
     openCamera((result) => {
       void (async () => {
         try {
-          const processed = await processImage(result.file, { aspectRatio: 1, maxSize: 1600, quality: 0.85 });
+          const processed = await processImage(result.file, { maxSize: 1600, quality: 0.85 });
           revokePreviewUrl(result.preview);
-          clearSelectedPhoto();
-          selectedPhoto = processed.file;
-          preview.textContent = 'Ảnh đã chọn';
-          preview.hidden = false;
+          setSelectedPhoto(processed.file, processed.preview);
         } catch {
           showToast('Không xử lý được ảnh này', 'error');
         }
@@ -1184,12 +1277,8 @@ export function renderMessagesPage(): RoutePage {
     if (!source) return;
     try {
       photoButton.disabled = true;
-      const processed = await processImage(source, { aspectRatio: 1, maxSize: 1600, quality: 0.85 });
-      clearSelectedPhoto();
-      selectedPhoto = processed.file;
-      previewUrl = processed.preview;
-      preview.textContent = 'Ảnh đã chọn';
-      preview.hidden = false;
+      const processed = await processImage(source, { maxSize: 1600, quality: 0.85 });
+      setSelectedPhoto(processed.file, processed.preview);
     } catch {
       showToast('Không xử lý được ảnh này, thử ảnh khác nhé', 'error');
     } finally {

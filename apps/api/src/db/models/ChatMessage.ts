@@ -16,6 +16,11 @@ export interface MessageReaction {
   userIds: Types.ObjectId[];
 }
 
+export interface MessageEditHistoryEntry {
+  text: string;
+  editedAt: Date;
+}
+
 export interface MessageAttachment {
   url: string;
   storagePath?: string;
@@ -53,6 +58,7 @@ export interface ChatMessageDocument extends Document {
   clientMutationId?: string;
   deletedAt?: Date;
   editedAt?: Date;
+  editHistory?: MessageEditHistoryEntry[];
   readBy: Types.ObjectId[];
   reactions: MessageReaction[];
   createdAt: Date;
@@ -84,6 +90,11 @@ const MessageReactionSchema = new Schema<MessageReaction>({
   userIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
 }, { _id: false });
 
+const MessageEditHistorySchema = new Schema<MessageEditHistoryEntry>({
+  text: { type: String, required: true, maxlength: 1000 },
+  editedAt: { type: Date, required: true },
+}, { _id: false });
+
 const MessageAttachmentSchema = new Schema<MessageAttachment>({
   url: { type: String, required: true, maxlength: 2048 },
   storagePath: { type: String, maxlength: 512 },
@@ -109,6 +120,7 @@ const ChatMessageSchema = new Schema<ChatMessageDocument>({
   clientMutationId: { type: String, maxlength: 100 },
   deletedAt: { type: Date },
   editedAt: { type: Date },
+  editHistory: { type: [MessageEditHistorySchema], default: undefined },
   readBy: { type: [{ type: Schema.Types.ObjectId, ref: 'User' }], default: [] },
   reactions: { type: [MessageReactionSchema], default: [] },
 }, { timestamps: true });

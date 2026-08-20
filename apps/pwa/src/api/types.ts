@@ -121,11 +121,17 @@ export interface ChatMessage {
   reactions?: ChatMessageReaction[];
   readBy?: string[];
   editedAt?: string;
+  editHistory?: ChatMessageEditHistoryEntry[];
   deletedAt?: string;
   clientMutationId?: string;
   isOwn: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ChatMessageEditHistoryEntry {
+  text: string;
+  editedAt: string;
 }
 
 export interface PaginatedResponse<T> {

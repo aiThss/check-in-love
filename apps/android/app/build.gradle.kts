@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.lovecheck"
         minSdk = 24
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.0.24"
+        versionCode = 37
+        versionName = "0.0.25"
     }
 
     signingConfigs {

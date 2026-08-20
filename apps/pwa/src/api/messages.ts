@@ -7,7 +7,7 @@ import {
   loadMockPreviewData,
   saveMockPreviewData,
 } from '../dev/mock-data';
-import type { ChatMessage, ChatMessageAttachment, ChatMessageReaction, ChatMessageReplyReference, ChatMessageType, ReferencedCheckin } from './types';
+import type { ChatMessage, ChatMessageAttachment, ChatMessageEditHistoryEntry, ChatMessageReaction, ChatMessageReplyReference, ChatMessageType, ReferencedCheckin } from './types';
 
 export interface RawMessage {
   _id?: string;
@@ -24,6 +24,7 @@ export interface RawMessage {
   reactions?: Array<{ type: string; userIds?: string[] }>;
   readBy?: string[];
   editedAt?: string;
+  editHistory?: ChatMessageEditHistoryEntry[];
   deletedAt?: string;
   clientMutationId?: string;
   createdAt: string;
@@ -51,7 +52,9 @@ export function mapChatMessage(raw: RawMessage): ChatMessage {
       count: reaction.userIds?.length ?? 0,
       reactedByMe: Boolean(currentUserId && reaction.userIds?.includes(currentUserId)),
     })),
-    readBy: raw.readBy?.map(String), editedAt: raw.editedAt, deletedAt: raw.deletedAt,
+    readBy: raw.readBy?.map(String), editedAt: raw.editedAt,
+    editHistory: raw.editHistory?.map((entry) => ({ text: entry.text, editedAt: entry.editedAt })),
+    deletedAt: raw.deletedAt,
     clientMutationId: raw.clientMutationId,
     isOwn: senderId === store.get().user?.id, createdAt: raw.createdAt, updatedAt: raw.updatedAt,
   };

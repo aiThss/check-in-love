@@ -275,6 +275,24 @@ describe('Messages scroll and reply behavior', () => {
     expect(picker.querySelector('.message-action-row')?.textContent).toContain('Thu hồi');
   });
 
+  it('shows an edited tag and reveals the previous text history on demand', async () => {
+    const edited = message('edited', true, 'Phiên bản hiện tại');
+    edited.editedAt = '2026-08-20T10:05:00.000Z';
+    edited.editHistory = [{ text: 'Phiên bản trước', editedAt: '2026-08-20T10:00:00.000Z' }];
+    const routePage = await mount([edited]);
+
+    const tag = routePage.element.querySelector<HTMLButtonElement>('.message-edited-tag')!;
+    const history = routePage.element.querySelector<HTMLElement>('.message-edit-history')!;
+    expect(tag.hidden).toBe(false);
+    expect(history.hidden).toBe(true);
+
+    tag.click();
+    expect(history.hidden).toBe(false);
+    expect(history.textContent).toContain('Lịch sử chỉnh sửa');
+    expect(history.textContent).toContain('Phiên bản trước');
+    expect(history.textContent).toContain('Ẩn lịch sử chỉnh sửa');
+  });
+
   it('renders a thumbnail when replying to an image message', async () => {
     const photo = message('photo', false);
     photo.type = 'image';
@@ -292,6 +310,19 @@ describe('Messages scroll and reply behavior', () => {
     const thumbnail = routePage.element.querySelector<HTMLImageElement>('[data-message-id="reply"] .message-quote-thumb');
     expect(thumbnail?.getAttribute('src')).toBe('/uploads/photo.jpg');
     expect(thumbnail?.getAttribute('alt')).toBe('Ảnh được trả lời');
+  });
+
+  it('opens the full-size viewer when a message photo is clicked', async () => {
+    const photo = message('photo', false);
+    photo.type = 'image';
+    photo.imageUrl = '/uploads/photo.jpg';
+    const routePage = await mount([photo]);
+    routePage.element.querySelector<HTMLImageElement>('[data-message-id="photo"] .chat-bubble.has-photo > img')?.click();
+
+    expect(mocks.openPolaroidCoverModal).toHaveBeenCalledWith(expect.objectContaining({
+      imageUrl: '/uploads/photo.jpg',
+      forceScratch: false,
+    }));
   });
 
   it('scrolls to an already loaded quoted original and cleans polling on destroy', async () => {
@@ -339,6 +370,7 @@ describe('Messages scroll and reply behavior', () => {
     Object.defineProperty(photoInput, 'files', { configurable: true, value: [file] });
     photoInput.dispatchEvent(new Event('change'));
     await flush();
+    expect(mocks.processImage).toHaveBeenCalledWith(file, { maxSize: 1600, quality: 0.85 });
 
     const sent = {
       ...message('photo-topic', true, 'Đi chơi nhé'),
