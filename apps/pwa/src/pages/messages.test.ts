@@ -273,6 +273,10 @@ describe('Messages scroll and reply behavior', () => {
     expect(picker.querySelector('.message-reaction-options')).not.toBeNull();
     expect(picker.querySelector('.message-action-row')?.textContent).toContain('Sửa');
     expect(picker.querySelector('.message-action-row')?.textContent).toContain('Thu hồi');
+
+    bubble.dispatchEvent(pointer('pointerup', 80, 100));
+    bubble.click();
+    expect(routePage.element.querySelector('.message-reaction-picker')).not.toBeNull();
   });
 
   it('shows an edited tag and reveals the previous text history on demand', async () => {

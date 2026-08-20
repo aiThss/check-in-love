@@ -226,6 +226,7 @@ export function renderMessagesPage(): RoutePage {
   };
   const messageViews = new Map<string, MessageView>();
   const messages = new Map<string, ChatMessage>();
+  const pickerStates = new WeakMap<MessageView, { ignoreNextClick: boolean }>();
   let selectedPhoto: File | null = null;
   let previewUrl: string | null = null;
   let pendingReply: PendingReply | null = null;
@@ -516,18 +517,24 @@ export function renderMessagesPage(): RoutePage {
     view.editHistory.hidden = !wasOpen;
   }
 
-  function openReactionPicker(view: MessageView): void {
+  function openReactionPicker(view: MessageView, openedByLongPress = false): void {
     const existing = view.bubble.querySelector('.message-reaction-picker');
-    if (existing) {
-      existing.remove();
-      return;
-    }
+    if (existing) return;
+    const pickerState = pickerStates.get(view) ?? { ignoreNextClick: false };
+    pickerState.ignoreNextClick = openedByLongPress;
+    pickerStates.set(view, pickerState);
     const picker = document.createElement('div');
     picker.className = 'message-reaction-picker';
     picker.setAttribute('role', 'menu');
     const reactionRow = document.createElement('div');
     reactionRow.className = 'message-reaction-options';
     picker.appendChild(reactionRow);
+    let removeOutsideListener: (() => void) | null = null;
+    const closePicker = () => {
+      pickerState.ignoreNextClick = false;
+      picker.remove();
+      removeOutsideListener?.();
+    };
     QUICK_REACTIONS.forEach((type) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -535,7 +542,7 @@ export function renderMessagesPage(): RoutePage {
       button.setAttribute('aria-label', `Bày tỏ ${type}`);
       button.addEventListener('click', (event) => {
         event.stopPropagation();
-        picker.remove();
+        closePicker();
         const toggleReaction = optionalMessageApiFunction('toggleMessageReaction');
         const request = toggleReaction
           ? toggleReaction(view.item.id, type)
@@ -561,7 +568,7 @@ export function renderMessagesPage(): RoutePage {
         edit.textContent = 'Sửa';
         edit.addEventListener('click', (event) => {
           event.stopPropagation();
-          picker.remove();
+          closePicker();
           const nextText = window.prompt('Chỉnh sửa tin nhắn', messageText(view.item));
           if (!nextText?.trim()) return;
           const editMessage = optionalMessageApiFunction('editMessage');
@@ -581,7 +588,7 @@ export function renderMessagesPage(): RoutePage {
       remove.textContent = 'Thu hồi';
       remove.addEventListener('click', (event) => {
         event.stopPropagation();
-        picker.remove();
+        closePicker();
         if (!window.confirm('Thu hồi tin nhắn này?')) return;
         const deleteMessage = optionalMessageApiFunction('deleteMessage');
         if (!deleteMessage) return;
@@ -597,6 +604,18 @@ export function renderMessagesPage(): RoutePage {
       picker.appendChild(actionRow);
     }
     view.bubble.appendChild(picker);
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      // Mobile browsers emit a synthetic click after a long-press. Consume only
+      // that click so the newly opened picker remains visible for the user.
+      if (pickerState.ignoreNextClick) {
+        pickerState.ignoreNextClick = false;
+        return;
+      }
+      if (!target || !picker.contains(target)) closePicker();
+    };
+    removeOutsideListener = () => document.removeEventListener('click', onDocumentClick, true);
+    document.addEventListener('click', onDocumentClick, true);
   }
 
   function refreshReadStatuses(): void {
@@ -804,7 +823,7 @@ export function renderMessagesPage(): RoutePage {
     renderEditHistory(view, item);
     let longPressTimer: number | null = null;
     bubble.addEventListener('pointerdown', () => {
-      longPressTimer = window.setTimeout(() => openReactionPicker(view), 560);
+      longPressTimer = window.setTimeout(() => openReactionPicker(view, true), 560);
     }, { passive: true });
     const clearLongPress = () => {
       if (longPressTimer !== null) window.clearTimeout(longPressTimer);
