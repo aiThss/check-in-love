@@ -167,6 +167,21 @@ describe('Messages scroll and reply behavior', () => {
     expect(thread.scrollTop).toBe(321);
   });
 
+  it('shows the read receipt only on the latest own message read by the partner', async () => {
+    const olderRead = message('older-read', true);
+    olderRead.readBy = ['me', 'partner'];
+    const newerUnread = message('newer-unread', true);
+    newerUnread.readBy = ['me'];
+    const routePage = await mount([olderRead, newerUnread]);
+
+    expect(routePage.element.querySelector('[data-message-id="older-read"] .message-read-status')?.textContent)
+      .toBe('Đã đọc');
+    expect(routePage.element.querySelector('[data-message-id="newer-unread"] .message-read-status')?.textContent)
+      .toBe('');
+    expect(routePage.element.querySelector('[data-message-id="newer-unread"] .message-read-status')?.hasAttribute('hidden'))
+      .toBe(true);
+  });
+
   it('prepends older messages without moving the reader away from the visible anchor', async () => {
     const newest = message('newest');
     mocks.getMessages.mockResolvedValueOnce(response([newest], true))

@@ -435,9 +435,17 @@ export function renderMessagesPage(): RoutePage {
     view.reactions.hidden = view.reactions.childElementCount === 0;
   }
 
-  function renderReadStatus(view: MessageView, item: ChatMessage): void {
-    view.readStatus.hidden = !item.isOwn || !item.readBy?.length;
-    view.readStatus.textContent = item.readBy?.length ? 'Đã đọc' : '';
+  function wasReadByPartner(item: ChatMessage): boolean {
+    if (!item.isOwn || !item.readBy?.length) return false;
+    const currentUserId = store.get().user?.id;
+    // The read endpoint also records the current user's own id while they are
+    // viewing the thread. Only a different member's id is a partner read.
+    return item.readBy.some((userId) => userId !== currentUserId);
+  }
+
+  function renderReadStatus(view: MessageView, item: ChatMessage, visible = false): void {
+    view.readStatus.hidden = !visible;
+    view.readStatus.textContent = visible ? 'Đã đọc' : '';
   }
 
   function openReactionPicker(view: MessageView): void {
@@ -515,6 +523,16 @@ export function renderMessagesPage(): RoutePage {
       picker.appendChild(remove);
     }
     view.bubble.appendChild(picker);
+  }
+
+  function refreshReadStatuses(): void {
+    const latestReadMessage = [...messages.values()]
+      .filter((item) => wasReadByPartner(item))
+      .sort((left, right) => getLatestActivityTime(right) - getLatestActivityTime(left))[0];
+
+    for (const view of messageViews.values()) {
+      renderReadStatus(view, view.item, view.item.id === latestReadMessage?.id);
+    }
   }
 
   function patchView(view: MessageView, item: ChatMessage): void {
@@ -753,6 +771,7 @@ export function renderMessagesPage(): RoutePage {
       insertMessage(item, source === 'older' ? 'prepend' : 'append');
       if (source === 'refresh' && !item.isOwn) newIncoming++;
     });
+    refreshReadStatuses();
 
     if (source === 'initial') {
       scrollToBottom('initial');
