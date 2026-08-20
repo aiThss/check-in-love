@@ -186,6 +186,19 @@ class LoveCheckBridge(
         }
     }
 
+    private fun getSquareBitmap(bitmap: Bitmap): Bitmap? {
+        return try {
+            val size = minOf(bitmap.width, bitmap.height)
+            if (size <= 0) return null
+
+            val left = (bitmap.width - size) / 2
+            val top = (bitmap.height - size) / 2
+            Bitmap.createBitmap(bitmap, left, top, size, size)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun getCircleBitmap(bitmap: Bitmap): Bitmap? {
         return try {
             val minSize = Math.min(bitmap.width, bitmap.height)
@@ -209,6 +222,31 @@ class LoveCheckBridge(
         }
     }
 
+    private fun normalizeLocalNotificationTitle(title: String): String {
+        val suffixes = listOf(
+            " đã gửi ảnh mới 📸",
+            " đã gửi ảnh mới",
+            " đã nhắn cho bạn",
+            " đã react check-in của bạn",
+            " đã reply check-in của bạn",
+            " đã check-in! 💕",
+            " đã check-in!",
+        )
+        return suffixes.firstNotNullOfOrNull { suffix ->
+            title.takeIf { it.endsWith(suffix) }?.removeSuffix(suffix)?.trim()
+        } ?: title
+    }
+
+    private fun compactLocalNotificationBody(body: String, photoUrl: String?): String {
+        val trimmed = body.trim()
+        val isGenericPhotoText = trimmed.isEmpty() ||
+            trimmed.equals("Xem ngay nào!", ignoreCase = true) ||
+            trimmed.equals("vừa gửi 1 ảnh check-in", ignoreCase = true) ||
+            trimmed.equals("vừa gửi 1 ảnh check in", ignoreCase = true)
+
+        return if (!photoUrl.isNullOrBlank() && isGenericPhotoText) "Ảnh mới 📸" else body
+    }
+
     @JavascriptInterface
     fun showLocalNotification(
         title: String,
@@ -219,6 +257,8 @@ class LoveCheckBridge(
     ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                val displayTitle = normalizeLocalNotificationTitle(title)
+                val displayBody = compactLocalNotificationBody(body, photoUrl)
                 val channelId = "realtime_interactions"
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
@@ -286,15 +326,15 @@ class LoveCheckBridge(
                     } else {
                         photoUrl
                     }
-                    photoBitmap = getBitmapFromUrl(resolvedPhotoUrl)
+                    photoBitmap = getBitmapFromUrl(resolvedPhotoUrl)?.let { getSquareBitmap(it) }
                 }
 
                 val builder = NotificationCompat.Builder(context, channelId)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setLargeIcon(largeIcon)
                     .setColor(0xFFFF3B7F.toInt())
-                    .setContentTitle(title)
-                    .setContentText(body)
+                    .setContentTitle(displayTitle)
+                    .setContentText(displayBody)
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setDefaults(NotificationCompat.DEFAULT_ALL)
                     .setSound(defaultSoundUri)
@@ -307,10 +347,10 @@ class LoveCheckBridge(
                     builder.setStyle(
                         NotificationCompat.BigPictureStyle()
                             .bigPicture(photoBitmap)
-                            .setSummaryText(body)
+                            .setSummaryText(displayBody)
                     )
                 } else {
-                    builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                    builder.setStyle(NotificationCompat.BigTextStyle().bigText(displayBody))
                 }
 
                 notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())

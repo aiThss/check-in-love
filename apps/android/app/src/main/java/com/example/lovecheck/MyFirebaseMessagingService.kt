@@ -54,7 +54,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val photoUrl: String?
 
         if (data.isNotEmpty()) {
-            title = data["title"] ?: notification?.title ?: "Check IN Love 💕"
+            title = data["title"] ?: notification?.title ?: "Check in Love"
             body = data["body"] ?: notification?.body ?: ""
             senderName = data["senderName"] ?: "Người ấy"
             senderAvatar = data["senderAvatar"]
@@ -62,7 +62,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             targetUrl = data["targetUrl"] ?: "/app/home"
             photoUrl = data["photoUrl"]
         } else if (notification != null) {
-            title = notification.title ?: "Check IN Love 💕"
+            title = notification.title ?: "Check in Love"
             body = notification.body ?: ""
             senderName = "Người ấy"
             senderAvatar = null
@@ -145,6 +145,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 putExtra("targetUrl", targetUrl)
             }
 
+            val displayTitle = if (actionType == "message" && senderName.isNotBlank()) {
+                senderName
+            } else {
+                title
+            }
+            val displayBody = compactNotificationBody(body, actionType, photoUrl)
+
             // Use one id for both the PendingIntent and the notification update.
             val notificationId = notificationIdGenerator.incrementAndGet()
             val pendingIntent = PendingIntent.getActivity(
@@ -160,8 +167,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 notificationId,
                 buildMessagingNotification(
                     channelId = channelId,
-                    title = title,
-                    body = body,
+                    title = displayTitle,
+                    body = displayBody,
                     actionType = actionType,
                     defaultSoundUri = defaultSoundUri,
                     pendingIntent = pendingIntent,
@@ -177,15 +184,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 Thread {
                     try {
                         val avatarBitmap = loadRemoteBitmap(senderAvatar)?.let { getCircleBitmap(it) }
-                        val photoBitmap = loadRemoteBitmap(photoUrl)
+                        val photoBitmap = loadRemoteBitmap(photoUrl)?.let { getSquareBitmap(it) }
 
                         if (avatarBitmap != null || photoBitmap != null) {
                             notificationManager.notify(
                                 notificationId,
                                 buildMessagingNotification(
                                     channelId = channelId,
-                                    title = title,
-                                    body = body,
+                                    title = displayTitle,
+                                    body = displayBody,
                                     actionType = actionType,
                                     defaultSoundUri = defaultSoundUri,
                                     pendingIntent = pendingIntent,
@@ -276,6 +283,30 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         } catch (e: Exception) {
             null
         }
+    }
+
+    private fun getSquareBitmap(bitmap: Bitmap): Bitmap? {
+        return try {
+            val size = minOf(bitmap.width, bitmap.height)
+            if (size <= 0) return null
+
+            val left = (bitmap.width - size) / 2
+            val top = (bitmap.height - size) / 2
+            Bitmap.createBitmap(bitmap, left, top, size, size)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun compactNotificationBody(body: String, actionType: String, photoUrl: String?): String {
+        val trimmed = body.trim()
+        val isPhotoNotification = actionType == "message" && !photoUrl.isNullOrBlank()
+        val isGenericPhotoText = trimmed.isEmpty() ||
+            trimmed.equals("Xem ngay nào!", ignoreCase = true) ||
+            trimmed.equals("vừa gửi 1 ảnh check-in", ignoreCase = true) ||
+            trimmed.equals("vừa gửi 1 ảnh check in", ignoreCase = true)
+
+        return if (isPhotoNotification && isGenericPhotoText) "Ảnh mới 📸" else body
     }
 
     private fun getCircleBitmap(bitmap: Bitmap): Bitmap? {
