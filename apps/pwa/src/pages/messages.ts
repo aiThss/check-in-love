@@ -670,7 +670,7 @@ export function renderMessagesPage(): RoutePage {
     const hasPhoto = Boolean(item.imageUrl);
     const element = document.createElement(hasPhoto ? 'section' : 'article');
     element.className = hasPhoto
-      ? 'chat-checkin-group'
+      ? `chat-checkin-group${item.isOwn ? ' own' : ''}`
       : `chat-text-message${item.isOwn ? ' own' : ''}`;
     element.dataset.messageId = item.id;
 
