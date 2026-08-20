@@ -1068,8 +1068,6 @@ class MainActivity : ComponentActivity() {
         private val allowedHosts = setOf(
             "couple.io.vn",
             "api.couple.io.vn",
-            "couple.babyress.games",
-            "api.couple.babyress.games",
             "localhost",
             "127.0.0.1",
             "10.0.2.2",

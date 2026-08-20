@@ -20,7 +20,7 @@ const envSchema = z.object({
     .transform((v) => parseInt(v, 10)),
   ALLOWED_ORIGINS: z
     .string()
-    .default('http://localhost:3000,http://localhost:3001,http://localhost:5173,https://couple.io.vn,https://admin.couple.io.vn,https://couple.babyress.games,https://admin.couple.babyress.games')
+    .default('http://localhost:3000,http://localhost:3001,http://localhost:5173,https://couple.io.vn,https://admin.couple.io.vn')
     .transform((v) =>
       v
         .split(',')
