@@ -91,6 +91,12 @@ export default async function messageStickerRoutes(app: FastifyInstance): Promis
       type: 'image',
       imageUrl: markStickerUrl(saved.url),
       storagePath: saved.storagePath,
+      attachments: [{
+        url: markStickerUrl(saved.url),
+        storagePath: saved.storagePath,
+        mimeType: 'image/webp',
+        sizeBytes: stickerBuffer.length,
+      }],
       clientMutationId,
     });
 

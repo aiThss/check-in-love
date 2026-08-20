@@ -1,5 +1,7 @@
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
 import { createMessage, getMessageContext, getMessages } from '../api/messages';
+import * as messageApi from '../api/messages';
+import { enqueueMessage, flushMessageOutbox, type QueuedMessage } from '../api/message-outbox';
 import { createCheckin } from '../api/checkins';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
 import { showToast } from '../components/toast';
@@ -35,6 +37,8 @@ interface MessageView {
   content: HTMLParagraphElement;
   time: HTMLTimeElement;
   quote: HTMLButtonElement | null;
+  reactions: HTMLElement;
+  readStatus: HTMLElement;
   replyKeys: Set<string>;
 }
 
@@ -83,6 +87,67 @@ function clampSwipe(distance: number): number {
   return SWIPE_MAX_TRANSLATE + (distance - SWIPE_MAX_TRANSLATE) * 0.18;
 }
 
+const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👍'];
+
+function optionalMessageApiFunction(name: string): ((...args: any[]) => any) | undefined {
+  try {
+    return (messageApi as unknown as Record<string, unknown>)[name] as ((...args: any[]) => any) | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+interface PendingShare {
+  text?: string;
+  files?: Array<{ blob: Blob; name?: string; type?: string }>;
+}
+
+interface AndroidPendingShare {
+  text?: string;
+  images?: Array<{ dataUrl: string; name?: string; type?: string }>;
+}
+
+function readAndroidPendingShare(): AndroidPendingShare | null {
+  try {
+    const raw = window.LoveCheckAndroid?.getPendingShareData?.();
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AndroidPendingShare;
+    return parsed.text || parsed.images?.length ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function dataUrlToBlob(dataUrl: string): Promise<Blob | null> {
+  try {
+    const response = await fetch(dataUrl);
+    return await response.blob();
+  } catch {
+    return null;
+  }
+}
+
+async function consumePendingShare(): Promise<PendingShare | null> {
+  if (!new URLSearchParams(window.location.search).has('share')) return null;
+  if (!('serviceWorker' in navigator)) return null;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const worker = navigator.serviceWorker.controller ?? registration.active;
+    if (!worker) return null;
+    return await new Promise<PendingShare | null>((resolve) => {
+      const channel = new MessageChannel();
+      const timeout = window.setTimeout(() => resolve(null), 2_000);
+      channel.port1.onmessage = (event) => {
+        window.clearTimeout(timeout);
+        resolve((event.data as PendingShare | null) ?? null);
+      };
+      worker.postMessage({ type: 'GET_PENDING_SHARE' }, [channel.port2]);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export function renderMessagesPage(): RoutePage {
   const page = document.createElement('div');
   page.className = 'page messages-page animate-fade-in';
@@ -99,6 +164,7 @@ export function renderMessagesPage(): RoutePage {
       <div>
         <span class="messages-eyebrow">Hai đứa mình</span>
         <h1>Tin nhắn</h1>
+        <span class="messages-presence" aria-live="polite"></span>
       </div>
     </header>
     <main class="messages-thread" aria-live="polite" aria-label="Cuộc trò chuyện"></main>
@@ -145,6 +211,7 @@ export function renderMessagesPage(): RoutePage {
   const attachMenu = page.querySelector<HTMLElement>('.messages-attach-menu')!;
   const preview = page.querySelector<HTMLElement>('.messages-photo-preview')!;
   const sendButton = page.querySelector<HTMLButtonElement>('.messages-send')!;
+  const presence = page.querySelector<HTMLElement>('.messages-presence')!;
   const bottomSentinel = document.createElement('div');
   bottomSentinel.dataset.messageBottomSentinel = '';
   bottomSentinel.className = 'messages-bottom-sentinel';
@@ -167,6 +234,43 @@ export function renderMessagesPage(): RoutePage {
   let pollTimer: number | null = null;
   let scrollFrame: number | null = null;
   let observer: IntersectionObserver | null = null;
+  let typingTimer: number | null = null;
+  let typingStopTimer: number | null = null;
+  let lastReadMessageId: string | null = null;
+  let partnerOnline = false;
+
+  const safePresence = (online: boolean): Promise<void> => (
+    optionalMessageApiFunction('setMessagePresence')?.(online) ?? Promise.resolve()
+  );
+  const safeTyping = (isTyping: boolean): Promise<void> => (
+    optionalMessageApiFunction('setMessageTyping')?.(isTyping) ?? Promise.resolve()
+  );
+  const safeRead = (options: { upTo: string }): Promise<void> => (
+    optionalMessageApiFunction('markMessagesRead')?.(options) ?? Promise.resolve()
+  );
+
+  async function sendQueuedMessage(queued: QueuedMessage): Promise<ChatMessage> {
+    if (queued.file) {
+      const formData = new FormData();
+      formData.append('file', queued.file, queued.fileName || 'shared-image.jpg');
+      if (queued.text) formData.append('text', queued.text);
+      if (queued.replyToMessageId) formData.append('replyToMessageId', queued.replyToMessageId);
+      formData.append('clientMutationId', queued.clientMutationId);
+      return createMessage(formData);
+    }
+    return createMessage({
+      type: 'text',
+      text: queued.text,
+      ...(queued.replyToMessageId ? { replyToMessageId: queued.replyToMessageId } : {}),
+      clientMutationId: queued.clientMutationId,
+    });
+  }
+
+  function flushOutbox(): void {
+    void flushMessageOutbox(sendQueuedMessage, (message) => {
+      replaceTemporaryMessage(`optimistic-${message.clientMutationId}`, message);
+    });
+  }
 
 
   function ensureSentinel(): void {
@@ -302,6 +406,117 @@ export function renderMessagesPage(): RoutePage {
     return card;
   }
 
+  function renderReactions(view: MessageView, item: ChatMessage): void {
+    view.reactions.replaceChildren();
+    for (const reaction of item.reactions ?? []) {
+      if (reaction.count <= 0) continue;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `message-reaction${reaction.reactedByMe ? ' reacted' : ''}`;
+      button.textContent = `${reaction.type} ${reaction.count > 1 ? reaction.count : ''}`.trim();
+      button.setAttribute('aria-label', `${reaction.type} ${reaction.count}`);
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const toggleReaction = optionalMessageApiFunction('toggleMessageReaction');
+        const request = toggleReaction
+          ? toggleReaction(item.id, reaction.type)
+          : Promise.resolve([]);
+        void request
+          .then((reactions: ChatMessage['reactions'] = []) => {
+            const latest = messages.get(item.id);
+            if (!latest) return;
+            latest.reactions = reactions;
+            renderReactions(view, latest);
+          })
+          .catch(() => showToast('Chưa cập nhật được cảm xúc', 'error'));
+      });
+      view.reactions.appendChild(button);
+    }
+    view.reactions.hidden = view.reactions.childElementCount === 0;
+  }
+
+  function renderReadStatus(view: MessageView, item: ChatMessage): void {
+    view.readStatus.hidden = !item.isOwn || !item.readBy?.length;
+    view.readStatus.textContent = item.readBy?.length ? 'Đã đọc' : '';
+  }
+
+  function openReactionPicker(view: MessageView): void {
+    const existing = view.bubble.querySelector('.message-reaction-picker');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    const picker = document.createElement('div');
+    picker.className = 'message-reaction-picker';
+    picker.setAttribute('role', 'menu');
+    QUICK_REACTIONS.forEach((type) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = type;
+      button.setAttribute('aria-label', `Bày tỏ ${type}`);
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        picker.remove();
+        const toggleReaction = optionalMessageApiFunction('toggleMessageReaction');
+        const request = toggleReaction
+          ? toggleReaction(view.item.id, type)
+          : Promise.resolve([]);
+        void request
+          .then((reactions: ChatMessage['reactions'] = []) => {
+            const latest = messages.get(view.item.id);
+            if (!latest) return;
+            latest.reactions = reactions;
+            renderReactions(view, latest);
+          })
+          .catch(() => showToast('Chưa cập nhật được cảm xúc', 'error'));
+      });
+      picker.appendChild(button);
+    });
+    if (view.item.isOwn) {
+      if (view.item.type === 'text') {
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'message-action-button';
+        edit.textContent = 'Sửa';
+        edit.addEventListener('click', (event) => {
+          event.stopPropagation();
+          picker.remove();
+          const nextText = window.prompt('Chỉnh sửa tin nhắn', messageText(view.item));
+          if (!nextText?.trim()) return;
+          const editMessage = optionalMessageApiFunction('editMessage');
+          if (!editMessage) return;
+          void editMessage(view.item.id, nextText.trim())
+            .then((updated: ChatMessage) => {
+              messages.set(updated.id, updated);
+              patchView(view, updated);
+            })
+            .catch(() => showToast('Chưa sửa được tin nhắn', 'error'));
+        });
+        picker.appendChild(edit);
+      }
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'message-action-button';
+      remove.textContent = 'Thu hồi';
+      remove.addEventListener('click', (event) => {
+        event.stopPropagation();
+        picker.remove();
+        if (!window.confirm('Thu hồi tin nhắn này?')) return;
+        const deleteMessage = optionalMessageApiFunction('deleteMessage');
+        if (!deleteMessage) return;
+        void deleteMessage(view.item.id)
+          .then(() => {
+            view.element.remove();
+            messageViews.delete(view.item.id);
+            messages.delete(view.item.id);
+          })
+          .catch(() => showToast('Chưa thu hồi được tin nhắn', 'error'));
+      });
+      picker.appendChild(remove);
+    }
+    view.bubble.appendChild(picker);
+  }
+
   function patchView(view: MessageView, item: ChatMessage): void {
     view.item = item;
     view.element.dataset.messageId = item.id;
@@ -326,6 +541,8 @@ export function renderMessagesPage(): RoutePage {
       view.quote.replaceChildren(...Array.from(nextQuote.childNodes));
       view.quote.dataset.replyToMessageId = nextQuote.dataset.replyToMessageId;
     }
+    renderReactions(view, item);
+    renderReadStatus(view, item);
   }
 
   function beginReply(item: ChatMessage): void {
@@ -460,7 +677,33 @@ export function renderMessagesPage(): RoutePage {
     primary.appendChild(time);
     element.dataset.messageCreatedAt = item.createdAt;
 
-    const view: MessageView = { item, element, bubble, content, time, quote, replyKeys: new Set() };
+    const reactions = document.createElement('div');
+    reactions.className = 'message-reactions';
+    reactions.hidden = true;
+    bubble.appendChild(reactions);
+    const readStatus = document.createElement('small');
+    readStatus.className = 'message-read-status';
+    readStatus.hidden = true;
+    primary.appendChild(readStatus);
+
+    const view: MessageView = { item, element, bubble, content, time, quote, reactions, readStatus, replyKeys: new Set() };
+    renderReactions(view, item);
+    renderReadStatus(view, item);
+    let longPressTimer: number | null = null;
+    bubble.addEventListener('pointerdown', () => {
+      longPressTimer = window.setTimeout(() => openReactionPicker(view), 560);
+    }, { passive: true });
+    const clearLongPress = () => {
+      if (longPressTimer !== null) window.clearTimeout(longPressTimer);
+      longPressTimer = null;
+    };
+    bubble.addEventListener('pointerup', clearLongPress, { passive: true });
+    bubble.addEventListener('pointercancel', clearLongPress, { passive: true });
+    bubble.addEventListener('pointermove', clearLongPress, { passive: true });
+    bubble.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      openReactionPicker(view);
+    });
     primary.addEventListener('click', () => element.classList.toggle('show-timestamp'));
     installSwipeReply(view);
     return view;
@@ -520,6 +763,16 @@ export function renderMessagesPage(): RoutePage {
         updateIndicator();
       }
     }
+    if (scrollState.isNearBottom) {
+      const latest = sorted.at(-1);
+      if (latest && !latest.isOwn && latest.id !== lastReadMessageId) {
+        lastReadMessageId = latest.id;
+        void safeRead({ upTo: latest.id }).catch(() => {
+          // A transient offline read receipt can be retried on the next refresh.
+          lastReadMessageId = null;
+        });
+      }
+    }
     return newIncoming;
   }
 
@@ -565,6 +818,19 @@ export function renderMessagesPage(): RoutePage {
     }
   }
 
+  async function refreshLatestMessages(): Promise<void> {
+    if (!scrollState.initialized || !active) return;
+    try {
+      const response = await getMessages({ limit: 50, force: true });
+      if (!active) return;
+      mergeMessages(response.data, 'refresh');
+      beforeCursor = response.beforeCursor ?? beforeCursor;
+      afterCursor = response.afterCursor ?? afterCursor;
+    } catch {
+      // Keep the current conversation when the stream reconnects during a blip.
+    }
+  }
+
   async function loadOlderMessages(): Promise<void> {
     if (!hasMoreOlder || !beforeCursor || scrollState.isLoadingOlder) return;
     scrollState.isLoadingOlder = true;
@@ -602,6 +868,75 @@ export function renderMessagesPage(): RoutePage {
     if (pollTimer === null) return;
     window.clearInterval(pollTimer);
     pollTimer = null;
+  }
+
+  async function handlePendingShare(): Promise<void> {
+    const pending = await consumePendingShare();
+    const android = readAndroidPendingShare();
+    if ((!pending && !android) || !active) return;
+    const clientMutationId = crypto.randomUUID?.() ?? `share-${Date.now()}`;
+    try {
+      let result: ChatMessage;
+      const nativeImage = android?.images?.[0];
+      const nativeBlob = nativeImage ? await dataUrlToBlob(nativeImage.dataUrl) : null;
+      const file = pending?.files?.[0] ?? (nativeBlob ? {
+        blob: nativeBlob,
+        name: nativeImage?.name || 'shared-image.jpg',
+      } : undefined);
+      const sharedText = pending?.text || android?.text || '';
+      if (file?.blob) {
+        const formData = new FormData();
+        formData.append('file', file.blob, file.name || 'shared-image.jpg');
+        if (sharedText) formData.append('text', sharedText);
+        formData.append('clientMutationId', clientMutationId);
+        result = await createMessage(formData);
+      } else if (sharedText) {
+        result = await createMessage({ type: 'text', text: sharedText, clientMutationId });
+      } else {
+        return;
+      }
+      mergeMessages([result], 'refresh');
+      scrollToBottom('send');
+      showToast('Đã gửi nội dung được chia sẻ', 'success');
+    } catch {
+      showToast('Chưa gửi được nội dung chia sẻ', 'error');
+    } finally {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('share');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  }
+
+  function handleRealtimeEvent(event: Event): void {
+    const data = (event as CustomEvent).detail as {
+      type?: string;
+      isTyping?: boolean;
+      online?: boolean;
+      senderName?: string;
+      messageId?: string;
+      deleted?: boolean;
+    } | undefined;
+    if (!data) return;
+    if (data.type === 'message.typing') {
+      presence.textContent = data.isTyping ? `${data.senderName || 'Người ấy'} đang nhập...` : (partnerOnline ? 'Đang hoạt động' : '');
+      presence.classList.toggle('typing', Boolean(data.isTyping));
+      return;
+    }
+    if (data.type === 'message.presence') {
+      partnerOnline = Boolean(data.online);
+      presence.textContent = partnerOnline ? 'Đang hoạt động' : 'Đã offline';
+      presence.classList.toggle('typing', false);
+      return;
+    }
+    if (data.type === 'message.updated' && data.deleted && data.messageId) {
+      messageViews.get(data.messageId)?.element.remove();
+      messageViews.delete(data.messageId);
+      messages.delete(data.messageId);
+      return;
+    }
+    if (data.type === 'message' || data.type?.startsWith('message.')) {
+      void refreshLatestMessages();
+    }
   }
 
   function clearSelectedPhoto(): void {
@@ -673,7 +1008,18 @@ export function renderMessagesPage(): RoutePage {
       clearPendingReply();
     } catch {
       messageViews.get(temporaryId)?.element.classList.add('message-send-failed');
-      showToast('Không gửi được tin nhắn, thử lại nhé', 'error');
+      if (navigator.onLine === false) {
+        await enqueueMessage({
+          text,
+          file: selectedPhoto ?? undefined,
+          fileName: selectedPhoto?.name,
+          replyToMessageId: replyAtSend?.messageId,
+          clientMutationId,
+        });
+        showToast('Đã lưu tin nhắn, sẽ tự gửi khi có mạng', 'info');
+      } else {
+        showToast('Không gửi được tin nhắn, thử lại nhé', 'error');
+      }
     } finally {
       sendButton.disabled = false;
     }
@@ -710,6 +1056,25 @@ export function renderMessagesPage(): RoutePage {
     scrollToBottom('follow');
   });
   form.addEventListener('submit', sendMessage);
+  window.addEventListener('lovecheck:realtime-event', handleRealtimeEvent);
+  const handleAndroidShare = () => { void handlePendingShare(); };
+  window.addEventListener('lovecheck:android-share', handleAndroidShare);
+  const handleOnline = () => flushOutbox();
+  window.addEventListener('online', handleOnline);
+  messageInput.addEventListener('input', () => {
+    if (!active) return;
+    if (typingStopTimer !== null) window.clearTimeout(typingStopTimer);
+    if (typingTimer === null) {
+      typingTimer = window.setTimeout(() => {
+        typingTimer = null;
+        void safeTyping(true).catch(() => {});
+      }, 250);
+    }
+    typingStopTimer = window.setTimeout(() => {
+      typingStopTimer = null;
+      void safeTyping(false).catch(() => {});
+    }, 1_500);
+  });
   messageInput.addEventListener('focus', () => {
     window.setTimeout(() => {
       scrollToBottom('follow');
@@ -770,17 +1135,29 @@ export function renderMessagesPage(): RoutePage {
     element: page,
     activate: () => {
       active = true;
+      void safePresence(true).catch(() => {});
       if (!scrollState.initialized) void loadInitialMessages();
       else {
         startPolling();
         void refreshMessages();
       }
       startPolling();
+      void handlePendingShare();
+      flushOutbox();
     },
-    deactivate: () => stopPolling(),
+    deactivate: () => {
+      stopPolling();
+      void safeTyping(false).catch(() => {});
+      void safePresence(false).catch(() => {});
+    },
     destroy: () => {
       active = false;
       stopPolling();
+      window.removeEventListener('lovecheck:realtime-event', handleRealtimeEvent);
+      window.removeEventListener('lovecheck:android-share', handleAndroidShare);
+      window.removeEventListener('online', handleOnline);
+      if (typingTimer !== null) window.clearTimeout(typingTimer);
+      if (typingStopTimer !== null) window.clearTimeout(typingStopTimer);
       if (scrollFrame !== null) window.cancelAnimationFrame(scrollFrame);
       observer?.disconnect();
       thread.removeEventListener('scroll', handleScroll);

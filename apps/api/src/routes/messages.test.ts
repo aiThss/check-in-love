@@ -34,6 +34,7 @@ async function getCreateHandler(): Promise<Handler> {
   const handlers = new Map<string, Handler>();
   const app = {
     get: vi.fn(),
+    patch: vi.fn(),
     delete: vi.fn(),
     post: vi.fn((path: string, _options: unknown, handler: Handler) => handlers.set(path, handler)),
   };

@@ -31,6 +31,7 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import android.util.Base64
 import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -166,6 +167,38 @@ class LoveCheckBridge(
         val escapedToken = JSONObject.quote(token)
         val escapedError = JSONObject.quote(error)
         return "{\"token\":$escapedToken,\"error\":$escapedError}"
+    }
+
+    @JavascriptInterface
+    fun getPendingShareData(): String {
+        val prefs = context.getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
+        val text = prefs.getString("pending_share_text", "").orEmpty()
+        val uriValues = prefs.getString("pending_share_uris", "").orEmpty()
+            .split('\n')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+        val images = org.json.JSONArray()
+        uriValues.take(4).forEach { rawUri ->
+            try {
+                val uri = Uri.parse(rawUri)
+                val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                    input.readBytes().take(8 * 1024 * 1024).toByteArray()
+                } ?: return@forEach
+                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                images.put(org.json.JSONObject().apply {
+                    put("dataUrl", "data:$mime;base64,${Base64.encodeToString(bytes, Base64.NO_WRAP)}")
+                    put("name", "shared-image.jpg")
+                    put("type", mime)
+                })
+            } catch (_: Exception) {
+                // A revoked grant should not prevent the text share from arriving.
+            }
+        }
+        prefs.edit().remove("pending_share_text").remove("pending_share_uris").apply()
+        return org.json.JSONObject().apply {
+            put("text", text)
+            put("images", images)
+        }.toString()
     }
 
     private fun getBitmapFromUrl(urlStr: String): Bitmap? {
@@ -334,6 +367,8 @@ class MainActivity : ComponentActivity() {
     private var webView: WebView? = null
     private var pendingFcmToken: String? = null
     private var webPageLoaded = false
+    private var pendingShareUris: List<Uri> = emptyList()
+    private var pendingShareText: String = ""
     private val updateCheckLock = Any()
     private var updateCheckRunning = false
     private var lastUpdateCheckAt = 0L
@@ -409,6 +444,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        captureIncomingShare(intent)
 
         val filter = IntentFilter("com.example.lovecheck.FCM_TOKEN_UPDATE")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -473,6 +509,7 @@ class MainActivity : ComponentActivity() {
                             override fun onPageFinished(view: WebView, url: String) {
                                 super.onPageFinished(view, url)
                                 webPageLoaded = true
+                                dispatchPendingShareToWeb()
 
                                 val insets = ViewCompat.getRootWindowInsets(window.decorView)
                                 val statusBarPx = insets
@@ -600,9 +637,38 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        captureIncomingShare(intent)
         val url = initialUrlFromIntent(intent)
         if (url != APP_URL) {
             webView?.loadUrl(url)
+        }
+    }
+
+    private fun captureIncomingShare(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND && intent?.action != Intent.ACTION_SEND_MULTIPLE) return
+        pendingShareText = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+        val uris = mutableListOf<Uri>()
+        intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let(uris::addAll)
+        intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let(uris::add)
+        intent.clipData?.let { clip ->
+            for (index in 0 until clip.itemCount) clip.getItemAt(index).uri?.let(uris::add)
+        }
+        pendingShareUris = uris.distinct().take(4)
+        if (pendingShareUris.isEmpty() && pendingShareText.isBlank()) return
+        getSharedPreferences("lovecheck", Context.MODE_PRIVATE).edit()
+            .putString("pending_share_text", pendingShareText)
+            .putString("pending_share_uris", pendingShareUris.joinToString("\n") { it.toString() })
+            .apply()
+        dispatchPendingShareToWeb()
+    }
+
+    private fun dispatchPendingShareToWeb() {
+        if (!webPageLoaded) return
+        webView?.post {
+            webView?.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('lovecheck:android-share'));",
+                null,
+            )
         }
     }
 

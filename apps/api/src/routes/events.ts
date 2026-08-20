@@ -3,13 +3,18 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 
 export interface RealtimeEvent {
-  type: 'message' | 'checkin' | 'reaction' | 'reply' | 'reminder';
+  type: 'message' | 'message.updated' | 'message.reaction' | 'message.read' | 'message.typing' | 'message.presence' | 'checkin' | 'reaction' | 'reply' | 'reminder';
   title: string;
   body: string;
   targetUrl?: string;
   photoUrl?: string;
   senderName?: string;
   senderAvatar?: string;
+  messageId?: string;
+  reactionType?: string;
+  isTyping?: boolean;
+  online?: boolean;
+  deleted?: boolean;
   timestamp?: number;
 }
 
@@ -58,7 +63,11 @@ export async function eventRoutes(app: FastifyInstance): Promise<void> {
     reply.raw.setHeader('Content-Type', 'text/event-stream');
     reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
     reply.raw.setHeader('Connection', 'keep-alive');
-    reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+    const origin = request.headers.origin;
+    if (origin && env.ALLOWED_ORIGINS.includes(origin)) {
+      reply.raw.setHeader('Access-Control-Allow-Origin', origin);
+      reply.raw.setHeader('Vary', 'Origin');
+    }
     reply.raw.flushHeaders?.();
 
     if (!userConnections.has(userId)) {

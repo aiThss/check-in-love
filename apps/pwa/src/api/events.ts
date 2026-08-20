@@ -9,6 +9,8 @@ export interface RealtimeEventData {
   photoUrl?: string;
   senderName?: string;
   senderAvatar?: string;
+  messageId?: string;
+  deleted?: boolean;
   timestamp?: number;
 }
 

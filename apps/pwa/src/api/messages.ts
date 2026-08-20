@@ -7,7 +7,7 @@ import {
   loadMockPreviewData,
   saveMockPreviewData,
 } from '../dev/mock-data';
-import type { ChatMessage, ChatMessageReplyReference, ChatMessageType, ReferencedCheckin } from './types';
+import type { ChatMessage, ChatMessageAttachment, ChatMessageReaction, ChatMessageReplyReference, ChatMessageType, ReferencedCheckin } from './types';
 
 export interface RawMessage {
   _id?: string;
@@ -18,8 +18,13 @@ export interface RawMessage {
   type: ChatMessageType;
   text?: string;
   imageUrl?: string;
+  attachments?: ChatMessageAttachment[];
   replyTo?: ChatMessageReplyReference;
   referencedCheckin?: ReferencedCheckin;
+  reactions?: Array<{ type: string; userIds?: string[] }>;
+  readBy?: string[];
+  editedAt?: string;
+  deletedAt?: string;
   clientMutationId?: string;
   createdAt: string;
   updatedAt: string;
@@ -34,13 +39,63 @@ export interface MessagePage {
 
 export function mapChatMessage(raw: RawMessage): ChatMessage {
   const senderId = String(raw.senderId ?? '');
+  const currentUserId = store.get().user?.id;
+  const imageUrl = raw.imageUrl ?? raw.attachments?.[0]?.url;
   return {
     id: String(raw._id ?? raw.id), coupleId: String(raw.coupleId ?? ''), senderId,
-    senderName: raw.senderName, type: raw.type, text: raw.text, imageUrl: raw.imageUrl,
+    senderName: raw.senderName, type: raw.type, text: raw.text, imageUrl,
+    attachments: raw.attachments,
     replyTo: raw.replyTo, referencedCheckin: raw.referencedCheckin,
+    reactions: raw.reactions?.map((reaction): ChatMessageReaction => ({
+      type: reaction.type,
+      count: reaction.userIds?.length ?? 0,
+      reactedByMe: Boolean(currentUserId && reaction.userIds?.includes(currentUserId)),
+    })),
+    readBy: raw.readBy?.map(String), editedAt: raw.editedAt, deletedAt: raw.deletedAt,
     clientMutationId: raw.clientMutationId,
     isOwn: senderId === store.get().user?.id, createdAt: raw.createdAt, updatedAt: raw.updatedAt,
   };
+}
+
+export async function editMessage(id: string, text: string): Promise<ChatMessage> {
+  const response = await apiFetch<{ message: RawMessage }>(`/messages/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ text }),
+  });
+  invalidateQueries('messages:list:');
+  invalidateRoutes('/app/messages');
+  return mapChatMessage(response.message);
+}
+
+export async function deleteMessage(id: string): Promise<void> {
+  await apiFetch(`/messages/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  invalidateQueries('messages:list:');
+  invalidateRoutes('/app/messages');
+}
+
+export async function toggleMessageReaction(id: string, type: string): Promise<ChatMessageReaction[]> {
+  const response = await apiFetch<{ reactions: Array<{ type: string; userIds?: string[] }> }>(
+    `/messages/${encodeURIComponent(id)}/reactions`,
+    { method: 'POST', body: JSON.stringify({ type }) },
+  );
+  const currentUserId = store.get().user?.id;
+  return response.reactions.map((reaction) => ({
+    type: reaction.type,
+    count: reaction.userIds?.length ?? 0,
+    reactedByMe: Boolean(currentUserId && reaction.userIds?.includes(currentUserId)),
+  }));
+}
+
+export async function markMessagesRead(options: { messageIds?: string[]; upTo?: string }): Promise<void> {
+  await apiFetch('/messages/read', { method: 'POST', body: JSON.stringify(options) });
+}
+
+export async function setMessageTyping(isTyping: boolean): Promise<void> {
+  await apiFetch('/messages/typing', { method: 'POST', body: JSON.stringify({ isTyping }) });
+}
+
+export async function setMessagePresence(online: boolean): Promise<void> {
+  await apiFetch('/messages/presence', { method: 'POST', body: JSON.stringify({ online }) });
 }
 
 export async function getMessages(options: { limit?: number; before?: string; after?: string; force?: boolean } = {}): Promise<MessagePage> {

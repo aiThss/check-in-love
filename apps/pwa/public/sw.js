@@ -1,10 +1,12 @@
 /* ============================================================
    LoveCheck Service Worker
-   Cache name: lovecheck-v6
+   Cache name: lovecheck-v7
    ============================================================ */
 
-const CACHE_NAME = 'lovecheck-v6';
+const CACHE_NAME = 'lovecheck-v7';
 const OFFLINE_URL = '/offline.html';
+const SHARE_DB = 'lovecheck-share-v1';
+const SHARE_STORE = 'pending';
 
 const SHELL_ASSETS = [
   '/',
@@ -53,6 +55,14 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Web Share Target delivers a POST to the SPA route. Keep the private file
+  // in IndexedDB, then let the authenticated Chat page upload it through the
+  // normal API client. Nothing is put in Cache Storage.
+  if (request.method === 'POST' && url.origin === self.location.origin && url.pathname === '/app/messages') {
+    event.respondWith(captureShareTarget(request));
+    return;
+  }
+
   // Skip non-GET requests, external resources, and extension requests.
   if (request.method !== 'GET') return;
   if (!url.protocol.startsWith('http')) return;
@@ -73,6 +83,47 @@ self.addEventListener('fetch', (event) => {
   // Static assets: cache-first
   event.respondWith(cacheFirst(request));
 });
+
+function openShareDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(SHARE_DB, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(SHARE_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function captureShareTarget(request) {
+  try {
+    const form = await request.formData();
+    const files = [];
+    for (const key of ['media', 'file', 'files']) {
+      for (const value of form.getAll(key)) {
+        if (value instanceof Blob && value.size > 0) {
+          files.push({ blob: value, name: value.name || 'shared-image.jpg', type: value.type || 'image/jpeg' });
+        }
+      }
+    }
+    const payload = {
+      text: String(form.get('text') || form.get('title') || form.get('url') || '').trim(),
+      files,
+      createdAt: Date.now(),
+    };
+    const db = await openShareDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(SHARE_STORE, 'readwrite');
+      tx.objectStore(SHARE_STORE).put(payload, 'latest');
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (error) {
+    console.warn('[SW] Share target capture failed', error);
+  }
+  return Response.redirect('/app/messages?share=pending', 303);
+}
 
 // ── Strategies ───────────────────────────────────────────────
 
@@ -122,6 +173,31 @@ self.addEventListener('message', (event) => {
 
   if (event.data?.type === 'CLEAR_PRIVATE_CACHE') {
     event.waitUntil(clearPrivateResponses());
+    return;
+  }
+
+  if (event.data?.type === 'GET_PENDING_SHARE' && event.ports?.[0]) {
+    event.waitUntil((async () => {
+      let payload = null;
+      try {
+        const db = await openShareDb();
+        payload = await new Promise((resolve, reject) => {
+          const tx = db.transaction(SHARE_STORE, 'readwrite');
+          const store = tx.objectStore(SHARE_STORE);
+          const get = store.get('latest');
+          get.onsuccess = () => {
+            const value = get.result || null;
+            if (value) store.delete('latest');
+            resolve(value);
+          };
+          get.onerror = () => reject(get.error);
+        });
+        db.close();
+      } catch (error) {
+        console.warn('[SW] Share target read failed', error);
+      }
+      event.ports[0].postMessage(payload);
+    })());
   }
 });
 

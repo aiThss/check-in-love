@@ -7,6 +7,22 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
+  "share_target": {
+    "action": "/app/messages",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "media",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  },
   "background_color": "#FFFFFF",
   "theme_color": "#FF3B7F",
   "icons": [

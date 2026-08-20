@@ -11,6 +11,20 @@ export interface MessageReplySnapshot {
   mediaUrl?: string;
 }
 
+export interface MessageReaction {
+  type: string;
+  userIds: Types.ObjectId[];
+}
+
+export interface MessageAttachment {
+  url: string;
+  storagePath?: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  sizeBytes?: number;
+}
+
 export interface ReferencedCheckinSnapshot {
   checkinId: Types.ObjectId;
   ownerId: Types.ObjectId;
@@ -31,12 +45,16 @@ export interface ChatMessageDocument extends Document {
   text?: string;
   imageUrl?: string;
   storagePath?: string;
+  attachments?: MessageAttachment[];
   replyToMessageId?: Types.ObjectId;
   replyTo?: MessageReplySnapshot;
   referencedCheckinId?: Types.ObjectId;
   referencedCheckin?: ReferencedCheckinSnapshot;
   clientMutationId?: string;
   deletedAt?: Date;
+  editedAt?: Date;
+  readBy: Types.ObjectId[];
+  reactions: MessageReaction[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +79,20 @@ const ReferencedCheckinSchema = new Schema<ReferencedCheckinSnapshot>({
   createdAt: { type: Date, required: true },
 }, { _id: false });
 
+const MessageReactionSchema = new Schema<MessageReaction>({
+  type: { type: String, required: true, maxlength: 32 },
+  userIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+}, { _id: false });
+
+const MessageAttachmentSchema = new Schema<MessageAttachment>({
+  url: { type: String, required: true, maxlength: 2048 },
+  storagePath: { type: String, maxlength: 512 },
+  mimeType: { type: String, required: true, maxlength: 120 },
+  width: { type: Number, min: 1 },
+  height: { type: Number, min: 1 },
+  sizeBytes: { type: Number, min: 0 },
+}, { _id: false });
+
 const ChatMessageSchema = new Schema<ChatMessageDocument>({
   coupleId: { type: Schema.Types.ObjectId, ref: 'Couple', required: true },
   senderId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -69,12 +101,16 @@ const ChatMessageSchema = new Schema<ChatMessageDocument>({
   text: { type: String, maxlength: 1000 },
   imageUrl: { type: String, maxlength: 2048 },
   storagePath: { type: String },
+  attachments: { type: [MessageAttachmentSchema], default: undefined },
   replyToMessageId: { type: Schema.Types.ObjectId, ref: 'ChatMessage' },
   replyTo: { type: ReplySnapshotSchema },
   referencedCheckinId: { type: Schema.Types.ObjectId, ref: 'CheckIn' },
   referencedCheckin: { type: ReferencedCheckinSchema },
   clientMutationId: { type: String, maxlength: 100 },
   deletedAt: { type: Date },
+  editedAt: { type: Date },
+  readBy: { type: [{ type: Schema.Types.ObjectId, ref: 'User' }], default: [] },
+  reactions: { type: [MessageReactionSchema], default: [] },
 }, { timestamps: true });
 
 ChatMessageSchema.index({ coupleId: 1, _id: -1 });

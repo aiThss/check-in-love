@@ -32,6 +32,25 @@ const textSchema = z.object({
   clientMutationId: z.string().trim().min(1).max(100).optional(),
 });
 
+const editSchema = z.object({
+  text: z.string().trim().min(1).max(1000),
+});
+
+const reactionSchema = z.object({
+  type: z.string().trim().min(1).max(32),
+});
+
+const readSchema = z.object({
+  messageIds: z.array(z.string().trim().min(1)).max(100).optional(),
+  upTo: z.string().trim().min(1).optional(),
+}).refine((value) => Boolean(value.messageIds?.length || value.upTo), {
+  message: 'messageIds or upTo is required',
+});
+
+const typingSchema = z.object({
+  isTyping: z.boolean(),
+});
+
 interface LegacyReplyRecord {
   userId: Types.ObjectId;
   userName: string;
@@ -47,6 +66,7 @@ interface LegacyCheckinRecord {
   type: 'photo' | 'text' | 'mood';
   imageUrl?: string;
   storagePath?: string;
+  attachments?: Array<{ url: string; storagePath?: string; mimeType: string; width?: number; height?: number; sizeBytes?: number }>;
   caption?: string;
   quickMessage?: string;
   mood?: string;
@@ -69,6 +89,10 @@ interface LeanMessageRecord {
   referencedCheckinId?: Types.ObjectId;
   referencedCheckin?: unknown;
   clientMutationId?: string;
+  deletedAt?: Date;
+  editedAt?: Date;
+  readBy?: Types.ObjectId[];
+  reactions?: Array<{ type: string; userIds: Types.ObjectId[] }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -263,6 +287,11 @@ async function hydrateLiveCheckins(
   });
 }
 
+async function partnerIdFor(coupleId: Types.ObjectId, userId: string): Promise<string | undefined> {
+  const couple = await Couple.findById(coupleId).lean();
+  return couple?.memberIds.find((id) => id.toString() !== userId)?.toString();
+}
+
 export default async function messagesRoutes(app: FastifyInstance): Promise<void> {
   app.get('/messages', { preHandler: authenticate }, async (request, reply) => {
     const parsed = listSchema.safeParse(request.query);
@@ -319,6 +348,7 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
     let text: string | undefined;
     let imageUrl: string | undefined;
     let storagePath: string | undefined;
+    let attachments: Array<{ url: string; storagePath?: string; mimeType: string; sizeBytes?: number }> | undefined;
     let replyToMessageId: string | undefined;
     let referencedCheckinId: string | undefined;
     let clientMutationId: string | undefined;
@@ -342,6 +372,7 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
       type = 'image';
       imageUrl = saved.url;
       storagePath = saved.storagePath;
+      attachments = [{ url: saved.url, storagePath: saved.storagePath, mimeType: 'image/jpeg', sizeBytes: buffer.length }];
     } else {
       const parsed = textSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -417,6 +448,7 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
       text,
       imageUrl,
       storagePath,
+      attachments,
       replyToMessageId: replyTo?.messageId,
       replyTo,
       referencedCheckinId: referencedCheckin?.checkinId,
@@ -474,6 +506,156 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
     return reply.send({ messages });
   });
 
+  app.patch('/messages/:id', { preHandler: authenticate }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!Types.ObjectId.isValid(id)) {
+      return reply.status(400).send({ error: 'Invalid message id', code: 'VALIDATION_ERROR' });
+    }
+
+    const parsed = editSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
+    }
+
+    const message = await ChatMessage.findOne({
+      _id: new Types.ObjectId(id),
+      coupleId: new Types.ObjectId(request.user.coupleId),
+      deletedAt: null,
+    });
+    if (!message) return reply.status(404).send({ error: 'Message not found', code: 'NOT_FOUND' });
+    if (message.senderId.toString() !== request.user.id) {
+      return reply.status(403).send({ error: 'Forbidden', code: 'FORBIDDEN' });
+    }
+
+    message.text = parsed.data.text;
+    message.editedAt = new Date();
+    await message.save();
+
+    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
+    if (partnerId) {
+      emitRealtimeEvent(partnerId, {
+        type: 'message.updated',
+        title: `${message.senderName} đã chỉnh sửa tin nhắn`,
+        body: snippet(message),
+        targetUrl: '/app/messages',
+        messageId: message._id.toString(),
+        senderName: message.senderName,
+        deleted: true,
+      });
+    }
+    return reply.send({ message });
+  });
+
+  app.post('/messages/:id/reactions', { preHandler: authenticate }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!Types.ObjectId.isValid(id)) {
+      return reply.status(400).send({ error: 'Invalid message id', code: 'VALIDATION_ERROR' });
+    }
+    const parsed = reactionSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
+    }
+
+    const message = await ChatMessage.findOne({
+      _id: new Types.ObjectId(id),
+      coupleId: new Types.ObjectId(request.user.coupleId),
+      deletedAt: null,
+    });
+    if (!message) return reply.status(404).send({ error: 'Message not found', code: 'NOT_FOUND' });
+
+    const userId = new Types.ObjectId(request.user.id);
+    const reaction = message.reactions.find((item) => item.type === parsed.data.type);
+    const index = reaction?.userIds.findIndex((value) => value.toString() === request.user.id) ?? -1;
+    const active = index < 0;
+    if (reaction) {
+      if (active) reaction.userIds.push(userId);
+      else reaction.userIds.splice(index, 1);
+      if (reaction.userIds.length === 0) {
+        message.reactions = message.reactions.filter((item) => item.type !== parsed.data.type);
+      }
+    } else {
+      message.reactions.push({ type: parsed.data.type, userIds: [userId] });
+    }
+    await message.save();
+
+    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
+    if (partnerId) {
+      emitRealtimeEvent(partnerId, {
+        type: 'message.reaction',
+        title: `${message.senderName} đã bày tỏ cảm xúc`,
+        body: active ? parsed.data.type : 'Đã bỏ cảm xúc',
+        targetUrl: '/app/messages',
+        messageId: message._id.toString(),
+        reactionType: parsed.data.type,
+        senderName: message.senderName,
+      });
+    }
+    return reply.send({ messageId: message._id, reactions: message.reactions, active });
+  });
+
+  app.post('/messages/read', { preHandler: authenticate }, async (request, reply) => {
+    const parsed = readSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
+    }
+    const coupleId = new Types.ObjectId(request.user.coupleId);
+    const ids = parsed.data.messageIds ?? [];
+    if (ids.some((value) => !Types.ObjectId.isValid(value)) || (parsed.data.upTo && !Types.ObjectId.isValid(parsed.data.upTo))) {
+      return reply.status(400).send({ error: 'Invalid message id', code: 'VALIDATION_ERROR' });
+    }
+    const filter: Record<string, unknown> = { coupleId, deletedAt: null };
+    if (ids.length) filter._id = { $in: ids.map((value) => new Types.ObjectId(value)) };
+    if (parsed.data.upTo) filter._id = { ...(filter._id as object ?? {}), $lte: new Types.ObjectId(parsed.data.upTo) };
+    const result = await ChatMessage.updateMany(filter, { $addToSet: { readBy: new Types.ObjectId(request.user.id) } });
+    const partnerId = await partnerIdFor(coupleId, request.user.id);
+    if (partnerId) {
+      emitRealtimeEvent(partnerId, {
+        type: 'message.read',
+        title: 'Tin nhắn đã được đọc',
+        body: '',
+        targetUrl: '/app/messages',
+        messageId: parsed.data.upTo ?? ids.at(-1),
+      });
+    }
+    return reply.send({ success: true, modifiedCount: result.modifiedCount });
+  });
+
+  app.post('/messages/typing', { preHandler: authenticate }, async (request, reply) => {
+    const parsed = typingSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
+    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
+    if (partnerId) {
+      const user = await User.findById(request.user.id).lean();
+      emitRealtimeEvent(partnerId, {
+        type: 'message.typing',
+        title: '',
+        body: '',
+        targetUrl: '/app/messages',
+        senderName: user?.displayName,
+        isTyping: parsed.data.isTyping,
+      });
+    }
+    return reply.send({ success: true });
+  });
+
+  app.post('/messages/presence', { preHandler: authenticate }, async (request, reply) => {
+    const body = request.body as { online?: boolean } | undefined;
+    const online = body?.online !== false;
+    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
+    if (partnerId) {
+      const user = await User.findById(request.user.id).lean();
+      emitRealtimeEvent(partnerId, {
+        type: 'message.presence',
+        title: '',
+        body: '',
+        targetUrl: '/app/messages',
+        senderName: user?.displayName,
+        online,
+      });
+    }
+    return reply.send({ success: true });
+  });
+
   app.delete('/messages/:id', { preHandler: authenticate }, async (request, reply) => {
     const { id } = request.params as { id: string };
     if (!Types.ObjectId.isValid(id)) {
@@ -492,6 +674,17 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
 
     message.deletedAt = new Date();
     await message.save();
+    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
+    if (partnerId) {
+      emitRealtimeEvent(partnerId, {
+        type: 'message.updated',
+        title: `${message.senderName} đã thu hồi tin nhắn`,
+        body: 'Tin nhắn đã được thu hồi',
+        targetUrl: '/app/messages',
+        messageId: message._id.toString(),
+        senderName: message.senderName,
+      });
+    }
     return reply.send({ success: true });
   });
 }

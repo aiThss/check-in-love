@@ -81,6 +81,21 @@ export interface ChatMessageReplyReference {
   mediaUrl?: string;
 }
 
+export interface ChatMessageReaction {
+  type: string;
+  count: number;
+  reactedByMe: boolean;
+}
+
+export interface ChatMessageAttachment {
+  url: string;
+  storagePath?: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  sizeBytes?: number;
+}
+
 export interface ReferencedCheckin {
   checkinId: string;
   ownerId: string;
@@ -100,8 +115,13 @@ export interface ChatMessage {
   type: ChatMessageType;
   text?: string;
   imageUrl?: string;
+  attachments?: ChatMessageAttachment[];
   replyTo?: ChatMessageReplyReference;
   referencedCheckin?: ReferencedCheckin;
+  reactions?: ChatMessageReaction[];
+  readBy?: string[];
+  editedAt?: string;
+  deletedAt?: string;
   clientMutationId?: string;
   isOwn: boolean;
   createdAt: string;

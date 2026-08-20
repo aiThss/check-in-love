@@ -36,3 +36,75 @@
   height: 1px;
   background: var(--border);
 }
+
+.messages-presence {
+  display: block;
+  min-height: 16px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.messages-presence.typing {
+  color: var(--primary, #ff3b7f);
+}
+
+.message-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.message-reaction,
+.message-reaction-picker button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft, rgba(255,255,255,.68));
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.2;
+  min-height: 26px;
+  padding: 3px 8px;
+}
+
+.message-reaction-picker .message-action-button {
+  min-width: 48px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.message-reaction.reacted {
+  border-color: var(--primary, #ff3b7f);
+  background: color-mix(in srgb, var(--primary, #ff3b7f) 14%, transparent);
+}
+
+.message-reaction-picker {
+  position: absolute;
+  z-index: 5;
+  inset-block-end: calc(100% + 6px);
+  inset-inline-start: 0;
+  display: flex;
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card, #fff);
+  box-shadow: 0 8px 24px rgba(0,0,0,.16);
+}
+
+.message-reaction-picker button {
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  min-width: 32px;
+  padding: 2px;
+}
+
+.message-read-status {
+  align-self: flex-end;
+  color: var(--text-secondary);
+  font-size: 10px;
+  margin-inline-end: 4px;
+}

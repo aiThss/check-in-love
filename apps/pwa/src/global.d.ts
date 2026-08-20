@@ -14,6 +14,7 @@ declare global {
         senderAvatar?: string | null,
       ) => void;
       signInWithGoogle?: () => void;
+      getPendingShareData?: () => string;
     };
     onFcmTokenReceived?: (token: string) => void;
   }
