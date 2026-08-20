@@ -54,6 +54,7 @@ export function initRealtimeEvents(): void {
               data.targetUrl || '/app/home',
               data.photoUrl || null,
               data.senderAvatar || null,
+              data.messageId || null,
             );
           }
         } catch (err) {

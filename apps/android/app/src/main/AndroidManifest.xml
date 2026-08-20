@@ -61,6 +61,10 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <receiver
+            android:name=".NotificationReplyReceiver"
+            android:exported="false" />
+
         <receiver android:name=".NotificationReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

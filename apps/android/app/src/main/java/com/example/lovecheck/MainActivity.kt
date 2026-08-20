@@ -160,6 +160,14 @@ class LoveCheckBridge(
     }
 
     @JavascriptInterface
+    fun setAuthToken(token: String?) {
+        val prefs = context.getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            if (token.isNullOrBlank()) remove("auth_token") else putString("auth_token", token)
+        }.apply()
+    }
+
+    @JavascriptInterface
     fun getFcmDebugInfo(): String {
         val prefs = context.getSharedPreferences("lovecheck", Context.MODE_PRIVATE)
         val token = prefs.getString("fcm_token", "").orEmpty()
@@ -219,6 +227,19 @@ class LoveCheckBridge(
         }
     }
 
+    private fun getSquareBitmap(bitmap: Bitmap): Bitmap? {
+        return try {
+            val size = minOf(bitmap.width, bitmap.height)
+            if (size <= 0) return null
+
+            val left = (bitmap.width - size) / 2
+            val top = (bitmap.height - size) / 2
+            Bitmap.createBitmap(bitmap, left, top, size, size)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun getCircleBitmap(bitmap: Bitmap): Bitmap? {
         return try {
             val minSize = Math.min(bitmap.width, bitmap.height)
@@ -242,16 +263,44 @@ class LoveCheckBridge(
         }
     }
 
+    private fun normalizeLocalNotificationTitle(title: String): String {
+        val suffixes = listOf(
+            " đã gửi ảnh mới 📸",
+            " đã gửi ảnh mới",
+            " đã nhắn cho bạn",
+            " đã react check-in của bạn",
+            " đã reply check-in của bạn",
+            " đã check-in! 💕",
+            " đã check-in!",
+        )
+        return suffixes.firstNotNullOfOrNull { suffix ->
+            title.takeIf { it.endsWith(suffix) }?.removeSuffix(suffix)?.trim()
+        } ?: title
+    }
+
+    private fun compactLocalNotificationBody(body: String, photoUrl: String?): String {
+        val trimmed = body.trim()
+        val isGenericPhotoText = trimmed.isEmpty() ||
+            trimmed.equals("Xem ngay nào!", ignoreCase = true) ||
+            trimmed.equals("vừa gửi 1 ảnh check-in", ignoreCase = true) ||
+            trimmed.equals("vừa gửi 1 ảnh check in", ignoreCase = true)
+
+        return if (!photoUrl.isNullOrBlank() && isGenericPhotoText) "Ảnh mới 📸" else body
+    }
+
     @JavascriptInterface
     fun showLocalNotification(
         title: String,
         body: String,
         targetUrl: String,
         photoUrl: String?,
-        senderAvatar: String?
+        senderAvatar: String?,
+        messageId: String?
     ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                val displayTitle = normalizeLocalNotificationTitle(title)
+                val displayBody = compactLocalNotificationBody(body, photoUrl)
                 val channelId = "realtime_interactions"
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
@@ -319,15 +368,15 @@ class LoveCheckBridge(
                     } else {
                         photoUrl
                     }
-                    photoBitmap = getBitmapFromUrl(resolvedPhotoUrl)
+                    photoBitmap = getBitmapFromUrl(resolvedPhotoUrl)?.let { getSquareBitmap(it) }
                 }
 
                 val builder = NotificationCompat.Builder(context, channelId)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setLargeIcon(largeIcon)
                     .setColor(0xFFFF3B7F.toInt())
-                    .setContentTitle(title)
-                    .setContentText(body)
+                    .setContentTitle(displayTitle)
+                    .setContentText(displayBody)
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setDefaults(NotificationCompat.DEFAULT_ALL)
                     .setSound(defaultSoundUri)
@@ -340,13 +389,15 @@ class LoveCheckBridge(
                     builder.setStyle(
                         NotificationCompat.BigPictureStyle()
                             .bigPicture(photoBitmap)
-                            .setSummaryText(body)
+                            .setSummaryText(displayBody)
                     )
                 } else {
-                    builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                    builder.setStyle(NotificationCompat.BigTextStyle().bigText(displayBody))
                 }
 
-                notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
+                val notificationId = (System.currentTimeMillis() % 100000).toInt()
+                addNotificationReplyAction(context, builder, notificationId, messageId)
+                notificationManager.notify(notificationId, builder.build())
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -354,14 +405,27 @@ class LoveCheckBridge(
     }
 
     @JavascriptInterface
+    fun showLocalNotification(
+        title: String,
+        body: String,
+        targetUrl: String,
+        photoUrl: String?,
+        senderAvatar: String?
+    ) {
+        showLocalNotification(title, body, targetUrl, photoUrl, senderAvatar, null)
+    }
+
+    @JavascriptInterface
     fun showLocalNotification(title: String, body: String, targetUrl: String, photoUrl: String?) {
-        showLocalNotification(title, body, targetUrl, photoUrl, null)
+        showLocalNotification(title, body, targetUrl, photoUrl, null, null)
     }
 }
 
 class MainActivity : ComponentActivity() {
 
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+    private var fileChooserActive = false
+    private var suppressWebBackUntil = 0L
     private var cameraPhotoUri: Uri? = null
     private var cameraPhotoFile: File? = null
     private var webView: WebView? = null
@@ -390,6 +454,10 @@ class MainActivity : ComponentActivity() {
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
+        fileChooserActive = false
+        suppressWebBackUntil =
+            android.os.SystemClock.elapsedRealtime() + FILE_CHOOSER_BACK_GUARD_MS
+
         val callback = fileUploadCallback
         fileUploadCallback = null
 
@@ -585,6 +653,8 @@ class MainActivity : ComponentActivity() {
                                 filePathCallback: ValueCallback<Array<Uri>>,
                                 fileChooserParams: FileChooserParams,
                             ): Boolean {
+                                fileChooserActive = true
+                                suppressWebBackUntil = 0L
                                 fileUploadCallback?.onReceiveValue(null)
                                 fileUploadCallback = filePathCallback
 
@@ -619,6 +689,16 @@ class MainActivity : ComponentActivity() {
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
+                    if (
+                        fileChooserActive ||
+                        android.os.SystemClock.elapsedRealtime() < suppressWebBackUntil
+                    ) {
+                        // Returning from the native camera/file picker can deliver one
+                        // extra Back event to the host Activity. Do not let it pop the
+                        // previous SPA tab after the chooser has already returned.
+                        return
+                    }
+
                     val currentWebView = webView ?: return
 
                     // Route every system/predictive Back gesture through the web history.
@@ -1130,6 +1210,7 @@ class MainActivity : ComponentActivity() {
         private const val RETRY_SCHEME = "lovecheck"
         private const val STICKER_PATCH_VERSION = "1.1.10"
         private const val UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000L
+        private const val FILE_CHOOSER_BACK_GUARD_MS = 1200L
 
         private val allowedHosts = setOf(
             "couple.io.vn",

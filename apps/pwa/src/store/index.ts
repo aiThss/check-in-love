@@ -52,6 +52,14 @@ function syncAndroidWidget(nextState: AppState): void {
   }
 }
 
+function syncAndroidAuthToken(token: string | null): void {
+  try {
+    window.LoveCheckAndroid?.setAuthToken?.(token ?? '');
+  } catch {
+    // Android bridge is best-effort only.
+  }
+}
+
 function syncMountedStreakBadges(nextState: AppState): void {
   const streak = Math.max(0, Math.trunc(nextState.couple?.streak ?? 0));
 
@@ -90,6 +98,7 @@ function commit(partial: Partial<AppState>, persist: boolean): void {
   if (partial.token !== undefined) {
     if (partial.token) localStorage.setItem(TOKEN_KEY, partial.token);
     else localStorage.removeItem(TOKEN_KEY);
+    syncAndroidAuthToken(partial.token ?? null);
   }
   if (partial.theme !== undefined) applyTheme(state.theme);
   publish(state, previousState);
@@ -109,6 +118,7 @@ export const store = {
     state = { ...defaultState };
     localStorage.removeItem(STATE_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    syncAndroidAuthToken(null);
     // Keep a resolved theme after clearing private state. Without this,
     // system dark mode receives dark tokens while light-only CSS selectors
     // still match because data-theme is missing.
@@ -136,6 +146,7 @@ export const store = {
   initTheme(): void {
     applyTheme(state.theme);
     syncAndroidWidget(state);
+    syncAndroidAuthToken(state.token);
 
     if (!themeListenerInstalled) {
       themeListenerInstalled = true;
@@ -151,6 +162,7 @@ export const store = {
         const previousState = state;
         state = readFromStorage();
         applyTheme(state.theme);
+        syncAndroidAuthToken(state.token);
         publish(state, previousState);
       });
     }

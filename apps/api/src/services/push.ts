@@ -137,6 +137,7 @@ export interface PushPayload {
   badge?: string;
   url?: string;
   tag?: string;
+  messageId?: string;
   kind?: 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message';
   checkinId?: string;
   senderName?: string;
@@ -211,10 +212,6 @@ export async function sendPushToUser(
             const fcmPayload = {
               message: {
                 token: token,
-                notification: {
-                  title: payload.title,
-                  body: payload.body,
-                },
                 data: {
                   title: payload.title,
                   body: payload.body,
@@ -224,16 +221,10 @@ export async function sendPushToUser(
                   targetUrl: payload.targetUrl || '/app/home',
                   checkinId: payload.checkinId || '',
                   photoUrl: payload.photoUrl || '',
+                  messageId: payload.messageId || '',
                 },
                 android: {
                   priority: 'HIGH',
-                  notification: {
-                    channel_id: 'realtime_interactions',
-                    sound: 'default',
-                    default_sound: true,
-                    default_vibrate_timings: true,
-                    notification_priority: 'PRIORITY_HIGH',
-                  },
                 },
               },
             };
@@ -301,12 +292,6 @@ export async function sendPushToUser(
         result.fcm.attempted += fcmTokens.length;
         const fcmPayload = {
           registration_ids: fcmTokens,
-          notification: {
-            title: payload.title,
-            body: payload.body,
-            sound: 'default',
-            channel_id: 'realtime_interactions',
-          },
           data: {
             title: payload.title,
             body: payload.body,
@@ -316,6 +301,7 @@ export async function sendPushToUser(
             targetUrl: payload.targetUrl || '/app/home',
             checkinId: payload.checkinId || '',
             photoUrl: payload.photoUrl || '',
+            messageId: payload.messageId || '',
           },
           priority: 'high',
         };
