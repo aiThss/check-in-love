@@ -77,6 +77,13 @@
   isolation: isolate;
 }
 
+/* Home/Memories cards stay square; the detail viewer uses the source ratio. */
+.polaroid-stage-view.is-aspect-aware {
+  max-width: 100%;
+  margin-inline: auto;
+  aspect-ratio: auto;
+}
+
 .polaroid-stage-photo {
   position: absolute;
   inset: 0;
@@ -85,6 +92,10 @@
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
+}
+
+.polaroid-stage-view.is-aspect-aware .polaroid-stage-photo {
+  object-fit: contain;
 }
 
 .polaroid-stage-canvas {

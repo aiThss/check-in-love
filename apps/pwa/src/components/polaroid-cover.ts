@@ -582,6 +582,33 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 
+  function fitStageToImage(): void {
+    if (!image.naturalWidth || !image.naturalHeight) return;
+    const ratio = image.naturalWidth / image.naturalHeight;
+    if (!Number.isFinite(ratio) || ratio <= 0) return;
+
+    // Keep the preview cards square, but let the detail viewer use the actual
+    // media ratio while reserving enough room for its metadata footer.
+    const maxWidth = Math.max(160, Math.min(420, modal.clientWidth - 20));
+    const maxHeight = Math.max(180, Math.min(600, window.innerHeight - 170));
+    let width = maxWidth;
+    let height = width / ratio;
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * ratio;
+    }
+    stage.classList.add('is-aspect-aware');
+    stage.style.width = `${Math.round(width)}px`;
+    stage.style.height = `${Math.round(height)}px`;
+    stage.style.aspectRatio = 'auto';
+  }
+
+  image.addEventListener('load', () => {
+    fitStageToImage();
+    resize();
+  });
+  if (image.complete) fitStageToImage();
+
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) {
     canvas.remove();
@@ -757,7 +784,11 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
   const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
   resizeObserver?.observe(stage);
-  window.addEventListener('resize', resize);
+  const onViewportResize = () => {
+    fitStageToImage();
+    resize();
+  };
+  window.addEventListener('resize', onViewportResize);
 
   const onEscape = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') destroy();
@@ -770,7 +801,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     if (ratioTimer !== null) clearTimeout(ratioTimer);
     if (successTimer !== null) clearTimeout(successTimer);
     resizeObserver?.disconnect();
-    window.removeEventListener('resize', resize);
+    window.removeEventListener('resize', onViewportResize);
     window.removeEventListener('keydown', onEscape);
     canvas.removeEventListener('pointerdown', onPointerDown);
     canvas.removeEventListener('pointermove', onPointerMove);
