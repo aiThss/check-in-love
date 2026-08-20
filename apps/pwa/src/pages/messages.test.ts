@@ -262,6 +262,38 @@ describe('Messages scroll and reply behavior', () => {
     expect(routePage.element.querySelector('.messages-reply-preview')?.hasAttribute('hidden')).toBe(true);
   });
 
+  it('shows edit and recall actions separately from reactions on own messages', async () => {
+    const routePage = await mount([message('own-message', true, 'Tin nhắn của mình')]);
+    const bubble = routePage.element.querySelector<HTMLElement>('.chat-text-bubble')!;
+
+    bubble.dispatchEvent(pointer('pointerdown', 80, 100));
+    await vi.advanceTimersByTimeAsync(600);
+
+    const picker = routePage.element.querySelector('.message-reaction-picker')!;
+    expect(picker.querySelector('.message-reaction-options')).not.toBeNull();
+    expect(picker.querySelector('.message-action-row')?.textContent).toContain('Sửa');
+    expect(picker.querySelector('.message-action-row')?.textContent).toContain('Thu hồi');
+  });
+
+  it('renders a thumbnail when replying to an image message', async () => {
+    const photo = message('photo', false);
+    photo.type = 'image';
+    photo.imageUrl = '/uploads/photo.jpg';
+    const reply = message('reply', true, 'Xem này');
+    reply.replyTo = {
+      messageId: photo.id,
+      senderId: photo.senderId,
+      senderName: photo.senderName,
+      type: 'image',
+      mediaUrl: photo.imageUrl,
+    };
+    const routePage = await mount([photo, reply]);
+
+    const thumbnail = routePage.element.querySelector<HTMLImageElement>('[data-message-id="reply"] .message-quote-thumb');
+    expect(thumbnail?.getAttribute('src')).toBe('/uploads/photo.jpg');
+    expect(thumbnail?.getAttribute('alt')).toBe('Ảnh được trả lời');
+  });
+
   it('scrolls to an already loaded quoted original and cleans polling on destroy', async () => {
     const original = message('original');
     const reply = message('reply', true, 'reply');

@@ -344,7 +344,23 @@ export function renderMessagesPage(): RoutePage {
     quote.className = 'message-quote';
     quote.dataset.replyToMessageId = item.replyTo.messageId;
     quote.setAttribute('aria-label', `Đi tới tin nhắn của ${item.replyTo.senderName}`);
-    quote.innerHTML = `<strong>${escapeHtml(item.replyTo.senderName)}</strong><span>${escapeHtml(item.replyTo.textSnippet || (item.replyTo.mediaUrl ? 'Ảnh' : 'Tin nhắn'))}</span>`;
+    const sender = document.createElement('strong');
+    sender.textContent = item.replyTo.senderName;
+    const content = document.createElement('span');
+    content.className = 'message-quote-content';
+    if (item.replyTo.mediaUrl) {
+      const thumbnail = document.createElement('img');
+      thumbnail.className = 'message-quote-thumb';
+      thumbnail.src = item.replyTo.mediaUrl;
+      thumbnail.alt = 'Ảnh được trả lời';
+      thumbnail.loading = 'lazy';
+      content.appendChild(thumbnail);
+    }
+    const summary = document.createElement('span');
+    summary.className = 'message-quote-text';
+    summary.textContent = item.replyTo.textSnippet || (item.replyTo.mediaUrl ? 'Ảnh' : 'Tin nhắn');
+    content.appendChild(summary);
+    quote.append(sender, content);
     return quote;
   }
 
@@ -457,6 +473,9 @@ export function renderMessagesPage(): RoutePage {
     const picker = document.createElement('div');
     picker.className = 'message-reaction-picker';
     picker.setAttribute('role', 'menu');
+    const reactionRow = document.createElement('div');
+    reactionRow.className = 'message-reaction-options';
+    picker.appendChild(reactionRow);
     QUICK_REACTIONS.forEach((type) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -478,9 +497,11 @@ export function renderMessagesPage(): RoutePage {
           })
           .catch(() => showToast('Chưa cập nhật được cảm xúc', 'error'));
       });
-      picker.appendChild(button);
+      reactionRow.appendChild(button);
     });
     if (view.item.isOwn) {
+      const actionRow = document.createElement('div');
+      actionRow.className = 'message-action-row';
       if (view.item.type === 'text') {
         const edit = document.createElement('button');
         edit.type = 'button';
@@ -500,7 +521,7 @@ export function renderMessagesPage(): RoutePage {
             })
             .catch(() => showToast('Chưa sửa được tin nhắn', 'error'));
         });
-        picker.appendChild(edit);
+        actionRow.appendChild(edit);
       }
       const remove = document.createElement('button');
       remove.type = 'button';
@@ -520,7 +541,8 @@ export function renderMessagesPage(): RoutePage {
           })
           .catch(() => showToast('Chưa thu hồi được tin nhắn', 'error'));
       });
-      picker.appendChild(remove);
+      actionRow.appendChild(remove);
+      picker.appendChild(actionRow);
     }
     view.bubble.appendChild(picker);
   }

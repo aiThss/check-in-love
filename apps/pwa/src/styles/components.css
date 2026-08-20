@@ -5042,8 +5042,7 @@ textarea:focus-visible,
   text-align: left;
 }
 
-.message-quote strong,
-.message-quote span {
+.message-quote strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5053,9 +5052,31 @@ textarea:focus-visible,
   font-size: 11px;
 }
 
-.message-quote span {
+.message-quote-content {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
   opacity: 0.78;
+}
+
+.message-quote-thumb {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.message-quote-text {
+  min-width: 0;
+  overflow: hidden;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .message-referenced-checkin {
