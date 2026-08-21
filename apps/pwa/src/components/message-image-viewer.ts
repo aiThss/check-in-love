@@ -1,8 +1,8 @@
 let activeClose: (() => void) | null = null;
 
 function openNativePhotoViewer(imageUrl: string, alt: string): boolean {
-  const openPhotoViewer = window.LoveCheckAndroid?.openPhotoViewer;
-  if (!openPhotoViewer) return false;
+  const bridge = window.LoveCheckAndroid;
+  if (!bridge?.openPhotoViewer) return false;
 
   let absoluteUrl: URL;
   try {
@@ -15,14 +15,22 @@ function openNativePhotoViewer(imageUrl: string, alt: string): boolean {
   // browser-relative path or a temporary browser blob URL by itself.
   if (absoluteUrl.protocol !== 'https:' && absoluteUrl.protocol !== 'http:') return false;
 
-  openPhotoViewer(
-    absoluteUrl.href,
-    alt,
-    '',
-    '',
-    'check-in-love-message.jpg',
-  );
-  return true;
+  try {
+    // Keep the bridge as the receiver. Android's WebView only exposes this
+    // Java method when invoked through its registered JS interface object.
+    bridge.openPhotoViewer(
+      absoluteUrl.href,
+      alt,
+      '',
+      '',
+      'check-in-love-message.jpg',
+    );
+    return true;
+  } catch {
+    // A partially-updated or older APK can lack a compatible bridge. The
+    // regular DOM viewer below remains a working fallback in that case.
+    return false;
+  }
 }
 
 /** Opens a lightweight, chat-only image viewer (separate from the Memories foil viewer). */
