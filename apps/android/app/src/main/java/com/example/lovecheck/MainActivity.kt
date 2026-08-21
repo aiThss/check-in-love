@@ -81,6 +81,14 @@ class LoveCheckBridge(
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private fun resolveRemoteUrl(url: String): String {
+        val trimmedUrl = url.trim()
+        if (trimmedUrl.startsWith("https://") || trimmedUrl.startsWith("http://")) {
+            return trimmedUrl
+        }
+        return "https://couple.io.vn/${trimmedUrl.trimStart('/')}"
+    }
+
     @JavascriptInterface
     fun updateWidget(streak: Int, partnerName: String) {
         LoveCheckWidgetProvider.updateWidgetData(context, streak, partnerName)
@@ -107,7 +115,7 @@ class LoveCheckBridge(
     @JavascriptInterface
     fun downloadFile(url: String, filename: String) {
         try {
-            val request = DownloadManager.Request(Uri.parse(url))
+            val request = DownloadManager.Request(Uri.parse(resolveRemoteUrl(url)))
                 .setTitle(filename)
                 .setDescription("Đang tải ảnh check-in...")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -129,8 +137,9 @@ class LoveCheckBridge(
         fileName: String,
     ) {
         try {
+            val resolvedPhotoUrl = resolveRemoteUrl(photoUrl)
             val intent = Intent(context, PhotoViewerActivity::class.java).apply {
-                putExtra("photoUrl", photoUrl)
+                putExtra("photoUrl", resolvedPhotoUrl)
                 putExtra("caption", caption)
                 putExtra("ownerName", ownerName)
                 putExtra("dateStr", dateStr)

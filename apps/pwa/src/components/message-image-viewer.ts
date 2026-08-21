@@ -1,8 +1,40 @@
 let activeClose: (() => void) | null = null;
 
+function openNativePhotoViewer(imageUrl: string, alt: string): boolean {
+  const openPhotoViewer = window.LoveCheckAndroid?.openPhotoViewer;
+  if (!openPhotoViewer) return false;
+
+  let absoluteUrl: URL;
+  try {
+    absoluteUrl = new URL(imageUrl, window.location.href);
+  } catch {
+    return false;
+  }
+
+  // Coil in the native activity can load remote URLs, but cannot resolve a
+  // browser-relative path or a temporary browser blob URL by itself.
+  if (absoluteUrl.protocol !== 'https:' && absoluteUrl.protocol !== 'http:') return false;
+
+  openPhotoViewer(
+    absoluteUrl.href,
+    alt,
+    '',
+    '',
+    'check-in-love-message.jpg',
+  );
+  return true;
+}
+
 /** Opens a lightweight, chat-only image viewer (separate from the Memories foil viewer). */
 export function openMessageImageViewer(imageUrl: string, alt = 'Ảnh tin nhắn'): { close: () => void } {
   activeClose?.();
+
+  // Android WebView has an intermittent GPU-compositing failure for this
+  // fixed, full-screen <img>. Use the native viewer there; PWA/web retain the
+  // lightweight DOM viewer below.
+  if (openNativePhotoViewer(imageUrl, alt)) {
+    return { close: () => {} };
+  }
 
   const backdrop = document.createElement('div');
   backdrop.className = 'message-image-viewer-backdrop';

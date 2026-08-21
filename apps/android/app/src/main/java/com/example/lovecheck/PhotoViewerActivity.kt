@@ -27,8 +27,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import coil3.compose.AsyncImagePainter
-import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 
@@ -100,24 +98,19 @@ fun PhotoViewerScreen(
             .background(Color(0xFF0A0A0A)),
     ) {
         // ── Image ────────────────────────────────────────────────────────────
-        val painter = rememberAsyncImagePainter(
+        AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(photoUrl)
                 .crossfade(300)
                 .build(),
+            contentDescription = caption.ifEmpty { "Ảnh check-in" },
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .align(Alignment.Center),
             onLoading = { isLoading = true;  hasError = false },
             onSuccess = { isLoading = false; hasError = false },
             onError   = { isLoading = false; hasError = true  },
-        )
-
-        androidx.compose.foundation.Image(
-            painter           = painter,
-            contentDescription = caption.ifEmpty { "Ảnh check-in" },
-            contentScale      = ContentScale.Fit,
-            modifier          = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-                .align(Alignment.Center),
         )
 
         // Loading spinner

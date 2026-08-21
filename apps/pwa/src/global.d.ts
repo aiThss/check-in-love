@@ -17,6 +17,13 @@ declare global {
       setAuthToken?: (token: string) => void;
       signInWithGoogle?: () => void;
       getPendingShareData?: () => string;
+      openPhotoViewer?: (
+        photoUrl: string,
+        caption: string,
+        ownerName: string,
+        dateStr: string,
+        fileName: string,
+      ) => void;
     };
     onFcmTokenReceived?: (token: string) => void;
   }
