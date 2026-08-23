@@ -136,33 +136,43 @@
   white-space: nowrap;
 }
 
-/* The selected wallpaper sits behind the glass bubbles and controls. A soft
- * tint keeps both light and dark message text readable over user photos. */
-.messages-page {
-  --messages-wallpaper-image: none;
-}
-
+/* The selected wallpaper sits behind the glass bubbles and controls. Keep the
+ * image on a real element instead of a CSS custom property: older Android
+ * WebViews have been unreliable when resolving var() inside background-image. */
 .messages-page.has-chat-wallpaper {
   background-color: var(--bg);
-  background-image:
-    linear-gradient(rgba(255, 247, 250, 0.42), rgba(255, 247, 250, 0.5)),
-    var(--messages-wallpaper-image);
+}
+
+.messages-wallpaper-layer {
+  display: none;
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  background-attachment: fixed;
+  opacity: 0.82;
 }
 
-[data-theme='dark'] .messages-page.has-chat-wallpaper {
-  background-image:
-    linear-gradient(rgba(24, 16, 30, 0.46), rgba(24, 16, 30, 0.58)),
-    var(--messages-wallpaper-image);
+.messages-page.has-chat-wallpaper .messages-wallpaper-layer {
+  display: block;
+}
+
+[data-theme='dark'] .messages-page.has-chat-wallpaper .messages-wallpaper-layer {
+  filter: brightness(0.72) saturate(0.86);
+  opacity: 0.68;
 }
 
 /* Wallpaper picker -------------------------------------------------------- */
 .messages-wallpaper-modal {
-  max-height: min(82dvh, 680px);
+  box-sizing: border-box;
+  max-height: calc(100vh - 96px);
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
@@ -179,22 +189,22 @@
 
 .messages-wallpaper-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 9px;
 }
 
 .messages-wallpaper-option {
   position: relative;
-  display: flex;
+  display: block;
   min-width: 0;
-  aspect-ratio: 0.82;
-  align-items: flex-end;
+  height: 148px;
+  min-height: 148px;
   overflow: hidden;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 14px;
   background-color: var(--accent-soft);
-  background-image: var(--wallpaper-preview);
+  background-image: none;
   background-position: center;
   background-size: cover;
   box-shadow: 0 5px 14px rgba(45, 21, 34, 0.12);
@@ -257,7 +267,7 @@
   border: 1px solid var(--border);
   border-radius: 14px;
   background-color: var(--accent-soft);
-  background-image: linear-gradient(rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.64)), var(--wallpaper-preview);
+  background-image: none;
   background-position: center;
   background-size: cover;
   color: var(--text-primary);
@@ -305,20 +315,22 @@
 }
 
 [data-theme='dark'] .messages-wallpaper-custom {
-  background-image: linear-gradient(rgba(34, 25, 41, 0.7), rgba(34, 25, 41, 0.7)), var(--wallpaper-preview);
+  background-image: none;
 }
 
 [data-theme='dark'] .messages-wallpaper-custom-icon {
   background: rgba(255, 255, 255, 0.14);
 }
 
-.messages-refresh-button {
-  flex: 0 0 42px;
-}
+@media (min-width: 420px) {
+  .messages-wallpaper-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 
-.messages-refresh-button:disabled {
-  cursor: wait;
-  opacity: 0.72;
+  .messages-wallpaper-option {
+    height: 132px;
+    min-height: 132px;
+  }
 }
 
 .messages-time-separator {

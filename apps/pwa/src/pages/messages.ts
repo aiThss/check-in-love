@@ -166,16 +166,24 @@ function toCssBackgroundImage(url: string): string {
 
 function applyChatBackground(page: HTMLElement, selection: ChatBackgroundSelection): void {
   const image = getChatBackgroundImage(selection);
+  const wallpaperLayer = page.querySelector<HTMLElement>('.messages-wallpaper-layer');
   if (!image) {
     page.classList.remove('has-chat-wallpaper');
-    page.style.removeProperty('--messages-wallpaper-image');
+    wallpaperLayer?.style.removeProperty('background-image');
+    page.style.removeProperty('background-image');
     delete page.dataset.chatBackground;
     return;
   }
 
   page.classList.add('has-chat-wallpaper');
   page.dataset.chatBackground = selection.kind === 'custom' ? 'custom' : selection.id;
-  page.style.setProperty('--messages-wallpaper-image', toCssBackgroundImage(image));
+  if (wallpaperLayer) {
+    wallpaperLayer.style.backgroundImage = toCssBackgroundImage(image);
+    page.style.removeProperty('background-image');
+  } else {
+    // Safe fallback for a page mounted by an older cached bundle.
+    page.style.backgroundImage = toCssBackgroundImage(image);
+  }
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -202,6 +210,7 @@ export function renderMessagesPage(): RoutePage {
     page.style.maxHeight = stableViewportHeight;
   }
   page.innerHTML = `
+    <div class="messages-wallpaper-layer" aria-hidden="true"></div>
     <header class="messages-header">
       <div class="messages-header-copy">
         <span class="messages-eyebrow">Hai đứa mình</span>
@@ -312,6 +321,7 @@ export function renderMessagesPage(): RoutePage {
   let typingStopTimer: number | null = null;
   let lastReadMessageId: string | null = null;
   let partnerOnline = false;
+  let latestRefreshInFlight: Promise<void> | null = null;
 
   function commitChatBackground(selection: ChatBackgroundSelection, successMessage: string): void {
     if (!saveChatBackground(selection)) {
@@ -348,10 +358,9 @@ export function renderMessagesPage(): RoutePage {
         current.kind === 'preset' && current.id === preset.id ? 'true' : 'false',
       );
       option.setAttribute('aria-label', `Chọn nền ${preset.name}`);
-      option.style.setProperty(
-        '--wallpaper-preview',
-        preset.imageUrl ? toCssBackgroundImage(preset.imageUrl) : preset.preview,
-      );
+      option.style.backgroundImage = preset.imageUrl
+        ? toCssBackgroundImage(preset.imageUrl)
+        : preset.preview;
       option.innerHTML = `<span class="messages-wallpaper-option-label">${preset.name}</span>`;
       option.addEventListener('click', () => {
         commitChatBackground(
@@ -371,10 +380,9 @@ export function renderMessagesPage(): RoutePage {
     const customButton = document.createElement('button');
     customButton.type = 'button';
     customButton.className = 'messages-wallpaper-custom';
-    customButton.style.setProperty(
-      '--wallpaper-preview',
-      current.kind === 'custom' ? toCssBackgroundImage(current.dataUrl) : 'none',
-    );
+    customButton.style.backgroundImage = current.kind === 'custom'
+      ? `linear-gradient(rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.64)), ${toCssBackgroundImage(current.dataUrl)}`
+      : 'linear-gradient(135deg, rgba(255, 239, 246, 0.96), rgba(255, 255, 255, 0.96))';
     customButton.innerHTML = `
       <span class="messages-wallpaper-custom-icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1158,15 +1166,23 @@ export function renderMessagesPage(): RoutePage {
 
   async function refreshLatestMessages(): Promise<void> {
     if (!scrollState.initialized || !active) return;
-    try {
-      const response = await getMessages({ limit: 50, force: true });
-      if (!active) return;
-      mergeMessages(response.data, 'refresh');
-      beforeCursor = response.beforeCursor ?? beforeCursor;
-      afterCursor = response.afterCursor ?? afterCursor;
-    } catch {
-      // Keep the current conversation when the stream reconnects during a blip.
-    }
+    if (latestRefreshInFlight) return latestRefreshInFlight;
+
+    latestRefreshInFlight = (async () => {
+      try {
+        const response = await getMessages({ limit: 50, force: true });
+        if (!active) return;
+        mergeMessages(response.data, 'refresh');
+        beforeCursor = response.beforeCursor ?? beforeCursor;
+        afterCursor = response.afterCursor ?? afterCursor;
+      } catch {
+        // Keep the current conversation when the stream reconnects during a blip.
+      } finally {
+        latestRefreshInFlight = null;
+      }
+    })();
+
+    return latestRefreshInFlight;
   }
 
   async function loadOlderMessages(): Promise<void> {
@@ -1411,8 +1427,19 @@ export function renderMessagesPage(): RoutePage {
   window.addEventListener('lovecheck:realtime-event', handleRealtimeEvent);
   const handleAndroidShare = () => { void handlePendingShare(); };
   window.addEventListener('lovecheck:android-share', handleAndroidShare);
-  const handleOnline = () => flushOutbox();
+  const handleOnline = () => {
+    flushOutbox();
+    if (active) void refreshLatestMessages();
+  };
+  const handleVisibilityChange = () => {
+    if (document.visibilityState !== 'visible' || !active) return;
+    // Android may throttle timers and suspend EventSource while the WebView is
+    // backgrounded. Reconcile immediately when the conversation is visible.
+    void refreshLatestMessages();
+    flushOutbox();
+  };
   window.addEventListener('online', handleOnline);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
   messageInput.addEventListener('input', () => {
     if (!active) return;
     if (typingStopTimer !== null) window.clearTimeout(typingStopTimer);
@@ -1532,6 +1559,7 @@ export function renderMessagesPage(): RoutePage {
       window.removeEventListener('lovecheck:realtime-event', handleRealtimeEvent);
       window.removeEventListener('lovecheck:android-share', handleAndroidShare);
       window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (typingTimer !== null) window.clearTimeout(typingTimer);
       if (typingStopTimer !== null) window.clearTimeout(typingStopTimer);
       if (scrollFrame !== null) window.cancelAnimationFrame(scrollFrame);

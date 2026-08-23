@@ -1,18 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../api/query-cache', () => ({
-  invalidateQueries: vi.fn(),
-}));
-vi.mock('../components/refresh-icon', () => ({
-  REFRESH_ICON_ANIMATION_DURATION_MS: 300,
-  refreshIconMarkup: '',
-  setRefreshButtonLoading: vi.fn(),
-}));
-vi.mock('../components/toast', () => ({ showToast: vi.fn() }));
-vi.mock('../route-invalidation', () => ({ invalidateRoutes: vi.fn() }));
-vi.mock('../router', () => ({ navigate: vi.fn() }));
-
 import { decorateTimeSeparators } from './message-thread-enhancements';
 
 function createMessage(createdAt: string, label: string): HTMLElement {

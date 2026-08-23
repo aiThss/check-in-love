@@ -696,6 +696,7 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
         targetUrl: '/app/messages',
         messageId: message._id.toString(),
         senderName: message.senderName,
+        deleted: true,
       });
     }
     return reply.send({ success: true });

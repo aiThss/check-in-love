@@ -2,7 +2,18 @@ import { store } from '../store';
 import { logger } from '../utils/logger';
 
 export interface RealtimeEventData {
-  type: 'message' | 'checkin' | 'reaction' | 'reply' | 'reminder' | 'connected';
+  type:
+    | 'message'
+    | 'message.updated'
+    | 'message.reaction'
+    | 'message.read'
+    | 'message.typing'
+    | 'message.presence'
+    | 'checkin'
+    | 'reaction'
+    | 'reply'
+    | 'reminder'
+    | 'connected';
   title?: string;
   body?: string;
   targetUrl?: string;

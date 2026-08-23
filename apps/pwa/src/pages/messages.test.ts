@@ -33,7 +33,11 @@ vi.mock('../components/camera', () => ({
   revokePreviewUrl: mocks.revokePreviewUrl,
 }));
 vi.mock('../components/toast', () => ({ showToast: mocks.showToast }));
-vi.mock('../router', () => ({ navigate: mocks.navigate }));
+vi.mock('../router', () => ({
+  navigate: mocks.navigate,
+  openHistoryLayer: vi.fn().mockReturnValue('wallpaper-test-layer'),
+  closeHistoryLayer: vi.fn(),
+}));
 vi.mock('../store/index', () => ({
   store: {
     get: () => ({
@@ -118,6 +122,7 @@ describe('Messages scroll and reply behavior', () => {
 
     expect(routePage.element.querySelector('.messages-eyebrow')?.textContent).toBe('Hai đứa mình');
     expect(routePage.element.querySelector('h1')).toBeNull();
+    expect(routePage.element.querySelector('.messages-refresh-button')).toBeNull();
 
     const menu = routePage.element.querySelector<HTMLElement>('.messages-header-menu')!;
     const menuButton = routePage.element.querySelector<HTMLButtonElement>('.messages-menu-button')!;
@@ -125,6 +130,19 @@ describe('Messages scroll and reply behavior', () => {
     menuButton.click();
     expect(menu.hidden).toBe(false);
     expect(menu.textContent).toContain('Đổi nền chat');
+  });
+
+  it('renders a stable two-column wallpaper list with bundled photo previews', async () => {
+    const routePage = await mount([]);
+    routePage.element.querySelector<HTMLButtonElement>('.messages-menu-button')?.click();
+    routePage.element.querySelector<HTMLButtonElement>('[data-messages-action="background"]')?.click();
+
+    const options = document.querySelectorAll<HTMLButtonElement>('.messages-wallpaper-option');
+    expect(options).toHaveLength(6);
+    expect(options[0].style.backgroundImage).toContain('linear-gradient');
+    expect(options[1].style.backgroundImage).toContain('rose-bloom.jpg');
+    expect(options[2].style.backgroundImage).toContain('sunset-ocean.jpg');
+    expect(options[0].style.getPropertyValue('--wallpaper-preview')).toBe('');
   });
 
   it('restores a selected wallpaper from local device storage', async () => {
@@ -136,7 +154,36 @@ describe('Messages scroll and reply behavior', () => {
     const routePage = await mount([]);
     expect(routePage.element.dataset.chatBackground).toBe('sunset-horizon');
     expect(routePage.element.classList.contains('has-chat-wallpaper')).toBe(true);
-    expect(routePage.element.style.getPropertyValue('--messages-wallpaper-image')).toContain('sunset-horizon.svg');
+    expect(routePage.element.querySelector<HTMLElement>('.messages-wallpaper-layer')?.style.backgroundImage)
+      .toContain('sunset-ocean.jpg');
+  });
+
+  it('refreshes immediately from realtime events and when Android resumes the WebView', async () => {
+    const first = message('first');
+    const incoming = message('incoming');
+    const routePage = await mount([first]);
+
+    mocks.getMessages.mockResolvedValue(response([first, incoming]));
+    const callsBeforeRealtime = mocks.getMessages.mock.calls.length;
+    window.dispatchEvent(new CustomEvent('lovecheck:realtime-event', {
+      detail: { type: 'message', messageId: incoming.id },
+    }));
+    await flush();
+
+    expect(routePage.element.querySelector('[data-message-id="incoming"]')).not.toBeNull();
+    const callsAfterRealtime = mocks.getMessages.mock.calls.length;
+    expect(callsAfterRealtime).toBeGreaterThan(callsBeforeRealtime);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
+    mocks.getMessages.mockResolvedValue(response([first, incoming, message('resumed')]));
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+
+    expect(routePage.element.querySelector('[data-message-id="resumed"]')).not.toBeNull();
+    expect(mocks.getMessages.mock.calls.length).toBeGreaterThan(callsAfterRealtime);
   });
 
   async function mount(data: ChatMessage[], hasMore = false) {

@@ -13,9 +13,12 @@ export const DEFAULT_CHAT_BACKGROUND_ID = 'default';
 export const CHAT_BACKGROUND_STORAGE_KEY = 'lovecheck_chat_background_v1';
 
 /**
- * Small, local-only wallpaper collection for the private two-person chat.
- * The SVGs are shipped with the PWA so the picker also works offline and in
- * the Android WebView without depending on a third-party image host.
+ * Local wallpaper collection for the private two-person chat. The photos are
+ * bundled with the PWA so the picker works offline and in the Android WebView
+ * without depending on a third-party image host at runtime.
+ *
+ * The preset ids stay stable so a wallpaper selected in an older release is
+ * automatically upgraded to the newer photo in this collection.
  */
 export const CHAT_BACKGROUND_PRESETS: readonly ChatBackgroundPreset[] = [
   {
@@ -26,33 +29,33 @@ export const CHAT_BACKGROUND_PRESETS: readonly ChatBackgroundPreset[] = [
   },
   {
     id: 'rose-garden',
-    name: 'Vườn hồng',
-    imageUrl: '/chat-backgrounds/rose-garden.svg',
-    preview: 'linear-gradient(135deg, #ffd8e6, #fff1f4)',
+    name: 'Hoa hồng',
+    imageUrl: '/chat-backgrounds/rose-bloom.jpg',
+    preview: 'linear-gradient(135deg, #d88d9f, #f9dce2)',
   },
   {
     id: 'sunset-horizon',
-    name: 'Hoàng hôn',
-    imageUrl: '/chat-backgrounds/sunset-horizon.svg',
-    preview: 'linear-gradient(145deg, #ffad9c, #e6a4d8 58%, #6971b9)',
+    name: 'Hoàng hôn biển',
+    imageUrl: '/chat-backgrounds/sunset-ocean.jpg',
+    preview: 'linear-gradient(145deg, #f5b0a4, #e78e7e 58%, #6b3a5e)',
   },
   {
     id: 'lavender-stars',
-    name: 'Sao tím',
-    imageUrl: '/chat-backgrounds/lavender-stars.svg',
-    preview: 'linear-gradient(145deg, #d8ccff, #b8cdfc 55%, #7e8bd0)',
+    name: 'Đồi lavender',
+    imageUrl: '/chat-backgrounds/lavender-field.jpg',
+    preview: 'linear-gradient(145deg, #bbd9f5, #8969a7 55%, #4c3a76)',
   },
   {
     id: 'mint-bloom',
-    name: 'Vườn bạc hà',
-    imageUrl: '/chat-backgrounds/mint-bloom.svg',
-    preview: 'linear-gradient(145deg, #c9f2e4, #fff0d7 56%, #f5a9af)',
+    name: 'Lá nhiệt đới',
+    imageUrl: '/chat-backgrounds/botanical-green.jpg',
+    preview: 'linear-gradient(145deg, #b9d792, #2f704a 56%, #102d27)',
   },
   {
     id: 'midnight-heart',
-    name: 'Tim đêm',
-    imageUrl: '/chat-backgrounds/midnight-heart.svg',
-    preview: 'linear-gradient(145deg, #17234c, #34235f 56%, #7f426d)',
+    name: 'Bãi biển hồng',
+    imageUrl: '/chat-backgrounds/palm-sunset.jpg',
+    preview: 'linear-gradient(145deg, #a9b2c7, #f0b2ba 56%, #5c3a4b)',
   },
 ] as const;
 
