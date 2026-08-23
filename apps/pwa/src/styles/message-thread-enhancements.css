@@ -166,7 +166,13 @@
   left: 0;
 }
 
-.messages-page > .messages-header,
+.messages-page > .messages-header {
+  /* Keep the compact header, especially the three-dot control, above the
+   * scrollable thread when older/newer bubbles pass underneath it. */
+  position: relative;
+  z-index: 4;
+}
+
 .messages-page > .messages-thread {
   position: relative;
   z-index: 1;
