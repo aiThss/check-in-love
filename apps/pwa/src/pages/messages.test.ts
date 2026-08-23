@@ -113,6 +113,32 @@ describe('Messages scroll and reply behavior', () => {
     expect(formatMessageTime('2026-08-07T07:25:00.000Z', now)).toMatch(/07\/08\/2026 14:25$/);
   });
 
+  it('keeps a compact couple-only header and exposes the chat options menu', async () => {
+    const routePage = await mount([]);
+
+    expect(routePage.element.querySelector('.messages-eyebrow')?.textContent).toBe('Hai đứa mình');
+    expect(routePage.element.querySelector('h1')).toBeNull();
+
+    const menu = routePage.element.querySelector<HTMLElement>('.messages-header-menu')!;
+    const menuButton = routePage.element.querySelector<HTMLButtonElement>('.messages-menu-button')!;
+    expect(menu.hidden).toBe(true);
+    menuButton.click();
+    expect(menu.hidden).toBe(false);
+    expect(menu.textContent).toContain('Đổi nền chat');
+  });
+
+  it('restores a selected wallpaper from local device storage', async () => {
+    localStorage.setItem(
+      'lovecheck_chat_background_v1',
+      JSON.stringify({ kind: 'preset', id: 'sunset-horizon' }),
+    );
+
+    const routePage = await mount([]);
+    expect(routePage.element.dataset.chatBackground).toBe('sunset-horizon');
+    expect(routePage.element.classList.contains('has-chat-wallpaper')).toBe(true);
+    expect(routePage.element.style.getPropertyValue('--messages-wallpaper-image')).toContain('sunset-horizon.svg');
+  });
+
   async function mount(data: ChatMessage[], hasMore = false) {
     mocks.getMessages.mockResolvedValue(response(data, hasMore));
     const { renderMessagesPage } = await import('./messages');

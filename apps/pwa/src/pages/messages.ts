@@ -5,10 +5,18 @@ import * as messageApi from '../api/messages';
 import { enqueueMessage, flushMessageOutbox, type QueuedMessage } from '../api/message-outbox';
 import { createCheckin } from '../api/checkins';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
+import { closeModal, showModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import type { ChatMessage } from '../api/types';
 import { navigate, type RoutePage } from '../router';
 import { store } from '../store/index';
+import {
+  CHAT_BACKGROUND_PRESETS,
+  getChatBackgroundImage,
+  readChatBackground,
+  saveChatBackground,
+  type ChatBackgroundSelection,
+} from '../utils/message-background';
 
 const NEAR_BOTTOM_DISTANCE = 80;
 const SWIPE_INTENT_DISTANCE = 10;
@@ -151,6 +159,37 @@ async function consumePendingShare(): Promise<PendingShare | null> {
   }
 }
 
+function toCssBackgroundImage(url: string): string {
+  const escaped = url.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return `url("${escaped}")`;
+}
+
+function applyChatBackground(page: HTMLElement, selection: ChatBackgroundSelection): void {
+  const image = getChatBackgroundImage(selection);
+  if (!image) {
+    page.classList.remove('has-chat-wallpaper');
+    page.style.removeProperty('--messages-wallpaper-image');
+    delete page.dataset.chatBackground;
+    return;
+  }
+
+  page.classList.add('has-chat-wallpaper');
+  page.dataset.chatBackground = selection.kind === 'custom' ? 'custom' : selection.id;
+  page.style.setProperty('--messages-wallpaper-image', toCssBackgroundImage(image));
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('Không đọc được ảnh nền'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Không đọc được ảnh nền'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function renderMessagesPage(): RoutePage {
   const page = document.createElement('div');
   page.className = 'page messages-page animate-fade-in';
@@ -164,10 +203,37 @@ export function renderMessagesPage(): RoutePage {
   }
   page.innerHTML = `
     <header class="messages-header">
-      <div>
+      <div class="messages-header-copy">
         <span class="messages-eyebrow">Hai đứa mình</span>
-        <h1>Tin nhắn</h1>
         <span class="messages-presence" aria-live="polite"></span>
+      </div>
+      <div class="messages-header-menu-wrap">
+        <button
+          class="messages-menu-button"
+          type="button"
+          aria-label="Tùy chọn cuộc trò chuyện"
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5" cy="12" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="19" cy="12" r="1.8" />
+          </svg>
+        </button>
+        <div class="messages-header-menu" role="menu" hidden>
+          <button class="messages-header-menu-item" type="button" role="menuitem" data-messages-action="background">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="16" rx="3" />
+              <circle cx="8.5" cy="9" r="1.5" />
+              <path d="m4 17 4.4-4.2a1.8 1.8 0 0 1 2.5 0l2.1 2 1.4-1.3a1.8 1.8 0 0 1 2.5 0L21 16.6" />
+            </svg>
+            <span>
+              <strong>Đổi nền chat</strong>
+              <small>Nền mẫu hoặc ảnh trong album</small>
+            </span>
+          </button>
+        </div>
       </div>
     </header>
     <main class="messages-thread" aria-live="polite" aria-label="Cuộc trò chuyện"></main>
@@ -215,6 +281,10 @@ export function renderMessagesPage(): RoutePage {
   const preview = page.querySelector<HTMLElement>('.messages-photo-preview')!;
   const sendButton = page.querySelector<HTMLButtonElement>('.messages-send')!;
   const presence = page.querySelector<HTMLElement>('.messages-presence')!;
+  const headerMenuButton = page.querySelector<HTMLButtonElement>('.messages-menu-button')!;
+  const headerMenu = page.querySelector<HTMLElement>('.messages-header-menu')!;
+  const backgroundMenuItem = page.querySelector<HTMLButtonElement>('[data-messages-action="background"]')!;
+  applyChatBackground(page, readChatBackground());
   const bottomSentinel = document.createElement('div');
   bottomSentinel.dataset.messageBottomSentinel = '';
   bottomSentinel.className = 'messages-bottom-sentinel';
@@ -242,6 +312,112 @@ export function renderMessagesPage(): RoutePage {
   let typingStopTimer: number | null = null;
   let lastReadMessageId: string | null = null;
   let partnerOnline = false;
+
+  function commitChatBackground(selection: ChatBackgroundSelection, successMessage: string): void {
+    if (!saveChatBackground(selection)) {
+      showToast('Không lưu được nền chat trên thiết bị này', 'error');
+      return;
+    }
+
+    applyChatBackground(page, selection);
+    closeModal();
+    showToast(successMessage, 'success');
+  }
+
+  function openChatBackgroundPicker(): void {
+    const current = readChatBackground();
+    const picker = document.createElement('div');
+    picker.className = 'messages-wallpaper-picker';
+
+    const description = document.createElement('p');
+    description.className = 'messages-wallpaper-description';
+    description.textContent = 'Chọn một nền nhẹ mắt cho cuộc trò chuyện của hai đứa mình.';
+
+    const grid = document.createElement('div');
+    grid.className = 'messages-wallpaper-grid';
+    grid.setAttribute('role', 'radiogroup');
+    grid.setAttribute('aria-label', 'Nền chat có sẵn');
+
+    CHAT_BACKGROUND_PRESETS.forEach((preset) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'messages-wallpaper-option';
+      option.setAttribute('role', 'radio');
+      option.setAttribute(
+        'aria-checked',
+        current.kind === 'preset' && current.id === preset.id ? 'true' : 'false',
+      );
+      option.setAttribute('aria-label', `Chọn nền ${preset.name}`);
+      option.style.setProperty(
+        '--wallpaper-preview',
+        preset.imageUrl ? toCssBackgroundImage(preset.imageUrl) : preset.preview,
+      );
+      option.innerHTML = `<span class="messages-wallpaper-option-label">${preset.name}</span>`;
+      option.addEventListener('click', () => {
+        commitChatBackground(
+          { kind: 'preset', id: preset.id },
+          preset.id === 'default' ? 'Đã khôi phục nền mặc định' : `Đã đổi nền: ${preset.name}`,
+        );
+      });
+      grid.appendChild(option);
+    });
+
+    const customInput = document.createElement('input');
+    customInput.type = 'file';
+    customInput.accept = 'image/*';
+    customInput.hidden = true;
+    customInput.setAttribute('aria-label', 'Chọn ảnh nền từ album');
+
+    const customButton = document.createElement('button');
+    customButton.type = 'button';
+    customButton.className = 'messages-wallpaper-custom';
+    customButton.style.setProperty(
+      '--wallpaper-preview',
+      current.kind === 'custom' ? toCssBackgroundImage(current.dataUrl) : 'none',
+    );
+    customButton.innerHTML = `
+      <span class="messages-wallpaper-custom-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12" />
+          <path d="m7 10 5 5 5-5" />
+          <path d="M5 21h14" />
+        </svg>
+      </span>
+      <span>
+        <strong>${current.kind === 'custom' ? 'Chọn ảnh khác' : 'Chọn ảnh từ album'}</strong>
+        <small>${current.kind === 'custom' ? 'Đang dùng ảnh riêng' : 'Ảnh sẽ được lưu riêng trên thiết bị'}</small>
+      </span>
+    `;
+    customButton.addEventListener('click', () => customInput.click());
+    customInput.addEventListener('change', async () => {
+      const source = customInput.files?.[0];
+      customInput.value = '';
+      if (!source) return;
+
+      let previewSource: string | null = null;
+      try {
+        customButton.disabled = true;
+        const processed = await processImage(source, { maxSize: 1600, quality: 0.82 });
+        previewSource = processed.preview;
+        const dataUrl = await readFileAsDataUrl(processed.file);
+        commitChatBackground({ kind: 'custom', dataUrl }, 'Đã đặt ảnh riêng làm nền chat');
+      } catch {
+        showToast('Không xử lý được ảnh nền này, thử ảnh khác nhé', 'error');
+      } finally {
+        revokePreviewUrl(previewSource);
+        customButton.disabled = false;
+      }
+    });
+
+    picker.append(description, grid, customButton, customInput);
+    showModal({
+      title: 'Nền trò chuyện',
+      content: picker,
+      cancelText: 'Đóng',
+      center: true,
+      modalClass: 'messages-wallpaper-modal',
+    });
+  }
 
   const safePresence = (online: boolean): Promise<void> => (
     optionalMessageApiFunction('setMessagePresence')?.(online) ?? Promise.resolve()
@@ -1256,9 +1432,34 @@ export function renderMessagesPage(): RoutePage {
       scrollToBottom('follow');
     }, 280);
   });
-  page.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && pendingReply) clearPendingReply();
-  });
+  const closeHeaderMenu = () => {
+    headerMenu.hidden = true;
+    headerMenuButton.setAttribute('aria-expanded', 'false');
+  };
+  const onHeaderMenuButtonClick = () => {
+    const nextHidden = !headerMenu.hidden;
+    headerMenu.hidden = nextHidden;
+    headerMenuButton.setAttribute('aria-expanded', String(!nextHidden));
+  };
+  const onHeaderMenuItemClick = () => {
+    closeHeaderMenu();
+    openChatBackgroundPicker();
+  };
+  const onPageClick = (event: MouseEvent) => {
+    const target = event.target;
+    if (!(target instanceof Element) || !target.closest('.messages-header-menu-wrap')) {
+      closeHeaderMenu();
+    }
+  };
+  const onPageKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape') return;
+    closeHeaderMenu();
+    if (pendingReply) clearPendingReply();
+  };
+  headerMenuButton.addEventListener('click', onHeaderMenuButtonClick);
+  backgroundMenuItem.addEventListener('click', onHeaderMenuItemClick);
+  page.addEventListener('click', onPageClick);
+  page.addEventListener('keydown', onPageKeyDown);
   photoButton.addEventListener('click', () => { attachMenu.hidden = !attachMenu.hidden; });
   preview.addEventListener('click', () => {
     if (!previewUrl) return;
@@ -1338,6 +1539,10 @@ export function renderMessagesPage(): RoutePage {
       thread.removeEventListener('scroll', handleScroll);
       thread.removeEventListener('click', onThreadClick);
       form.removeEventListener('submit', sendMessage);
+      headerMenuButton.removeEventListener('click', onHeaderMenuButtonClick);
+      backgroundMenuItem.removeEventListener('click', onHeaderMenuItemClick);
+      page.removeEventListener('click', onPageClick);
+      page.removeEventListener('keydown', onPageKeyDown);
       clearSelectedPhoto();
     },
   };
