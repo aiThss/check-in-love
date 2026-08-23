@@ -145,6 +145,47 @@ describe('Messages scroll and reply behavior', () => {
     expect(options[0].style.getPropertyValue('--wallpaper-preview')).toBe('');
   });
 
+  it('applies a selected preset immediately and persists it for the active chat page', async () => {
+    const routePage = await mount([]);
+    routePage.element.querySelector<HTMLButtonElement>('.messages-menu-button')?.click();
+    routePage.element.querySelector<HTMLButtonElement>('[data-messages-action="background"]')?.click();
+
+    const option = document.querySelectorAll<HTMLButtonElement>('.messages-wallpaper-option')[2];
+    option.click();
+
+    expect(JSON.parse(localStorage.getItem('lovecheck_chat_background_v1') ?? '{}')).toEqual({
+      kind: 'preset',
+      id: 'sunset-horizon',
+    });
+    expect(routePage.element.classList.contains('has-chat-wallpaper')).toBe(true);
+    expect(routePage.element.dataset.chatBackground).toBe('sunset-horizon');
+    const layer = routePage.element.querySelector<HTMLElement>('.messages-wallpaper-layer')!;
+    expect(layer.style.backgroundImage).toContain('sunset-ocean.jpg');
+    expect(layer.style.position).toBe('absolute');
+    expect(layer.style.display).toBe('block');
+    expect(layer.style.top).toBe('0px');
+    expect(layer.style.bottom).toBe('0px');
+  });
+
+  it('still applies a preset when device storage is unavailable', async () => {
+    const routePage = await mount([]);
+    routePage.element.querySelector<HTMLButtonElement>('.messages-menu-button')?.click();
+    routePage.element.querySelector<HTMLButtonElement>('[data-messages-action="background"]')?.click();
+
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+    try {
+      document.querySelectorAll<HTMLButtonElement>('.messages-wallpaper-option')[1]?.click();
+      expect(routePage.element.dataset.chatBackground).toBe('rose-garden');
+      expect(routePage.element.querySelector<HTMLElement>('.messages-wallpaper-layer')?.style.backgroundImage)
+        .toContain('rose-bloom.jpg');
+      expect(mocks.showToast).toHaveBeenCalledWith(expect.stringContaining('chỉ áp dụng cho phiên này'), 'info');
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
   it('restores a selected wallpaper from local device storage', async () => {
     localStorage.setItem(
       'lovecheck_chat_background_v1',

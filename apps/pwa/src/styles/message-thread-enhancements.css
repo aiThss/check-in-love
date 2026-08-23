@@ -141,21 +141,35 @@
  * WebViews have been unreliable when resolving var() inside background-image. */
 .messages-page.has-chat-wallpaper {
   background-color: var(--bg);
+  isolation: isolate;
 }
 
 .messages-wallpaper-layer {
   display: none;
+  z-index: 0;
+  pointer-events: none;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: 0.82;
+}
+
+/* `.page > :not(.bottom-nav)` gives direct page children a positioned layout
+ * with higher specificity. Keep the wallpaper an actual full-page layer instead
+ * of letting that generic rule collapse it into a zero-height flow item. */
+.messages-page > .messages-wallpaper-layer {
   position: absolute;
   z-index: 0;
   top: 0;
   right: 0;
   bottom: 0;
   left: 0;
-  pointer-events: none;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
-  opacity: 0.82;
+}
+
+.messages-page > .messages-header,
+.messages-page > .messages-thread {
+  position: relative;
+  z-index: 1;
 }
 
 .messages-page.has-chat-wallpaper .messages-wallpaper-layer {

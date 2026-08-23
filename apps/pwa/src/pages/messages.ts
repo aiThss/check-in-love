@@ -169,7 +169,16 @@ function applyChatBackground(page: HTMLElement, selection: ChatBackgroundSelecti
   const wallpaperLayer = page.querySelector<HTMLElement>('.messages-wallpaper-layer');
   if (!image) {
     page.classList.remove('has-chat-wallpaper');
-    wallpaperLayer?.style.removeProperty('background-image');
+    if (wallpaperLayer) {
+      wallpaperLayer.style.removeProperty('background-image');
+      wallpaperLayer.style.removeProperty('display');
+      wallpaperLayer.style.removeProperty('position');
+      wallpaperLayer.style.removeProperty('top');
+      wallpaperLayer.style.removeProperty('right');
+      wallpaperLayer.style.removeProperty('bottom');
+      wallpaperLayer.style.removeProperty('left');
+      wallpaperLayer.style.removeProperty('z-index');
+    }
     page.style.removeProperty('background-image');
     delete page.dataset.chatBackground;
     return;
@@ -178,6 +187,16 @@ function applyChatBackground(page: HTMLElement, selection: ChatBackgroundSelecti
   page.classList.add('has-chat-wallpaper');
   page.dataset.chatBackground = selection.kind === 'custom' ? 'custom' : selection.id;
   if (wallpaperLayer) {
+    // Keep the geometry inline as a fallback for stale Android/PWA CSS bundles.
+    // The generic `.page > :not(.bottom-nav)` rule otherwise wins on specificity
+    // and turns this absolute layer into a zero-height flow item.
+    wallpaperLayer.style.display = 'block';
+    wallpaperLayer.style.position = 'absolute';
+    wallpaperLayer.style.top = '0';
+    wallpaperLayer.style.right = '0';
+    wallpaperLayer.style.bottom = '0';
+    wallpaperLayer.style.left = '0';
+    wallpaperLayer.style.zIndex = '0';
     wallpaperLayer.style.backgroundImage = toCssBackgroundImage(image);
     page.style.removeProperty('background-image');
   } else {
@@ -324,14 +343,18 @@ export function renderMessagesPage(): RoutePage {
   let latestRefreshInFlight: Promise<void> | null = null;
 
   function commitChatBackground(selection: ChatBackgroundSelection, successMessage: string): void {
-    if (!saveChatBackground(selection)) {
-      showToast('Không lưu được nền chat trên thiết bị này', 'error');
-      return;
-    }
-
+    const persisted = saveChatBackground(selection);
+    // Applying the wallpaper is an in-memory UI action and must not depend on
+    // localStorage being available. Quota/private-mode failures previously made
+    // both preset and album selections appear to do nothing at all.
     applyChatBackground(page, selection);
     closeModal();
-    showToast(successMessage, 'success');
+    showToast(
+      persisted
+        ? successMessage
+        : `${successMessage} (chỉ áp dụng cho phiên này vì bộ nhớ thiết bị đầy)`,
+      persisted ? 'success' : 'info',
+    );
   }
 
   function openChatBackgroundPicker(): void {
