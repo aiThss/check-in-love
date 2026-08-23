@@ -22,6 +22,8 @@ import org.json.JSONObject
  * It also installs Android-only layout guards for the two canvas-based scratch UIs.
  * Chromium WebView on some devices intermittently resolves their percentage/aspect
  * ratio heights as a tiny horizontal strip even though normal Chrome/PWA is fine.
+ * The same guard also stabilizes the chat wallpaper picker sheet, whose grid can
+ * otherwise collapse below its title on affected WebView builds.
  */
 @SuppressLint("ViewConstructor")
 class StickerWebView(context: Context) : WebView(context) {
@@ -376,6 +378,250 @@ class StickerWebView(context: Context) : WebView(context) {
               normalizeOccasionCard(document);
               normalizePolaroid(document);
               pruneDuplicateCardToasts();
+            })();
+            """.trimIndent(),
+            null,
+        )
+
+        installAndroidWallpaperLayoutFix()
+    }
+
+    /**
+     * Android-only fallback for the chat wallpaper picker.
+     *
+     * The PWA picker is intentionally left untouched: current Chrome/PWA lays it out
+     * correctly. A few Android WebView versions collapse the generic centered modal's
+     * content box while resolving viewport units, leaving only the title bar visible.
+     * Measure the actual WebView viewport and assign stable pixel boxes instead.
+     */
+    private fun installAndroidWallpaperLayoutFix() {
+        evaluateJavascript(
+            """
+            (function installLoveCheckAndroidWallpaperLayoutFix() {
+              if (!document || !document.documentElement || typeof Node === 'undefined') return;
+
+              var STYLE_ID = 'lovecheck-android-wallpaper-layout-fix-v1';
+              if (!document.getElementById(STYLE_ID)) {
+                var style = document.createElement('style');
+                style.id = STYLE_ID;
+                style.textContent =
+                  '.messages-wallpaper-modal{' +
+                    'box-sizing:border-box!important;' +
+                    'display:block!important;' +
+                    'height:auto!important;min-height:0!important;' +
+                    'overflow-x:hidden!important;overflow-y:auto!important;' +
+                    'visibility:visible!important;opacity:1!important;' +
+                    'animation:none!important;transform:none!important;' +
+                  '}' +
+                  '.messages-wallpaper-modal .messages-wallpaper-picker{' +
+                    'display:grid!important;width:100%!important;' +
+                    'height:auto!important;min-height:1px!important;' +
+                  '}' +
+                  '.messages-wallpaper-modal .messages-wallpaper-grid{' +
+                    'display:grid!important;width:100%!important;' +
+                    'min-height:1px!important;' +
+                  '}' +
+                  '.messages-wallpaper-modal .messages-wallpaper-option{' +
+                    'display:block!important;visibility:visible!important;' +
+                    'height:148px!important;min-height:148px!important;' +
+                  '}' +
+                  '.messages-wallpaper-modal .messages-wallpaper-custom{' +
+                    'display:flex!important;visibility:visible!important;' +
+                    'min-height:58px!important;' +
+                  '}';
+                (document.head || document.documentElement).appendChild(style);
+              }
+
+              var px = function (value) {
+                var parsed = parseFloat(value || '0');
+                return Number.isFinite(parsed) ? parsed : 0;
+              };
+
+              var readCssPx = function (name) {
+                try {
+                  return Math.max(
+                    0,
+                    px(getComputedStyle(document.documentElement).getPropertyValue(name))
+                  );
+                } catch (_) {
+                  return 0;
+                }
+              };
+
+              var findWallpaperModal = function (root) {
+                if (root && root.nodeType === 1 && root.matches &&
+                    root.matches('.messages-wallpaper-modal')) return root;
+                if (root && root.querySelector) {
+                  var nested = root.querySelector('.messages-wallpaper-modal');
+                  if (nested) return nested;
+                  // Older cached bundles may not forward modalClass to the modal
+                  // element, but the picker content itself is still identifiable.
+                  var nestedPicker = root.querySelector('.messages-wallpaper-picker');
+                  if (nestedPicker && nestedPicker.closest) {
+                    var nestedModal = nestedPicker.closest('.modal');
+                    if (nestedModal) return nestedModal;
+                  }
+                }
+                var modal = document.querySelector('.messages-wallpaper-modal');
+                if (modal) return modal;
+                var picker = document.querySelector('.messages-wallpaper-picker');
+                return picker && picker.closest ? picker.closest('.modal') : null;
+              };
+
+              var normalizeWallpaperPicker = function (root) {
+                var modal = findWallpaperModal(root);
+                if (!modal || !modal.isConnected) return;
+
+                var overlay = modal.closest('.modal-overlay');
+                var picker = modal.querySelector('.messages-wallpaper-picker');
+                if (!overlay || !picker) return;
+
+                var viewportWidth = Math.max(
+                  1,
+                  Math.round(window.innerWidth || document.documentElement.clientWidth || 1)
+                );
+                var viewportHeight = Math.max(
+                  1,
+                  Math.round(window.innerHeight || document.documentElement.clientHeight || 1)
+                );
+                var statusBar = readCssPx('--android-status-bar');
+                var navBar = readCssPx('--android-nav-bar');
+                var sidePadding = 14;
+                var topPadding = Math.max(16, Math.round(statusBar + 8));
+                var bottomPadding = Math.max(16, Math.round(navBar + 8));
+                var usableHeight = Math.max(260, viewportHeight - topPadding - bottomPadding);
+                var modalWidth = Math.max(180, Math.min(440, viewportWidth - sidePadding * 2));
+                var columns = viewportWidth >= 420 ? 3 : 2;
+                var optionHeight = columns === 3 ? 132 : 148;
+
+                // Use explicit edges instead of inset/100dvh. Older WebViews can report
+                // a transient zero height for those values while a centered modal opens.
+                overlay.style.setProperty('position', 'fixed', 'important');
+                overlay.style.setProperty('top', '0px', 'important');
+                overlay.style.setProperty('right', '0px', 'important');
+                overlay.style.setProperty('bottom', '0px', 'important');
+                overlay.style.setProperty('left', '0px', 'important');
+                overlay.style.setProperty('width', 'auto', 'important');
+                overlay.style.setProperty('height', 'auto', 'important');
+                overlay.style.setProperty('min-width', '0px', 'important');
+                overlay.style.setProperty('min-height', '0px', 'important');
+                overlay.style.setProperty('box-sizing', 'border-box', 'important');
+                overlay.style.setProperty(
+                  'padding',
+                  topPadding + 'px ' + sidePadding + 'px ' + bottomPadding + 'px',
+                  'important'
+                );
+                overlay.style.setProperty('display', 'flex', 'important');
+                overlay.style.setProperty('align-items', 'center', 'important');
+                overlay.style.setProperty('justify-content', 'center', 'important');
+
+                modal.style.setProperty('display', 'block', 'important');
+                modal.style.setProperty('position', 'relative', 'important');
+                modal.style.setProperty('box-sizing', 'border-box', 'important');
+                modal.style.setProperty('width', modalWidth + 'px', 'important');
+                modal.style.setProperty('min-width', '0px', 'important');
+                modal.style.setProperty('max-width', modalWidth + 'px', 'important');
+                modal.style.setProperty('height', 'auto', 'important');
+                modal.style.setProperty('min-height', '0px', 'important');
+                modal.style.setProperty('max-height', usableHeight + 'px', 'important');
+                modal.style.setProperty('overflow-x', 'hidden', 'important');
+                modal.style.setProperty('overflow-y', 'auto', 'important');
+                modal.style.setProperty('visibility', 'visible', 'important');
+                modal.style.setProperty('opacity', '1', 'important');
+                modal.style.setProperty('animation', 'none', 'important');
+                modal.style.setProperty('transform', 'none', 'important');
+                modal.style.setProperty('flex', '0 0 auto', 'important');
+
+                var title = modal.querySelector('.modal-title');
+                if (title) {
+                  title.style.setProperty('display', 'block', 'important');
+                  title.style.setProperty('visibility', 'visible', 'important');
+                }
+
+                picker.style.setProperty('display', 'grid', 'important');
+                picker.style.setProperty('width', '100%', 'important');
+                picker.style.setProperty('height', 'auto', 'important');
+                picker.style.setProperty('min-height', '1px', 'important');
+
+                var grid = picker.querySelector('.messages-wallpaper-grid');
+                if (grid) {
+                  grid.style.setProperty('display', 'grid', 'important');
+                  grid.style.setProperty('width', '100%', 'important');
+                  grid.style.setProperty(
+                    'grid-template-columns',
+                    'repeat(' + columns + ', minmax(0, 1fr))',
+                    'important'
+                  );
+                  grid.style.setProperty('min-height', '1px', 'important');
+                }
+
+                Array.prototype.forEach.call(
+                  picker.querySelectorAll('.messages-wallpaper-option'),
+                  function (option) {
+                    option.style.setProperty('display', 'block', 'important');
+                    option.style.setProperty('visibility', 'visible', 'important');
+                    option.style.setProperty('height', optionHeight + 'px', 'important');
+                    option.style.setProperty('min-height', optionHeight + 'px', 'important');
+                  }
+                );
+
+                var custom = picker.querySelector('.messages-wallpaper-custom');
+                if (custom) {
+                  custom.style.setProperty('display', 'flex', 'important');
+                  custom.style.setProperty('visibility', 'visible', 'important');
+                  custom.style.setProperty('min-height', '58px', 'important');
+                }
+
+                // Force the WebView to commit the corrected layout before the next frame.
+                modal.getBoundingClientRect();
+                picker.getBoundingClientRect();
+              };
+
+              if (!window.__loveCheckAndroidWallpaperObserverV1) {
+                window.__loveCheckAndroidWallpaperObserverV1 = new MutationObserver(function (records) {
+                  records.forEach(function (record) {
+                    record.addedNodes.forEach(function (node) {
+                      if (node && node.nodeType === 1) normalizeWallpaperPicker(node);
+                    });
+                  });
+                });
+                window.__loveCheckAndroidWallpaperObserverV1.observe(
+                  document.documentElement,
+                  { childList: true, subtree: true }
+                );
+              }
+
+              if (!window.__loveCheckAndroidWallpaperAppendChildV1) {
+                var nativeAppendChild = Node.prototype.appendChild;
+                window.__loveCheckAndroidWallpaperAppendChildV1 = nativeAppendChild;
+                Node.prototype.appendChild = function (child) {
+                  var result = nativeAppendChild.call(this, child);
+                  try {
+                    if (child && child.nodeType === 1) normalizeWallpaperPicker(child);
+                  } catch (_) {
+                    // This fallback must never interfere with regular DOM insertion.
+                  }
+                  return result;
+                };
+              }
+
+              if (!window.__loveCheckAndroidWallpaperViewportFixV1) {
+                window.__loveCheckAndroidWallpaperViewportFixV1 = function () {
+                  normalizeWallpaperPicker(document);
+                };
+                window.addEventListener(
+                  'resize',
+                  window.__loveCheckAndroidWallpaperViewportFixV1,
+                  { passive: true }
+                );
+                window.addEventListener(
+                  'orientationchange',
+                  window.__loveCheckAndroidWallpaperViewportFixV1,
+                  { passive: true }
+                );
+              }
+
+              normalizeWallpaperPicker(document);
             })();
             """.trimIndent(),
             null,
