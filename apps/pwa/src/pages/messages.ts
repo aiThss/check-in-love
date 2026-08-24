@@ -476,7 +476,7 @@ export function renderMessagesPage(): RoutePage {
       </span>
       <span>
         <strong>${current.kind === 'custom' ? 'Chọn ảnh khác' : 'Chọn ảnh từ album'}</strong>
-        <small>${current.kind === 'custom' ? 'Đang dùng ảnh riêng' : 'Ảnh sẽ được lưu riêng trên thiết bị'}</small>
+        <small>${current.kind === 'custom' ? 'Đang dùng ảnh riêng · đã đồng bộ' : 'Được đồng bộ cho cả hai người'}</small>
       </span>
     `;
     customButton.addEventListener('click', () => customInput.click());
