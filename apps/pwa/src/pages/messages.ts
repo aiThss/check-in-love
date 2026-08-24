@@ -403,9 +403,11 @@ export function renderMessagesPage(): RoutePage {
     const customButton = document.createElement('button');
     customButton.type = 'button';
     customButton.className = 'messages-wallpaper-custom';
-    customButton.style.backgroundImage = current.kind === 'custom'
-      ? `linear-gradient(rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.64)), ${toCssBackgroundImage(current.dataUrl)}`
-      : 'linear-gradient(135deg, rgba(255, 239, 246, 0.96), rgba(255, 255, 255, 0.96))';
+    if (current.kind === 'custom') {
+      // Let CSS provide the light/dark overlay instead of baking a white
+      // gradient into an inline background that dark mode cannot override.
+      customButton.style.setProperty('--wallpaper-custom-image', toCssBackgroundImage(current.dataUrl));
+    }
     customButton.innerHTML = `
       <span class="messages-wallpaper-custom-icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">

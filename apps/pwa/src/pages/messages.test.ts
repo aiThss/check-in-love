@@ -145,6 +145,16 @@ describe('Messages scroll and reply behavior', () => {
     expect(options[0].style.getPropertyValue('--wallpaper-preview')).toBe('');
   });
 
+  it('leaves the album button background to theme CSS instead of an inline light gradient', async () => {
+    const routePage = await mount([]);
+    routePage.element.querySelector<HTMLButtonElement>('.messages-menu-button')?.click();
+    routePage.element.querySelector<HTMLButtonElement>('[data-messages-action="background"]')?.click();
+
+    const customButton = document.querySelector<HTMLButtonElement>('.messages-wallpaper-custom')!;
+    expect(customButton.style.backgroundImage).toBe('');
+    expect(customButton.style.getPropertyValue('--wallpaper-custom-image')).toBe('');
+  });
+
   it('applies a selected preset immediately and persists it for the active chat page', async () => {
     const routePage = await mount([]);
     routePage.element.querySelector<HTMLButtonElement>('.messages-menu-button')?.click();
