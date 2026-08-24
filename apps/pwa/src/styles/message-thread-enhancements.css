@@ -397,39 +397,67 @@
 
 .message-system-event {
   display: flex;
-  width: 100%;
+  width: fit-content;
+  max-width: min(94%, 440px);
   align-items: baseline;
   justify-content: center;
   gap: 4px 7px;
-  margin: 8px auto;
-  padding: 0 18px;
-  color: var(--text-secondary);
+  margin: 7px auto;
+  padding: 6px 12px;
+  border: 1px solid var(--system-event-border);
+  border-radius: 999px;
+  background: var(--system-event-bg);
+  box-shadow: var(--system-event-shadow);
+  color: var(--system-event-fg);
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
+  backdrop-filter: blur(16px) saturate(135%);
   font-size: 10px;
+  font-weight: 650;
   line-height: 1.35;
   text-align: center;
   user-select: none;
 }
 
 .message-system-event-copy {
-  max-width: min(88vw, 360px);
+  max-width: min(78vw, 360px);
   margin: 0;
   overflow-wrap: anywhere;
 }
 
 .message-system-event-time {
   flex: 0 0 auto;
-  color: var(--text-secondary);
+  color: inherit;
   font-size: 9px;
-  opacity: .76;
+  opacity: .72;
   white-space: nowrap;
 }
 
-[data-theme='dark'] .message-system-event {
-  color: rgba(255, 255, 255, .64);
+.message-system-event {
+  --system-event-fg: #2d1930;
+  --system-event-bg: rgba(255, 255, 255, .86);
+  --system-event-border: rgba(45, 25, 48, .18);
+  --system-event-shadow: 0 4px 16px rgba(35, 20, 40, .16);
 }
 
-[data-theme='dark'] .message-system-event-time {
-  color: rgba(255, 255, 255, .48);
+[data-theme='dark'] .message-system-event {
+  --system-event-fg: #fff;
+  --system-event-bg: rgba(30, 16, 34, .78);
+  --system-event-border: rgba(255, 255, 255, .2);
+  --system-event-shadow: 0 4px 18px rgba(0, 0, 0, .28);
+}
+
+.messages-page[data-system-event-tone='light'] .message-system-event {
+  --system-event-fg: #2d1930;
+  --system-event-bg: rgba(255, 255, 255, .86);
+  --system-event-border: rgba(45, 25, 48, .18);
+  --system-event-shadow: 0 4px 16px rgba(35, 20, 40, .16);
+}
+
+.messages-page[data-system-event-tone='dark'] .message-system-event {
+  --system-event-fg: #fff;
+  --system-event-bg: rgba(30, 16, 34, .78);
+  --system-event-border: rgba(255, 255, 255, .2);
+  --system-event-shadow: 0 4px 18px rgba(0, 0, 0, .28);
 }
 
 .messages-presence {

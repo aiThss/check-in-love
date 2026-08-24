@@ -18,6 +18,7 @@ import {
   saveChatBackground,
   type ChatBackgroundSelection,
 } from '../utils/message-background';
+import { analyzeImageTone, themeFallbackTone } from '../utils/image-contrast';
 
 const NEAR_BOTTOM_DISTANCE = 80;
 const SWIPE_INTENT_DISTANCE = 10;
@@ -173,8 +174,28 @@ function toCssBackgroundImage(url: string): string {
   return `url("${escaped}")`;
 }
 
+const systemEventToneRequests = new WeakMap<HTMLElement, number>();
+
+function applySystemEventTone(page: HTMLElement, image: string | null): void {
+  const requestId = (systemEventToneRequests.get(page) ?? 0) + 1;
+  systemEventToneRequests.set(page, requestId);
+
+  if (!image) {
+    delete page.dataset.systemEventTone;
+    return;
+  }
+
+  const fallback = themeFallbackTone();
+  page.dataset.systemEventTone = fallback;
+  void analyzeImageTone(image).then((tone) => {
+    if (systemEventToneRequests.get(page) !== requestId) return;
+    page.dataset.systemEventTone = tone ?? fallback;
+  });
+}
+
 function applyChatBackground(page: HTMLElement, selection: ChatBackgroundSelection): void {
   const image = getChatBackgroundImage(selection);
+  applySystemEventTone(page, image);
   const wallpaperLayer = page.querySelector<HTMLElement>('.messages-wallpaper-layer');
   if (!image) {
     page.classList.remove('has-chat-wallpaper');
