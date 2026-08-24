@@ -1,5 +1,6 @@
 import { store } from '../store';
 import { logger } from '../utils/logger';
+import type { ChatBackgroundSnapshot } from './types';
 
 export interface RealtimeEventData {
   type:
@@ -9,6 +10,7 @@ export interface RealtimeEventData {
     | 'message.read'
     | 'message.typing'
     | 'message.presence'
+    | 'chat.background.updated'
     | 'checkin'
     | 'reaction'
     | 'reply'
@@ -22,6 +24,7 @@ export interface RealtimeEventData {
   senderAvatar?: string;
   messageId?: string;
   deleted?: boolean;
+  chatBackground?: ChatBackgroundSnapshot;
   timestamp?: number;
 }
 

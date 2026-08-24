@@ -5,7 +5,7 @@ import { Types } from 'mongoose';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { env } from '../config/env';
-import { ChatMessage, ChatMessageType } from '../db/models/ChatMessage';
+import { ChatMessage, ChatMessageType, ChatSystemEvent } from '../db/models/ChatMessage';
 import { CheckIn } from '../db/models/CheckIn';
 import { Couple } from '../db/models/Couple';
 import { User } from '../db/models/User';
@@ -89,6 +89,7 @@ interface LeanMessageRecord {
   replyTo?: unknown;
   referencedCheckinId?: Types.ObjectId;
   referencedCheckin?: unknown;
+  systemEvent?: ChatSystemEvent;
   clientMutationId?: string;
   deletedAt?: Date;
   editedAt?: Date;

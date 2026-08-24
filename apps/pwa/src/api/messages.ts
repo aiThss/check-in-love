@@ -7,7 +7,7 @@ import {
   loadMockPreviewData,
   saveMockPreviewData,
 } from '../dev/mock-data';
-import type { ChatMessage, ChatMessageAttachment, ChatMessageEditHistoryEntry, ChatMessageReaction, ChatMessageReplyReference, ChatMessageType, ReferencedCheckin } from './types';
+import type { ChatMessage, ChatMessageAttachment, ChatMessageEditHistoryEntry, ChatMessageReaction, ChatMessageReplyReference, ChatMessageType, ChatSystemEvent, ReferencedCheckin } from './types';
 
 export interface RawMessage {
   _id?: string;
@@ -21,6 +21,7 @@ export interface RawMessage {
   attachments?: ChatMessageAttachment[];
   replyTo?: ChatMessageReplyReference;
   referencedCheckin?: ReferencedCheckin;
+  systemEvent?: ChatSystemEvent;
   reactions?: Array<{ type: string; userIds?: string[] }>;
   readBy?: string[];
   editedAt?: string;
@@ -47,6 +48,7 @@ export function mapChatMessage(raw: RawMessage): ChatMessage {
     senderName: raw.senderName, type: raw.type, text: raw.text, imageUrl,
     attachments: raw.attachments,
     replyTo: raw.replyTo, referencedCheckin: raw.referencedCheckin,
+    systemEvent: raw.systemEvent,
     reactions: raw.reactions?.map((reaction): ChatMessageReaction => ({
       type: reaction.type,
       count: reaction.userIds?.length ?? 0,

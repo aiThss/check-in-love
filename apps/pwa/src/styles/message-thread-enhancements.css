@@ -395,6 +395,43 @@
   background: var(--border);
 }
 
+.message-system-event {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 7px;
+  margin: 8px auto;
+  padding: 0 18px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.35;
+  text-align: center;
+  user-select: none;
+}
+
+.message-system-event-copy {
+  max-width: min(88vw, 360px);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.message-system-event-time {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 9px;
+  opacity: .76;
+  white-space: nowrap;
+}
+
+[data-theme='dark'] .message-system-event {
+  color: rgba(255, 255, 255, .64);
+}
+
+[data-theme='dark'] .message-system-event-time {
+  color: rgba(255, 255, 255, .48);
+}
+
 .messages-presence {
   display: block;
   min-height: 16px;

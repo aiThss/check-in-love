@@ -1,13 +1,14 @@
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
 import { openMessageImageViewer } from '../components/message-image-viewer';
-import { createMessage, getMessageContext, getMessages } from '../api/messages';
+import { createMessage, getMessageContext, getMessages, mapChatMessage } from '../api/messages';
 import * as messageApi from '../api/messages';
+import { getSharedChatBackground, updateSharedChatBackground } from '../api/chat-background';
 import { enqueueMessage, flushMessageOutbox, type QueuedMessage } from '../api/message-outbox';
 import { createCheckin } from '../api/checkins';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
 import { closeModal, showModal } from '../components/modal';
 import { showToast } from '../components/toast';
-import type { ChatMessage } from '../api/types';
+import type { ChatBackgroundSnapshot, ChatMessage } from '../api/types';
 import { navigate, type RoutePage } from '../router';
 import { store } from '../store/index';
 import {
@@ -51,6 +52,7 @@ interface MessageView {
   reactions: HTMLElement;
   readStatus: HTMLElement;
   replyKeys: Set<string>;
+  systemEvent?: boolean;
 }
 
 function escapeHtml(value: string | undefined): string {
@@ -86,7 +88,14 @@ function getLatestActivityTime(item: ChatMessage): number {
 }
 
 function messageText(item: ChatMessage): string {
-  return item.text ?? '';
+  if (item.text) return item.text;
+  if (item.systemEvent?.kind === 'background_changed') {
+    if (item.systemEvent.backgroundKind === 'preset' && item.systemEvent.backgroundId === 'default') {
+      return `${item.senderName} đã khôi phục chủ đề mặc định`;
+    }
+    return `${item.senderName} đã đổi chủ đề thành ${item.systemEvent.backgroundLabel}`;
+  }
+  return '';
 }
 
 function isReducedMotion(): boolean {
@@ -203,6 +212,17 @@ function applyChatBackground(page: HTMLElement, selection: ChatBackgroundSelecti
     // Safe fallback for a page mounted by an older cached bundle.
     page.style.backgroundImage = toCssBackgroundImage(image);
   }
+}
+
+function selectionFromSharedBackground(background: ChatBackgroundSnapshot | null | undefined): ChatBackgroundSelection | null {
+  if (!background) return null;
+  if (background.kind === 'preset' && background.id && CHAT_BACKGROUND_PRESETS.some((item) => item.id === background.id)) {
+    return { kind: 'preset', id: background.id };
+  }
+  if (background.kind === 'custom' && background.imageUrl) {
+    return { kind: 'custom', dataUrl: background.imageUrl };
+  }
+  return null;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -341,8 +361,9 @@ export function renderMessagesPage(): RoutePage {
   let lastReadMessageId: string | null = null;
   let partnerOnline = false;
   let latestRefreshInFlight: Promise<void> | null = null;
+  let sharedBackgroundSyncInFlight: Promise<void> | null = null;
 
-  function commitChatBackground(selection: ChatBackgroundSelection, successMessage: string): void {
+  async function commitChatBackground(selection: ChatBackgroundSelection, successMessage: string): Promise<void> {
     const persisted = saveChatBackground(selection);
     // Applying the wallpaper is an in-memory UI action and must not depend on
     // localStorage being available. Quota/private-mode failures previously made
@@ -355,6 +376,43 @@ export function renderMessagesPage(): RoutePage {
         : `${successMessage} (chỉ áp dụng cho phiên này vì bộ nhớ thiết bị đầy)`,
       persisted ? 'success' : 'info',
     );
+
+    try {
+      const response = await updateSharedChatBackground(selection);
+      const sharedSelection = selectionFromSharedBackground(response.background);
+      if (sharedSelection) {
+        saveChatBackground(sharedSelection);
+        applyChatBackground(page, sharedSelection);
+      }
+      if (response.message) {
+        mergeMessages([mapChatMessage(response.message)], 'refresh');
+      }
+    } catch {
+      // Keep the local selection usable if the server is temporarily offline. A
+      // later explicit change will retry the online sync without losing the UI.
+      if (persisted) {
+        showToast(`${successMessage}; chưa đồng bộ được với người ấy`, 'info');
+      }
+    }
+  }
+
+  async function syncSharedChatBackground(): Promise<void> {
+    if (sharedBackgroundSyncInFlight) return sharedBackgroundSyncInFlight;
+    sharedBackgroundSyncInFlight = (async () => {
+      try {
+        const response = await getSharedChatBackground();
+        if (!active) return;
+        const sharedSelection = selectionFromSharedBackground(response.background);
+        if (!sharedSelection) return;
+        saveChatBackground(sharedSelection);
+        applyChatBackground(page, sharedSelection);
+      } catch {
+        // The local wallpaper remains as the offline fallback.
+      } finally {
+        sharedBackgroundSyncInFlight = null;
+      }
+    })();
+    return sharedBackgroundSyncInFlight;
   }
 
   function openChatBackgroundPicker(): void {
@@ -386,7 +444,7 @@ export function renderMessagesPage(): RoutePage {
         : preset.preview;
       option.innerHTML = `<span class="messages-wallpaper-option-label">${preset.name}</span>`;
       option.addEventListener('click', () => {
-        commitChatBackground(
+        void commitChatBackground(
           { kind: 'preset', id: preset.id },
           preset.id === 'default' ? 'Đã khôi phục nền mặc định' : `Đã đổi nền: ${preset.name}`,
         );
@@ -433,7 +491,7 @@ export function renderMessagesPage(): RoutePage {
         const processed = await processImage(source, { maxSize: 1600, quality: 0.82 });
         previewSource = processed.preview;
         const dataUrl = await readFileAsDataUrl(processed.file);
-        commitChatBackground({ kind: 'custom', dataUrl }, 'Đã đặt ảnh riêng làm nền chat');
+        void commitChatBackground({ kind: 'custom', dataUrl }, 'Đã đặt ảnh riêng làm nền chat');
       } catch {
         showToast('Không xử lý được ảnh nền này, thử ảnh khác nhé', 'error');
       } finally {
@@ -636,6 +694,7 @@ export function renderMessagesPage(): RoutePage {
   }
 
   function renderReactions(view: MessageView, item: ChatMessage): void {
+    if (view.systemEvent) return;
     view.reactions.replaceChildren();
     for (const reaction of item.reactions ?? []) {
       if (reaction.count <= 0) continue;
@@ -673,11 +732,13 @@ export function renderMessagesPage(): RoutePage {
   }
 
   function renderReadStatus(view: MessageView, item: ChatMessage, visible = false): void {
+    if (view.systemEvent) return;
     view.readStatus.hidden = !visible;
     view.readStatus.textContent = visible ? 'Đã đọc' : '';
   }
 
   function renderEditHistory(view: MessageView, item: ChatMessage): void {
+    if (view.systemEvent) return;
     const edited = Boolean(item.editedAt);
     view.editedTag.hidden = !edited;
     view.editedTag.setAttribute('aria-expanded', edited && !view.editHistory.hidden ? 'true' : 'false');
@@ -830,7 +891,7 @@ export function renderMessagesPage(): RoutePage {
 
   function refreshReadStatuses(): void {
     const latestReadMessage = [...messages.values()]
-      .filter((item) => wasReadByPartner(item))
+      .filter((item) => !item.systemEvent && wasReadByPartner(item))
       .sort((left, right) => getLatestActivityTime(right) - getLatestActivityTime(left))[0];
 
     for (const view of messageViews.values()) {
@@ -843,6 +904,13 @@ export function renderMessagesPage(): RoutePage {
     view.element.dataset.messageId = item.id;
     view.element.dataset.messageCreatedAt = item.createdAt;
     view.element.classList.toggle('own', item.isOwn);
+    if (view.systemEvent) {
+      view.content.textContent = messageText(item);
+      view.time.textContent = formatMessageTime(item.createdAt);
+      view.time.dateTime = item.createdAt;
+      view.time.title = new Date(item.createdAt).toLocaleString('vi-VN');
+      return;
+    }
     view.content.textContent = messageText(item);
     view.content.hidden = !messageText(item);
     view.time.textContent = formatMessageTime(item.createdAt);
@@ -948,7 +1016,48 @@ export function renderMessagesPage(): RoutePage {
     }, true);
   }
 
+  function createSystemEventView(item: ChatMessage): MessageView {
+    const element = document.createElement('div');
+    element.className = 'message-system-event';
+    element.dataset.messageId = item.id;
+    element.dataset.messageCreatedAt = item.createdAt;
+
+    const content = document.createElement('p');
+    content.className = 'message-system-event-copy';
+    content.textContent = messageText(item);
+    const time = document.createElement('time');
+    time.className = 'message-system-event-time';
+    time.textContent = formatMessageTime(item.createdAt);
+    time.dateTime = item.createdAt;
+    time.title = new Date(item.createdAt).toLocaleString('vi-VN');
+    element.append(content, time);
+
+    // Keep the MessageView shape stable for the existing map/patch code. These
+    // nodes stay detached because system events intentionally have no bubble,
+    // reactions, read receipt, edit history, or swipe-to-reply affordance.
+    const bubble = document.createElement('div');
+    const editedTag = document.createElement('button');
+    const editHistory = document.createElement('div');
+    const reactions = document.createElement('div');
+    const readStatus = document.createElement('small');
+    return {
+      item,
+      element,
+      bubble,
+      content,
+      time,
+      quote: null,
+      editedTag,
+      editHistory,
+      reactions,
+      readStatus,
+      replyKeys: new Set(),
+      systemEvent: true,
+    };
+  }
+
   function createView(item: ChatMessage): MessageView {
+    if (item.systemEvent?.kind === 'background_changed') return createSystemEventView(item);
     const hasPhoto = Boolean(item.imageUrl);
     const element = document.createElement(hasPhoto ? 'section' : 'article');
     element.className = hasPhoto
@@ -1088,7 +1197,7 @@ export function renderMessagesPage(): RoutePage {
         return;
       }
       insertMessage(item, source === 'older' ? 'prepend' : 'append');
-      if (source === 'refresh' && !item.isOwn) newIncoming++;
+      if (source === 'refresh' && !item.isOwn && !item.systemEvent) newIncoming++;
     });
     refreshReadStatuses();
 
@@ -1103,7 +1212,7 @@ export function renderMessagesPage(): RoutePage {
     }
     if (scrollState.isNearBottom) {
       const latest = sorted.at(-1);
-      if (latest && !latest.isOwn && latest.id !== lastReadMessageId) {
+      if (latest && !latest.isOwn && !latest.systemEvent && latest.id !== lastReadMessageId) {
         lastReadMessageId = latest.id;
         void safeRead({ upTo: latest.id }).catch(() => {
           // A transient offline read receipt can be retried on the next refresh.
@@ -1294,6 +1403,7 @@ export function renderMessagesPage(): RoutePage {
       senderName?: string;
       messageId?: string;
       deleted?: boolean;
+      chatBackground?: ChatBackgroundSnapshot;
     } | undefined;
     if (!data) return;
     if (data.type === 'message.typing') {
@@ -1305,6 +1415,15 @@ export function renderMessagesPage(): RoutePage {
       partnerOnline = Boolean(data.online);
       presence.textContent = partnerOnline ? 'Đang hoạt động' : 'Đã offline';
       presence.classList.toggle('typing', false);
+      return;
+    }
+    if (data.type === 'chat.background.updated') {
+      const sharedSelection = selectionFromSharedBackground(data.chatBackground);
+      if (sharedSelection) {
+        saveChatBackground(sharedSelection);
+        applyChatBackground(page, sharedSelection);
+      }
+      void refreshLatestMessages();
       return;
     }
     if (data.type === 'message.updated' && data.deleted && data.messageId) {
@@ -1454,13 +1573,17 @@ export function renderMessagesPage(): RoutePage {
   window.addEventListener('lovecheck:android-share', handleAndroidShare);
   const handleOnline = () => {
     flushOutbox();
-    if (active) void refreshLatestMessages();
+    if (active) {
+      void refreshLatestMessages();
+      void syncSharedChatBackground();
+    }
   };
   const handleVisibilityChange = () => {
     if (document.visibilityState !== 'visible' || !active) return;
     // Android may throttle timers and suspend EventSource while the WebView is
     // backgrounded. Reconcile immediately when the conversation is visible.
     void refreshLatestMessages();
+    void syncSharedChatBackground();
     flushOutbox();
   };
   window.addEventListener('online', handleOnline);
@@ -1561,6 +1684,7 @@ export function renderMessagesPage(): RoutePage {
     element: page,
     activate: () => {
       active = true;
+      void syncSharedChatBackground();
       void safePresence(true).catch(() => {});
       if (!scrollState.initialized) {
         void loadInitialMessages().then(() => focusReplyFromQuery());

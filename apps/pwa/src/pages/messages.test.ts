@@ -237,6 +237,35 @@ describe('Messages scroll and reply behavior', () => {
     expect(mocks.getMessages.mock.calls.length).toBeGreaterThan(callsAfterRealtime);
   });
 
+  it('renders a background change as a compact system event and applies remote wallpaper sync', async () => {
+    const themeEvent = message('theme-event', true, 'Thúy Hà đã đổi chủ đề thành Đồi lavender');
+    themeEvent.systemEvent = {
+      kind: 'background_changed',
+      backgroundKind: 'preset',
+      backgroundId: 'lavender-stars',
+      backgroundLabel: 'Đồi lavender',
+    };
+    const routePage = await mount([themeEvent]);
+
+    const systemEvent = routePage.element.querySelector<HTMLElement>('[data-message-id="theme-event"]')!;
+    expect(systemEvent.className).toBe('message-system-event');
+    expect(systemEvent.textContent).toContain('Thúy Hà đã đổi chủ đề thành Đồi lavender');
+    expect(systemEvent.querySelector('.chat-text-bubble')).toBeNull();
+
+    window.dispatchEvent(new CustomEvent('lovecheck:realtime-event', {
+      detail: {
+        type: 'chat.background.updated',
+        chatBackground: {
+          kind: 'preset',
+          id: 'sunset-horizon',
+          label: 'Hoàng hôn biển',
+        },
+      },
+    }));
+    await flush();
+    expect(routePage.element.dataset.chatBackground).toBe('sunset-horizon');
+  });
+
   async function mount(data: ChatMessage[], hasMore = false) {
     mocks.getMessages.mockResolvedValue(response(data, hasMore));
     const { renderMessagesPage } = await import('./messages');

@@ -27,6 +27,16 @@ export interface Couple {
   createdAt: string;
 }
 
+export type ChatBackgroundKind = 'preset' | 'custom';
+
+export interface ChatBackgroundSnapshot {
+  kind: ChatBackgroundKind;
+  id?: string;
+  imageUrl?: string;
+  label: string;
+  updatedAt?: string;
+}
+
 export interface Reaction {
   type: ReactionType;
   count: number;
@@ -107,6 +117,14 @@ export interface ReferencedCheckin {
   createdAt: string;
 }
 
+export interface ChatSystemEvent {
+  kind: 'background_changed';
+  backgroundKind: ChatBackgroundKind;
+  backgroundId?: string;
+  backgroundLabel: string;
+  backgroundImageUrl?: string;
+}
+
 export interface ChatMessage {
   id: string;
   coupleId: string;
@@ -118,6 +136,7 @@ export interface ChatMessage {
   attachments?: ChatMessageAttachment[];
   replyTo?: ChatMessageReplyReference;
   referencedCheckin?: ReferencedCheckin;
+  systemEvent?: ChatSystemEvent;
   reactions?: ChatMessageReaction[];
   readBy?: string[];
   editedAt?: string;

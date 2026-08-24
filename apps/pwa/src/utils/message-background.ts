@@ -72,7 +72,12 @@ function isCustomSelection(value: unknown): value is { kind: 'custom'; dataUrl: 
   const candidate = value as Record<string, unknown>;
   return candidate.kind === 'custom'
     && typeof candidate.dataUrl === 'string'
-    && candidate.dataUrl.startsWith('data:image/');
+    && (
+      candidate.dataUrl.startsWith('data:image/')
+      || candidate.dataUrl.startsWith('https://')
+      || candidate.dataUrl.startsWith('http://')
+      || candidate.dataUrl.startsWith('/uploads/')
+    );
 }
 
 export function readChatBackground(): ChatBackgroundSelection {

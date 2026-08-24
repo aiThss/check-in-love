@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 
 export interface RealtimeEvent {
-  type: 'message' | 'message.updated' | 'message.reaction' | 'message.read' | 'message.typing' | 'message.presence' | 'checkin' | 'reaction' | 'reply' | 'reminder';
+  type: 'message' | 'message.updated' | 'message.reaction' | 'message.read' | 'message.typing' | 'message.presence' | 'chat.background.updated' | 'checkin' | 'reaction' | 'reply' | 'reminder';
   title: string;
   body: string;
   targetUrl?: string;
@@ -15,6 +15,13 @@ export interface RealtimeEvent {
   isTyping?: boolean;
   online?: boolean;
   deleted?: boolean;
+  chatBackground?: {
+    kind: 'preset' | 'custom';
+    id?: string;
+    imageUrl?: string;
+    label: string;
+    updatedAt?: string;
+  };
   timestamp?: number;
 }
 

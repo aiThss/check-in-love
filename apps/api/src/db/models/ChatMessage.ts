@@ -41,6 +41,14 @@ export interface ReferencedCheckinSnapshot {
   createdAt: Date;
 }
 
+export interface ChatSystemEvent {
+  kind: 'background_changed';
+  backgroundKind: 'preset' | 'custom';
+  backgroundId?: string;
+  backgroundLabel: string;
+  backgroundImageUrl?: string;
+}
+
 export interface ChatMessageDocument extends Document {
   _id: Types.ObjectId;
   coupleId: Types.ObjectId;
@@ -55,6 +63,7 @@ export interface ChatMessageDocument extends Document {
   replyTo?: MessageReplySnapshot;
   referencedCheckinId?: Types.ObjectId;
   referencedCheckin?: ReferencedCheckinSnapshot;
+  systemEvent?: ChatSystemEvent;
   clientMutationId?: string;
   deletedAt?: Date;
   editedAt?: Date;
@@ -83,6 +92,14 @@ const ReferencedCheckinSchema = new Schema<ReferencedCheckinSnapshot>({
   mood: { type: String },
   imageUrl: { type: String, maxlength: 2048 },
   createdAt: { type: Date, required: true },
+}, { _id: false });
+
+const ChatSystemEventSchema = new Schema<ChatSystemEvent>({
+  kind: { type: String, enum: ['background_changed'], required: true },
+  backgroundKind: { type: String, enum: ['preset', 'custom'], required: true },
+  backgroundId: { type: String, maxlength: 80 },
+  backgroundLabel: { type: String, required: true, maxlength: 120 },
+  backgroundImageUrl: { type: String, maxlength: 2048 },
 }, { _id: false });
 
 const MessageReactionSchema = new Schema<MessageReaction>({
@@ -117,6 +134,7 @@ const ChatMessageSchema = new Schema<ChatMessageDocument>({
   replyTo: { type: ReplySnapshotSchema },
   referencedCheckinId: { type: Schema.Types.ObjectId, ref: 'CheckIn' },
   referencedCheckin: { type: ReferencedCheckinSchema },
+  systemEvent: { type: ChatSystemEventSchema },
   clientMutationId: { type: String, maxlength: 100 },
   deletedAt: { type: Date },
   editedAt: { type: Date },
