@@ -3,7 +3,6 @@ package com.example.lovecheck
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AlertDialog
 import android.app.DownloadManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -48,8 +47,27 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -445,7 +463,9 @@ class MainActivity : ComponentActivity() {
     private val updateCheckLock = Any()
     private var updateCheckRunning = false
     private var lastUpdateCheckAt = 0L
-    private var updateDialog: AlertDialog? = null
+    private var updateUiState by mutableStateOf<UpdateUiState?>(null)
+    private val updateProgressHandler = Handler(Looper.getMainLooper())
+    private var updateProgressRunnable: Runnable? = null
     private var nativeGoogleSignInInProgress = false
     private val credentialManager by lazy(LazyThreadSafetyMode.NONE) {
         CredentialManager.create(this)
@@ -548,9 +568,10 @@ class MainActivity : ComponentActivity() {
         setupDailyReminders(this)
 
         setContent {
-            AndroidView(
-                factory = { context ->
-                    StickerWebView(context).apply {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AndroidView(
+                    factory = { context ->
+                        StickerWebView(context).apply {
                         webView = this
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -678,11 +699,20 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        loadUrl(initialUrlFromIntent(intent))
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
+                            loadUrl(initialUrlFromIntent(intent))
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                updateUiState?.let { state ->
+                    UpdateBottomBar(
+                        state = state,
+                        onPrimary = { onUpdatePrimaryAction(state) },
+                        onSecondary = { onUpdateSecondaryAction(state) },
+                    )
+                }
+            }
         }
 
         installBackHandler()
@@ -690,7 +720,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        checkUpdate()
+        if (!restorePendingUpdateDownload()) {
+            checkUpdate()
+        }
+    }
+
+    override fun onPause() {
+        stopUpdateProgressTracking()
+        super.onPause()
     }
 
     private fun installBackHandler() {
@@ -1046,6 +1083,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        stopUpdateProgressTracking()
         try {
             unregisterReceiver(fcmReceiver)
         } catch (e: Exception) {
@@ -1057,7 +1095,7 @@ class MainActivity : ComponentActivity() {
     private fun checkUpdate() {
         val now = android.os.SystemClock.elapsedRealtime()
         synchronized(updateCheckLock) {
-            if (updateCheckRunning || updateDialog?.isShowing == true) return
+            if (updateCheckRunning || updateUiState != null) return
             if (now - lastUpdateCheckAt < UPDATE_CHECK_INTERVAL_MS) return
             updateCheckRunning = true
             lastUpdateCheckAt = now
@@ -1098,7 +1136,7 @@ class MainActivity : ComponentActivity() {
 
                         if (apkUrl != null) {
                             runOnUiThread {
-                                showUpdateDialog(latestVersion, apkUrl)
+                                showUpdateAvailable(latestVersion, apkUrl)
                             }
                         }
                     }
@@ -1114,52 +1152,244 @@ class MainActivity : ComponentActivity() {
         }.start()
     }
 
-    private fun showUpdateDialog(version: String, url: String) {
-        if (isFinishing || isDestroyed || updateDialog?.isShowing == true) return
+    private fun showUpdateAvailable(version: String, url: String) {
+        if (isFinishing || isDestroyed || updateUiState != null) return
 
-        val dialogView = layoutInflater.inflate(R.layout.dialog_update, null)
-        val dialog = AlertDialog.Builder(this)
-            .setView(dialogView)
-            .create()
-
-        updateDialog = dialog
-        dialog.setOnDismissListener {
-            if (updateDialog === dialog) updateDialog = null
-        }
-
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-
-        val txtMessage = dialogView.findViewById<android.widget.TextView>(R.id.dialog_message)
         val stickerPatchNote = if (compareVersions(version, STICKER_PATCH_VERSION) >= 0) {
-            "\n\nBản vá này bổ sung gửi sticker trực tiếp từ bàn phím và sửa nhận ảnh clipboard."
+            " Bản này bổ sung gửi sticker trực tiếp từ bàn phím và sửa nhận ảnh clipboard."
         } else {
             ""
         }
-        txtMessage.text =
-            "Có phiên bản mới (v$version). Bạn có muốn tải xuống và cập nhật ngay không?$stickerPatchNote"
-
-        val btnCancel = dialogView.findViewById<android.widget.Button>(R.id.btn_cancel)
-        val btnUpdate = dialogView.findViewById<android.widget.Button>(R.id.btn_update)
-
-        btnCancel.setOnClickListener {
-            dialog.dismiss()
-        }
-
-        btnUpdate.setOnClickListener {
-            downloadAndInstallApk(url)
-            dialog.dismiss()
-        }
-
-        dialog.show()
+        updateUiState = UpdateUiState(
+            stage = UpdateStage.AVAILABLE,
+            version = version,
+            apkUrl = url,
+            detail = "Đã có Check IN Love v$version.$stickerPatchNote",
+        )
     }
 
-    private fun downloadAndInstallApk(apkUrl: String) {
+    private fun onUpdatePrimaryAction(state: UpdateUiState) {
+        when (state.stage) {
+            UpdateStage.AVAILABLE -> startUpdateDownload(state.version, state.apkUrl)
+            UpdateStage.DOWNLOADING -> Unit
+            UpdateStage.READY -> installDownloadedUpdate()
+            UpdateStage.FAILED -> {
+                if (state.apkUrl.isNullOrBlank()) {
+                    clearStoredUpdateDownload(removeDownload = true)
+                    updateUiState = null
+                    synchronized(updateCheckLock) { lastUpdateCheckAt = 0L }
+                    checkUpdate()
+                } else {
+                    startUpdateDownload(state.version, state.apkUrl)
+                }
+            }
+        }
+    }
+
+    private fun onUpdateSecondaryAction(state: UpdateUiState) {
+        when (state.stage) {
+            UpdateStage.AVAILABLE -> updateUiState = null
+            UpdateStage.DOWNLOADING -> cancelUpdateDownload()
+            // The finished APK remains registered in DownloadManager so it can be offered
+            // again after the user reopens the app.
+            UpdateStage.READY -> updateUiState = null
+            UpdateStage.FAILED -> {
+                clearStoredUpdateDownload(removeDownload = true)
+                updateUiState = null
+            }
+        }
+    }
+
+    private fun startUpdateDownload(version: String, apkUrl: String?) {
+        if (apkUrl.isNullOrBlank()) return
+
+        clearStoredUpdateDownload(removeDownload = true)
+        val fileVersion = version.replace(Regex("[^0-9A-Za-z._-]"), "_")
+        val request = DownloadManager.Request(Uri.parse(apkUrl))
+            .setTitle("Check IN Love Update v$version")
+            .setDescription("Đang tải xuống phiên bản mới...")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setDestinationInExternalPublicDir(
+                Environment.DIRECTORY_DOWNLOADS,
+                "check-in-love-update-v$fileVersion.apk",
+            )
+
+        try {
+            val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val downloadId = downloadManager.enqueue(request)
+            updatePreferences().edit()
+                .putLong(UPDATE_DOWNLOAD_ID, downloadId)
+                .putString(UPDATE_DOWNLOAD_VERSION, version)
+                .putString(UPDATE_DOWNLOAD_URL, apkUrl)
+                .apply()
+            updateUiState = UpdateUiState(
+                stage = UpdateStage.DOWNLOADING,
+                version = version,
+                apkUrl = apkUrl,
+                detail = "Đang chuẩn bị tải xuống...",
+            )
+            startUpdateProgressTracking(downloadId, version, apkUrl)
+        } catch (error: Exception) {
+            updateUiState = UpdateUiState(
+                stage = UpdateStage.FAILED,
+                version = version,
+                apkUrl = apkUrl,
+                detail = "Không thể bắt đầu tải xuống. Hãy thử lại.",
+            )
+            Log.e(TAG, "Unable to enqueue app update", error)
+        }
+    }
+
+    private fun cancelUpdateDownload() {
+        clearStoredUpdateDownload(removeDownload = true)
+        stopUpdateProgressTracking()
+        updateUiState = null
+    }
+
+    private fun restorePendingUpdateDownload(): Boolean {
+        val prefs = updatePreferences()
+        val downloadId = prefs.getLong(UPDATE_DOWNLOAD_ID, -1L)
+        val version = prefs.getString(UPDATE_DOWNLOAD_VERSION, "").orEmpty()
+        val apkUrl = prefs.getString(UPDATE_DOWNLOAD_URL, null)
+        if (downloadId < 0L || version.isBlank()) return false
+
+        val currentVersion = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+        if (compareVersions(version, currentVersion) <= 0) {
+            clearStoredUpdateDownload(removeDownload = true)
+            return false
+        }
+
+        val snapshot = queryUpdateDownload(downloadId)
+        if (snapshot == null) {
+            clearStoredUpdateDownload(removeDownload = false)
+            return false
+        }
+
+        when (snapshot.status) {
+            DownloadManager.STATUS_SUCCESSFUL -> {
+                updateUiState = UpdateUiState(
+                    stage = UpdateStage.READY,
+                    version = version,
+                    apkUrl = apkUrl,
+                    detail = completedDownloadDetail(snapshot),
+                )
+            }
+            DownloadManager.STATUS_FAILED -> {
+                updateUiState = UpdateUiState(
+                    stage = UpdateStage.FAILED,
+                    version = version,
+                    apkUrl = apkUrl,
+                    detail = "Không thể tải bản cập nhật. Hãy kiểm tra mạng hoặc bộ nhớ rồi thử lại.",
+                )
+            }
+            else -> {
+                showDownloadingUpdate(version, apkUrl, snapshot)
+                startUpdateProgressTracking(downloadId, version, apkUrl)
+            }
+        }
+        return true
+    }
+
+    private fun startUpdateProgressTracking(downloadId: Long, version: String, apkUrl: String?) {
+        stopUpdateProgressTracking()
+        val task = object : Runnable {
+            override fun run() {
+                when (val snapshot = queryUpdateDownload(downloadId)) {
+                    null -> {
+                        updateUiState = UpdateUiState(
+                            stage = UpdateStage.FAILED,
+                            version = version,
+                            apkUrl = apkUrl,
+                            detail = "Không tìm thấy tác vụ tải xuống. Hãy thử lại.",
+                        )
+                        stopUpdateProgressTracking()
+                    }
+                    else -> when (snapshot.status) {
+                        DownloadManager.STATUS_SUCCESSFUL -> {
+                            updateUiState = UpdateUiState(
+                                stage = UpdateStage.READY,
+                                version = version,
+                                apkUrl = apkUrl,
+                                detail = completedDownloadDetail(snapshot),
+                            )
+                            stopUpdateProgressTracking()
+                        }
+                        DownloadManager.STATUS_FAILED -> {
+                            updateUiState = UpdateUiState(
+                                stage = UpdateStage.FAILED,
+                                version = version,
+                                apkUrl = apkUrl,
+                                detail = "Không thể tải bản cập nhật. Hãy kiểm tra mạng hoặc bộ nhớ rồi thử lại.",
+                            )
+                            stopUpdateProgressTracking()
+                        }
+                        else -> {
+                            showDownloadingUpdate(version, apkUrl, snapshot)
+                            updateProgressHandler.postDelayed(this, UPDATE_PROGRESS_INTERVAL_MS)
+                        }
+                    }
+                }
+            }
+        }
+        updateProgressRunnable = task
+        updateProgressHandler.post(task)
+    }
+
+    private fun stopUpdateProgressTracking() {
+        updateProgressRunnable?.let(updateProgressHandler::removeCallbacks)
+        updateProgressRunnable = null
+    }
+
+    private fun showDownloadingUpdate(
+        version: String,
+        apkUrl: String?,
+        snapshot: UpdateDownloadSnapshot,
+    ) {
+        val totalBytes = snapshot.totalBytes
+        val downloadedBytes = snapshot.downloadedBytes.coerceAtLeast(0L)
+        val progress = if (totalBytes > 0L) {
+            ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
+        } else {
+            0
+        }
+        val stateText = if (snapshot.status == DownloadManager.STATUS_PAUSED) {
+            "Đang chờ kết nối để tiếp tục tải..."
+        } else {
+            "Đang tải xuống..."
+        }
+        val sizeText = if (totalBytes > 0L) {
+            "${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}"
+        } else {
+            formatBytes(downloadedBytes)
+        }
+        updateUiState = UpdateUiState(
+            stage = UpdateStage.DOWNLOADING,
+            version = version,
+            apkUrl = apkUrl,
+            progress = progress,
+            detail = "$stateText $sizeText",
+        )
+    }
+
+    private fun completedDownloadDetail(snapshot: UpdateDownloadSnapshot): String {
+        val bytes = snapshot.totalBytes.takeIf { it > 0L } ?: snapshot.downloadedBytes
+        return if (bytes > 0L) {
+            "Đã tải xong ${formatBytes(bytes)}. Bạn có thể cài ngay hoặc để sau."
+        } else {
+            "Đã tải xong. Bạn có thể cài ngay hoặc để sau."
+        }
+    }
+
+    private fun installDownloadedUpdate() {
+        val downloadId = updatePreferences().getLong(UPDATE_DOWNLOAD_ID, -1L)
+        if (downloadId < 0L || queryUpdateDownload(downloadId)?.status != DownloadManager.STATUS_SUCCESSFUL) {
+            restorePendingUpdateDownload()
+            return
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !packageManager.canRequestPackageInstalls()
         ) {
-            synchronized(updateCheckLock) {
-                lastUpdateCheckAt = 0L
-            }
             startActivity(
                 Intent(
                     Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -1169,47 +1399,78 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val request = DownloadManager.Request(Uri.parse(apkUrl))
-            .setTitle("Check IN Love Update")
-            .setDescription("Đang tải xuống phiên bản mới...")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(
-                Environment.DIRECTORY_DOWNLOADS,
-                "check-in-love-update.apk",
-            )
-
         val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val downloadId = downloadManager.enqueue(request)
-
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-                if (id == downloadId) {
-                    val uri = downloadManager.getUriForDownloadedFile(downloadId)
-                    if (uri != null) {
-                        val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, "application/vnd.android.package-archive")
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        }
-                        context.startActivity(installIntent)
-                    }
-                    context.unregisterReceiver(this)
-                }
-            }
+        val apkUri = downloadManager.getUriForDownloadedFile(downloadId)
+        if (apkUri == null) {
+            updateUiState = updateUiState?.copy(
+                stage = UpdateStage.FAILED,
+                detail = "Không tìm thấy tệp cập nhật. Hãy tải lại.",
+            )
+            return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(
-                receiver,
-                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-                Context.RECEIVER_EXPORTED,
+        try {
+            startActivity(
+                Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(apkUri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                },
             )
-        } else {
-            registerReceiver(
-                receiver,
-                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+        } catch (error: Exception) {
+            updateUiState = updateUiState?.copy(
+                stage = UpdateStage.FAILED,
+                detail = "Không thể mở trình cài đặt. Hãy tải lại bản cập nhật.",
             )
+            Log.e(TAG, "Unable to open package installer", error)
+        }
+    }
+
+    private fun queryUpdateDownload(downloadId: Long): UpdateDownloadSnapshot? {
+        return try {
+            val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            downloadManager.query(DownloadManager.Query().setFilterById(downloadId))?.use { cursor ->
+                if (!cursor.moveToFirst()) return null
+                UpdateDownloadSnapshot(
+                    status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)),
+                    downloadedBytes = cursor.getLong(
+                        cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR),
+                    ),
+                    totalBytes = cursor.getLong(
+                        cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES),
+                    ),
+                )
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Unable to read update download status", error)
+            null
+        }
+    }
+
+    private fun clearStoredUpdateDownload(removeDownload: Boolean) {
+        val prefs = updatePreferences()
+        val downloadId = prefs.getLong(UPDATE_DOWNLOAD_ID, -1L)
+        if (removeDownload && downloadId >= 0L) {
+            try {
+                (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).remove(downloadId)
+            } catch (error: Exception) {
+                Log.w(TAG, "Unable to remove update download", error)
+            }
+        }
+        prefs.edit()
+            .remove(UPDATE_DOWNLOAD_ID)
+            .remove(UPDATE_DOWNLOAD_VERSION)
+            .remove(UPDATE_DOWNLOAD_URL)
+            .apply()
+    }
+
+    private fun updatePreferences() =
+        getSharedPreferences(UPDATE_PREFERENCES, Context.MODE_PRIVATE)
+
+    private fun formatBytes(bytes: Long): String {
+        return when {
+            bytes < 1024L -> "$bytes B"
+            bytes < 1024L * 1024L -> "${bytes / 1024L} KB"
+            else -> String.format(Locale.getDefault(), "%.1f MB", bytes / (1024f * 1024f))
         }
     }
 
@@ -1219,6 +1480,11 @@ class MainActivity : ComponentActivity() {
         private const val RETRY_SCHEME = "lovecheck"
         private const val STICKER_PATCH_VERSION = "1.1.10"
         private const val UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000L
+        private const val UPDATE_PROGRESS_INTERVAL_MS = 400L
+        private const val UPDATE_PREFERENCES = "lovecheck_update"
+        private const val UPDATE_DOWNLOAD_ID = "download_id"
+        private const val UPDATE_DOWNLOAD_VERSION = "download_version"
+        private const val UPDATE_DOWNLOAD_URL = "download_url"
         private const val FILE_CHOOSER_BACK_GUARD_MS = 1200L
 
         private val allowedHosts = setOf(
@@ -1304,6 +1570,153 @@ class MainActivity : ComponentActivity() {
                     android.app.AlarmManager.INTERVAL_DAY,
                     pendingIntent,
                 )
+            }
+        }
+    }
+}
+
+private enum class UpdateStage {
+    AVAILABLE,
+    DOWNLOADING,
+    READY,
+    FAILED,
+}
+
+private data class UpdateUiState(
+    val stage: UpdateStage,
+    val version: String,
+    val apkUrl: String?,
+    val progress: Int = 0,
+    val detail: String,
+)
+
+private data class UpdateDownloadSnapshot(
+    val status: Int,
+    val downloadedBytes: Long,
+    val totalBytes: Long,
+)
+
+@Composable
+private fun UpdateBottomBar(
+    state: UpdateUiState,
+    onPrimary: () -> Unit,
+    onSecondary: () -> Unit,
+) {
+    val title = when (state.stage) {
+        UpdateStage.AVAILABLE -> "Có bản cập nhật mới"
+        UpdateStage.DOWNLOADING -> "Đang tải Check IN Love v${state.version}"
+        UpdateStage.READY -> "Bản v${state.version} đã sẵn sàng"
+        UpdateStage.FAILED -> "Chưa tải được bản cập nhật"
+    }
+    val primaryLabel = when (state.stage) {
+        UpdateStage.AVAILABLE -> "Tải xuống"
+        UpdateStage.DOWNLOADING -> "Đang tải"
+        UpdateStage.READY -> "Cập nhật"
+        UpdateStage.FAILED -> "Tải lại"
+    }
+    val secondaryLabel = when (state.stage) {
+        UpdateStage.AVAILABLE, UpdateStage.READY -> "Để sau"
+        UpdateStage.DOWNLOADING -> "Hủy tải"
+        UpdateStage.FAILED -> "Đóng"
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 12.dp, bottom = 14.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xF21F1B24)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = state.detail,
+                            color = Color(0xFFC9C3D4),
+                            fontSize = 13.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = when (state.stage) {
+                            UpdateStage.AVAILABLE -> "✦"
+                            UpdateStage.DOWNLOADING -> "${state.progress}%"
+                            UpdateStage.READY -> "✓"
+                            UpdateStage.FAILED -> "!"
+                        },
+                        color = Color(0xFFFF6B98),
+                        fontSize = if (state.stage == UpdateStage.DOWNLOADING) 15.sp else 26.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                }
+
+                if (state.stage == UpdateStage.DOWNLOADING) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    LinearProgressIndicator(
+                        progress = { state.progress / 100f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(7.dp),
+                        color = Color(0xFFFF477B),
+                        trackColor = Color(0xFF403847),
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = onSecondary,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFE0DAE9),
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text(secondaryLabel, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onPrimary,
+                        enabled = state.stage != UpdateStage.DOWNLOADING,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFF3B7F),
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFF6B4353),
+                            disabledContentColor = Color(0xFFE3CBD3),
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text(primaryLabel, fontWeight = FontWeight.ExtraBold)
+                    }
+                }
             }
         }
     }
