@@ -3,13 +3,16 @@
     android:id="@+id/quick_widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_photo_background">
+    android:background="@drawable/widget_photo_background"
+    android:clipToOutline="true">
 
     <!-- The partner's check-in photo background -->
     <ImageView
         android:id="@+id/quick_widget_image"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@drawable/widget_photo_background"
+        android:clipToOutline="true"
         android:scaleType="centerCrop"
         android:contentDescription="@null"
         android:visibility="gone" />
@@ -20,6 +23,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/widget_photo_scrim"
+        android:clipToOutline="true"
         android:contentDescription="@null"
         android:visibility="gone" />
 
