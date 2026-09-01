@@ -9,12 +9,22 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.Shader
+import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
+import android.text.TextUtils
 import android.view.View
 import android.widget.RemoteViews
 import androidx.work.BackoffPolicy
@@ -263,15 +273,18 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
                                 BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 },
                             )
                             if (bitmap != null) {
-                                val roundedBitmap = cropAndRoundWidgetImage(
+                                val cardBitmap = createSquarePhotoCard(
+                                    context,
                                     appWidgetManager,
                                     appWidgetId,
                                     bitmap,
+                                    message,
                                 )
-                                if (roundedBitmap !== bitmap) bitmap.recycle()
-                                views.setImageViewBitmap(R.id.quick_widget_image, roundedBitmap)
+                                if (cardBitmap !== bitmap) bitmap.recycle()
+                                views.setImageViewBitmap(R.id.quick_widget_image, cardBitmap)
                                 views.setViewVisibility(R.id.quick_widget_image, View.VISIBLE)
-                                views.setViewVisibility(R.id.quick_widget_scrim, View.VISIBLE)
+                                views.setViewVisibility(R.id.quick_widget_scrim, View.GONE)
+                                views.setViewVisibility(R.id.quick_widget_body, View.GONE)
                             } else {
                                 views.setViewVisibility(R.id.quick_widget_image, View.GONE)
                                 views.setViewVisibility(R.id.quick_widget_scrim, View.GONE)
@@ -299,50 +312,92 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
         }
 
         /**
-         * The app's check-in card uses a 28px corner radius. A widget is rendered by the
-         * launcher, so clipToOutline is not reliable here; crop and mask the bitmap instead.
+         * The launcher may allocate a 2x2 widget as a tall rectangle. Compose the photo,
+         * gradient and caption as one square bitmap so the visible card remains square and
+         * every layer shares the same rounded corners.
          */
-        private fun cropAndRoundWidgetImage(
+        private fun createSquarePhotoCard(
+            context: Context,
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int,
             source: Bitmap,
+            message: String,
         ): Bitmap {
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
             val targetWidthDp = options
-                .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 240)
+                .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 110)
                 .coerceAtLeast(1)
-            val targetHeightDp = options
-                .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160)
-                .coerceAtLeast(1)
-            val targetAspect = targetWidthDp.toFloat() / targetHeightDp
-            val sourceAspect = source.width.toFloat() / source.height
-
-            val sourceRect = if (sourceAspect > targetAspect) {
-                val cropWidth = (source.height * targetAspect).toInt().coerceAtMost(source.width)
-                val left = (source.width - cropWidth) / 2
-                Rect(left, 0, left + cropWidth, source.height)
-            } else {
-                val cropHeight = (source.width / targetAspect).toInt().coerceAtMost(source.height)
-                val top = (source.height - cropHeight) / 2
-                Rect(0, top, source.width, top + cropHeight)
-            }
+            val cardEdge = minOf(source.width, source.height)
+            val sourceLeft = (source.width - cardEdge) / 2
+            val sourceTop = (source.height - cardEdge) / 2
+            val sourceRect = Rect(sourceLeft, sourceTop, sourceLeft + cardEdge, sourceTop + cardEdge)
 
             val output = Bitmap.createBitmap(
-                sourceRect.width(),
-                sourceRect.height(),
+                cardEdge,
+                cardEdge,
                 Bitmap.Config.ARGB_8888,
             )
             val canvas = Canvas(output)
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            val pixelsPerDp = output.width.toFloat() / targetWidthDp
+            val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            val pixelsPerDp = cardEdge.toFloat() / targetWidthDp
             val cornerRadiusPx = (PHOTO_CORNER_RADIUS_DP * pixelsPerDp)
-                .coerceAtMost(minOf(output.width, output.height) / 2f)
-            val destination = RectF(0f, 0f, output.width.toFloat(), output.height.toFloat())
+                .coerceAtMost(cardEdge / 2f)
+            val destination = RectF(0f, 0f, cardEdge.toFloat(), cardEdge.toFloat())
 
-            canvas.drawRoundRect(destination, cornerRadiusPx, cornerRadiusPx, paint)
-            paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
-            canvas.drawBitmap(source, sourceRect, destination, paint)
-            paint.xfermode = null
+            canvas.drawRoundRect(destination, cornerRadiusPx, cornerRadiusPx, cardPaint)
+            cardPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+            canvas.drawBitmap(source, sourceRect, destination, cardPaint)
+            cardPaint.xfermode = null
+
+            canvas.save()
+            val roundedClip = Path().apply {
+                addRoundRect(destination, cornerRadiusPx, cornerRadiusPx, Path.Direction.CW)
+            }
+            canvas.clipPath(roundedClip)
+            val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f,
+                    0f,
+                    0f,
+                    cardEdge.toFloat(),
+                    intArrayOf(
+                        Color.TRANSPARENT,
+                        Color.argb(115, 25, 15, 23),
+                        Color.argb(225, 25, 15, 23),
+                    ),
+                    floatArrayOf(0f, 0.52f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawRect(destination, overlayPaint)
+            canvas.restore()
+
+            val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
+                color = Color.WHITE
+                textSize = 17f * pixelsPerDp
+                typeface = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.resources.getFont(R.font.be_vietnam_pro_extra_bold)
+                } else {
+                    Typeface.create("sans-serif", Typeface.BOLD)
+                }
+            }
+            val horizontalPadding = 12f * pixelsPerDp
+            val textWidth = (cardEdge - horizontalPadding * 2).toInt().coerceAtLeast(1)
+            val textLayout = StaticLayout.Builder
+                .obtain(message, 0, message.length, textPaint, textWidth)
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setEllipsize(TextUtils.TruncateAt.END)
+                .setIncludePad(false)
+                .setMaxLines(2)
+                .build()
+            val textBottom = 14f * pixelsPerDp
+            canvas.save()
+            canvas.translate(
+                horizontalPadding,
+                (cardEdge - textBottom - textLayout.height).coerceAtLeast(horizontalPadding),
+            )
+            textLayout.draw(canvas)
+            canvas.restore()
             return output
         }
     }
