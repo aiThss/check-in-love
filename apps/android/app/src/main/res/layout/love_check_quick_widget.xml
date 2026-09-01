@@ -32,7 +32,7 @@
         android:paddingStart="16dp"
         android:paddingTop="16dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="36dp">
+        android:paddingBottom="18dp">
 
         <TextView
             android:id="@+id/quick_widget_body"

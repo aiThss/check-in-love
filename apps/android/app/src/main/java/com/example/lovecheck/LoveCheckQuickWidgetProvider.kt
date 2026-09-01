@@ -8,6 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
+import android.graphics.RectF
 import android.net.Uri
 import android.view.View
 import android.widget.RemoteViews
@@ -50,6 +56,7 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
         private const val UNIQUE_IMAGE_WORK = "latest_partner_checkin_image"
         private const val WIDGET_IMAGE_DIRECTORY = "widgets"
         private const val MAX_IMAGE_EDGE_PX = 512
+        private const val PHOTO_CORNER_RADIUS_DP = 28f
 
         fun updatePartnerCheckin(
             context: Context,
@@ -256,7 +263,13 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
                                 BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 },
                             )
                             if (bitmap != null) {
-                                views.setImageViewBitmap(R.id.quick_widget_image, bitmap)
+                                val roundedBitmap = cropAndRoundWidgetImage(
+                                    appWidgetManager,
+                                    appWidgetId,
+                                    bitmap,
+                                )
+                                if (roundedBitmap !== bitmap) bitmap.recycle()
+                                views.setImageViewBitmap(R.id.quick_widget_image, roundedBitmap)
                                 views.setViewVisibility(R.id.quick_widget_image, View.VISIBLE)
                                 views.setViewVisibility(R.id.quick_widget_scrim, View.VISIBLE)
                             } else {
@@ -283,6 +296,54 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
+        }
+
+        /**
+         * The app's check-in card uses a 28px corner radius. A widget is rendered by the
+         * launcher, so clipToOutline is not reliable here; crop and mask the bitmap instead.
+         */
+        private fun cropAndRoundWidgetImage(
+            appWidgetManager: AppWidgetManager,
+            appWidgetId: Int,
+            source: Bitmap,
+        ): Bitmap {
+            val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+            val targetWidthDp = options
+                .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 240)
+                .coerceAtLeast(1)
+            val targetHeightDp = options
+                .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160)
+                .coerceAtLeast(1)
+            val targetAspect = targetWidthDp.toFloat() / targetHeightDp
+            val sourceAspect = source.width.toFloat() / source.height
+
+            val sourceRect = if (sourceAspect > targetAspect) {
+                val cropWidth = (source.height * targetAspect).toInt().coerceAtMost(source.width)
+                val left = (source.width - cropWidth) / 2
+                Rect(left, 0, left + cropWidth, source.height)
+            } else {
+                val cropHeight = (source.width / targetAspect).toInt().coerceAtMost(source.height)
+                val top = (source.height - cropHeight) / 2
+                Rect(0, top, source.width, top + cropHeight)
+            }
+
+            val output = Bitmap.createBitmap(
+                sourceRect.width(),
+                sourceRect.height(),
+                Bitmap.Config.ARGB_8888,
+            )
+            val canvas = Canvas(output)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            val pixelsPerDp = output.width.toFloat() / targetWidthDp
+            val cornerRadiusPx = (PHOTO_CORNER_RADIUS_DP * pixelsPerDp)
+                .coerceAtMost(minOf(output.width, output.height) / 2f)
+            val destination = RectF(0f, 0f, output.width.toFloat(), output.height.toFloat())
+
+            canvas.drawRoundRect(destination, cornerRadiusPx, cornerRadiusPx, paint)
+            paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+            canvas.drawBitmap(source, sourceRect, destination, paint)
+            paint.xfermode = null
+            return output
         }
     }
 }
