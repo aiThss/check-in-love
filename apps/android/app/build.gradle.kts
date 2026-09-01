@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.lovecheck"
         minSdk = 24
         targetSdk = 36
-        versionCode = 49
-        versionName = "0.0.37"
+        versionCode = 50
+        versionName = "0.0.38"
     }
 
     signingConfigs {
@@ -110,4 +110,7 @@ dependencies {
   // Image loading (native photo viewer)
   implementation(libs.coil.compose)
   implementation(libs.coil.network.okhttp)
+
+  // Reliable background download for the latest photo widget update.
+  implementation(libs.androidx.work.runtime)
 }

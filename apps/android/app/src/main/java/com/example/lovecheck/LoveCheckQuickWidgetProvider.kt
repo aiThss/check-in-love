@@ -6,15 +6,23 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.view.View
 import android.widget.RemoteViews
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlin.concurrent.thread
+import java.util.concurrent.TimeUnit
 
 class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(
@@ -33,9 +41,15 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
         private const val KEY_CHECKIN_TEXT = "checkin_text"
         private const val KEY_CHECKIN_TYPE = "checkin_type"
         private const val KEY_HAS_IMAGE = "has_image"
+        private const val KEY_IMAGE_URL = "image_url"
+        private const val KEY_IMAGE_PATH = "image_path"
         private const val KEY_TIMESTAMP = "timestamp"
 
         private const val CHECKIN_URL = "https://couple.io.vn/app/checkin"
+        private const val CHECKIN_ORIGIN = "https://couple.io.vn"
+        private const val UNIQUE_IMAGE_WORK = "latest_partner_checkin_image"
+        private const val WIDGET_IMAGE_DIRECTORY = "widgets"
+        private const val MAX_IMAGE_EDGE_PX = 512
 
         fun updatePartnerCheckin(
             context: Context,
@@ -53,43 +67,142 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
                 .putString(KEY_TIMESTAMP, timestamp)
 
             if (checkinType == "photo" && !imageUrl.isNullOrEmpty()) {
-                // Fetch image in background thread
-                thread {
-                    val file = File(context.cacheDir, "partner_checkin.jpg")
-                    val success = downloadImageToFile(imageUrl, file)
-                    editor.putBoolean(KEY_HAS_IMAGE, success)
-                    editor.apply()
-                    triggerWidgetUpdate(context)
-                }
+                editor
+                    .putString(KEY_IMAGE_URL, imageUrl)
+                    .remove(KEY_IMAGE_PATH)
+                    .putBoolean(KEY_HAS_IMAGE, false)
+                    .apply()
+                triggerWidgetUpdate(context)
+                enqueueLatestImageDownload(context, imageUrl)
             } else {
-                editor.putBoolean(KEY_HAS_IMAGE, false)
+                editor
+                    .remove(KEY_IMAGE_URL)
+                    .remove(KEY_IMAGE_PATH)
+                    .putBoolean(KEY_HAS_IMAGE, false)
                 editor.apply()
                 triggerWidgetUpdate(context)
             }
         }
 
-        private fun downloadImageToFile(urlStr: String, file: File): Boolean {
+        private fun enqueueLatestImageDownload(context: Context, imageUrl: String) {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+            val input = Data.Builder()
+                .putString(LatestWidgetImageWorker.INPUT_IMAGE_URL, imageUrl)
+                .build()
+            val request = OneTimeWorkRequest.Builder(LatestWidgetImageWorker::class.java)
+                .setConstraints(constraints)
+                .setInputData(input)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
+                .build()
+
+            WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
+                UNIQUE_IMAGE_WORK,
+                ExistingWorkPolicy.REPLACE,
+                request,
+            )
+        }
+
+        /** Called by WorkManager after the FCM service has returned. */
+        internal fun downloadAndDisplayLatestImage(context: Context, imageUrl: String): Boolean {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (prefs.getString(KEY_IMAGE_URL, null) != imageUrl) {
+                return true
+            }
+
+            val imageFile = downloadImageToFile(context, imageUrl) ?: return false
+            if (prefs.getString(KEY_IMAGE_URL, null) != imageUrl) {
+                return true
+            }
+
+            prefs.edit()
+                .putString(KEY_IMAGE_PATH, imageFile.absolutePath)
+                .putBoolean(KEY_HAS_IMAGE, true)
+                .apply()
+            triggerWidgetUpdate(context)
+            return true
+        }
+
+        private fun downloadImageToFile(context: Context, imageUrl: String): File? {
+            val imageDirectory = File(context.filesDir, WIDGET_IMAGE_DIRECTORY)
+            if (!imageDirectory.exists() && !imageDirectory.mkdirs()) return null
+
+            val imageKey = imageUrl.hashCode().toUInt().toString(16)
+            val finalFile = File(imageDirectory, "partner_checkin_$imageKey.jpg")
+            val downloadedFile = File(imageDirectory, "partner_checkin_$imageKey.download")
+            val stagedFile = File(imageDirectory, "partner_checkin_$imageKey.new.jpg")
+            var connection: HttpURLConnection? = null
+
             return try {
-                val url = URL(urlStr)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.doInput = true
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-                connection.connect()
-                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                    connection.inputStream.use { input ->
-                        FileOutputStream(file).use { output ->
+                val resolvedUrl = if (imageUrl.startsWith('/')) "$CHECKIN_ORIGIN$imageUrl" else imageUrl
+                val activeConnection = URL(resolvedUrl).openConnection() as HttpURLConnection
+                connection = activeConnection
+                activeConnection.doInput = true
+                activeConnection.connectTimeout = 10_000
+                activeConnection.readTimeout = 10_000
+                activeConnection.connect()
+                if (activeConnection.responseCode == HttpURLConnection.HTTP_OK) {
+                    activeConnection.inputStream.use { input ->
+                        FileOutputStream(downloadedFile).use { output ->
                             input.copyTo(output)
                         }
                     }
-                    true
+                    val bitmap = decodeWidgetBitmap(downloadedFile) ?: return null
+                    val wroteImage = try {
+                        FileOutputStream(stagedFile).use { output ->
+                            bitmap.compress(Bitmap.CompressFormat.JPEG, 88, output)
+                        }
+                    } finally {
+                        bitmap.recycle()
+                    }
+                    if (!wroteImage) return null
+
+                    if (finalFile.exists() && !finalFile.delete()) return null
+                    if (!stagedFile.renameTo(finalFile)) {
+                        stagedFile.copyTo(finalFile, overwrite = true)
+                        stagedFile.delete()
+                    }
+                    finalFile
                 } else {
-                    false
+                    null
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
-                false
+                null
+            } finally {
+                connection?.disconnect()
+                downloadedFile.delete()
+                stagedFile.delete()
             }
+        }
+
+        private fun decodeWidgetBitmap(file: File): Bitmap? {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+            var sampleSize = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / sampleSize > MAX_IMAGE_EDGE_PX * 2) {
+                sampleSize *= 2
+            }
+
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            val decoded = BitmapFactory.decodeFile(file.absolutePath, options) ?: return null
+            val largestEdge = maxOf(decoded.width, decoded.height)
+            if (largestEdge <= MAX_IMAGE_EDGE_PX) return decoded
+
+            val scale = MAX_IMAGE_EDGE_PX.toFloat() / largestEdge
+            val scaled = Bitmap.createScaledBitmap(
+                decoded,
+                (decoded.width * scale).toInt().coerceAtLeast(1),
+                (decoded.height * scale).toInt().coerceAtLeast(1),
+                true,
+            )
+            if (scaled !== decoded) decoded.recycle()
+            return scaled
         }
 
         private fun triggerWidgetUpdate(context: Context) {
@@ -108,10 +221,10 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
             appWidgetId: Int
         ) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val partnerName = prefs.getString(KEY_PARTNER_NAME, "").orEmpty()
             val text = prefs.getString(KEY_CHECKIN_TEXT, "").orEmpty()
             val checkinType = prefs.getString(KEY_CHECKIN_TYPE, "").orEmpty()
             val hasImage = prefs.getBoolean(KEY_HAS_IMAGE, false)
+            val imagePath = prefs.getString(KEY_IMAGE_PATH, null)
 
             val launchIntent = Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
@@ -130,17 +243,18 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
             }
 
             if (checkinType.isNotEmpty()) {
-                val titleText = if (partnerName.isNotEmpty()) "$partnerName da check-in" else "Nguoi ay da check-in"
-                views.setTextViewText(R.id.quick_widget_title, titleText)
-                views.setTextViewText(R.id.quick_widget_body, text)
-                views.setViewVisibility(R.id.quick_widget_title, View.VISIBLE)
+                val message = text.ifBlank { "Có check-in mới 💗" }
+                views.setTextViewText(R.id.quick_widget_body, message)
                 views.setViewVisibility(R.id.quick_widget_body, View.VISIBLE)
 
                 if (hasImage) {
-                    val file = File(context.cacheDir, "partner_checkin.jpg")
-                    if (file.exists()) {
+                    val file = imagePath?.let(::File)
+                    if (file != null && file.exists()) {
                         try {
-                            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                            val bitmap = BitmapFactory.decodeFile(
+                                file.absolutePath,
+                                BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 },
+                            )
                             if (bitmap != null) {
                                 views.setImageViewBitmap(R.id.quick_widget_image, bitmap)
                                 views.setViewVisibility(R.id.quick_widget_image, View.VISIBLE)
@@ -162,10 +276,7 @@ class LoveCheckQuickWidgetProvider : AppWidgetProvider() {
                     views.setViewVisibility(R.id.quick_widget_scrim, View.GONE)
                 }
             } else {
-                // Default state
-                views.setTextViewText(R.id.quick_widget_title, "Chua co check-in moi")
-                views.setTextViewText(R.id.quick_widget_body, "Nhan de gui check-in cho doi phuong")
-                views.setViewVisibility(R.id.quick_widget_title, View.VISIBLE)
+                views.setTextViewText(R.id.quick_widget_body, "Nhấn để gửi check-in")
                 views.setViewVisibility(R.id.quick_widget_body, View.VISIBLE)
                 views.setViewVisibility(R.id.quick_widget_image, View.GONE)
                 views.setViewVisibility(R.id.quick_widget_scrim, View.GONE)

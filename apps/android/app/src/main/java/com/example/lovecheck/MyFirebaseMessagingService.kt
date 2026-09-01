@@ -83,11 +83,11 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             if (actionType == "checkin" || actionType == "reaction" || actionType == "reply" || actionType == "message") {
                 LoveCheckWidgetProvider.updateWidgetNotification(this, senderName, title, body, targetUrl)
 
-                if (actionType == "checkin" && !photoUrl.isNullOrEmpty()) {
+                if (actionType == "checkin") {
                     LoveCheckQuickWidgetProvider.updatePartnerCheckin(
                         this,
                         senderName,
-                        "photo",
+                        if (photoUrl.isNullOrEmpty()) "text" else "photo",
                         body,
                         photoUrl,
                         null

@@ -18,6 +18,7 @@ lifecycleViewmodelNav3 = "2.10.0"
 firebaseBom = "33.1.0"
 coil = "3.2.0"
 googleServices = "4.4.2"
+work = "2.11.2"
 
 
 [libraries]
@@ -49,6 +50,7 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
+androidx-work-runtime = { module = "androidx.work:work-runtime", version.ref = "work" }
 
 
 [plugins]
