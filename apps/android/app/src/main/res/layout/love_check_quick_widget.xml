@@ -3,9 +3,7 @@
     android:id="@+id/quick_widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_photo_background"
-    android:clipToOutline="true"
-    android:outlineProvider="background">
+    android:background="@drawable/widget_photo_background">
 
     <!-- The partner's check-in photo background -->
     <ImageView
@@ -17,11 +15,12 @@
         android:visibility="gone" />
 
     <!-- Dark gradient scrim overlay to make text highly readable -->
-    <View
+    <ImageView
         android:id="@+id/quick_widget_scrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/widget_photo_scrim"
+        android:contentDescription="@null"
         android:visibility="gone" />
 
     <!-- Content overlay -->
