@@ -332,12 +332,27 @@ a {
   justify-content: space-around;
   width: 100%;
   max-width: 440px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--liquid-glass-bg);
+  border: 1px solid var(--liquid-glass-border);
   border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-elevated);
+  box-shadow: var(--liquid-glass-shadow);
+  -webkit-backdrop-filter: var(--liquid-glass-blur);
+  backdrop-filter: var(--liquid-glass-blur);
   padding: 0 var(--space-sm);
   pointer-events: all;
+  position: relative;
+  overflow: hidden;
+}
+
+.bottom-nav-inner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.8) 50%, transparent 100%);
+  pointer-events: none;
 }
 
 .nav-item {
@@ -390,27 +405,29 @@ a {
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: var(--accent);
+  background: linear-gradient(135deg, #ff478d 0%, #ff1c6b 100%);
   color: #ffffff;
-  border: 3px solid var(--bg);
-  box-shadow: 0 8px 24px rgba(255, 59, 127, 0.35);
+  border: 3.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 32px rgba(255, 28, 107, 0.45), inset 0 1.5px 1.5px rgba(255, 255, 255, 0.8), inset 0 -1.5px 1.5px rgba(0, 0, 0, 0.15);
   margin-top: -30px;
   cursor: pointer;
   flex-shrink: 0;
   position: relative;
   z-index: 101;
   transition: transform var(--duration-fast) var(--ease-spring),
-    box-shadow var(--duration-fast) var(--ease);
+    box-shadow var(--duration-fast) var(--ease),
+    filter var(--duration-fast) var(--ease);
 }
 
 .nav-checkin-btn:hover {
   transform: scale(1.08);
-  box-shadow: 0 10px 30px rgba(255, 59, 127, 0.45);
+  box-shadow: 0 14px 36px rgba(255, 28, 107, 0.55), inset 0 1.5px 1.5px rgba(255, 255, 255, 0.9);
+  filter: brightness(1.04);
 }
 
 .nav-checkin-btn:active {
   transform: scale(0.92) translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 59, 127, 0.2);
+  box-shadow: 0 6px 16px rgba(255, 28, 107, 0.25);
 }
 
 .nav-checkin-btn svg {
@@ -3457,13 +3474,21 @@ textarea.input {
 [data-theme='light'] .glass-profile-card,
 [data-theme='light'] .glass-modal,
 [data-theme='light'] .card,
-[data-theme='light'] .card-solid,
 [data-theme='light'] .modal {
-  background: #ffffff !important;
-  box-shadow: var(--shadow) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 244, 248, 0.68) 100%
+  ) !important;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+  box-shadow:
+    0 14px 40px -8px rgba(160, 30, 70, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.02),
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.3) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(190%) !important;
+  backdrop-filter: blur(26px) saturate(190%) !important;
 }
-
-
 
 /* Giao diện Glass cho các pills/buttons trong Light Mode */
 [data-theme='light'] .glass-pill,
@@ -3474,19 +3499,18 @@ textarea.input {
 [data-theme='light'] .reaction-option,
 [data-theme='light'] .theme-choice,
 [data-theme='light'] .reaction-detail-row,
-[data-theme='light'] .reply-detail-item,
-[data-theme='light'] .glass-pill,
-[data-theme='light'] .glass-action,
-[data-theme='light'] .memory-reaction-summary:not(.has-reactions),
-[data-theme='light'] .reaction-pill,
-[data-theme='light'] .memory-reply-count,
-[data-theme='light'] .reaction-option,
-[data-theme='light'] .theme-choice,
-[data-theme='light'] .reaction-detail-row,
 [data-theme='light'] .reply-detail-item {
-  background: rgba(255, 255, 255, 0.78) !important;
-  border: 1px solid rgba(0, 0, 0, 0.06) !important;
-  box-shadow: none !important;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 240, 246, 0.62) 100%
+  ) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.9) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(170%) !important;
+  backdrop-filter: blur(16px) saturate(170%) !important;
   color: var(--text-primary) !important;
 }
 
@@ -3946,11 +3970,15 @@ textarea:focus-visible,
 [data-theme='dark'] .photo-drop-area,
 [data-theme='dark'] .modal,
 [data-theme='dark'] .bottom-nav-inner {
-  background: linear-gradient(145deg, rgba(68, 35, 56, 0.92), rgba(45, 27, 41, 0.94)) !important;
-  border-color: rgba(255, 164, 198, 0.2) !important;
+  background: linear-gradient(135deg, rgba(54, 30, 48, 0.8) 0%, rgba(36, 20, 32, 0.68) 100%) !important;
+  border: 1px solid rgba(255, 170, 205, 0.22) !important;
   box-shadow:
-    0 18px 46px rgba(24, 7, 20, 0.3),
-    inset 0 1px 0 rgba(255, 214, 229, 0.08) !important;
+    0 20px 48px -6px rgba(0, 0, 0, 0.5),
+    0 2px 10px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(190%) contrast(104%) !important;
+  backdrop-filter: blur(30px) saturate(190%) contrast(104%) !important;
 }
 
 [data-theme='dark'] .btn-icon,
@@ -5134,8 +5162,9 @@ textarea:focus-visible,
 .chat-text-message.own .chat-text-bubble {
   border-color: transparent;
   border-radius: 20px 20px 6px 20px;
-  background: var(--accent);
+  background: linear-gradient(135deg, #ff478d 0%, #ff1c6b 100%);
   color: #fff;
+  box-shadow: 0 4px 16px rgba(255, 28, 107, 0.28), inset 0 1.2px 1px rgba(255, 255, 255, 0.45);
 }
 
 .chat-text-bubble p {
@@ -5179,11 +5208,11 @@ textarea:focus-visible,
 .chat-bubble {
   padding: 10px 13px;
   border-radius: 20px 20px 20px 7px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.84) 0%, rgba(255, 242, 247, 0.7) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 4px 16px rgba(160, 30, 70, 0.06), inset 0 1px 0.5px rgba(255, 255, 255, 0.95);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
 }
 
 .chat-bubble.has-photo {
@@ -5278,13 +5307,25 @@ textarea:focus-visible,
   width: min(calc(100% - 28px), 452px);
   margin: auto;
   padding: 7px;
-  border: 0;
+  border: 1px solid var(--liquid-glass-border);
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: var(--shadow-elevated);
-  -webkit-backdrop-filter: blur(24px) saturate(145%);
-  backdrop-filter: blur(24px) saturate(145%);
-  transition: border-radius var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease);
+  background: var(--liquid-glass-bg);
+  box-shadow: var(--liquid-glass-shadow);
+  -webkit-backdrop-filter: var(--liquid-glass-blur);
+  backdrop-filter: var(--liquid-glass-blur);
+  overflow: hidden;
+  transition: border-radius var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.messages-composer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.85) 50%, transparent 100%);
+  pointer-events: none;
 }
 
 .messages-composer-row {
@@ -5360,23 +5401,6 @@ textarea {
   scroll-margin-bottom: calc(var(--keyboard-offset, 0px) + 3px);
 }
 
-.messages-photo-button,
-.messages-send {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  font-size: 25px;
-  line-height: 1;
-}
-
-.messages-photo-button {
-  color: var(--accent);
-  background: rgba(255, 59, 127, 0.1);
-}
-
 .messages-attach-backdrop {
   position: fixed;
   inset: 0;
@@ -5397,13 +5421,24 @@ textarea {
   flex-direction: column;
   width: 250px;
   border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22), 0 2px 10px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--liquid-glass-border);
+  background: var(--liquid-glass-bg);
+  -webkit-backdrop-filter: var(--liquid-glass-blur);
+  backdrop-filter: var(--liquid-glass-blur);
+  box-shadow: var(--liquid-glass-shadow);
   overflow: hidden;
   animation: attachMenuPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.messages-attach-menu::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.9) 50%, transparent 100%);
+  pointer-events: none;
 }
 
 .messages-attach-menu[hidden] {
@@ -5495,11 +5530,20 @@ textarea {
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: var(--accent);
+  background: linear-gradient(135deg, #ff478d 0%, #ff1c6b 100%);
   border-radius: 50%;
   border: 0;
+  box-shadow: 0 6px 18px rgba(255, 28, 107, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.65);
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease), filter var(--duration-fast) var(--ease);
+  font-size: 20px;
+  line-height: 1;
+  transition: transform var(--duration-fast) var(--ease), filter var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.messages-send:hover {
+  transform: scale(1.06);
+  filter: brightness(1.05);
+  box-shadow: 0 8px 22px rgba(255, 28, 107, 0.5), inset 0 1.2px 1px rgba(255, 255, 255, 0.75);
 }
 
 .messages-send:active {
@@ -5513,17 +5557,20 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.65);
   border-radius: 50%;
-  background: transparent;
-  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--accent);
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.9);
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+  font-size: 22px;
+  line-height: 1;
+  transition: transform var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
 .messages-photo-button:hover {
-  color: var(--accent);
   background: var(--accent-soft);
+  transform: scale(1.06);
 }
 
 .messages-photo-button:active {
@@ -5638,10 +5685,29 @@ textarea {
   transform: scale(0.92);
 }
 
-[data-theme='dark'] .chat-bubble,
+[data-theme='dark'] .chat-bubble {
+  background: linear-gradient(135deg, rgba(56, 34, 48, 0.82) 0%, rgba(42, 24, 36, 0.72) 100%);
+  border: 1px solid rgba(255, 170, 205, 0.18);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0.5px rgba(255, 255, 255, 0.14);
+}
+
 [data-theme='dark'] .messages-composer {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(40, 31, 36, 0.82);
+  background: var(--liquid-glass-bg);
+  border-color: var(--liquid-glass-border);
+  box-shadow: var(--liquid-glass-shadow);
+  -webkit-backdrop-filter: var(--liquid-glass-blur);
+  backdrop-filter: var(--liquid-glass-blur);
+}
+
+[data-theme='dark'] .messages-photo-button {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 170, 205, 0.2);
+  color: var(--accent);
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.15);
+}
+
+[data-theme='dark'] .messages-photo-button:hover {
+  background: rgba(255, 59, 127, 0.2);
 }
 
 [data-theme='dark'] .message-quote {
@@ -5649,14 +5715,17 @@ textarea {
 }
 
 [data-theme='dark'] .messages-attach-menu {
-  background: rgba(36, 24, 34, 0.94);
-  border-color: rgba(255, 164, 198, 0.18);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  background: var(--liquid-glass-bg);
+  border-color: var(--liquid-glass-border);
+  box-shadow: var(--liquid-glass-shadow);
+  -webkit-backdrop-filter: var(--liquid-glass-blur);
+  backdrop-filter: var(--liquid-glass-blur);
 }
 
 [data-theme='dark'] .messages-photo-preview {
-  background: rgba(50, 36, 46, 0.85);
-  border-color: rgba(255, 164, 198, 0.2);
+  background: linear-gradient(135deg, rgba(58, 34, 50, 0.85) 0%, rgba(42, 24, 38, 0.75) 100%);
+  border-color: rgba(255, 164, 198, 0.24);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 1px 0.5px rgba(255, 255, 255, 0.15);
 }
 
 [data-theme='dark'] .messages-photo-remove {

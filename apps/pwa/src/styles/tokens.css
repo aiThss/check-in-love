@@ -25,7 +25,13 @@
 
   /* ── Shadows ──────────────────────────────────────────────── */
   --shadow: 0 10px 30px rgba(160, 30, 70, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --shadow-elevated: 0 16px 36px rgba(160, 30, 70, 0.14), inset 0 1px 0 rgba(255, 255, 255, 1);
+  --shadow-elevated: 0 16px 36px rgba(160, 30, 70, 0.14), inset 0 1.5px 1px 0 rgba(255, 255, 255, 1), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.35);
+
+  /* ── Liquid Glass (iOS 26xxx Design) ────────────────────────── */
+  --liquid-glass-blur: blur(28px) saturate(190%) contrast(102%);
+  --liquid-glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(255, 242, 247, 0.58) 100%);
+  --liquid-glass-border: rgba(255, 255, 255, 0.65);
+  --liquid-glass-shadow: 0 16px 44px -6px rgba(180, 40, 80, 0.12), 0 2px 8px rgba(0, 0, 0, 0.03), inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.3);
 
   /* ── Radii ────────────────────────────────────────────────── */
   --radius-card: 28px;
@@ -81,6 +87,12 @@
   --accent-glow: rgba(255, 59, 127, 0.28);
   --shadow: 0 18px 46px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --shadow-elevated: 0 22px 50px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* ── Liquid Glass Dark ── */
+  --liquid-glass-blur: blur(30px) saturate(190%) contrast(104%);
+  --liquid-glass-bg: linear-gradient(135deg, rgba(52, 30, 46, 0.8) 0%, rgba(36, 20, 32, 0.68) 100%);
+  --liquid-glass-border: rgba(255, 170, 205, 0.22);
+  --liquid-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 1px 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
 }
 
 /* ── System Dark Mode (fallback when theme is "system") ─────── */
@@ -102,5 +114,11 @@
     --accent-glow: rgba(255, 59, 127, 0.28);
     --shadow: 0 18px 46px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     --shadow-elevated: 0 22px 50px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+    /* ── Liquid Glass Dark ── */
+    --liquid-glass-blur: blur(30px) saturate(190%) contrast(104%);
+    --liquid-glass-bg: linear-gradient(135deg, rgba(52, 30, 46, 0.8) 0%, rgba(36, 20, 32, 0.68) 100%);
+    --liquid-glass-border: rgba(255, 170, 205, 0.22);
+    --liquid-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 1px 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
   }
 }
