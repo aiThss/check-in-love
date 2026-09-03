@@ -12,7 +12,6 @@ import {
   revokePreviewUrl,
   type CameraResult,
 } from '../components/camera';
-import type { CheckIn } from '../api/types';
 
 const PHOTO_ASPECT_RATIO = 1;
 const PHOTO_CSS_RATIO = '1 / 1';
@@ -271,33 +270,6 @@ export function renderCheckinPage(): HTMLElement {
       renderContentForm();
 
       return createCheckin(buildPhotoPayload(fallback.file, caption, clientMutationId));
-    }
-  }
-
-  function compactUploadPicker(picker: HTMLElement): void {
-    const icon = picker.children[0] as HTMLElement | undefined;
-    const copy = picker.children[1] as HTMLElement | undefined;
-    const title = copy?.querySelector<HTMLElement>('p:first-child');
-    const subtitle = copy?.querySelector<HTMLElement>('p:last-child');
-
-    if (icon) {
-      icon.style.fontSize = 'clamp(46px, 13vw, 56px)';
-      icon.style.lineHeight = '1';
-    }
-
-    if (copy) {
-      copy.style.maxWidth = '100%';
-      copy.style.padding = '0 10px';
-    }
-
-    if (title) {
-      title.style.fontSize = 'clamp(13px, 3.6vw, 15px)';
-      title.style.lineHeight = '1.25';
-    }
-
-    if (subtitle) {
-      subtitle.style.fontSize = '11px';
-      subtitle.style.lineHeight = '1.25';
     }
   }
 

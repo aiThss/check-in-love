@@ -867,7 +867,7 @@ export function renderHomePage(): HTMLElement {
             checkin.createdAt
           );
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     } catch {

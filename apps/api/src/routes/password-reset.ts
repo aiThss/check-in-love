@@ -1,7 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { env } from '../config/env';
 import { OtpCode } from '../db/models/OtpCode';
 import { User } from '../db/models/User';
 import { isEmailConfigured, sendOtpEmail } from '../services/email';

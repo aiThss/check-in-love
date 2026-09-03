@@ -69,7 +69,7 @@ export async function apiRequest<T>(
       ...options,
       headers,
     });
-  } catch (err) {
+  } catch {
     throw new ApiError(0, 'Network error — unable to reach the server.');
   }
 

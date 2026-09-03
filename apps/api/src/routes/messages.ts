@@ -144,12 +144,18 @@ function deterministicObjectId(dateValue: Date, identity: string): Types.ObjectI
   return new Types.ObjectId(`${timestamp}${suffix}`);
 }
 
+const syncedCouples = new Set<string>();
+
 /**
  * Bridges the old shared CheckIn stream into ChatMessage without duplicating media.
  * It is idempotent and preserves original timestamps, so historical photos/replies do
  * not jump to the bottom of the conversation after a deploy.
  */
 async function syncLegacyCheckinMessages(coupleId: Types.ObjectId): Promise<void> {
+  const coupleKey = coupleId.toString();
+  if (syncedCouples.has(coupleKey)) {
+    return;
+  }
   const checkins = await CheckIn.find({
     coupleId,
     deletedAt: null,
@@ -245,6 +251,8 @@ async function syncLegacyCheckinMessages(coupleId: Types.ObjectId): Promise<void
   if (operations.length > 0) {
     await ChatMessage.bulkWrite(operations, { ordered: false });
   }
+
+  syncedCouples.add(coupleKey);
 }
 
 async function hydrateLiveCheckins(

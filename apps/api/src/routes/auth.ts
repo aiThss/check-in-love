@@ -523,7 +523,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const { email, password, otpCode, deviceId, coupleCode } = parsed.data;
 
-      let user: InstanceType<typeof User> | null = null;
+      let user: InstanceType<typeof User> | null;
 
       if (email && password) {
         // Email + password + OTP login

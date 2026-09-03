@@ -9,6 +9,8 @@ export default tseslint.config(
       '**/node_modules/**',
       'apps/android/**',
       'apps/pwa/public/sw.js',
+      'qr-helper.js',
+      'vite-tele.js',
     ],
   },
   js.configs.recommended,

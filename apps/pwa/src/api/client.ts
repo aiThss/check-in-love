@@ -27,7 +27,7 @@ function getLanDevelopmentApiUrl(): string | null {
   return `http://${host}:3001/api`;
 }
 
-function getApiUrl(): string {
+export function getApiUrl(): string {
   if (typeof window !== 'undefined') {
     const custom = (window as Window & { __API_URL__?: string }).__API_URL__;
     if (custom && !isLoopbackApiUrl(custom)) return custom;
@@ -111,7 +111,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
       ...requestOptions,
       headers,
     });
-  } catch (err) {
+  } catch {
     throw new ApiError('Không có kết nối mạng', 'NETWORK_ERROR', 0);
   }
 

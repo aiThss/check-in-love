@@ -28,40 +28,59 @@ function fcmTokenReference(token: string): string {
   return `${token.slice(0, 6)}...${token.slice(-6)}`;
 }
 
+let cachedServiceAccount: ServiceAccount | null = null;
+let serviceAccountLoadAttempted = false;
+
+function loadServiceAccount(): ServiceAccount | null {
+  if (serviceAccountLoadAttempted) return cachedServiceAccount;
+  serviceAccountLoadAttempted = true;
+
+  if (env.FCM_SERVICE_ACCOUNT_JSON) {
+    try {
+      cachedServiceAccount = JSON.parse(env.FCM_SERVICE_ACCOUNT_JSON);
+      if (cachedServiceAccount?.private_key) return cachedServiceAccount;
+    } catch (err) {
+      logger.error('[push] Failed to parse FCM_SERVICE_ACCOUNT_JSON', err);
+    }
+  }
+  if (!cachedServiceAccount && env.FCM_SERVICE_ACCOUNT_FILE) {
+    const filePath = path.resolve(env.FCM_SERVICE_ACCOUNT_FILE);
+    if (fs.existsSync(filePath)) {
+      try {
+        cachedServiceAccount = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        if (cachedServiceAccount?.private_key) return cachedServiceAccount;
+      } catch (err) {
+        logger.error('[push] Failed to read FCM_SERVICE_ACCOUNT_FILE', err);
+      }
+    }
+  }
+  if (!cachedServiceAccount) {
+    const candidates = [
+      path.resolve(process.cwd(), 'firebase-service-account.json'),
+      path.resolve(process.cwd(), 'check-in-couple-firebase-adminsdk-fbsvc-a9244a86c4.json'),
+      path.resolve(__dirname, '../../../../firebase-service-account.json'),
+      path.resolve(__dirname, '../../../../check-in-couple-firebase-adminsdk-fbsvc-a9244a86c4.json'),
+      '/app/firebase-service-account.json',
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+          if (parsed && parsed.private_key) {
+            cachedServiceAccount = parsed;
+            break;
+          }
+        } catch {}
+      }
+    }
+  }
+
+  return cachedServiceAccount;
+}
+
 async function getFcmAccessToken(): Promise<{ accessToken: string; projectId: string } | null> {
   try {
-    let serviceAccount: ServiceAccount | null = null;
-    if (env.FCM_SERVICE_ACCOUNT_JSON) {
-      try {
-        serviceAccount = JSON.parse(env.FCM_SERVICE_ACCOUNT_JSON);
-      } catch (err) {
-        logger.error('[push] Failed to parse FCM_SERVICE_ACCOUNT_JSON', err);
-      }
-    }
-    if (!serviceAccount && env.FCM_SERVICE_ACCOUNT_FILE) {
-      const filePath = path.resolve(env.FCM_SERVICE_ACCOUNT_FILE);
-      if (fs.existsSync(filePath)) {
-        serviceAccount = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      }
-    }
-    if (!serviceAccount) {
-      const candidates = [
-        path.resolve(process.cwd(), 'firebase-service-account.json'),
-        path.resolve(process.cwd(), 'check-in-couple-firebase-adminsdk-fbsvc-a9244a86c4.json'),
-        path.resolve(__dirname, '../../../../firebase-service-account.json'),
-        path.resolve(__dirname, '../../../../check-in-couple-firebase-adminsdk-fbsvc-a9244a86c4.json'),
-        '/app/firebase-service-account.json',
-      ];
-      for (const candidate of candidates) {
-        if (fs.existsSync(candidate)) {
-          try {
-            serviceAccount = JSON.parse(fs.readFileSync(candidate, 'utf8'));
-            if (serviceAccount && serviceAccount.private_key) break;
-          } catch {}
-        }
-      }
-    }
-
+    const serviceAccount = loadServiceAccount();
     if (!serviceAccount) {
       return null;
     }
@@ -369,10 +388,10 @@ export async function sendPushToUser(
     } catch (err: unknown) {
       result.webPush.failed++;
       const webErr = err as { statusCode?: number };
-      if (webErr.statusCode === 410) {
+      if (webErr.statusCode === 410 || webErr.statusCode === 404) {
         // Subscription is no longer valid — clean it up
         await PushSubscription.deleteOne({ _id: sub._id });
-        logger.info(`[push] Removed expired subscription ${sub.endpoint}`);
+        logger.info(`[push] Removed expired subscription (${webErr.statusCode}) ${sub.endpoint}`);
       } else {
         logger.error('[push] Failed to send web notification', err);
       }

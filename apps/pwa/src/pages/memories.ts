@@ -509,7 +509,7 @@ export function renderMemoriesPage(): HTMLElement {
   const DAY_NAMES = ['chủ nhật', 'thứ hai', 'thứ ba', 'thứ tư', 'thứ năm', 'thứ sáu', 'thứ bảy'];
 
   function matchDateFlexible(d: Date, lowerQuery: string): boolean {
-    let q = lowerQuery
+    const q = lowerQuery
       .replace(/(\d+)\s*(?:st|nd|rd|th)\s*(\d*)/g, '$1-$2')
       .replace(/[^a-z0-9]/g, ' ')
       .replace(/\s+/g, ' ')
@@ -831,14 +831,13 @@ export function renderMemoriesPage(): HTMLElement {
 
     const detail = document.createElement('div');
     detail.className = 'checkin-detail';
-    let isReplySectionOpen = false;
 
     const renderDetailContent = () => {
       // Lấy URL ảnh tốt nhất, kể cả khi type lệch hoặc field thiếu
       const photoUrl = getCheckinPhotoUrl(item);
       const hasPhoto = Boolean(photoUrl);
 
-      let contentHtml = '';
+      let contentHtml: string;
 
       if (hasPhoto) {
         // Hiển thị ảnh nếu có URL — không phụ thuộc cứng vào item.type
@@ -970,7 +969,6 @@ export function renderMemoriesPage(): HTMLElement {
               createdAt: new Date().toISOString(),
             },
           ];
-          isReplySectionOpen = true;
           renderDetailContent();
           if (input) input.value = '';
         } catch {

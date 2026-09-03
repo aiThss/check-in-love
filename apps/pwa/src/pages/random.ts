@@ -47,7 +47,6 @@ export function renderRandomPage(): HTMLElement {
 
   // Selected state
   let selectedCategory: string | undefined = undefined;
-  let activeDrawResult: RandomItem | null = null;
   let categories: RandomCategory[] = [];
 
   // Category Selector grid
@@ -216,7 +215,6 @@ export function renderRandomPage(): HTMLElement {
     
     try {
       const res = await drawRandom(selectedCategory);
-      activeDrawResult = res;
       renderResultCard(res);
       showToast('Đã rút thành công một thẻ bài! 🎉', 'success');
       

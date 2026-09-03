@@ -392,7 +392,6 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
 
     let cooldown = 0;
     let cooldownInterval: ReturnType<typeof setInterval> | null = null;
-    let otpSentSuccessfully = false;
 
     content.innerHTML = `
       <div style="font-size:72px;line-height:1" class="animate-pulse">📬</div>
@@ -550,7 +549,6 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
 
       try {
         await sendOtp(formData.email);
-        otpSentSuccessfully = true;
         offlineBanner.style.display = 'none';
         showToast(
           isResend ? '✉️ Đã gửi lại mã mới!' : `✉️ Mã đã gửi tới ${formData.email}`,
@@ -882,7 +880,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       const formattedDate = formatDateVietnamese(formData.loveStartDate);
 
       if (days >= 0 && formData.loveStartDate) {
-        let milestoneText = '';
+        let milestoneText: string;
         if (days === 0) milestoneText = 'Ngày đầu tiên bên nhau ✨';
         else if (days < 30) milestoneText = 'Những ngày đầu rực rỡ 💓';
         else if (days < 100) milestoneText = 'Sắp đạt mốc 100 ngày 🎉';
@@ -1004,7 +1002,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       localStorage.setItem('lovecheck_token', result.token);
 
       showSuccessAndNavigate();
-    } catch (err: unknown) {
+    } catch {
       // Fallback for local UI preview when backend API server is offline
       showToast('Đã tạo dữ liệu xem thử Local! Đang vào trang chính...', 'info');
       const preview = seedMockPreviewData({

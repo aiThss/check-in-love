@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
+import { isDevelopmentOrigin } from '../utils/origin';
 
 export interface RealtimeEvent {
   type: 'message' | 'message.updated' | 'message.reaction' | 'message.read' | 'message.typing' | 'message.presence' | 'chat.background.updated' | 'checkin' | 'reaction' | 'reply' | 'reminder';
@@ -71,7 +72,7 @@ export async function eventRoutes(app: FastifyInstance): Promise<void> {
     reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
     reply.raw.setHeader('Connection', 'keep-alive');
     const origin = request.headers.origin;
-    if (origin && env.ALLOWED_ORIGINS.includes(origin)) {
+    if (origin && (env.ALLOWED_ORIGINS.includes(origin) || isDevelopmentOrigin(origin))) {
       reply.raw.setHeader('Access-Control-Allow-Origin', origin);
       reply.raw.setHeader('Vary', 'Origin');
     }

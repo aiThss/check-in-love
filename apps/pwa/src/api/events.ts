@@ -1,5 +1,6 @@
 import { store } from '../store';
 import { logger } from '../utils/logger';
+import { getApiUrl } from './client';
 import type { ChatBackgroundSnapshot } from './types';
 
 export interface RealtimeEventData {
@@ -42,7 +43,8 @@ export function initRealtimeEvents(): void {
     if (!token) return;
 
     try {
-      const url = `/api/events?token=${encodeURIComponent(token)}`;
+      const base = getApiUrl().replace(/\/+$/, '');
+      const url = `${base}/events?token=${encodeURIComponent(token)}`;
       eventSource = new EventSource(url);
 
       eventSource.onmessage = (event) => {

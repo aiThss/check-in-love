@@ -28,7 +28,7 @@ function getRoute(): Route {
     '/random',
   ];
 
-  let route = validRoutes.includes(path as Route) ? (path as Route) : '/dashboard';
+  const route = validRoutes.includes(path as Route) ? (path as Route) : '/dashboard';
   
   const auth = isAuthenticated();
   
