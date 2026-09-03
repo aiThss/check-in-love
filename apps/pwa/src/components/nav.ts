@@ -1,18 +1,19 @@
 import { getCurrentPath, navigate } from '../router';
+import { iconHome, iconMemories, iconMessages, iconPlus, iconProfile } from './icons';
 
 interface NavItem {
-  icon: string;
+  icon: (filled?: boolean) => string;
   label: string;
   path: string;
   isCheckin?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { icon: '🏠', label: 'Home', path: '/app/home' },
-  { icon: '📸', label: 'Kỷ niệm', path: '/app/memories' },
-  { icon: '', label: '', path: '/app/checkin', isCheckin: true },
-  { icon: '💬', label: 'Tin nhắn', path: '/app/messages' },
-  { icon: '<img src="/user.png" alt="Profile" style="width:22px;height:22px;object-fit:contain;display:block;" />', label: 'Profile', path: '/app/profile' },
+  { icon: (filled) => iconHome({ filled, size: 22 }), label: 'Home', path: '/app/home' },
+  { icon: (filled) => iconMemories({ filled, size: 22 }), label: 'Kỷ niệm', path: '/app/memories' },
+  { icon: () => iconPlus({ size: 24, strokeWidth: 3 }), label: '', path: '/app/checkin', isCheckin: true },
+  { icon: (filled) => iconMessages({ filled, size: 22 }), label: 'Tin nhắn', path: '/app/messages' },
+  { icon: (filled) => iconProfile({ filled, size: 22 }), label: 'Cá nhân', path: '/app/profile' },
 ];
 
 const SUPPORTS_HOVER =
@@ -28,6 +29,12 @@ function applyActiveState(path: string): void {
     button.setAttribute('aria-current', active ? 'page' : 'false');
     if (button.classList.contains('nav-checkin-btn')) {
       button.setAttribute('aria-label', active ? 'Đóng check-in' : 'Tạo check-in mới');
+    } else {
+      const item = NAV_ITEMS.find((n) => n.path === button.dataset.route);
+      const iconEl = button.querySelector<HTMLElement>('.nav-icon');
+      if (item && iconEl) {
+        iconEl.innerHTML = item.icon(active);
+      }
     }
 
     if (!button.classList.contains('nav-checkin-btn')) {
@@ -87,7 +94,7 @@ export function createNav(): HTMLElement {
       button.className = 'nav-item';
       button.style.transform = 'none';
       button.style.transition = 'background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease)';
-      button.innerHTML = `<span class="nav-icon" aria-hidden="true">${item.icon}</span><span class="nav-label">${item.label}</span>`;
+      button.innerHTML = `<span class="nav-icon" aria-hidden="true">${item.icon(false)}</span><span class="nav-label">${item.label}</span>`;
     }
 
     button.addEventListener('pointerdown', () => applyActiveState(item.path));

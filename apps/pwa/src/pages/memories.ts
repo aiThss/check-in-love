@@ -9,6 +9,7 @@ import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refres
 import { smilePlusIconMarkup } from '../components/smile-plus-icon';
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
 import { createReplyToggle, getReplyPagePath } from '../components/reply-toggle';
+import { iconSend } from '../components/icons';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
 let cachedMemories: CheckIn[] = [];
@@ -273,7 +274,7 @@ function buildSocialRow(
       data-1p-ignore="true"
     />
     <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
-    <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
+    <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">${iconSend({ size: 16 })}</button>
   `;
   const input = form.querySelector<HTMLInputElement>('input');
   const submitButton = form.querySelector<HTMLButtonElement>('.rm-send-message');

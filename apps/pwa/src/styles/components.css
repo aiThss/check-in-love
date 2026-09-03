@@ -364,8 +364,19 @@ a {
 }
 
 .nav-item .nav-icon {
-  font-size: 22px;
-  line-height: 1;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: transform var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.nav-item .nav-icon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
 }
 
 .nav-item .nav-label {
@@ -3883,7 +3894,7 @@ body::after {
 }
 
 .nav-item.active .nav-icon {
-  transform: translateY(-1px);
+  transform: translateY(-2px) scale(1.08);
 }
 
 .nav-checkin-btn {
@@ -5395,24 +5406,59 @@ textarea {
 }
 
 .messages-attach-menu button {
-  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: var(--text-primary);
   font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
   text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
+}
+
+.messages-attach-menu button svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.messages-attach-menu button:hover {
+  background: var(--accent-soft);
 }
 
 .messages-attach-menu button:active {
   background: var(--accent-soft);
+  transform: scale(0.97);
 }
 
 .messages-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #fff;
   background: var(--accent);
-  font-size: 22px;
-  font-weight: 800;
+  border-radius: 50%;
+  transition: transform var(--duration-fast) var(--ease), filter var(--duration-fast) var(--ease);
+}
+
+.messages-send:active {
+  transform: scale(0.92);
+}
+
+.messages-photo-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease);
+}
+
+.messages-photo-button:active {
+  transform: scale(0.92);
 }
 
 .messages-input-wrap {

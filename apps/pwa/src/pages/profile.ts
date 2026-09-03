@@ -10,6 +10,7 @@ import { apiFetch } from '../api/client';
 import { ensurePushSubscription, isAndroidApp, testPushNotification, syncAndroidFcmNow } from '../api/push';
 import type { User, Couple } from '../api/types';
 import { isMockPreviewMode } from '../dev/mock-data';
+import { iconArrowRight, iconBell, iconDownload, iconLogout } from '../components/icons';
 
 function calcDaysTogether(loveStartDate?: string): number {
   if (!loveStartDate) return 0;
@@ -240,7 +241,7 @@ function buildReminderCard(): HTMLElement {
     const header = document.createElement('div');
     header.className = 'reminder-card-header';
     header.innerHTML = `
-      <div class="reminder-card-icon" aria-hidden="true">🔔</div>
+      <div class="reminder-card-icon" aria-hidden="true">${iconBell({ size: 22 })}</div>
       <div class="reminder-card-copy">
         <span class="reminder-card-title">Nhắc check-in</span>
         <span class="reminder-card-subtitle">Nhắc đúng giờ, kể cả khi app đã đóng</span>
@@ -297,8 +298,8 @@ function buildReminderCard(): HTMLElement {
     testRow.className = 'reminder-test-row';
     testRow.style.cssText = 'margin-top: 14px; display: flex; justify-content: flex-end;';
     testRow.innerHTML = `
-      <button type="button" id="btn-test-push" class="btn-ghost" style="font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);">
-        🔔 Thử gửi thông báo
+      <button type="button" id="btn-test-push" class="btn-ghost" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);">
+        ${iconBell({ size: 14 })} Thử gửi thông báo
       </button>
     `;
     card.appendChild(testRow);
@@ -332,7 +333,7 @@ function buildReminderCard(): HTMLElement {
       } finally {
         if (btn) {
           btn.disabled = false;
-          btn.textContent = '🔔 Thử gửi thông báo';
+          btn.innerHTML = `${iconBell({ size: 14 })} Thử gửi thông báo`;
         }
       }
     });
@@ -844,7 +845,7 @@ export function renderProfilePage(): HTMLElement {
     updateRow.innerHTML = `
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
         <div style="display:flex;align-items:flex-start;gap:12px;min-width:0;">
-          <span style="font-size:20px;line-height:1;">⬆️</span>
+          <span style="display:flex;align-items:center;color:var(--accent);">${iconDownload({ size: 22 })}</span>
           <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
             <span style="font-size:14px;font-weight:600;">Cập nhật APK</span>
             <span id="apk-update-status" style="font-size:11px;color:var(--text-secondary);line-height:1.4;">
@@ -877,16 +878,16 @@ export function renderProfilePage(): HTMLElement {
     // 4. Logout Row
     const logoutRow = document.createElement('div');
     logoutRow.className = 'card-solid';
-    logoutRow.style.cssText = 'padding:16px;cursor:pointer;display:flex;justify-content:between;align-items:center;border-color:rgba(239, 68, 68, 0.2);';
+    logoutRow.style.cssText = 'padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-color:rgba(239, 68, 68, 0.2);';
     logoutRow.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:20px;">🚪</span>
+        <span style="display:flex;align-items:center;color:#ef4444;">${iconLogout({ size: 22 })}</span>
         <div style="display:flex;flex-direction:column;">
           <span style="font-size:14px;font-weight:600;color:#ef4444;">Đăng xuất</span>
           <span style="font-size:11px;color:var(--text-secondary);">Thoát tài khoản khỏi thiết bị này</span>
         </div>
       </div>
-      <span style="font-size:16px;color:#ef4444;">→</span>
+      <span style="display:flex;align-items:center;color:#ef4444;">${iconArrowRight({ size: 18 })}</span>
     `;
     logoutRow.addEventListener('click', () => {
       showModal({

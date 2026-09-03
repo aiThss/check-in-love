@@ -6,6 +6,7 @@ import { getSharedChatBackground, updateSharedChatBackground } from '../api/chat
 import { enqueueMessage, flushMessageOutbox, type QueuedMessage } from '../api/message-outbox';
 import { createCheckin } from '../api/checkins';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
+import { iconCamera, iconGallery, iconPlus, iconSend } from '../components/icons';
 import { closeModal, showModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import type { ChatBackgroundSnapshot, ChatMessage } from '../api/types';
@@ -311,10 +312,10 @@ export function renderMessagesPage(): RoutePage {
       <div class="messages-reply-preview" hidden></div>
       <div class="messages-composer-row">
         <input id="message-photo" type="file" accept="image/*" hidden />
-        <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm">+</button>
+        <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm">${iconPlus({ size: 20, strokeWidth: 2.6 })}</button>
         <div class="messages-attach-menu" hidden>
-          <button type="button" data-attach="gallery">Chọn ảnh</button>
-          <button type="button" data-attach="camera">Chụp check-in</button>
+          <button type="button" data-attach="gallery">${iconGallery({ size: 18 })}<span>Chọn ảnh</span></button>
+          <button type="button" data-attach="camera">${iconCamera({ size: 18 })}<span>Chụp check-in</span></button>
         </div>
         <div class="messages-input-wrap">
           <button class="messages-photo-preview" type="button" hidden aria-label="Xem ảnh đã chọn"></button>
@@ -334,7 +335,7 @@ export function renderMessagesPage(): RoutePage {
             data-1p-ignore="true"
           />
         </div>
-        <button class="messages-send" type="submit" aria-label="Gửi tin nhắn">↑</button>
+        <button class="messages-send" type="submit" aria-label="Gửi tin nhắn">${iconSend({ size: 18 })}</button>
       </div>
     </form>
   `;

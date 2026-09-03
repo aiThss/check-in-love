@@ -10,6 +10,7 @@ import { smilePlusIconMarkup } from '../components/smile-plus-icon';
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
 import { createReplyToggle, getReplyPagePath } from '../components/reply-toggle';
 import { createMessage } from '../api/messages';
+import { iconSend } from '../components/icons';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -557,7 +558,7 @@ function buildRecentMemoriesSection(): HTMLElement {
             data-1p-ignore="true"
           />
           <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
-          <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
+          <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">${iconSend({ size: 16 })}</button>
         `;
 
         const replyInput = replyForm.querySelector<HTMLInputElement>('input');
