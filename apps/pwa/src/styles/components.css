@@ -364,19 +364,8 @@ a {
 }
 
 .nav-item .nav-icon {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-tertiary);
-  transition: transform var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
-}
-
-.nav-item .nav-icon svg {
-  width: 22px;
-  height: 22px;
-  display: block;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .nav-item .nav-label {
@@ -3894,7 +3883,7 @@ body::after {
 }
 
 .nav-item.active .nav-icon {
-  transform: translateY(-2px) scale(1.08);
+  transform: translateY(-1px);
 }
 
 .nav-checkin-btn {

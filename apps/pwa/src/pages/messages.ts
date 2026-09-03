@@ -6,7 +6,6 @@ import { getSharedChatBackground, updateSharedChatBackground } from '../api/chat
 import { enqueueMessage, flushMessageOutbox, type QueuedMessage } from '../api/message-outbox';
 import { createCheckin } from '../api/checkins';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
-import { iconCamera, iconClose, iconGallery, iconPlus, iconSend } from '../components/icons';
 import { closeModal, showModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import type { ChatBackgroundSnapshot, ChatMessage } from '../api/types';
@@ -313,18 +312,18 @@ export function renderMessagesPage(): RoutePage {
         <div class="messages-attach-sheet-handle" aria-hidden="true"></div>
         <div class="messages-attach-sheet-header">
           <span class="messages-attach-sheet-title">Gửi ảnh cho người ấy 💕</span>
-          <button type="button" class="messages-attach-sheet-close" aria-label="Đóng">${iconClose({ size: 18 })}</button>
+          <button type="button" class="messages-attach-sheet-close" aria-label="Đóng">✕</button>
         </div>
         <div class="messages-attach-sheet-grid">
           <button type="button" class="messages-attach-sheet-item" data-attach="camera">
-            <div class="messages-attach-sheet-icon camera-grad">${iconCamera({ size: 24 })}</div>
+            <div class="messages-attach-sheet-icon camera-grad"><span style="font-size: 24px; line-height: 1;">📷</span></div>
             <div class="messages-attach-sheet-text">
               <strong>Chụp check-in</strong>
               <small>Mở máy ảnh chụp khoảnh khắc</small>
             </div>
           </button>
           <button type="button" class="messages-attach-sheet-item" data-attach="gallery">
-            <div class="messages-attach-sheet-icon gallery-grad">${iconGallery({ size: 24 })}</div>
+            <div class="messages-attach-sheet-icon gallery-grad"><span style="font-size: 24px; line-height: 1;">🖼️</span></div>
             <div class="messages-attach-sheet-text">
               <strong>Thư viện ảnh</strong>
               <small>Chọn từ album chất lượng 2K</small>
@@ -337,7 +336,7 @@ export function renderMessagesPage(): RoutePage {
       <div class="messages-reply-preview" hidden></div>
       <div class="messages-composer-row">
         <input id="message-photo" type="file" accept="image/*" hidden />
-        <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm">${iconPlus({ size: 20, strokeWidth: 2.6 })}</button>
+        <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm">+</button>
         <div class="messages-input-wrap">
           <button class="messages-photo-preview" type="button" hidden aria-label="Xem ảnh đã chọn"></button>
           <textarea
@@ -353,7 +352,7 @@ export function renderMessagesPage(): RoutePage {
             spellcheck="false"
           ></textarea>
         </div>
-        <button class="messages-send" type="submit" aria-label="Gửi tin nhắn">${iconSend({ size: 18 })}</button>
+        <button class="messages-send" type="submit" aria-label="Gửi tin nhắn">↑</button>
       </div>
     </form>
   `;

@@ -1,7 +1,6 @@
 import { navigate } from '../router';
 import { getCheckins } from '../api/checkins';
 import { createMessage } from '../api/messages';
-import { iconSend } from '../components/icons';
 import type { CheckIn, CheckInReply } from '../api/types';
 import { showToast } from '../components/toast';
 import { store } from '../store/index';
@@ -101,7 +100,7 @@ function renderReplyThread(content: HTMLElement, checkin: CheckIn): void {
           data-form-type="other"
           data-1p-ignore="true"
         />
-        <button type="submit" aria-label="Gửi phản hồi">${iconSend({ size: 16 })}</button>
+        <button type="submit" aria-label="Gửi phản hồi">↑</button>
       </form>
     </section>
   `;
