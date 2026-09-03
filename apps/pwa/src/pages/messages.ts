@@ -307,33 +307,26 @@ export function renderMessagesPage(): RoutePage {
     </header>
     <main class="messages-thread" aria-live="polite" aria-label="Cuộc trò chuyện"></main>
     <button class="messages-new-indicator" type="button" hidden aria-live="polite"></button>
-    <div class="messages-attach-sheet-backdrop" hidden>
-      <div class="messages-attach-sheet" role="dialog" aria-modal="true" aria-label="Đính kèm ảnh">
-        <div class="messages-attach-sheet-handle" aria-hidden="true"></div>
-        <div class="messages-attach-sheet-header">
-          <span class="messages-attach-sheet-title">Gửi ảnh cho người ấy 💕</span>
-          <button type="button" class="messages-attach-sheet-close" aria-label="Đóng">✕</button>
-        </div>
-        <div class="messages-attach-sheet-grid">
-          <button type="button" class="messages-attach-sheet-item" data-attach="camera">
-            <div class="messages-attach-sheet-icon camera-grad"><span style="font-size: 24px; line-height: 1;">📷</span></div>
-            <div class="messages-attach-sheet-text">
-              <strong>Chụp check-in</strong>
-              <small>Mở máy ảnh chụp khoảnh khắc</small>
-            </div>
-          </button>
-          <button type="button" class="messages-attach-sheet-item" data-attach="gallery">
-            <div class="messages-attach-sheet-icon gallery-grad"><span style="font-size: 24px; line-height: 1;">🖼️</span></div>
-            <div class="messages-attach-sheet-text">
-              <strong>Thư viện ảnh</strong>
-              <small>Chọn từ album chất lượng 2K</small>
-            </div>
-          </button>
-        </div>
-      </div>
-    </div>
+    <div class="messages-attach-backdrop" hidden></div>
     <form class="messages-composer" autocomplete="off">
       <div class="messages-reply-preview" hidden></div>
+      <div class="messages-attach-menu" hidden role="dialog" aria-label="Tùy chọn đính kèm">
+        <button type="button" class="messages-attach-item" data-attach="camera">
+          <span class="messages-attach-icon camera-bg">📷</span>
+          <div class="messages-attach-info">
+            <strong>Chụp check-in</strong>
+            <small>Mở máy ảnh chụp khoảnh khắc</small>
+          </div>
+        </button>
+        <div class="messages-attach-divider"></div>
+        <button type="button" class="messages-attach-item" data-attach="gallery">
+          <span class="messages-attach-icon gallery-bg">🖼️</span>
+          <div class="messages-attach-info">
+            <strong>Chọn ảnh</strong>
+            <small>Từ thư viện ảnh chất lượng 2K</small>
+          </div>
+        </button>
+      </div>
       <div class="messages-composer-row">
         <input id="message-photo" type="file" accept="image/*" hidden />
         <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm">+</button>
@@ -364,8 +357,8 @@ export function renderMessagesPage(): RoutePage {
   const messageInput = page.querySelector<HTMLTextAreaElement>('#message-input')!;
   const photoInput = page.querySelector<HTMLInputElement>('#message-photo')!;
   const photoButton = page.querySelector<HTMLButtonElement>('.messages-photo-button')!;
-  const attachBackdrop = page.querySelector<HTMLElement>('.messages-attach-sheet-backdrop')!;
-  const attachCloseBtn = page.querySelector<HTMLButtonElement>('.messages-attach-sheet-close');
+  const attachBackdrop = page.querySelector<HTMLElement>('.messages-attach-backdrop')!;
+  const attachMenu = page.querySelector<HTMLElement>('.messages-attach-menu')!;
   const preview = page.querySelector<HTMLElement>('.messages-photo-preview')!;
   const sendButton = page.querySelector<HTMLButtonElement>('.messages-send')!;
   const presence = page.querySelector<HTMLElement>('.messages-presence')!;
@@ -1690,7 +1683,7 @@ export function renderMessagesPage(): RoutePage {
   const onPageKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Escape') return;
     closeHeaderMenu();
-    closeAttachSheet();
+    closeAttachMenu();
     if (pendingReply) clearPendingReply();
   };
   headerMenuButton.addEventListener('click', onHeaderMenuButtonClick);
@@ -1698,36 +1691,35 @@ export function renderMessagesPage(): RoutePage {
   page.addEventListener('click', onPageClick);
   page.addEventListener('keydown', onPageKeyDown);
 
-  const openAttachSheet = () => {
+  const openAttachMenu = () => {
     attachBackdrop.hidden = false;
-    window.requestAnimationFrame(() => {
-      attachBackdrop.classList.add('is-open');
-    });
+    attachMenu.hidden = false;
     try { navigator.vibrate?.(10); } catch {}
   };
-  const closeAttachSheet = () => {
-    attachBackdrop.classList.remove('is-open');
-    window.setTimeout(() => {
-      attachBackdrop.hidden = true;
-    }, 220);
+  const closeAttachMenu = () => {
+    attachBackdrop.hidden = true;
+    attachMenu.hidden = true;
   };
 
-  photoButton.addEventListener('click', openAttachSheet);
-  attachCloseBtn?.addEventListener('click', closeAttachSheet);
-  attachBackdrop.addEventListener('click', (e) => {
-    if (e.target === attachBackdrop) closeAttachSheet();
+  photoButton.addEventListener('click', () => {
+    if (attachMenu.hidden) {
+      openAttachMenu();
+    } else {
+      closeAttachMenu();
+    }
   });
+  attachBackdrop.addEventListener('click', closeAttachMenu);
 
   preview.addEventListener('click', () => {
     if (!previewUrl) return;
     openMessageImageViewer(previewUrl, 'Ảnh đã chọn');
   });
-  attachBackdrop.querySelector('[data-attach="gallery"]')?.addEventListener('click', () => {
-    closeAttachSheet();
+  attachMenu.querySelector('[data-attach="gallery"]')?.addEventListener('click', () => {
+    closeAttachMenu();
     photoInput.click();
   });
-  attachBackdrop.querySelector('[data-attach="camera"]')?.addEventListener('click', () => {
-    closeAttachSheet();
+  attachMenu.querySelector('[data-attach="camera"]')?.addEventListener('click', () => {
+    closeAttachMenu();
     openCamera((result) => {
       void (async () => {
         try {

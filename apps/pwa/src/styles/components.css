@@ -5377,153 +5377,114 @@ textarea {
   background: rgba(255, 59, 127, 0.1);
 }
 
-.messages-attach-sheet-backdrop {
+.messages-attach-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 200;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.22s var(--ease);
+  z-index: 85;
+  background: transparent;
 }
 
-.messages-attach-sheet-backdrop.is-open {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.messages-attach-sheet-backdrop[hidden] {
+.messages-attach-backdrop[hidden] {
   display: none;
 }
 
-.messages-attach-sheet {
-  width: 100%;
-  max-width: 480px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-bottom: 0;
-  border-radius: 28px 28px 0 0;
-  padding: 12px 20px calc(24px + var(--safe-bottom));
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.25);
-  transform: translateY(100%);
-  transition: transform 0.26s cubic-bezier(0.32, 1.25, 0.64, 1);
-  box-sizing: border-box;
-}
-
-.messages-attach-sheet-backdrop.is-open .messages-attach-sheet {
-  transform: translateY(0);
-}
-
-.messages-attach-sheet-handle {
-  width: 38px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--border);
-  margin: 0 auto 14px;
-}
-
-.messages-attach-sheet-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.messages-attach-sheet-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.messages-attach-sheet-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--surface-solid);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
-}
-
-.messages-attach-sheet-close:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.messages-attach-sheet-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.messages-attach-sheet-item {
+.messages-attach-menu {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 4px;
+  z-index: 95;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 10px;
-  padding: 18px 12px;
-  border: 1px solid var(--border);
+  width: 250px;
   border-radius: 20px;
-  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22), 0 2px 10px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  animation: attachMenuPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.messages-attach-menu[hidden] {
+  display: none;
+}
+
+@keyframes attachMenuPop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.messages-attach-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+  transition: background var(--duration-fast) var(--ease);
 }
 
-.messages-attach-sheet-item:hover {
-  border-color: var(--accent);
-  box-shadow: 0 4px 16px var(--accent-glow);
-  transform: translateY(-2px);
+.messages-attach-item:hover,
+.messages-attach-item:active {
+  background: var(--accent-soft);
 }
 
-.messages-attach-sheet-item:active {
-  transform: scale(0.96);
-}
-
-.messages-attach-sheet-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+.messages-attach-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+  font-size: 19px;
+  line-height: 1;
 }
 
-.messages-attach-sheet-icon.camera-grad {
-  background: linear-gradient(135deg, #ff3b7f, #ff758c);
+.messages-attach-icon.camera-bg {
+  background: linear-gradient(135deg, rgba(255, 59, 127, 0.16), rgba(255, 117, 140, 0.24));
 }
 
-.messages-attach-sheet-icon.gallery-grad {
-  background: linear-gradient(135deg, #8a4fff, #ff5e98);
+.messages-attach-icon.gallery-bg {
+  background: linear-gradient(135deg, rgba(138, 79, 255, 0.16), rgba(255, 94, 152, 0.24));
 }
 
-.messages-attach-sheet-text {
+.messages-attach-info {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
 }
 
-.messages-attach-sheet-text strong {
-  font-size: 14px;
+.messages-attach-info strong {
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.messages-attach-sheet-text small {
+.messages-attach-info small {
   font-size: 11px;
   color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.messages-attach-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0 12px;
+  opacity: 0.7;
 }
 
 .messages-send {
@@ -5650,14 +5611,10 @@ textarea {
   background: rgba(255, 59, 127, 0.18);
 }
 
-[data-theme='dark'] .messages-attach-sheet {
-  background: rgba(36, 24, 34, 0.96);
+[data-theme='dark'] .messages-attach-menu {
+  background: rgba(36, 24, 34, 0.94);
   border-color: rgba(255, 164, 198, 0.18);
-}
-
-[data-theme='dark'] .messages-attach-sheet-item {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 164, 198, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
 }
 
 @media (prefers-reduced-motion: reduce) {
