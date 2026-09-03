@@ -331,7 +331,7 @@ export function renderMessagesPage(): RoutePage {
         <input id="message-photo" type="file" accept="image/*" hidden />
         <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm">+</button>
         <div class="messages-input-wrap">
-          <button class="messages-photo-preview" type="button" hidden aria-label="Xem ảnh đã chọn"></button>
+          <div class="messages-photo-preview" hidden></div>
           <textarea
             id="message-input"
             name="chat_message_input"
@@ -1483,13 +1483,13 @@ export function renderMessagesPage(): RoutePage {
     clearSelectedPhoto();
     selectedPhoto = file;
     previewUrl = previewSource;
-    const thumbnail = document.createElement('img');
-    thumbnail.src = previewSource;
-    thumbnail.alt = 'Ảnh đã chọn';
-    thumbnail.loading = 'lazy';
-    const label = document.createElement('span');
-    label.textContent = 'Ảnh đã chọn';
-    preview.append(thumbnail, label);
+    preview.innerHTML = `
+      <div class="messages-photo-preview-body" role="button" tabindex="0" aria-label="Xem ảnh phóng to">
+        <img src="${escapeHtml(previewSource)}" alt="Ảnh đã chọn" />
+        <span>Ảnh đã chọn</span>
+      </div>
+      <button type="button" class="messages-photo-remove" aria-label="Bỏ chọn ảnh" title="Bỏ ảnh">×</button>
+    `;
     preview.hidden = false;
   }
 
@@ -1638,6 +1638,9 @@ export function renderMessagesPage(): RoutePage {
     if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice) {
       e.preventDefault();
       form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    } else if (e.key === 'Backspace' && messageInput.value === '' && selectedPhoto) {
+      clearSelectedPhoto();
+      try { navigator.vibrate?.(10); } catch {}
     }
   });
 
@@ -1710,7 +1713,14 @@ export function renderMessagesPage(): RoutePage {
   });
   attachBackdrop.addEventListener('click', closeAttachMenu);
 
-  preview.addEventListener('click', () => {
+  preview.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('.messages-photo-remove')) {
+      event.stopPropagation();
+      clearSelectedPhoto();
+      try { navigator.vibrate?.(10); } catch {}
+      return;
+    }
     if (!previewUrl) return;
     openMessageImageViewer(previewUrl, 'Ảnh đã chọn');
   });
