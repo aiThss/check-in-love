@@ -6,7 +6,7 @@ import { getSharedChatBackground, updateSharedChatBackground } from '../api/chat
 import { enqueueMessage, flushMessageOutbox, type QueuedMessage } from '../api/message-outbox';
 import { createCheckin } from '../api/checkins';
 import { openCamera, processImage, revokePreviewUrl } from '../components/camera';
-import { iconCamera, iconGallery, iconPlus, iconSend } from '../components/icons';
+import { iconCamera, iconClose, iconGallery, iconPlus, iconSend } from '../components/icons';
 import { closeModal, showModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import type { ChatBackgroundSnapshot, ChatMessage } from '../api/types';
@@ -308,32 +308,50 @@ export function renderMessagesPage(): RoutePage {
     </header>
     <main class="messages-thread" aria-live="polite" aria-label="Cuộc trò chuyện"></main>
     <button class="messages-new-indicator" type="button" hidden aria-live="polite"></button>
+    <div class="messages-attach-sheet-backdrop" hidden>
+      <div class="messages-attach-sheet" role="dialog" aria-modal="true" aria-label="Đính kèm ảnh">
+        <div class="messages-attach-sheet-handle" aria-hidden="true"></div>
+        <div class="messages-attach-sheet-header">
+          <span class="messages-attach-sheet-title">Gửi ảnh cho người ấy 💕</span>
+          <button type="button" class="messages-attach-sheet-close" aria-label="Đóng">${iconClose({ size: 18 })}</button>
+        </div>
+        <div class="messages-attach-sheet-grid">
+          <button type="button" class="messages-attach-sheet-item" data-attach="camera">
+            <div class="messages-attach-sheet-icon camera-grad">${iconCamera({ size: 24 })}</div>
+            <div class="messages-attach-sheet-text">
+              <strong>Chụp check-in</strong>
+              <small>Mở máy ảnh chụp khoảnh khắc</small>
+            </div>
+          </button>
+          <button type="button" class="messages-attach-sheet-item" data-attach="gallery">
+            <div class="messages-attach-sheet-icon gallery-grad">${iconGallery({ size: 24 })}</div>
+            <div class="messages-attach-sheet-text">
+              <strong>Thư viện ảnh</strong>
+              <small>Chọn từ album chất lượng 2K</small>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
     <form class="messages-composer" autocomplete="off">
       <div class="messages-reply-preview" hidden></div>
       <div class="messages-composer-row">
         <input id="message-photo" type="file" accept="image/*" hidden />
         <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm">${iconPlus({ size: 20, strokeWidth: 2.6 })}</button>
-        <div class="messages-attach-menu" hidden>
-          <button type="button" data-attach="gallery">${iconGallery({ size: 18 })}<span>Chọn ảnh</span></button>
-          <button type="button" data-attach="camera">${iconCamera({ size: 18 })}<span>Chụp check-in</span></button>
-        </div>
         <div class="messages-input-wrap">
           <button class="messages-photo-preview" type="button" hidden aria-label="Xem ảnh đã chọn"></button>
-          <input
+          <textarea
             id="message-input"
-            type="text"
             name="chat_message_input"
-            maxlength="280"
+            rows="1"
+            maxlength="1000"
             placeholder="Gửi tin nhắn..."
             aria-label="Nội dung tin nhắn"
             autocomplete="off"
             autocorrect="off"
             autocapitalize="sentences"
             spellcheck="false"
-            data-lpignore="true"
-            data-form-type="other"
-            data-1p-ignore="true"
-          />
+          ></textarea>
         </div>
         <button class="messages-send" type="submit" aria-label="Gửi tin nhắn">${iconSend({ size: 18 })}</button>
       </div>
@@ -344,10 +362,11 @@ export function renderMessagesPage(): RoutePage {
   const indicator = page.querySelector<HTMLButtonElement>('.messages-new-indicator')!;
   const form = page.querySelector<HTMLFormElement>('.messages-composer')!;
   const replyPreview = page.querySelector<HTMLElement>('.messages-reply-preview')!;
-  const messageInput = page.querySelector<HTMLInputElement>('#message-input')!;
+  const messageInput = page.querySelector<HTMLTextAreaElement>('#message-input')!;
   const photoInput = page.querySelector<HTMLInputElement>('#message-photo')!;
   const photoButton = page.querySelector<HTMLButtonElement>('.messages-photo-button')!;
-  const attachMenu = page.querySelector<HTMLElement>('.messages-attach-menu')!;
+  const attachBackdrop = page.querySelector<HTMLElement>('.messages-attach-sheet-backdrop')!;
+  const attachCloseBtn = page.querySelector<HTMLButtonElement>('.messages-attach-sheet-close');
   const preview = page.querySelector<HTMLElement>('.messages-photo-preview')!;
   const sendButton = page.querySelector<HTMLButtonElement>('.messages-send')!;
   const presence = page.querySelector<HTMLElement>('.messages-presence')!;
@@ -1538,6 +1557,7 @@ export function renderMessagesPage(): RoutePage {
         replaceTemporaryMessage(temporaryId, result);
       }
       messageInput.value = '';
+      resetInputHeight();
       clearSelectedPhoto();
       clearPendingReply();
     } catch {
@@ -1610,7 +1630,27 @@ export function renderMessagesPage(): RoutePage {
   };
   window.addEventListener('online', handleOnline);
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  const autoExpandInput = () => {
+    messageInput.style.height = 'auto';
+    const nextHeight = Math.min(messageInput.scrollHeight, 120);
+    messageInput.style.height = `${Math.max(24, nextHeight)}px`;
+    messageInput.style.overflowY = messageInput.scrollHeight > 120 ? 'auto' : 'hidden';
+  };
+  const resetInputHeight = () => {
+    messageInput.style.height = '24px';
+    messageInput.style.overflowY = 'hidden';
+  };
+
+  const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  messageInput.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice) {
+      e.preventDefault();
+      form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    }
+  });
+
   messageInput.addEventListener('input', () => {
+    autoExpandInput();
     if (!active) return;
     if (typingStopTimer !== null) window.clearTimeout(typingStopTimer);
     if (typingTimer === null) {
@@ -1651,23 +1691,44 @@ export function renderMessagesPage(): RoutePage {
   const onPageKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Escape') return;
     closeHeaderMenu();
+    closeAttachSheet();
     if (pendingReply) clearPendingReply();
   };
   headerMenuButton.addEventListener('click', onHeaderMenuButtonClick);
   backgroundMenuItem.addEventListener('click', onHeaderMenuItemClick);
   page.addEventListener('click', onPageClick);
   page.addEventListener('keydown', onPageKeyDown);
-  photoButton.addEventListener('click', () => { attachMenu.hidden = !attachMenu.hidden; });
+
+  const openAttachSheet = () => {
+    attachBackdrop.hidden = false;
+    window.requestAnimationFrame(() => {
+      attachBackdrop.classList.add('is-open');
+    });
+    try { navigator.vibrate?.(10); } catch {}
+  };
+  const closeAttachSheet = () => {
+    attachBackdrop.classList.remove('is-open');
+    window.setTimeout(() => {
+      attachBackdrop.hidden = true;
+    }, 220);
+  };
+
+  photoButton.addEventListener('click', openAttachSheet);
+  attachCloseBtn?.addEventListener('click', closeAttachSheet);
+  attachBackdrop.addEventListener('click', (e) => {
+    if (e.target === attachBackdrop) closeAttachSheet();
+  });
+
   preview.addEventListener('click', () => {
     if (!previewUrl) return;
     openMessageImageViewer(previewUrl, 'Ảnh đã chọn');
   });
-  attachMenu.querySelector('[data-attach="gallery"]')?.addEventListener('click', () => {
-    attachMenu.hidden = true;
+  attachBackdrop.querySelector('[data-attach="gallery"]')?.addEventListener('click', () => {
+    closeAttachSheet();
     photoInput.click();
   });
-  attachMenu.querySelector('[data-attach="camera"]')?.addEventListener('click', () => {
-    attachMenu.hidden = true;
+  attachBackdrop.querySelector('[data-attach="camera"]')?.addEventListener('click', () => {
+    closeAttachSheet();
     openCamera((result) => {
       void (async () => {
         try {

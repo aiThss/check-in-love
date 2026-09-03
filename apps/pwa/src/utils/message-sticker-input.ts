@@ -42,15 +42,15 @@ let lastStickerSignature = '';
 let lastStickerAcceptedAt = 0;
 let styleFrame: number | null = null;
 
-function isMessageInput(target: EventTarget | null): target is HTMLInputElement {
-  return target instanceof HTMLInputElement
+function isMessageInput(target: EventTarget | null): target is (HTMLInputElement | HTMLTextAreaElement) {
+  return (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
     && Boolean(target.closest('.messages-page .messages-input-wrap'));
 }
 
-function getActiveMessageInput(): HTMLInputElement | null {
-  return document.querySelector<HTMLInputElement>(
+function getActiveMessageInput(): HTMLInputElement | HTMLTextAreaElement | null {
+  return document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
     '.route-page.is-active .messages-page #message-input',
-  ) ?? document.querySelector<HTMLInputElement>('.messages-page #message-input');
+  ) ?? document.querySelector<HTMLInputElement | HTMLTextAreaElement>('.messages-page #message-input');
 }
 
 function extensionFromMime(mime: string): string {
@@ -158,7 +158,7 @@ function restoreDraftWhenMounted(): void {
   }
 }
 
-async function sendSticker(file: File, input: HTMLInputElement): Promise<void> {
+async function sendSticker(file: File, input: HTMLInputElement | HTMLTextAreaElement): Promise<void> {
   if (sendingSticker || isDuplicateSticker(file)) return;
 
   const form = input.closest<HTMLFormElement>('.messages-composer');
