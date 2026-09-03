@@ -341,7 +341,7 @@ a {
   padding: 0 var(--space-sm);
   pointer-events: all;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .bottom-nav-inner::before {
@@ -5313,7 +5313,7 @@ textarea:focus-visible,
   box-shadow: var(--liquid-glass-shadow);
   -webkit-backdrop-filter: var(--liquid-glass-blur);
   backdrop-filter: var(--liquid-glass-blur);
-  overflow: hidden;
+  overflow: visible;
   transition: border-radius var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
