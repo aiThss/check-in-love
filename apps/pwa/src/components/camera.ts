@@ -240,27 +240,10 @@ async function handleFileSelection(
 
       settled = true;
 
-      // For camera captures, skip pre-processing here and return the raw file
-      // directly — the caller (applyPhotoTransform) does the single processing
-      // pass with the correct aspect-ratio / quality params.
-      // Full-resolution camera shots (12–48 MP) are very slow to process twice.
-      if (isCamera) {
-        onResult({ file, preview: URL.createObjectURL(file) });
-        resolve();
-        return;
-      }
-
-      // Gallery / non-camera: pre-process to a reasonable size.
-      try {
-        onResult(await processImage(file));
-      } catch {
-        onResult({
-          file,
-          preview: URL.createObjectURL(file),
-        });
-      } finally {
-        resolve();
-      }
+      // Return raw file directly — let the caller handle any necessary single transform
+      // pass to prevent double compression and keep images sharp and crisp.
+      onResult({ file, preview: URL.createObjectURL(file) });
+      resolve();
     };
 
     input.oncancel = () => {

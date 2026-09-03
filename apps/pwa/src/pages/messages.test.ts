@@ -529,7 +529,7 @@ describe('Messages scroll and reply behavior', () => {
     Object.defineProperty(photoInput, 'files', { configurable: true, value: [file] });
     photoInput.dispatchEvent(new Event('change'));
     await flush();
-    expect(mocks.processImage).toHaveBeenCalledWith(file, { maxSize: 1600, quality: 0.85 });
+    expect(mocks.processImage).toHaveBeenCalledWith(file, { maxSize: 2560, quality: 0.92 });
 
     const sent = {
       ...message('photo-topic', true, 'Đi chơi nhé'),

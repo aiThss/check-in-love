@@ -1670,7 +1670,7 @@ export function renderMessagesPage(): RoutePage {
     openCamera((result) => {
       void (async () => {
         try {
-          const processed = await processImage(result.file, { maxSize: 1600, quality: 0.85 });
+          const processed = await processImage(result.file, { maxSize: 2560, quality: 0.92 });
           revokePreviewUrl(result.preview);
           setSelectedPhoto(processed.file, processed.preview);
         } catch {
@@ -1684,7 +1684,7 @@ export function renderMessagesPage(): RoutePage {
     if (!source) return;
     try {
       photoButton.disabled = true;
-      const processed = await processImage(source, { maxSize: 1600, quality: 0.85 });
+      const processed = await processImage(source, { maxSize: 2560, quality: 0.92 });
       setSelectedPhoto(processed.file, processed.preview);
     } catch {
       showToast('Không xử lý được ảnh này, thử ảnh khác nhé', 'error');

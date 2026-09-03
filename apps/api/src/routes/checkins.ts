@@ -266,11 +266,16 @@ export default async function checkinsRoutes(
 
         let { buffer } = imageFile;
 
-        // Resize to max 1080px wide while preserving quality
+        // Keep photos sharp and crisp (up to 2560px for chat or 2048px for checkin)
+        // without pixelation or compression artifacts
+        const isChatPhoto = Boolean(chatReplyToMessageId);
+        const maxDimension = isChatPhoto ? 2560 : 2048;
+        const quality = isChatPhoto ? 92 : 90;
+
         buffer = await sharp(buffer)
           .rotate()
-          .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true })
-          .jpeg({ quality: 88 })
+          .resize(maxDimension, maxDimension, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality })
           .toBuffer();
 
         const saved = await storageService.saveFile(

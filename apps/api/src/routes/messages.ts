@@ -15,7 +15,7 @@ import { storageService } from '../services/storage';
 import { emitRealtimeEvent } from './events';
 
 const LEGACY_SYNC_LIMIT = 250;
-const MESSAGE_IMAGE_MAX_SIZE = 1080;
+const MESSAGE_IMAGE_MAX_SIZE = 2560;
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(30),
@@ -379,7 +379,7 @@ export default async function messagesRoutes(app: FastifyInstance): Promise<void
         // Keep shared/gallery images consistent with check-in media while
         // preserving their aspect ratio and never upscaling small originals.
         .resize(MESSAGE_IMAGE_MAX_SIZE, MESSAGE_IMAGE_MAX_SIZE, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 88 })
+        .jpeg({ quality: 92 })
         .toBuffer();
       const saved = await storageService.saveFile(buffer, image.filename, 'image/jpeg');
       type = 'image';

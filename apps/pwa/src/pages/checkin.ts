@@ -200,9 +200,9 @@ export function renderCheckinPage(): HTMLElement {
     try {
       const result = await processImage(sourceFile, {
         aspectRatio: PHOTO_ASPECT_RATIO,
-        // Max 1600px — balance between quality and upload speed
-        maxSize: 1600,
-        quality: 0.85,
+        // 2K resolution — crisp, sharp on all mobile and desktop screens
+        maxSize: 2048,
+        quality: 0.90,
       });
 
       revokePreviewUrl(selectedPreviewUrl);
@@ -260,8 +260,8 @@ export function renderCheckinPage(): HTMLElement {
       showToast('Upload ảnh chưa ổn, đang thử bản nhẹ hơn...', 'info');
       const fallback = await processImage(selectedSourceFile, {
         aspectRatio: PHOTO_ASPECT_RATIO,
-        maxSize: 640,
-        quality: 0.62,
+        maxSize: 1080,
+        quality: 0.75,
       });
 
       revokePreviewUrl(selectedPreviewUrl);
