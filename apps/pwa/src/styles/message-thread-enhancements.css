@@ -1,22 +1,20 @@
+/* Compact conversation header: keep the useful couple label and leave the
+ * thread as much vertical space as possible for messages. */
 .messages-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-/* Compact conversation header: keep the useful couple label and leave the
- * thread as much vertical space as possible for messages. */
-.messages-header {
-  min-height: 34px;
-  padding: 0 4px 8px;
+  min-height: 52px;
+  padding: 0 2px 12px;
 }
 
 .messages-header-copy {
   display: flex;
   min-width: 0;
-  align-items: baseline;
-  gap: 8px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .messages-eyebrow {
@@ -48,12 +46,12 @@
 
 .messages-menu-button {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.48);
+  border-radius: 14px;
+  background: var(--surface-solid);
   color: var(--text-secondary);
   transition: background 160ms ease, color 160ms ease, transform 160ms ease;
 }

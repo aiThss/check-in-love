@@ -27,7 +27,7 @@ export function decorateTimeSeparators(page: HTMLElement): void {
   const thread = page.querySelector<HTMLElement>('.messages-thread');
   if (!thread) return;
 
-  thread.querySelectorAll('.messages-time-separator').forEach((separator) => separator.remove());
+  const unusedSeparators = new Set(thread.querySelectorAll('.messages-time-separator'));
 
   const messageElements = Array.from(
     thread.querySelectorAll<HTMLElement>(':scope > [data-message-id]'),
@@ -43,11 +43,21 @@ export function decorateTimeSeparators(page: HTMLElement): void {
       previousTimestamp !== null
       && timestamp - previousTimestamp >= MESSAGE_GAP_MS
     ) {
-      message.before(createTimeSeparator(label));
+      const previous = message.previousElementSibling;
+      if (previous?.classList.contains('messages-time-separator')) {
+        unusedSeparators.delete(previous);
+        if (previous.textContent !== label) {
+          previous.textContent = label;
+          previous.setAttribute('aria-label', `Tin nhắn mới lúc ${label}`);
+        }
+      } else {
+        message.before(createTimeSeparator(label));
+      }
     }
 
     previousTimestamp = timestamp;
   });
+  unusedSeparators.forEach((separator) => separator.remove());
 }
 
 function enhanceMessagesPage(): void {

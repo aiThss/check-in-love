@@ -82,6 +82,7 @@ function pointer(type: string, x: number, y: number, id = 1): Event {
 }
 
 describe('Messages scroll and reply behavior', () => {
+  const mountedPages: Array<{ destroy?: () => void }> = [];
   beforeEach(() => {
     vi.resetModules();
     vi.useFakeTimers();
@@ -107,7 +108,10 @@ describe('Messages scroll and reply behavior', () => {
     mocks.openMessageImageViewer.mockReset();
   });
 
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    mountedPages.splice(0).forEach((page) => page.destroy?.());
+    vi.useRealTimers();
+  });
 
   it('shows the date and year for messages from another day', async () => {
     const { formatMessageTime } = await import('./messages');
@@ -270,11 +274,75 @@ describe('Messages scroll and reply behavior', () => {
     mocks.getMessages.mockResolvedValue(response(data, hasMore));
     const { renderMessagesPage } = await import('./messages');
     const routePage = renderMessagesPage();
+    mountedPages.push(routePage);
     document.body.appendChild(routePage.element);
     routePage.activate?.();
     await flush();
     return routePage;
   }
+
+  it('does not mutate unchanged message content on a realtime reconciliation', async () => {
+    const first = message('first');
+    const routePage = await mount([first]);
+    const bubble = routePage.element.querySelector('.chat-text-bubble')!;
+    const records: MutationRecord[] = [];
+    const monitor = new MutationObserver((changes) => records.push(...changes));
+    monitor.observe(bubble, { childList: true, subtree: true, attributes: true });
+    mocks.getMessages.mockResolvedValue(response([{ ...first }]));
+    window.dispatchEvent(new CustomEvent('lovecheck:realtime-event', { detail: { type: 'message' } }));
+    await flush();
+    expect(records).toHaveLength(0);
+    monitor.disconnect();
+    routePage.destroy?.();
+  });
+
+  it('ignores realtime refresh and polling while the route is inactive', async () => {
+    const routePage = await mount([message('first')]);
+    routePage.deactivate?.();
+    const calls = mocks.getMessages.mock.calls.length;
+    window.dispatchEvent(new CustomEvent('lovecheck:realtime-event', { detail: { type: 'message' } }));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mocks.getMessages).toHaveBeenCalledTimes(calls);
+    routePage.destroy?.();
+  });
+
+  it('coalesces slow polling requests', async () => {
+    const routePage = await mount([message('first')]);
+    let resolve!: (value: ReturnType<typeof response>) => void;
+    mocks.getMessages.mockReturnValue(new Promise((done) => { resolve = done; }));
+    const calls = mocks.getMessages.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mocks.getMessages).toHaveBeenCalledTimes(calls + 1);
+    resolve(response([]));
+    await flush();
+    routePage.destroy?.();
+  });
+
+  it('preserves chronological order when an older page contains multiple messages', async () => {
+    const routePage = await mount([{ ...message('newest'), createdAt: '2026-08-08T10:00:00Z' }], true);
+    mocks.getMessages.mockResolvedValue(response([
+      { ...message('oldest'), createdAt: '2026-08-08T08:00:00Z' },
+      { ...message('middle'), createdAt: '2026-08-08T09:00:00Z' },
+    ]));
+    const thread = routePage.element.querySelector<HTMLElement>('.messages-thread')!;
+    setScrollMetrics(thread, 0);
+    thread.dispatchEvent(new Event('scroll'));
+    await flush();
+    expect(Array.from(thread.querySelectorAll<HTMLElement>('[data-message-id]'), (node) => node.dataset.messageId))
+      .toEqual(['oldest', 'middle', 'newest']);
+    routePage.destroy?.();
+  });
+
+  it('does not submit the same draft twice while sending', async () => {
+    const routePage = await mount([]);
+    mocks.createMessage.mockReturnValue(new Promise(() => {}));
+    routePage.element.querySelector<HTMLTextAreaElement>('#message-input')!.value = 'Chờ mình nhé';
+    const form = routePage.element.querySelector('form')!;
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(mocks.createMessage).toHaveBeenCalledTimes(1);
+    routePage.destroy?.();
+  });
 
   function setScrollMetrics(thread: HTMLElement, scrollTop: number, scrollHeight = 1000, clientHeight = 200) {
     Object.defineProperties(thread, {

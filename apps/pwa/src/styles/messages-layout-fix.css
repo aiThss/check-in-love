@@ -13,6 +13,101 @@
   padding: 8px 2px calc(190px + var(--safe-bottom));
   scroll-padding-bottom: calc(190px + var(--safe-bottom));
   overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* Keep compositor layers bounded to the bubble currently being dragged. */
+.messages-thread :is(.chat-text-bubble, .chat-bubble, .chat-reply-bubble) {
+  will-change: auto;
+}
+
+.messages-thread .is-swiping {
+  will-change: transform;
+}
+
+.messages-thread .chat-text-message {
+  max-width: min(84%, 380px);
+  min-width: 0;
+}
+
+.messages-thread .chat-text-bubble p {
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.messages-thread .chat-text-message.own .chat-text-bubble {
+  background: #c91f5b;
+}
+
+.messages-thread .own .message-referenced-checkin small {
+  color: inherit;
+}
+
+.messages-page:not(.has-chat-wallpaper) .chat-text-bubble {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.messages-page :is(button, textarea):focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 3px;
+}
+
+.messages-page textarea {
+  caret-color: var(--accent);
+}
+
+.messages-page ::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.messages-composer :is(.messages-send, .messages-photo-button) {
+  width: 44px;
+  height: 44px;
+  box-shadow: none;
+}
+
+.messages-composer .messages-send {
+  background: #c91f5b;
+}
+
+.messages-composer .messages-send:disabled {
+  opacity: 0.5;
+  cursor: wait;
+  transform: none;
+}
+
+.messages-composer .messages-photo-button {
+  background: var(--surface-solid);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+.messages-photo-button svg {
+  transition: transform 180ms ease-out;
+}
+
+.messages-photo-button[aria-expanded='true'] svg {
+  transform: rotate(45deg);
+}
+
+.messages-composer #message-input {
+  font-size: 16px;
+  line-height: 24px;
+  padding: 0;
+}
+
+.messages-composer .messages-input-wrap {
+  align-self: center;
+}
+
+.messages-composer #message-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
 }
 
 /* Keep the fixed composer glassy without creating an opaque lower panel. */
@@ -36,7 +131,7 @@
   position: relative;
   min-height: 46px;
   padding: 7px 40px 7px 12px;
-  border-left: 4px solid var(--accent);
+  border-left: 1px solid var(--accent);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.34);
 }
@@ -201,6 +296,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .messages-page *,
+  .messages-page *::before,
+  .messages-page *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
   .messages-composer.is-sending-sticker .messages-send {
     animation: none;
   }

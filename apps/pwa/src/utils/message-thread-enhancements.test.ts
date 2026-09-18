@@ -14,6 +14,21 @@ function createMessage(createdAt: string, label: string): HTMLElement {
 }
 
 describe('message time separators', () => {
+  it('keeps existing separators without DOM mutations on unchanged refreshes', () => {
+    const page = document.createElement('section');
+    page.innerHTML = '<main class="messages-thread"></main>';
+    const thread = page.firstElementChild!;
+    thread.append(createMessage('2026-08-08T07:00:00Z', '14:00'), createMessage('2026-08-08T08:00:00Z', '15:00'));
+    decorateTimeSeparators(page);
+    const separator = thread.querySelector('.messages-time-separator');
+    const observer = new MutationObserver(() => {});
+    observer.observe(thread, { childList: true, subtree: true });
+    decorateTimeSeparators(page);
+    expect(observer.takeRecords()).toHaveLength(0);
+    expect(thread.querySelector('.messages-time-separator')).toBe(separator);
+    observer.disconnect();
+  });
+
   it('adds a separator after a gap of at least twenty minutes', () => {
     const page = document.createElement('section');
     const thread = document.createElement('main');

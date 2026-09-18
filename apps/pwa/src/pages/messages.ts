@@ -1,4 +1,5 @@
-import { openPolaroidCoverModal } from '../components/polaroid-cover';
+import '../styles/messages-layout-fix.css';
+import '../styles/message-thread-enhancements.css';
 import { openMessageImageViewer } from '../components/message-image-viewer';
 import { createMessage, getMessageContext, getMessages, mapChatMessage } from '../api/messages';
 import * as messageApi from '../api/messages';
@@ -25,6 +26,8 @@ const SWIPE_INTENT_DISTANCE = 10;
 const SWIPE_REPLY_THRESHOLD = 56;
 const SWIPE_MAX_TRANSLATE = 76;
 const POLL_INTERVAL = 10_000;
+const messageTimeFormatter = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' });
+const messageDateFormatter = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 interface PendingReply {
   messageId: string;
@@ -73,14 +76,10 @@ export function formatMessageTime(value: string, now = new Date()): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  const time = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const time = messageTimeFormatter.format(date);
   if (localDayKey(date) === localDayKey(now)) return time;
 
-  const day = date.toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  const day = messageDateFormatter.format(date);
   return `${day} ${time}`;
 }
 
@@ -306,13 +305,13 @@ export function renderMessagesPage(): RoutePage {
       </div>
     </header>
     <main class="messages-thread" aria-live="polite" aria-label="Cuộc trò chuyện"></main>
-    <button class="messages-new-indicator" type="button" hidden aria-live="polite"></button>
+    <button class="messages-new-indicator" type="button" hidden aria-live="polite" aria-label="Đến tin nhắn mới nhất"></button>
     <div class="messages-attach-backdrop" hidden></div>
     <form class="messages-composer" autocomplete="off">
       <div class="messages-reply-preview" hidden></div>
       <div class="messages-attach-menu" hidden role="dialog" aria-label="Tùy chọn đính kèm">
         <button type="button" class="messages-attach-item" data-attach="camera">
-          <span class="messages-attach-icon camera-bg">📷</span>
+          <span class="messages-attach-icon camera-bg"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5 6 8H3v12h18V8h-3l-2-3Z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
           <div class="messages-attach-info">
             <strong>Chụp check-in</strong>
             <small>Mở máy ảnh chụp khoảnh khắc</small>
@@ -320,7 +319,7 @@ export function renderMessagesPage(): RoutePage {
         </button>
         <div class="messages-attach-divider"></div>
         <button type="button" class="messages-attach-item" data-attach="gallery">
-          <span class="messages-attach-icon gallery-bg">🖼️</span>
+          <span class="messages-attach-icon gallery-bg"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg></span>
           <div class="messages-attach-info">
             <strong>Chọn ảnh</strong>
             <small>Từ thư viện ảnh chất lượng 2K</small>
@@ -329,7 +328,7 @@ export function renderMessagesPage(): RoutePage {
       </div>
       <div class="messages-composer-row">
         <input id="message-photo" type="file" accept="image/*" hidden />
-        <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm">+</button>
+        <button class="messages-photo-button" type="button" aria-label="Mở tùy chọn đính kèm" aria-expanded="false"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
         <div class="messages-input-wrap">
           <div class="messages-photo-preview" hidden></div>
           <textarea
@@ -345,7 +344,7 @@ export function renderMessagesPage(): RoutePage {
             spellcheck="false"
           ></textarea>
         </div>
-        <button class="messages-send" type="submit" aria-label="Gửi tin nhắn">↑</button>
+        <button class="messages-send" type="submit" aria-label="Gửi tin nhắn"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
       </div>
     </form>
   `;
@@ -394,6 +393,8 @@ export function renderMessagesPage(): RoutePage {
   let lastReadMessageId: string | null = null;
   let partnerOnline = false;
   let latestRefreshInFlight: Promise<void> | null = null;
+  let refreshInFlight: Promise<void> | null = null;
+  let indicatorContent = '';
   let sharedBackgroundSyncInFlight: Promise<void> | null = null;
 
   async function commitChatBackground(selection: ChatBackgroundSelection, successMessage: string): Promise<void> {
@@ -593,6 +594,11 @@ export function renderMessagesPage(): RoutePage {
 
     const count = scrollState.pendingIncomingCount;
     const isScrolledUp = distanceFromBottom() > 160;
+    const nextContent = count > 0 ? String(count) : isScrolledUp ? 'latest' : '';
+    indicator.hidden = !nextContent;
+    if (nextContent === indicatorContent) return;
+    indicatorContent = nextContent;
+    indicator.setAttribute('aria-label', count > 0 ? `${count} tin nhắn mới` : 'Đến tin nhắn mới nhất');
 
     if (count > 0) {
       indicator.hidden = false;
@@ -713,12 +719,16 @@ export function renderMessagesPage(): RoutePage {
         window.setTimeout(() => targetView?.element.classList.remove('message-highlight'), 1_500);
       } else if (reference.imageUrl) {
         // If not in chat thread, open the clean Polaroid photo viewer without scratch
-        openPolaroidCoverModal({
-          imageUrl: reference.imageUrl,
-          title: reference.caption || `Kỷ niệm của ${reference.ownerName} 💖`,
-          dateText: `${reference.ownerName} · Kỷ niệm`,
-          forceScratch: false,
-        });
+        const imageUrl = reference.imageUrl;
+        void import('../components/polaroid-cover').then(({ openPolaroidCoverModal }) => {
+          if (!active) return;
+          openPolaroidCoverModal({
+            imageUrl,
+            title: reference.caption || `Kỷ niệm của ${reference.ownerName} 💖`,
+            dateText: `${reference.ownerName} · Kỷ niệm`,
+            forceScratch: false,
+          });
+        }).catch(() => showToast('Chưa mở được ảnh, thử lại nhé', 'error'));
       } else {
         navigate('/app/memories');
       }
@@ -766,6 +776,7 @@ export function renderMessagesPage(): RoutePage {
 
   function renderReadStatus(view: MessageView, item: ChatMessage, visible = false): void {
     if (view.systemEvent) return;
+    if (view.readStatus.hidden === !visible && view.readStatus.textContent === (visible ? 'Đã đọc' : '')) return;
     view.readStatus.hidden = !visible;
     view.readStatus.textContent = visible ? 'Đã đọc' : '';
   }
@@ -923,9 +934,13 @@ export function renderMessagesPage(): RoutePage {
   }
 
   function refreshReadStatuses(): void {
-    const latestReadMessage = [...messages.values()]
-      .filter((item) => !item.systemEvent && wasReadByPartner(item))
-      .sort((left, right) => getLatestActivityTime(right) - getLatestActivityTime(left))[0];
+    let latestReadMessage: ChatMessage | undefined;
+    for (const item of messages.values()) {
+      if (!item.systemEvent && wasReadByPartner(item)
+        && (!latestReadMessage || getLatestActivityTime(item) > getLatestActivityTime(latestReadMessage))) {
+        latestReadMessage = item;
+      }
+    }
 
     for (const view of messageViews.values()) {
       renderReadStatus(view, view.item, view.item.id === latestReadMessage?.id);
@@ -933,6 +948,9 @@ export function renderMessagesPage(): RoutePage {
   }
 
   function patchView(view: MessageView, item: ChatMessage): void {
+    // Polling and SSE often return the same snapshot. Preserve live DOM (including
+    // selection and open edit history) rather than rebuilding unchanged content.
+    if (JSON.stringify(view.item) === JSON.stringify(item)) return;
     view.item = item;
     view.element.dataset.messageId = item.id;
     view.element.dataset.messageCreatedAt = item.createdAt;
@@ -1214,7 +1232,10 @@ export function renderMessagesPage(): RoutePage {
   function mergeMessages(incoming: ChatMessage[], source: 'initial' | 'refresh' | 'older'): number {
     const wasNearBottom = scrollState.isNearBottom;
     let newIncoming = 0;
+    if (incoming.length === 0) return 0;
+    thread.querySelector('.messages-empty')?.remove();
     const sorted = [...incoming].sort((a, b) => getLatestActivityTime(a) - getLatestActivityTime(b));
+    if (source === 'older') sorted.reverse();
     sorted.forEach((item) => {
       const existing = messageViews.get(item.id);
       if (existing) {
@@ -1243,7 +1264,7 @@ export function renderMessagesPage(): RoutePage {
         updateIndicator();
       }
     }
-    if (scrollState.isNearBottom) {
+    if (source !== 'older' && scrollState.isNearBottom) {
       const latest = sorted.at(-1);
       if (latest && !latest.isOwn && !latest.systemEvent && latest.id !== lastReadMessageId) {
         lastReadMessageId = latest.id;
@@ -1320,15 +1341,22 @@ export function renderMessagesPage(): RoutePage {
 
   async function refreshMessages(): Promise<void> {
     if (!scrollState.initialized || !active) return;
-    try {
-      const response = await getMessages({ limit: 50, after: afterCursor ?? undefined, force: true });
-      if (active) {
-        mergeMessages(response.data, 'refresh');
-        afterCursor = response.afterCursor ?? afterCursor;
+    if (latestRefreshInFlight) return latestRefreshInFlight;
+    if (refreshInFlight) return refreshInFlight;
+    refreshInFlight = (async () => {
+      try {
+        const response = await getMessages({ limit: 50, after: afterCursor ?? undefined, force: true });
+        if (active) {
+          mergeMessages(response.data, 'refresh');
+          afterCursor = response.afterCursor ?? afterCursor;
+        }
+      } catch {
+        // Keep the conversation visible while offline.
+      } finally {
+        refreshInFlight = null;
       }
-    } catch {
-      // Keep the existing conversation visible while a background refresh fails.
-    }
+    })();
+    return refreshInFlight;
   }
 
   async function refreshLatestMessages(): Promise<void> {
@@ -1337,10 +1365,11 @@ export function renderMessagesPage(): RoutePage {
 
     latestRefreshInFlight = (async () => {
       try {
+        if (refreshInFlight) await refreshInFlight;
+        if (!active) return;
         const response = await getMessages({ limit: 50, force: true });
         if (!active) return;
         mergeMessages(response.data, 'refresh');
-        beforeCursor = response.beforeCursor ?? beforeCursor;
         afterCursor = response.afterCursor ?? afterCursor;
       } catch {
         // Keep the current conversation when the stream reconnects during a blip.
@@ -1359,6 +1388,7 @@ export function renderMessagesPage(): RoutePage {
     const previousTop = thread.scrollTop;
     try {
       const response = await getMessages({ limit: 50, before: beforeCursor, force: true });
+      if (!active) return;
       mergeMessages(response.data, 'older');
       thread.scrollTop = previousTop + (thread.scrollHeight - previousHeight);
       beforeCursor = response.beforeCursor ?? beforeCursor;
@@ -1375,13 +1405,12 @@ export function renderMessagesPage(): RoutePage {
     scrollFrame = window.requestAnimationFrame(() => {
       scrollFrame = null;
       setNearBottom(distanceFromBottom() <= NEAR_BOTTOM_DISTANCE);
-      updateIndicator();
       if (thread.scrollTop <= 32) void loadOlderMessages();
     });
   }
 
   function startPolling(): void {
-    if (pollTimer !== null) return;
+    if (pollTimer !== null || !active || document.visibilityState === 'hidden') return;
     pollTimer = window.setInterval(() => void refreshMessages(), POLL_INTERVAL);
   }
 
@@ -1429,6 +1458,7 @@ export function renderMessagesPage(): RoutePage {
   }
 
   function handleRealtimeEvent(event: Event): void {
+    if (!active) return;
     const data = (event as CustomEvent).detail as {
       type?: string;
       isTyping?: boolean;
@@ -1495,6 +1525,7 @@ export function renderMessagesPage(): RoutePage {
 
   async function sendMessage(event: SubmitEvent): Promise<void> {
     event.preventDefault();
+    if (sendButton.disabled) return;
     const text = messageInput.value.trim();
     if (!text && !selectedPhoto) return;
 
@@ -1613,7 +1644,12 @@ export function renderMessagesPage(): RoutePage {
     }
   };
   const handleVisibilityChange = () => {
-    if (document.visibilityState !== 'visible' || !active) return;
+    if (document.visibilityState !== 'visible') {
+      stopPolling();
+      return;
+    }
+    if (!active) return;
+    startPolling();
     // Android may throttle timers and suspend EventSource while the WebView is
     // backgrounded. Reconcile immediately when the conversation is visible.
     void refreshLatestMessages();
@@ -1624,9 +1660,10 @@ export function renderMessagesPage(): RoutePage {
   document.addEventListener('visibilitychange', handleVisibilityChange);
   const autoExpandInput = () => {
     messageInput.style.height = 'auto';
-    const nextHeight = Math.min(messageInput.scrollHeight, 120);
+    const contentHeight = messageInput.scrollHeight;
+    const nextHeight = Math.min(contentHeight, 120);
     messageInput.style.height = `${Math.max(24, nextHeight)}px`;
-    messageInput.style.overflowY = messageInput.scrollHeight > 120 ? 'auto' : 'hidden';
+    messageInput.style.overflowY = contentHeight > 120 ? 'auto' : 'hidden';
   };
   const resetInputHeight = () => {
     messageInput.style.height = '24px';
@@ -1635,6 +1672,7 @@ export function renderMessagesPage(): RoutePage {
 
   const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
   messageInput.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice) {
       e.preventDefault();
       form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
@@ -1695,11 +1733,13 @@ export function renderMessagesPage(): RoutePage {
   page.addEventListener('keydown', onPageKeyDown);
 
   const openAttachMenu = () => {
+    photoButton.setAttribute('aria-expanded', 'true');
     attachBackdrop.hidden = false;
     attachMenu.hidden = false;
     try { navigator.vibrate?.(10); } catch {}
   };
   const closeAttachMenu = () => {
+    photoButton.setAttribute('aria-expanded', 'false');
     attachBackdrop.hidden = true;
     attachMenu.hidden = true;
   };
@@ -1774,7 +1814,7 @@ export function renderMessagesPage(): RoutePage {
         void loadInitialMessages().then(() => focusReplyFromQuery());
       } else {
         startPolling();
-        void refreshMessages();
+        void refreshLatestMessages();
         void focusReplyFromQuery();
       }
       startPolling();
@@ -1782,7 +1822,11 @@ export function renderMessagesPage(): RoutePage {
       flushOutbox();
     },
     deactivate: () => {
+      active = false;
       stopPolling();
+      if (typingTimer !== null) window.clearTimeout(typingTimer);
+      if (typingStopTimer !== null) window.clearTimeout(typingStopTimer);
+      typingTimer = typingStopTimer = null;
       void safeTyping(false).catch(() => {});
       void safePresence(false).catch(() => {});
     },

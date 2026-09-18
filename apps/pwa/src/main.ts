@@ -1,8 +1,6 @@
 import './styles/tokens.css';
 import './styles/components.css';
 import './styles/animations.css';
-import './styles/messages-layout-fix.css';
-import './styles/message-thread-enhancements.css';
 import './styles/message-image-viewer.css';
 import './styles/auth-interaction-vibe.css';
 import { store } from './store/index';
