@@ -344,6 +344,54 @@ describe('Messages scroll and reply behavior', () => {
     routePage.destroy?.();
   });
 
+  it('keeps the composer focused through successive sends without cancelling clicks', async () => {
+    const routePage = await mount([]);
+    const input = routePage.element.querySelector<HTMLTextAreaElement>('#message-input')!;
+    const send = routePage.element.querySelector<HTMLButtonElement>('.messages-send')!;
+    input.focus();
+
+    for (const text of ['Tin thứ nhất', 'Tin thứ hai']) {
+      input.value = text;
+      mocks.createMessage.mockResolvedValue(message(text, true, text));
+      for (const type of ['pointerdown', 'mousedown']) {
+        const down = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 });
+        send.dispatchEvent(down);
+        expect(down.defaultPrevented).toBe(true);
+      }
+      send.click();
+      expect(document.activeElement).toBe(input);
+      await flush();
+      expect(document.activeElement).toBe(input);
+      expect(input.value).toBe('');
+    }
+    expect(mocks.createMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves send-button focus behavior alone when the composer is not focused', async () => {
+    const routePage = await mount([]);
+    const send = routePage.element.querySelector<HTMLButtonElement>('.messages-send')!;
+    send.focus();
+    const down = new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 });
+    send.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(send);
+  });
+
+  it('does not reopen the keyboard when a pending send finishes after the user leaves the input', async () => {
+    const routePage = await mount([]);
+    const input = routePage.element.querySelector<HTMLTextAreaElement>('#message-input')!;
+    const send = routePage.element.querySelector<HTMLButtonElement>('.messages-send')!;
+    let finish!: (value: ChatMessage) => void;
+    mocks.createMessage.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    input.value = 'Đang gửi';
+    input.focus();
+    send.click();
+    input.blur();
+    finish(message('sent', true));
+    await flush();
+    expect(document.activeElement).not.toBe(input);
+  });
+
   function setScrollMetrics(thread: HTMLElement, scrollTop: number, scrollHeight = 1000, clientHeight = 200) {
     Object.defineProperties(thread, {
       scrollTop: { configurable: true, writable: true, value: scrollTop },

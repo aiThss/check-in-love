@@ -1632,6 +1632,16 @@ export function renderMessagesPage(): RoutePage {
     updateIndicator();
     scrollToBottom('follow');
   });
+  // Keep the current text-input focus before the button's default pointer action
+  // can dismiss the mobile keyboard. The subsequent click still submits normally.
+  // Do not refocus after awaiting the request: the user may have left the input.
+  const preserveComposerFocus = (event: MouseEvent) => {
+    if (event.button === 0 && document.activeElement === messageInput) {
+      event.preventDefault();
+    }
+  };
+  sendButton.addEventListener('pointerdown', preserveComposerFocus);
+  sendButton.addEventListener('mousedown', preserveComposerFocus);
   form.addEventListener('submit', sendMessage);
   window.addEventListener('lovecheck:realtime-event', handleRealtimeEvent);
   const handleAndroidShare = () => { void handlePendingShare(); };
@@ -1844,6 +1854,8 @@ export function renderMessagesPage(): RoutePage {
       thread.removeEventListener('scroll', handleScroll);
       thread.removeEventListener('click', onThreadClick);
       form.removeEventListener('submit', sendMessage);
+      sendButton.removeEventListener('pointerdown', preserveComposerFocus);
+      sendButton.removeEventListener('mousedown', preserveComposerFocus);
       headerMenuButton.removeEventListener('click', onHeaderMenuButtonClick);
       backgroundMenuItem.removeEventListener('click', onHeaderMenuItemClick);
       page.removeEventListener('click', onPageClick);
