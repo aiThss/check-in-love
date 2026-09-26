@@ -24,10 +24,16 @@ export interface BucketItem {
   isCustom?: boolean;
 }
 
-const PLACES_STORAGE_KEY = 'lovecheck_journey_places';
-const BUCKET_STORAGE_KEY = 'lovecheck_journey_bucket';
+export const PLACES_STORAGE_KEY = 'lovecheck_journey_places';
+export const BUCKET_STORAGE_KEY = 'lovecheck_journey_bucket';
+export const MIGRATION_SEED_CLEANUP_KEY = 'lovecheck_journey_seed_cleanup_v1';
 
-const DEFAULT_PLACES: LovePlace[] = [
+/**
+ * Legacy demo seed items from previous versions.
+ * Kept strictly as reference data for safe one-time migration cleanup.
+ * Never used as defaults for new users.
+ */
+const LEGACY_SEED_PLACES: LovePlace[] = [
   { id: 'sapa', name: 'Sa Pa', region: 'north', x: 34, y: 12, status: 'wishlist', note: 'Săn mây Fansipan và nắm tay nhau giữa sương mù' },
   { id: 'hanoi', name: 'Hà Nội', region: 'north', x: 48, y: 18, status: 'visited', visitedDate: '2024-10-10', note: 'Dạo quanh Hồ Gươm mùa hoa sữa và thưởng thức cà phê trứng' },
   { id: 'halong', name: 'Hạ Long', region: 'north', x: 59, y: 19, status: 'wishlist', note: 'Đi du thuyền ngắm hoàng hôn buông xuống vịnh' },
@@ -43,7 +49,7 @@ const DEFAULT_PLACES: LovePlace[] = [
   { id: 'phuquoc', name: 'Phú Quốc', region: 'islands', x: 33, y: 92, status: 'wishlist', note: 'Ngắm hoàng hôn lộng lẫy và thưởng thức hải sản đêm' },
 ];
 
-const DEFAULT_BUCKET: BucketItem[] = [
+const LEGACY_SEED_BUCKET: BucketItem[] = [
   { id: 'b1', title: 'Ăn tối lãng mạn dưới ánh nến tại nhà', category: 'dating', completed: true, completedDate: '2024-11-15', note: 'Tự tay nấu mì ý và cắm hoa xinh' },
   { id: 'b2', title: 'Cùng đi xem một bộ phim suất chiếu nửa đêm', category: 'dating', completed: true, completedDate: '2024-10-31', note: 'Rạp vắng tanh chỉ có hai đứa' },
   { id: 'b3', title: 'Hẹn hò tại quán cà phê sách yên tĩnh', category: 'dating', completed: false, note: 'Mỗi đứa đọc một cuốn sách và nhâm nhi trà nóng' },
@@ -69,17 +75,115 @@ const CATEGORY_MAP: Record<BucketCategory, { label: string; icon: string }> = {
   future: { label: 'Tương lai', icon: '💍' },
 };
 
-function loadStoredPlaces(): LovePlace[] {
-  try {
-    const raw = localStorage.getItem(PLACES_STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as LovePlace[];
-  } catch {
-    // ignore
+function isExactUnmodifiedSeedPlaces(items: unknown[]): boolean {
+  if (!Array.isArray(items) || items.length === 0) return true;
+  const seedMap = new Map(LEGACY_SEED_PLACES.map((p) => [p.id, p]));
+  for (const item of items) {
+    if (!item || typeof item !== 'object') return false;
+    const p = item as Partial<LovePlace>;
+    if (!p.id || !seedMap.has(p.id)) return false; // Contains custom/foreign ID -> preserve!
+    const original = seedMap.get(p.id)!;
+    if (p.name !== original.name) return false;
+    if (p.region !== original.region) return false;
+    if (p.status !== original.status) return false;
+    if ((p.note || '') !== (original.note || '')) return false;
+    if ((p.visitedDate || '') !== (original.visitedDate || '')) return false;
   }
-  return [...DEFAULT_PLACES];
+  return true;
 }
 
-function saveStoredPlaces(places: LovePlace[]): void {
+function isExactUnmodifiedSeedBucket(items: unknown[]): boolean {
+  if (!Array.isArray(items) || items.length === 0) return true;
+  const seedMap = new Map(LEGACY_SEED_BUCKET.map((b) => [b.id, b]));
+  for (const item of items) {
+    if (!item || typeof item !== 'object') return false;
+    const b = item as Partial<BucketItem>;
+    if (!b.id || !seedMap.has(b.id)) return false; // Contains custom/foreign ID -> preserve!
+    const original = seedMap.get(b.id)!;
+    if (b.title !== original.title) return false;
+    if (b.category !== original.category) return false;
+    if (b.completed !== original.completed) return false;
+    if ((b.note || '') !== (original.note || '')) return false;
+    if ((b.completedDate || '') !== (original.completedDate || '')) return false;
+  }
+  return true;
+}
+
+export function runSeedCleanupMigration(): void {
+  try {
+    if (localStorage.getItem(MIGRATION_SEED_CLEANUP_KEY) === 'true') {
+      return;
+    }
+
+    const rawPlaces = localStorage.getItem(PLACES_STORAGE_KEY);
+    if (rawPlaces) {
+      try {
+        const parsed = JSON.parse(rawPlaces);
+        if (Array.isArray(parsed) && isExactUnmodifiedSeedPlaces(parsed)) {
+          localStorage.setItem(PLACES_STORAGE_KEY, JSON.stringify([]));
+        }
+      } catch {
+        // If unparseable, do not blindly delete
+      }
+    }
+
+    const rawBucket = localStorage.getItem(BUCKET_STORAGE_KEY);
+    if (rawBucket) {
+      try {
+        const parsed = JSON.parse(rawBucket);
+        if (Array.isArray(parsed) && isExactUnmodifiedSeedBucket(parsed)) {
+          localStorage.setItem(BUCKET_STORAGE_KEY, JSON.stringify([]));
+        }
+      } catch {
+        // If unparseable, do not blindly delete
+      }
+    }
+
+    localStorage.setItem(MIGRATION_SEED_CLEANUP_KEY, 'true');
+  } catch {
+    // Storage quota or sandboxing errors
+  }
+}
+
+export function isValidLovePlace(item: unknown): item is LovePlace {
+  if (!item || typeof item !== 'object') return false;
+  const p = item as Record<string, unknown>;
+  if (typeof p.id !== 'string' || !p.id.trim()) return false;
+  if (typeof p.name !== 'string' || !p.name.trim()) return false;
+  if (p.region !== 'north' && p.region !== 'central' && p.region !== 'south' && p.region !== 'islands') return false;
+  if (typeof p.x !== 'number' || Number.isNaN(p.x) || typeof p.y !== 'number' || Number.isNaN(p.y)) return false;
+  if (p.status !== 'visited' && p.status !== 'wishlist') return false;
+  if (p.visitedDate !== undefined && typeof p.visitedDate !== 'string') return false;
+  if (p.note !== undefined && typeof p.note !== 'string') return false;
+  return true;
+}
+
+export function isValidBucketItem(item: unknown): item is BucketItem {
+  if (!item || typeof item !== 'object') return false;
+  const b = item as Record<string, unknown>;
+  if (typeof b.id !== 'string' || !b.id.trim()) return false;
+  if (typeof b.title !== 'string' || !b.title.trim()) return false;
+  if (b.category !== 'dating' && b.category !== 'travel' && b.category !== 'cozy' && b.category !== 'adventure' && b.category !== 'future') return false;
+  if (typeof b.completed !== 'boolean') return false;
+  if (b.completedDate !== undefined && typeof b.completedDate !== 'string') return false;
+  if (b.note !== undefined && typeof b.note !== 'string') return false;
+  return true;
+}
+
+export function loadStoredPlaces(): LovePlace[] {
+  runSeedCleanupMigration();
+  try {
+    const raw = localStorage.getItem(PLACES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isValidLovePlace);
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredPlaces(places: LovePlace[]): void {
   try {
     localStorage.setItem(PLACES_STORAGE_KEY, JSON.stringify(places));
   } catch {
@@ -87,17 +191,20 @@ function saveStoredPlaces(places: LovePlace[]): void {
   }
 }
 
-function loadStoredBucket(): BucketItem[] {
+export function loadStoredBucket(): BucketItem[] {
+  runSeedCleanupMigration();
   try {
     const raw = localStorage.getItem(BUCKET_STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as BucketItem[];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isValidBucketItem);
   } catch {
-    // ignore
+    return [];
   }
-  return [...DEFAULT_BUCKET];
 }
 
-function saveStoredBucket(items: BucketItem[]): void {
+export function saveStoredBucket(items: BucketItem[]): void {
   try {
     localStorage.setItem(BUCKET_STORAGE_KEY, JSON.stringify(items));
   } catch {
@@ -154,13 +261,13 @@ export function renderLoveJourneyPage(): HTMLElement {
       <div class="journey-stat-card">
         <span class="journey-stat-label">Toạ độ đã đi</span>
         <div class="journey-stat-value" id="stat-visited-places">
-          0<span class="journey-stat-total">/ 0</span>
+          0 <span class="journey-stat-total">/ 0</span>
         </div>
       </div>
       <div class="journey-stat-card">
         <span class="journey-stat-label">Điều ước đạt được</span>
         <div class="journey-stat-value" id="stat-completed-bucket">
-          0<span class="journey-stat-total">/ 0</span>
+          0 <span class="journey-stat-total">/ 0</span>
         </div>
       </div>
       <div class="journey-stat-card">
@@ -240,10 +347,10 @@ export function renderLoveJourneyPage(): HTMLElement {
     const progressPct = totalBucket > 0 ? Math.round((completedBucket / totalBucket) * 100) : 0;
 
     const visitedEl = hero.querySelector('#stat-visited-places');
-    if (visitedEl) visitedEl.innerHTML = `${visitedPlaces}<span class="journey-stat-total">/ ${places.length}</span>`;
+    if (visitedEl) visitedEl.innerHTML = `${visitedPlaces} <span class="journey-stat-total">/ ${places.length}</span>`;
 
     const bucketEl = hero.querySelector('#stat-completed-bucket');
-    if (bucketEl) bucketEl.innerHTML = `${completedBucket}<span class="journey-stat-total">/ ${totalBucket}</span>`;
+    if (bucketEl) bucketEl.innerHTML = `${completedBucket} <span class="journey-stat-total">/ ${totalBucket}</span>`;
 
     const progressEl = hero.querySelector('#stat-progress-percent');
     if (progressEl) progressEl.textContent = `${progressPct}%`;
@@ -291,7 +398,7 @@ export function renderLoveJourneyPage(): HTMLElement {
         <div id="journey-pins-container"></div>
       </div>
 
-      <!-- Selected Place Detail Card -->
+      <!-- Selected Place Detail Card or Empty State -->
       <div id="journey-selected-place-slot"></div>
     `;
 
@@ -314,8 +421,10 @@ export function renderLoveJourneyPage(): HTMLElement {
             ${isVisited ? '❤️' : '🚩'}
             ${place.id === selectedPlaceId ? '<div class="journey-pin-pulse"></div>' : ''}
           </div>
-          <span class="journey-pin-label">${escapeHtml(place.name)}</span>
+          <span class="journey-pin-label"></span>
         `;
+        const labelEl = pinBtn.querySelector('.journey-pin-label');
+        if (labelEl) labelEl.textContent = place.name;
 
         pinBtn.addEventListener('click', () => {
           selectedPlaceId = place.id;
@@ -326,71 +435,114 @@ export function renderLoveJourneyPage(): HTMLElement {
       });
     }
 
-    // Render detail card for selected place
+    // Render detail card for selected place or empty state if places is empty
     const selectedPlace = places.find((p) => p.id === selectedPlaceId) || places[0];
-    if (selectedSlot && selectedPlace) {
-      const isVisited = selectedPlace.status === 'visited';
-      selectedSlot.innerHTML = `
-        <div class="journey-place-detail-card">
-          <div class="journey-place-detail-header">
-            <div>
-              <h3 class="journey-place-detail-title">📍 ${escapeHtml(selectedPlace.name)}</h3>
-              <small style="color:var(--text-secondary);font-size:11px;">
-                Khu vực: ${formatRegion(selectedPlace.region)}
-              </small>
-            </div>
-            <span class="journey-place-detail-status ${selectedPlace.status}">
-              ${isVisited ? '💖 Đã cùng nhau ghé' : '✨ Điểm đến ấp ủ'}
-            </span>
-          </div>
 
-          <p class="journey-place-detail-note">
-            ${escapeHtml(selectedPlace.note || 'Chưa có ghi chú cho toạ độ này.')}
-          </p>
-
-          ${
-            selectedPlace.visitedDate
-              ? `<div style="font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;">
-                  <span>📅 Ngày ghé thăm:</span> <strong>${escapeHtml(selectedPlace.visitedDate)}</strong>
-                </div>`
-              : ''
-          }
-
-          <div class="journey-place-detail-actions">
-            <button type="button" class="btn-primary" id="btn-toggle-place-status" style="flex:1;padding:9px;font-size:12px;">
-              ${isVisited ? 'Đánh dấu thành ấp ủ 🚩' : 'Đánh dấu đã ghé thăm 💖'}
-            </button>
-            <button type="button" class="btn-ghost" id="btn-edit-place-note" style="padding:9px 12px;font-size:12px;">
-              ✏️ Sửa
+    if (selectedSlot) {
+      if (!selectedPlace || places.length === 0) {
+        selectedSlot.innerHTML = `
+          <div class="journey-map-empty-state">
+            <span class="journey-empty-icon" aria-hidden="true">🗺️</span>
+            <h3 class="journey-empty-title">Chưa có điểm đến nào</h3>
+            <p class="journey-empty-text">Thêm nơi hai bạn đã đi hoặc đang muốn cùng nhau khám phá.</p>
+            <button type="button" class="btn-primary" id="btn-empty-add-place" style="margin-top:6px;padding:8px 16px;font-size:13px;">
+              + Thêm điểm đến
             </button>
           </div>
-        </div>
-      `;
+        `;
+        selectedSlot.querySelector('#btn-empty-add-place')?.addEventListener('click', () => {
+          openAddPlaceModal();
+        });
+      } else {
+        const isVisited = selectedPlace.status === 'visited';
+        const card = document.createElement('div');
+        card.className = 'journey-place-detail-card';
 
-      selectedSlot.querySelector('#btn-toggle-place-status')?.addEventListener('click', (e) => {
-        const nextStatus = isVisited ? 'wishlist' : 'visited';
-        selectedPlace.status = nextStatus;
-        if (nextStatus === 'wishlist') selectedPlace.visitedDate = undefined;
-        if (nextStatus === 'visited' && !selectedPlace.visitedDate) {
-          const now = new Date();
-          selectedPlace.visitedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'journey-place-detail-header';
+
+        const leftHeader = document.createElement('div');
+        const titleEl = document.createElement('h3');
+        titleEl.className = 'journey-place-detail-title';
+        titleEl.textContent = `📍 ${selectedPlace.name}`;
+        const regionEl = document.createElement('small');
+        regionEl.style.cssText = 'color:var(--text-secondary);font-size:11px;';
+        regionEl.textContent = `Khu vực: ${formatRegion(selectedPlace.region)}`;
+        leftHeader.appendChild(titleEl);
+        leftHeader.appendChild(regionEl);
+
+        const statusBadge = document.createElement('span');
+        statusBadge.className = `journey-place-detail-status ${selectedPlace.status}`;
+        statusBadge.textContent = isVisited ? '💖 Đã cùng nhau ghé' : '✨ Điểm đến ấp ủ';
+
+        headerDiv.appendChild(leftHeader);
+        headerDiv.appendChild(statusBadge);
+        card.appendChild(headerDiv);
+
+        const noteP = document.createElement('p');
+        noteP.className = 'journey-place-detail-note';
+        noteP.textContent = selectedPlace.note || 'Chưa có ghi chú cho toạ độ này.';
+        card.appendChild(noteP);
+
+        if (selectedPlace.visitedDate) {
+          const dateRow = document.createElement('div');
+          dateRow.style.cssText = 'font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;';
+          const labelSpan = document.createElement('span');
+          labelSpan.textContent = '📅 Ngày ghé thăm:';
+          const valStrong = document.createElement('strong');
+          valStrong.textContent = selectedPlace.visitedDate;
+          dateRow.appendChild(labelSpan);
+          dateRow.appendChild(valStrong);
+          card.appendChild(dateRow);
         }
-        saveStoredPlaces(places);
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        triggerHeartSparkles(rect.left + rect.width / 2, rect.top);
-        showToast(
-          nextStatus === 'visited'
-            ? `Tuyệt vời! Đã ghi dấu toạ độ ${selectedPlace.name} 💖`
-            : `Đã chuyển ${selectedPlace.name} về danh sách ấp ủ`,
-          'success',
-        );
-        renderMapPanel();
-        updateStats();
-      });
 
-      selectedSlot.querySelector('#btn-edit-place-note')?.addEventListener('click', () => {
-        openEditPlaceModal(selectedPlace);
-      });
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'journey-place-detail-actions';
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'btn-primary';
+        toggleBtn.id = 'btn-toggle-place-status';
+        toggleBtn.style.cssText = 'flex:1;padding:9px;font-size:12px;';
+        toggleBtn.textContent = isVisited ? 'Đánh dấu thành ấp ủ 🚩' : 'Đánh dấu đã ghé thăm 💖';
+        toggleBtn.addEventListener('click', (e) => {
+          const nextStatus = isVisited ? 'wishlist' : 'visited';
+          selectedPlace.status = nextStatus;
+          if (nextStatus === 'wishlist') selectedPlace.visitedDate = undefined;
+          if (nextStatus === 'visited' && !selectedPlace.visitedDate) {
+            const now = new Date();
+            selectedPlace.visitedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          }
+          saveStoredPlaces(places);
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          triggerHeartSparkles(rect.left + rect.width / 2, rect.top);
+          showToast(
+            nextStatus === 'visited'
+              ? `Tuyệt vời! Đã ghi dấu toạ độ ${selectedPlace.name} 💖`
+              : `Đã chuyển ${selectedPlace.name} về danh sách ấp ủ`,
+            'success',
+          );
+          renderMapPanel();
+          updateStats();
+        });
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'btn-ghost';
+        editBtn.id = 'btn-edit-place-note';
+        editBtn.style.cssText = 'padding:9px 12px;font-size:12px;';
+        editBtn.textContent = '✏️ Sửa';
+        editBtn.addEventListener('click', () => {
+          openEditPlaceModal(selectedPlace);
+        });
+
+        actionsDiv.appendChild(toggleBtn);
+        actionsDiv.appendChild(editBtn);
+        card.appendChild(actionsDiv);
+
+        selectedSlot.innerHTML = '';
+        selectedSlot.appendChild(card);
+      }
     }
 
     mapPanel.querySelector('#btn-add-place')?.addEventListener('click', () => {
@@ -469,6 +621,23 @@ export function renderLoveJourneyPage(): HTMLElement {
     const listSlot = bucketPanel.querySelector<HTMLElement>('#journey-bucket-list-slot');
     if (!listSlot) return;
 
+    if (bucketItems.length === 0) {
+      listSlot.innerHTML = `
+        <div class="journey-empty-state">
+          <span class="journey-empty-icon" aria-hidden="true">✨</span>
+          <h3 class="journey-empty-title">Chưa có điều ước nào</h3>
+          <p class="journey-empty-text">Tạo điều đầu tiên hai bạn muốn cùng nhau thực hiện.</p>
+          <button type="button" class="btn-primary" id="btn-empty-add-bucket" style="margin-top:6px;padding:8px 16px;font-size:13px;">
+            + Thêm điều ước
+          </button>
+        </div>
+      `;
+      listSlot.querySelector('#btn-empty-add-bucket')?.addEventListener('click', () => {
+        openAddBucketModal();
+      });
+      return;
+    }
+
     let filtered = bucketItems;
     if (activeFilter === 'incomplete') filtered = bucketItems.filter((i) => !i.completed);
     else if (activeFilter === 'completed') filtered = bucketItems.filter((i) => i.completed);
@@ -477,7 +646,7 @@ export function renderLoveJourneyPage(): HTMLElement {
     if (filtered.length === 0) {
       listSlot.innerHTML = `
         <div class="journey-empty-state">
-          <span class="journey-empty-icon">🍃</span>
+          <span class="journey-empty-icon" aria-hidden="true">🍃</span>
           <p class="journey-empty-text">Chưa có điều ước nào trong mục này.</p>
         </div>
       `;
@@ -491,40 +660,78 @@ export function renderLoveJourneyPage(): HTMLElement {
 
       const catMeta = CATEGORY_MAP[item.category] || { label: 'Khác', icon: '✨' };
 
-      card.innerHTML = `
-        <div class="journey-bucket-card-top">
-          <button type="button" class="journey-checkbox-btn" aria-label="${item.completed ? 'Bỏ hoàn thành' : 'Đánh dấu hoàn thành'}">
-            ${item.completed ? '✓' : ''}
-          </button>
-          <div class="journey-bucket-info">
-            <span class="journey-bucket-category">
-              <span>${catMeta.icon}</span> ${catMeta.label}
-            </span>
-            <h3 class="journey-bucket-title">${escapeHtml(item.title)}</h3>
-            ${item.note ? `<p class="journey-bucket-note">${escapeHtml(item.note)}</p>` : ''}
-          </div>
-        </div>
+      const topRow = document.createElement('div');
+      topRow.className = 'journey-bucket-card-top';
 
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;">
-          ${
-            item.completed && item.completedDate
-              ? `<span class="journey-bucket-date-badge">🎉 Đạt được: ${item.completedDate}</span>`
-              : `<span style="font-size:11px;color:var(--text-secondary)">Ấp ủ thực hiện cùng nhau</span>`
-          }
-          <button type="button" class="btn-ghost" data-action="edit" style="padding:4px 8px;font-size:11px;">
-            ✏️
-          </button>
-        </div>
-      `;
+      const checkBtn = document.createElement('button');
+      checkBtn.type = 'button';
+      checkBtn.className = 'journey-checkbox-btn';
+      checkBtn.setAttribute('aria-label', item.completed ? 'Bỏ hoàn thành' : 'Đánh dấu hoàn thành');
+      checkBtn.textContent = item.completed ? '✓' : '';
 
-      // Checkbox click
-      const checkBtn = card.querySelector<HTMLButtonElement>('.journey-checkbox-btn');
-      checkBtn?.addEventListener('click', () => {
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'journey-bucket-info';
+
+      const catSpan = document.createElement('span');
+      catSpan.className = 'journey-bucket-category';
+      catSpan.innerHTML = `<span>${catMeta.icon}</span> ${catMeta.label}`;
+
+      const titleH3 = document.createElement('h3');
+      titleH3.className = 'journey-bucket-title';
+      titleH3.textContent = item.title;
+
+      infoDiv.appendChild(catSpan);
+      infoDiv.appendChild(titleH3);
+
+      if (item.note) {
+        const noteP = document.createElement('p');
+        noteP.className = 'journey-bucket-note';
+        noteP.textContent = item.note;
+        infoDiv.appendChild(noteP);
+      }
+
+      topRow.appendChild(checkBtn);
+      topRow.appendChild(infoDiv);
+      card.appendChild(topRow);
+
+      const bottomRow = document.createElement('div');
+      bottomRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;';
+
+      if (item.completed && item.completedDate) {
+        const badge = document.createElement('span');
+        badge.className = 'journey-bucket-date-badge';
+        badge.textContent = `🎉 Đạt được: ${item.completedDate}`;
+        bottomRow.appendChild(badge);
+      } else {
+        const hint = document.createElement('span');
+        hint.style.cssText = 'font-size:11px;color:var(--text-secondary);';
+        hint.textContent = 'Ấp ủ thực hiện cùng nhau';
+        bottomRow.appendChild(hint);
+      }
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'btn-ghost';
+      editBtn.style.cssText = 'padding:4px 8px;font-size:11px;';
+      editBtn.textContent = '✏️';
+      editBtn.setAttribute('aria-label', `Sửa điều ước ${item.title}`);
+      editBtn.addEventListener('click', () => {
+        openEditBucketModal(item);
+      });
+      bottomRow.appendChild(editBtn);
+
+      card.appendChild(bottomRow);
+
+      checkBtn.addEventListener('click', () => {
         const nextState = !item.completed;
         item.completed = nextState;
-        if (nextState && !item.completedDate) {
-          const now = new Date();
-          item.completedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (nextState) {
+          if (!item.completedDate) {
+            const now = new Date();
+            item.completedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          }
+        } else {
+          item.completedDate = undefined;
         }
         saveStoredBucket(bucketItems);
 
@@ -540,11 +747,6 @@ export function renderLoveJourneyPage(): HTMLElement {
 
         renderBucketPanel();
         updateStats();
-      });
-
-      // Edit item click
-      card.querySelector('[data-action="edit"]')?.addEventListener('click', () => {
-        openEditBucketModal(item);
       });
 
       listSlot.appendChild(card);
@@ -611,7 +813,6 @@ export function renderLoveJourneyPage(): HTMLElement {
 
       if (!name) return;
 
-      // Assign smart approximate coordinates by region
       const coords = getRegionDefaultCoords(region);
 
       const newPlace: LovePlace = {
@@ -641,21 +842,21 @@ export function renderLoveJourneyPage(): HTMLElement {
     modal.innerHTML = `
       <div class="journey-modal-card">
         <div class="journey-modal-header">
-          <h3 class="journey-modal-title">Chỉnh sửa toạ độ: ${escapeHtml(place.name)}</h3>
+          <h3 class="journey-modal-title">Chỉnh sửa toạ độ</h3>
           <button type="button" class="journey-modal-close-btn" aria-label="Đóng">&times;</button>
         </div>
         <form id="edit-place-form" style="display:flex;flex-direction:column;gap:12px;">
           <div class="journey-form-group">
             <label class="journey-form-label" for="edit-place-name">Tên địa điểm</label>
-            <input id="edit-place-name" class="journey-form-input" name="name" value="${escapeHtml(place.name)}" required />
+            <input id="edit-place-name" class="journey-form-input" name="name" required />
           </div>
           <div class="journey-form-group">
             <label class="journey-form-label" for="edit-place-note">Ghi chú kỷ niệm</label>
-            <textarea id="edit-place-note" class="journey-form-textarea" name="note" rows="3">${escapeHtml(place.note || '')}</textarea>
+            <textarea id="edit-place-note" class="journey-form-textarea" name="note" rows="3"></textarea>
           </div>
           <div class="journey-form-group">
             <label class="journey-form-label" for="edit-place-date">Ngày ghé thăm</label>
-            <input id="edit-place-date" class="journey-form-input" type="date" name="visitedDate" value="${escapeHtml(place.visitedDate || '')}" />
+            <input id="edit-place-date" class="journey-form-input" type="date" name="visitedDate" />
           </div>
           <div class="journey-form-actions">
             <button type="button" class="btn-ghost" id="btn-delete-place" style="margin-right:auto;color:#ef4444;">Xóa</button>
@@ -665,6 +866,13 @@ export function renderLoveJourneyPage(): HTMLElement {
         </form>
       </div>
     `;
+
+    const nameInput = modal.querySelector<HTMLInputElement>('#edit-place-name');
+    if (nameInput) nameInput.value = place.name;
+    const noteTextarea = modal.querySelector<HTMLTextAreaElement>('#edit-place-note');
+    if (noteTextarea) noteTextarea.value = place.note || '';
+    const dateInput = modal.querySelector<HTMLInputElement>('#edit-place-date');
+    if (dateInput) dateInput.value = place.visitedDate || '';
 
     document.body.appendChild(modal);
 
@@ -780,7 +988,7 @@ export function renderLoveJourneyPage(): HTMLElement {
         <form id="edit-bucket-form" style="display:flex;flex-direction:column;gap:12px;">
           <div class="journey-form-group">
             <label class="journey-form-label" for="edit-bucket-title">Tiêu đề điều ước</label>
-            <input id="edit-bucket-title" class="journey-form-input" name="title" value="${escapeHtml(item.title)}" required />
+            <input id="edit-bucket-title" class="journey-form-input" name="title" required />
           </div>
           <div class="journey-form-group">
             <label class="journey-form-label" for="edit-bucket-category">Danh mục</label>
@@ -794,7 +1002,7 @@ export function renderLoveJourneyPage(): HTMLElement {
           </div>
           <div class="journey-form-group">
             <label class="journey-form-label" for="edit-bucket-note">Ghi chú</label>
-            <textarea id="edit-bucket-note" class="journey-form-textarea" name="note" rows="2">${escapeHtml(item.note || '')}</textarea>
+            <textarea id="edit-bucket-note" class="journey-form-textarea" name="note" rows="2"></textarea>
           </div>
           <div class="journey-form-actions">
             <button type="button" class="btn-ghost" id="btn-delete-bucket" style="margin-right:auto;color:#ef4444;">Xóa</button>
@@ -804,6 +1012,11 @@ export function renderLoveJourneyPage(): HTMLElement {
         </form>
       </div>
     `;
+
+    const titleInput = modal.querySelector<HTMLInputElement>('#edit-bucket-title');
+    if (titleInput) titleInput.value = item.title;
+    const noteTextarea = modal.querySelector<HTMLTextAreaElement>('#edit-bucket-note');
+    if (noteTextarea) noteTextarea.value = item.note || '';
 
     document.body.appendChild(modal);
 
@@ -860,15 +1073,6 @@ export function renderLoveJourneyPage(): HTMLElement {
       case 'islands':
         return { x: 38, y: 92 };
     }
-  }
-
-  function escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
   }
 
   // Initial render

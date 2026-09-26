@@ -726,8 +726,27 @@
   font-size: 32px;
 }
 
+.journey-empty-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
 .journey-empty-text {
   font-size: 13px;
   color: var(--text-secondary);
   margin: 0;
+}
+
+.journey-map-empty-state {
+  text-align: center;
+  padding: 22px 16px;
+  background: var(--surface-solid);
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
