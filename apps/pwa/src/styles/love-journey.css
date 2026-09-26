@@ -256,21 +256,51 @@
   height: 100%;
 }
 
-.maplibregl-ctrl-attrib,
+/* ── MapLibre Attribution Styling (Visible & Accessible) ────── */
 .maplibregl-ctrl-bottom-right {
-  display: none !important;
+  bottom: 8px !important;
+  right: 8px !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  color: var(--text-secondary) !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  padding: 2px 6px !important;
+  max-width: 240px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+[data-theme='dark'] .maplibregl-ctrl-attrib {
+  background: rgba(24, 20, 30, 0.85) !important;
+  color: rgba(255, 255, 255, 0.65) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: inherit !important;
+  text-decoration: underline !important;
 }
 
 /* ── Floating Map Controls Bar ─────────────────────────────── */
 .journey-map-floating-bar {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
+  top: 10px;
+  left: 10px;
+  right: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   z-index: 10;
   pointer-events: none;
 }
@@ -279,12 +309,12 @@
 .journey-map-actions-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   pointer-events: auto;
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  padding: 4px;
+  padding: 3px;
   border-radius: 999px;
   border: 1px solid rgba(255, 59, 127, 0.18);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
@@ -298,7 +328,7 @@
 }
 
 .journey-map-filter-btn {
-  padding: 5px 11px;
+  padding: 4px 9px;
   font-size: 11px;
   font-weight: 700;
   border: none;
@@ -326,7 +356,7 @@
   border: none;
   background: transparent;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease;
@@ -535,6 +565,23 @@
   background: rgba(245, 158, 11, 0.15);
   color: #d97706;
   border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.journey-place-card-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 50%;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.journey-place-card-close:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .journey-place-cover-img {
@@ -898,16 +945,39 @@
   margin: 0;
 }
 
+.journey-map-empty-slot {
+  width: 100%;
+}
+
 .journey-map-empty-state {
-  text-align: center;
-  padding: 22px 16px;
-  background: var(--surface-solid);
+  margin-top: 14px;
+  padding: 16px 18px;
+  background: var(--surface);
   border: 1px dashed var(--border);
-  border-radius: 20px;
+  border-radius: 18px;
+  text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  box-shadow: var(--shadow);
+}
+
+.journey-map-empty-state .journey-empty-icon {
+  font-size: 26px;
+}
+
+.journey-map-empty-state .journey-empty-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.journey-map-empty-state .journey-empty-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 /* ── Autocomplete & Chips for Add Place Modal ─────────────── */

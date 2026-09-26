@@ -5,6 +5,8 @@ import {
   PLACES_STORAGE_KEY,
   BUCKET_STORAGE_KEY,
   MIGRATION_SEED_CLEANUP_KEY,
+  OPENFREEMAP_LIBERTY_STYLE,
+  OPENFREEMAP_DARK_STYLE,
 } from './love-journey';
 
 vi.mock('../router', () => ({
@@ -67,7 +69,14 @@ vi.mock('maplibre-gl', () => {
     }
 
     addControl() { return this; }
-    setStyle() { return this; }
+    setStyle() {
+      this._sources = {};
+      this._layers = {};
+      queueMicrotask(() => {
+        this._trigger('style.load');
+      });
+      return this;
+    }
     getSource(id: string) {
       if (!this._sources[id]) return undefined;
       return {
@@ -190,7 +199,7 @@ describe('Love Journey and Bucket List Page', () => {
 
     // Empty state messages and CTA buttons are rendered
     expect(page.textContent).toContain('Chưa có điểm đến nào');
-    expect(page.textContent).toContain('Thêm nơi hai bạn đã đi hoặc đang muốn cùng nhau khám phá.');
+    expect(page.textContent).toContain('Lưu nơi đầu tiên hai bạn đã cùng nhau ghé qua.');
     expect(page.querySelector('#btn-empty-add-place')).not.toBeNull();
 
     expect(page.textContent).toContain('Chưa có điều ước nào');
@@ -577,6 +586,76 @@ describe('Love Journey and Bucket List Page', () => {
       page.querySelector<HTMLButtonElement>('#journey-btn-zoom-out')?.click();
       page.querySelector<HTMLButtonElement>('#journey-btn-reset')?.click();
     }).not.toThrow();
+  });
+
+  it('renders empty state outside .journey-map-canvas-wrap when places is empty (Bug 2 regression)', () => {
+    const page = renderLoveJourneyPage();
+    document.body.appendChild(page);
+
+    const mapWrap = page.querySelector('.journey-map-canvas-wrap');
+    const emptyState = page.querySelector('.journey-map-empty-state');
+    const mapPanel = page.querySelector('.journey-map-panel');
+    const mapContainer = page.querySelector('.journey-map-container');
+
+    expect(mapContainer).not.toBeNull();
+    expect(emptyState).not.toBeNull();
+    expect(mapWrap).not.toBeNull();
+    expect(mapPanel).not.toBeNull();
+
+    // Regression test for Bug 2: empty state MUST NOT be inside .journey-map-canvas-wrap
+    expect(mapWrap?.contains(emptyState)).toBe(false);
+    expect(mapPanel?.contains(emptyState)).toBe(true);
+
+    // Selected place slot inside map wrap must be empty when places = []
+    const selectedSlot = page.querySelector('#journey-selected-place-slot');
+    expect(selectedSlot?.children.length).toBe(0);
+  });
+
+  it('uses OpenFreeMap public vector styles and contains zero cartocdn references (Bug 1 regression)', async () => {
+    expect(OPENFREEMAP_LIBERTY_STYLE).toBe('https://tiles.openfreemap.org/styles/liberty');
+    expect(OPENFREEMAP_DARK_STYLE).toBe('https://tiles.openfreemap.org/styles/dark');
+
+    const fs = await import('fs');
+    const path = await import('path');
+    const sourceContent = fs.readFileSync(path.resolve(__dirname, './love-journey.ts'), 'utf-8');
+    const cssContent = fs.readFileSync(path.resolve(__dirname, '../styles/love-journey.css'), 'utf-8');
+
+    expect(sourceContent).not.toContain('cartocdn.com');
+    expect(sourceContent).not.toContain('CARTO_POSITRON_STYLE');
+    expect(sourceContent).not.toContain('CARTO_DARK_STYLE');
+    expect(cssContent).not.toContain('cartocdn.com');
+  });
+
+  it('ensures map attribution is restored and not hidden by CSS rules', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const cssContent = fs.readFileSync(path.resolve(__dirname, '../styles/love-journey.css'), 'utf-8');
+
+    expect(cssContent).not.toMatch(/\.maplibregl-ctrl-attrib[^{]*\{[^}]*display\s*:\s*none/);
+    expect(cssContent).not.toMatch(/\.maplibregl-ctrl-attrib[^{]*\{[^}]*visibility\s*:\s*hidden/);
+    expect(cssContent).not.toMatch(/\.maplibregl-ctrl-attrib[^{]*\{[^}]*opacity\s*:\s*0/);
+  });
+
+  it('updates map style on theme change without losing journey route or markers', async () => {
+    localStorage.setItem(
+      PLACES_STORAGE_KEY,
+      JSON.stringify([
+        { id: 'p1', name: 'Hà Nội', latitude: 21.0285, longitude: 105.8542, status: 'visited', visitedDate: '2025-01-01' },
+        { id: 'p2', name: 'Đà Nẵng', latitude: 16.0544, longitude: 108.2022, status: 'visited', visitedDate: '2025-02-01' },
+      ]),
+    );
+    localStorage.setItem(MIGRATION_SEED_CLEANUP_KEY, 'true');
+
+    const page = renderLoveJourneyPage();
+    document.body.appendChild(page);
+
+    expect(page.querySelectorAll('.journey-map-pin').length).toBe(2);
+
+    // Trigger theme toggle to dark
+    document.documentElement.setAttribute('data-theme', 'dark');
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(page.querySelectorAll('.journey-map-pin').length).toBe(2);
   });
 
   it('cleans up resources on destroy lifecycle', () => {

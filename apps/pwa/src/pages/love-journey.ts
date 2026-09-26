@@ -77,6 +77,18 @@ export const BUCKET_STORAGE_KEY = 'lovecheck_journey_bucket';
 export const MIGRATION_SEED_CLEANUP_KEY = 'lovecheck_journey_seed_cleanup_v1';
 
 /**
+ * OpenFreeMap official vector styles.
+ * Fully open-source, unlimited public vector tile hosting, zero API key required.
+ */
+export const OPENFREEMAP_LIBERTY_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+export const OPENFREEMAP_DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
+
+export const VIETNAM_BOUNDS: [[number, number], [number, number]] = [
+  [102.14, 8.18],
+  [109.46, 23.39],
+];
+
+/**
  * Legacy demo seed items from previous versions.
  * Kept strictly as reference data for safe one-time migration cleanup.
  * Never used as defaults for new users.
@@ -121,62 +133,6 @@ const CATEGORY_MAP: Record<BucketCategory, { label: string; icon: string }> = {
   cozy: { label: 'Đời thường', icon: '🏡' },
   adventure: { label: 'Trải nghiệm', icon: '🎨' },
   future: { label: 'Tương lai', icon: '💍' },
-};
-
-/**
- * Free pastel basemap styles using Carto Positron (light) & Dark Matter (dark) raster tiles.
- * Extremely high-speed, zero API key required, perfectly matches the romantic travel diary aesthetic.
- */
-const CARTO_POSITRON_STYLE = {
-  version: 8,
-  sources: {
-    'carto-tiles': {
-      type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png',
-        'https://d.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png',
-      ],
-      tileSize: 256,
-      attribution: '&copy; CARTO &copy; OpenStreetMap',
-    },
-  },
-  layers: [
-    {
-      id: 'carto-tiles-layer',
-      type: 'raster',
-      source: 'carto-tiles',
-      minzoom: 0,
-      maxzoom: 20,
-    },
-  ],
-};
-
-const CARTO_DARK_STYLE = {
-  version: 8,
-  sources: {
-    'carto-tiles': {
-      type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
-        'https://d.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
-      ],
-      tileSize: 256,
-      attribution: '&copy; CARTO &copy; OpenStreetMap',
-    },
-  },
-  layers: [
-    {
-      id: 'carto-tiles-layer',
-      type: 'raster',
-      source: 'carto-tiles',
-      minzoom: 0,
-      maxzoom: 20,
-    },
-  ],
 };
 
 function normalizeText(str: string): string {
@@ -422,6 +378,10 @@ function isDarkTheme(): boolean {
     || (store.get().theme === 'system' && Boolean(window.matchMedia?.('(prefers-color-scheme: dark)').matches));
 }
 
+function getMapStyle(): string {
+  return isDarkTheme() ? OPENFREEMAP_DARK_STYLE : OPENFREEMAP_LIBERTY_STYLE;
+}
+
 function getJourneyLineCoordinates(places: LovePlace[]): [number, number][] {
   return places
     .filter((p) => p.status === 'visited')
@@ -577,102 +537,92 @@ export function renderLoveJourneyPage(): HTMLElement {
     if (progressLabel) progressLabel.textContent = `${completedBucket}/${totalBucket} (${progressPct}%)`;
   }
 
-  // ── Render Map Panel ─────────────────────────────────────────
-  function renderMapPanel(): void {
-    mapPanel.innerHTML = `
-      <div class="journey-panel-header">
-        <h2 class="journey-panel-title">
-          <span>📍</span> Toạ độ kỷ niệm
-        </h2>
-        <button type="button" class="journey-add-pin-btn" id="btn-add-place">
-          <span>+</span> Thêm điểm đến
-        </button>
-      </div>
+  // ── Build Map Panel Static DOM (Constructed once, never destroyed on place update) ──
+  mapPanel.innerHTML = `
+    <div class="journey-panel-header">
+      <h2 class="journey-panel-title">
+        <span>📍</span> Toạ độ kỷ niệm
+      </h2>
+      <button type="button" class="journey-add-pin-btn" id="btn-add-place">
+        <span>+</span> Thêm điểm đến
+      </button>
+    </div>
 
-      <div class="journey-map-canvas-wrap" id="journey-map-wrap">
-        <div id="journey-map-container" class="journey-map-container"></div>
+    <!-- 1. The Map Canvas Wrap: ALWAYS FULL MAP -->
+    <div class="journey-map-canvas-wrap" id="journey-map-wrap">
+      <div id="journey-map-container" class="journey-map-container"></div>
 
-        <!-- Floating Map Controls Bar -->
-        <div class="journey-map-floating-bar" aria-label="Bộ điều khiển bản đồ">
-          <div class="journey-map-filter-group">
-            <button type="button" class="journey-map-filter-btn${activeMapFilter === 'all' ? ' active' : ''}" data-map-filter="all">Tất cả</button>
-            <button type="button" class="journey-map-filter-btn${activeMapFilter === 'visited' ? ' active' : ''}" data-map-filter="visited">💖 Đã đi</button>
-            <button type="button" class="journey-map-filter-btn${activeMapFilter === 'wishlist' ? ' active' : ''}" data-map-filter="wishlist">✨ Ấp ủ</button>
-          </div>
-          <div class="journey-map-actions-group">
-            <button type="button" class="journey-map-ctrl-btn" id="journey-btn-reset" title="Toàn cảnh">🎯</button>
-            <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-in" title="Phóng to">+</button>
-            <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-out" title="Thu nhỏ">−</button>
-          </div>
+      <!-- Floating Map Controls Bar -->
+      <div class="journey-map-floating-bar" aria-label="Bộ điều khiển bản đồ">
+        <div class="journey-map-filter-group">
+          <button type="button" class="journey-map-filter-btn${(activeMapFilter as string) === 'all' ? ' active' : ''}" data-map-filter="all">Tất cả</button>
+          <button type="button" class="journey-map-filter-btn${(activeMapFilter as string) === 'visited' ? ' active' : ''}" data-map-filter="visited">💖 Đã đi</button>
+          <button type="button" class="journey-map-filter-btn${(activeMapFilter as string) === 'wishlist' ? ' active' : ''}" data-map-filter="wishlist">✨ Ấp ủ</button>
         </div>
-
-        <!-- Selected Place Floating Card or Empty State Overlay -->
-        <div id="journey-selected-place-slot" class="journey-selected-place-slot"></div>
+        <div class="journey-map-actions-group">
+          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-reset" title="Toàn cảnh Việt Nam">🎯</button>
+          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-in" title="Phóng to">+</button>
+          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-out" title="Thu nhỏ">−</button>
+        </div>
       </div>
-    `;
 
-    mapPanel.querySelector('#btn-add-place')?.addEventListener('click', () => {
-      openAddPlaceModal();
+      <!-- Selected Place Floating Card inside Map (shown only when a place is selected) -->
+      <div id="journey-selected-place-slot" class="journey-selected-place-slot"></div>
+    </div>
+
+    <!-- 2. Empty State Slot: OUTSIDE .journey-map-canvas-wrap so it NEVER blocks the map -->
+    <div id="journey-map-empty-slot" class="journey-map-empty-slot"></div>
+  `;
+
+  mapPanel.querySelector('#btn-add-place')?.addEventListener('click', () => {
+    openAddPlaceModal();
+  });
+
+  // Map Controls Events
+  mapPanel.querySelectorAll<HTMLButtonElement>('.journey-map-filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      activeMapFilter = btn.dataset.mapFilter as 'all' | 'visited' | 'wishlist';
+      mapPanel.querySelectorAll('.journey-map-filter-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      syncMarkers();
+      setupJourneyRouteLayer();
     });
+  });
 
-    // Map Controls Events
-    mapPanel.querySelectorAll<HTMLButtonElement>('.journey-map-filter-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        activeMapFilter = btn.dataset.mapFilter as 'all' | 'visited' | 'wishlist';
-        mapPanel.querySelectorAll('.journey-map-filter-btn').forEach((b) => b.classList.toggle('active', b === btn));
-        syncMarkers();
-        setupJourneyRouteLayer();
-      });
-    });
+  mapPanel.querySelector('#journey-btn-zoom-in')?.addEventListener('click', () => {
+    try {
+      map?.zoomIn({ duration: 300 });
+    } catch {
+      // ignore
+    }
+  });
 
-    mapPanel.querySelector('#journey-btn-zoom-in')?.addEventListener('click', () => {
-      try {
-        map?.zoomIn({ duration: 300 });
-      } catch {
-        // ignore
-      }
-    });
+  mapPanel.querySelector('#journey-btn-zoom-out')?.addEventListener('click', () => {
+    try {
+      map?.zoomOut({ duration: 300 });
+    } catch {
+      // ignore
+    }
+  });
 
-    mapPanel.querySelector('#journey-btn-zoom-out')?.addEventListener('click', () => {
-      try {
-        map?.zoomOut({ duration: 300 });
-      } catch {
-        // ignore
-      }
-    });
-
-    mapPanel.querySelector('#journey-btn-reset')?.addEventListener('click', () => {
-      fitMapToPlaces();
-    });
-
-    initMapInstance();
-    renderSelectedPlaceCard();
-  }
+  mapPanel.querySelector('#journey-btn-reset')?.addEventListener('click', () => {
+    fitMapToPlaces();
+  });
 
   function initMapInstance(): void {
     const mapContainer = mapPanel.querySelector<HTMLElement>('#journey-map-container');
-    if (!mapContainer) return;
+    if (!mapContainer || map) return;
 
-    if (map) {
-      try {
-        map.remove();
-      } catch {
-        // ignore
-      }
-      map = null;
-    }
-
-    const initialStyle = isDarkTheme() ? CARTO_DARK_STYLE : CARTO_POSITRON_STYLE;
+    const initialStyle = getMapStyle();
 
     try {
       map = new MapLibreMap({
         container: mapContainer,
-        style: initialStyle as any,
+        style: initialStyle,
         center: [106.8, 16.2],
         zoom: 5.3,
         minZoom: 3.5,
         maxZoom: 18,
-        attributionControl: false,
+        attributionControl: { compact: true },
       });
 
       map.on('load', () => {
@@ -751,7 +701,11 @@ export function renderLoveJourneyPage(): HTMLElement {
     if (!map) return;
     try {
       if (places.length === 0) {
-        map.fitBounds([[102.14, 8.18], [109.46, 23.39]], { padding: 30, duration: 800 });
+        map.fitBounds(VIETNAM_BOUNDS, {
+          padding: { top: 40, bottom: 40, left: 30, right: 30 },
+          maxZoom: 6.8,
+          duration: 800,
+        });
         return;
       }
       const bounds = new LngLatBounds();
@@ -769,7 +723,6 @@ export function renderLoveJourneyPage(): HTMLElement {
   }
 
   function syncMarkers(): void {
-    // Clean up active markers
     activeMarkers.forEach((m) => {
       try {
         m.remove();
@@ -864,29 +817,46 @@ export function renderLoveJourneyPage(): HTMLElement {
     });
   }
 
-  function renderSelectedPlaceCard(): void {
-    const selectedSlot = mapPanel.querySelector<HTMLElement>('#journey-selected-place-slot');
-    if (!selectedSlot) return;
+  // ── Render Empty State OUTSIDE the Map (Bug 2 Fix) ───────────
+  function renderMapEmptyState(): void {
+    const emptySlot = mapPanel.querySelector<HTMLElement>('#journey-map-empty-slot');
+    if (!emptySlot) return;
 
     if (places.length === 0) {
-      selectedSlot.innerHTML = `
+      emptySlot.innerHTML = `
         <div class="journey-map-empty-state">
           <span class="journey-empty-icon" aria-hidden="true">🗺️</span>
           <h3 class="journey-empty-title">Chưa có điểm đến nào</h3>
-          <p class="journey-empty-text">Thêm nơi hai bạn đã đi hoặc đang muốn cùng nhau khám phá.</p>
+          <p class="journey-empty-text">Lưu nơi đầu tiên hai bạn đã cùng nhau ghé qua.</p>
           <button type="button" class="btn-primary" id="btn-empty-add-place" style="margin-top:6px;padding:8px 16px;font-size:13px;">
             + Thêm điểm đến
           </button>
         </div>
       `;
-      selectedSlot.querySelector('#btn-empty-add-place')?.addEventListener('click', () => {
+      emptySlot.querySelector('#btn-empty-add-place')?.addEventListener('click', () => {
         openAddPlaceModal();
       });
+    } else {
+      emptySlot.innerHTML = '';
+    }
+  }
+
+  // ── Render Selected Place Floating Card INSIDE Map ───────────
+  function renderSelectedPlaceCard(): void {
+    const selectedSlot = mapPanel.querySelector<HTMLElement>('#journey-selected-place-slot');
+    if (!selectedSlot) return;
+
+    if (places.length === 0 || !selectedPlaceId) {
+      selectedSlot.innerHTML = '';
       return;
     }
 
-    const selectedPlace = places.find((p) => p.id === selectedPlaceId) || places[0];
-    selectedPlaceId = selectedPlace.id;
+    const selectedPlace = places.find((p) => p.id === selectedPlaceId);
+    if (!selectedPlace) {
+      selectedSlot.innerHTML = '';
+      return;
+    }
+
     const isVisited = selectedPlace.status === 'visited';
 
     const card = document.createElement('div');
@@ -905,12 +875,28 @@ export function renderLoveJourneyPage(): HTMLElement {
     leftHeader.appendChild(titleEl);
     leftHeader.appendChild(regionEl);
 
+    const rightHeader = document.createElement('div');
+    rightHeader.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
     const statusBadge = document.createElement('span');
     statusBadge.className = `journey-place-detail-status ${selectedPlace.status}`;
     statusBadge.textContent = isVisited ? '💖 Đã cùng nhau ghé' : '✨ Điểm đến ấp ủ';
+    rightHeader.appendChild(statusBadge);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'journey-place-card-close';
+    closeBtn.setAttribute('aria-label', 'Đóng thẻ');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.addEventListener('click', () => {
+      selectedPlaceId = '';
+      syncMarkers();
+      renderSelectedPlaceCard();
+    });
+    rightHeader.appendChild(closeBtn);
 
     headerDiv.appendChild(leftHeader);
-    headerDiv.appendChild(statusBadge);
+    headerDiv.appendChild(rightHeader);
     card.appendChild(headerDiv);
 
     if (selectedPlace.photoUrl) {
@@ -1382,6 +1368,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       syncMarkers();
       setupJourneyRouteLayer();
       renderSelectedPlaceCard();
+      renderMapEmptyState();
       updateStats();
       fitMapToPlaces();
     });
@@ -1446,6 +1433,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       syncMarkers();
       setupJourneyRouteLayer();
       renderSelectedPlaceCard();
+      renderMapEmptyState();
       updateStats();
       fitMapToPlaces();
     });
@@ -1642,35 +1630,27 @@ export function renderLoveJourneyPage(): HTMLElement {
     }
   }
 
-  // Theme synchronization for dynamic dark / light tiles
-  const unsubscribeStore = store.subscribe(() => {
-    if (map) {
-      try {
-        const isDark = isDarkTheme();
-        map.setStyle(isDark ? (CARTO_DARK_STYLE as any) : (CARTO_POSITRON_STYLE as any));
-        map.once('style.load', () => {
-          setupJourneyRouteLayer();
-          syncMarkers();
-        });
-      } catch {
-        // ignore
-      }
+  function handleThemeChange(): void {
+    if (!map) return;
+    const targetStyle = getMapStyle();
+    try {
+      map.setStyle(targetStyle);
+      map.once('style.load', () => {
+        setupJourneyRouteLayer();
+        syncMarkers();
+      });
+    } catch {
+      // ignore
     }
+  }
+
+  // Theme synchronization for dynamic dark / light vector tiles
+  const unsubscribeStore = store.subscribe(() => {
+    handleThemeChange();
   });
 
   const themeObserver = new MutationObserver(() => {
-    if (map) {
-      try {
-        const isDark = isDarkTheme();
-        map.setStyle(isDark ? (CARTO_DARK_STYLE as any) : (CARTO_POSITRON_STYLE as any));
-        map.once('style.load', () => {
-          setupJourneyRouteLayer();
-          syncMarkers();
-        });
-      } catch {
-        // ignore
-      }
-    }
+    handleThemeChange();
   });
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
@@ -1698,7 +1678,9 @@ export function renderLoveJourneyPage(): HTMLElement {
   };
 
   // Initial renders
-  renderMapPanel();
+  initMapInstance();
+  renderSelectedPlaceCard();
+  renderMapEmptyState();
   renderBucketPanel();
   updateStats();
   updateTabVisibility();
