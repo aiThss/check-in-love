@@ -1,0 +1,733 @@
+/* ============================================================
+   Love Journey & Bucket List Styles — LoveCheck PWA
+   Crafted with distinctive romantic keepsake visual identity
+   ============================================================ */
+
+.journey-page {
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: calc(var(--safe-top, 0px) + 20px) 16px calc(var(--safe-bottom, 0px) + 104px) 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Hero / Header ─────────────────────────────────────────── */
+.journey-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.journey-tag-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.journey-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(255, 59, 127, 0.2);
+}
+
+.journey-title {
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.journey-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 640px;
+}
+
+/* ── Stats Summary Bar ──────────────────────────────────────── */
+.journey-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.journey-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.journey-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 59, 127, 0.35);
+}
+
+.journey-stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.journey-stat-value {
+  font-size: clamp(18px, 3.5vw, 24px);
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.journey-stat-total {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ── View Switcher Tabs (Mobile) ───────────────────────────── */
+.journey-tabs {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.journey-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease), transform 0.15s ease;
+}
+
+.journey-tab-btn:active {
+  transform: scale(0.98);
+}
+
+.journey-tab-btn.active {
+  background: var(--surface-solid);
+  color: var(--accent);
+  box-shadow: 0 4px 12px rgba(255, 59, 127, 0.12);
+  font-weight: 700;
+}
+
+/* ── Layout Grid for Desktop & Mobile ──────────────────────── */
+.journey-main-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .journey-tabs {
+    display: none; /* Desktop shows both panels side-by-side */
+  }
+
+  .journey-main-grid {
+    display: grid;
+    grid-template-columns: 460px minmax(0, 1fr);
+    align-items: start;
+    gap: 28px;
+  }
+
+  .journey-map-panel {
+    position: sticky;
+    top: calc(var(--safe-top, 0px) + 20px);
+  }
+}
+
+/* ── Map Panel ─────────────────────────────────────────────── */
+.journey-map-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.journey-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.journey-panel-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.journey-add-pin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(255, 59, 127, 0.2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.journey-add-pin-btn:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.journey-add-pin-btn:active {
+  transform: scale(0.96);
+}
+
+/* ── Interactive Vector Map Container ───────────────────────── */
+.journey-map-canvas-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1.35;
+  background: linear-gradient(165deg, rgba(255, 235, 240, 0.45) 0%, rgba(240, 245, 255, 0.3) 100%);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 59, 127, 0.12);
+  overflow: hidden;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='dark'] .journey-map-canvas-wrap {
+  background: linear-gradient(165deg, rgba(40, 24, 35, 0.8) 0%, rgba(20, 25, 38, 0.8) 100%);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.journey-map-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── Interactive Map Pins ───────────────────────────────────── */
+.journey-map-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 5;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0.2s ease;
+  background: none;
+  border: none;
+  padding: 0;
+  outline: none;
+}
+
+.journey-map-pin:hover,
+.journey-map-pin:focus-visible {
+  transform: translate(-50%, -50%) scale(1.22);
+  z-index: 10;
+}
+
+.journey-pin-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.journey-pin-visited .journey-pin-dot {
+  background: linear-gradient(135deg, #ff3b7f 0%, #e11d48 100%);
+  color: #ffffff;
+  border: 2px solid #ffffff;
+}
+
+.journey-pin-wishlist .journey-pin-dot {
+  background: var(--surface-solid);
+  color: var(--accent);
+  border: 2px dashed var(--accent);
+}
+
+.journey-pin-pulse {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: rgba(255, 59, 127, 0.35);
+  animation: journeyPinPulse 2.4s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes journeyPinPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  65% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.journey-pin-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  margin-top: 4px;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+/* ── Selected Place Card in Map Panel ──────────────────────── */
+.journey-place-detail-card {
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.25s var(--ease);
+}
+
+.journey-place-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.journey-place-detail-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.journey-place-detail-status {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.journey-place-detail-status.visited {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.journey-place-detail-status.wishlist {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.journey-place-detail-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.journey-place-detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* ── Bucket List Panel ─────────────────────────────────────── */
+.journey-bucket-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.journey-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.journey-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.journey-filter-pill {
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.18s var(--ease);
+}
+
+.journey-filter-pill:hover {
+  border-color: rgba(255, 59, 127, 0.4);
+  color: var(--text-primary);
+}
+
+.journey-filter-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(255, 59, 127, 0.22);
+}
+
+.journey-progress-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.journey-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.journey-progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 59, 127, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.journey-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff85a1 0%, #ff3b7f 70%, #f59e0b 100%);
+  border-radius: 999px;
+  transition: width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Bucket Items List ─────────────────────────────────────── */
+.journey-bucket-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .journey-bucket-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.journey-bucket-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease);
+  position: relative;
+  overflow: hidden;
+}
+
+.journey-bucket-card:hover {
+  border-color: rgba(255, 59, 127, 0.35);
+  transform: translateY(-2px);
+}
+
+.journey-bucket-card.completed {
+  background: var(--surface-solid);
+  border-color: rgba(16, 185, 129, 0.22);
+}
+
+.journey-bucket-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.journey-checkbox-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  color: transparent;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  padding: 0;
+}
+
+.journey-bucket-card.completed .journey-checkbox-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-color: #10b981;
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.journey-bucket-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.journey-bucket-category {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.journey-bucket-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-primary);
+  margin: 0;
+  word-break: break-word;
+}
+
+.journey-bucket-card.completed .journey-bucket-title {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.journey-bucket-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.journey-bucket-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+/* ── Modal Overlay & Dialog ────────────────────────────────── */
+.journey-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.journey-modal-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 440px;
+  padding: 22px;
+  box-shadow: var(--shadow-elevated);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: scaleUp 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.journey-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.journey-modal-title {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.journey-modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+  line-height: 1;
+}
+
+.journey-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.journey-form-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.journey-form-input,
+.journey-form-select,
+.journey-form-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.journey-form-input:focus,
+.journey-form-select:focus,
+.journey-form-textarea:focus {
+  border-color: var(--accent);
+}
+
+.journey-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* ── Sparkle Burst Animation ───────────────────────────────── */
+@keyframes heartSparkleFly {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx, 0), var(--ty, -50px)) scale(1.3);
+    opacity: 0;
+  }
+}
+
+.heart-sparkle-particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  font-size: 20px;
+  animation: heartSparkleFly 0.8s cubic-bezier(0.12, 0.8, 0.32, 1) forwards;
+}
+
+/* ── Empty State ───────────────────────────────────────────── */
+.journey-empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.journey-empty-icon {
+  font-size: 32px;
+}
+
+.journey-empty-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}

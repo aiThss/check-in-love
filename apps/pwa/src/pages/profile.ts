@@ -777,6 +777,25 @@ export function renderProfilePage(): HTMLElement {
     });
     settingsContainer.appendChild(editRow);
 
+    // 1.5. Journey & Bucket List Row
+    const journeyRow = document.createElement('div');
+    journeyRow.className = 'card-solid';
+    journeyRow.style.cssText = 'padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.2s;';
+    journeyRow.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:20px;">🗺️</span>
+        <div style="display:flex;flex-direction:column;">
+          <span style="font-size:14px;font-weight:600;">Bản đồ hẹn hò & 100 Điều ước</span>
+          <span style="font-size:11px;color:var(--text-secondary);">Toạ độ đã đi qua & mục tiêu cùng nhau chạm tới</span>
+        </div>
+      </div>
+      <span style="font-size:16px;color:var(--text-secondary);">→</span>
+    `;
+    journeyRow.addEventListener('click', () => {
+      navigate('/app/journey');
+    });
+    settingsContainer.appendChild(journeyRow);
+
     // 2. Theme Toggle Row
     const themeRow = document.createElement('div');
     themeRow.className = 'card-solid theme-settings-card';

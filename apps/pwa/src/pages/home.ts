@@ -741,9 +741,31 @@ export function renderHomePage(): HTMLElement {
   contentArea.appendChild(renderSkeleton());
   page.appendChild(contentArea);
 
+  // Journey Banner — "Bản đồ hẹn hò & 100 Điều ước đôi"
+  const journeyBanner = document.createElement('div');
+  journeyBanner.className = 'home-journey-banner card-solid';
+  journeyBanner.style.cssText =
+    'margin: 20px 16px 0; padding: 14px 16px; border-radius: 20px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; background: linear-gradient(135deg, rgba(255, 59, 127, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%), var(--surface); border: 1px solid var(--border); transition: transform 0.2s ease, border-color 0.2s ease;';
+  journeyBanner.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:42px;height:42px;border-radius:14px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">
+        🗺️
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <span style="font-size:14px;font-weight:700;color:var(--text-primary);letter-spacing:-0.01em;">Bản đồ hẹn hò & 100 Điều ước</span>
+        <span style="font-size:12px;color:var(--text-secondary);">Ghi dấu từng toạ độ và ước mơ của hai đứa ✨</span>
+      </div>
+    </div>
+    <span style="font-size:16px;color:var(--text-secondary);margin-left:8px;">›</span>
+  `;
+  journeyBanner.addEventListener('click', () => {
+    navigate('/app/journey');
+  });
+  page.appendChild(journeyBanner);
+
   // Recent memories section — "Những điều rất nhỏ"
   const recentMemoriesSection = buildRecentMemoriesSection();
-  recentMemoriesSection.style.cssText = 'margin-top:28px;padding-bottom:16px;';
+  recentMemoriesSection.style.cssText = 'margin-top:20px;padding-bottom:16px;';
   page.appendChild(recentMemoriesSection);
 
   async function renderPushPrompt() {

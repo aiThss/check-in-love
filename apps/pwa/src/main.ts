@@ -3,6 +3,7 @@ import './styles/components.css';
 import './styles/animations.css';
 import './styles/message-image-viewer.css';
 import './styles/auth-interaction-vibe.css';
+import './styles/love-journey.css';
 import { store } from './store/index';
 import { initRouter, navigate } from './router';
 import { clearPrivateClientState } from './session';
@@ -338,6 +339,8 @@ initRouter({
   '/app/random': () => import('./pages/random').then(({ renderRandomPage }) => renderRandomPage()),
   '/app/profile': () => import('./pages/profile').then(({ renderProfilePage }) => renderProfilePage()),
   '/app/messages': () => import('./pages/messages').then(({ renderMessagesPage }) => renderMessagesPage()),
+  '/app/journey': () => import('./pages/love-journey').then(({ renderLoveJourneyPage }) => renderLoveJourneyPage()),
+  '/app/bucket-list': () => import('./pages/love-journey').then(({ renderLoveJourneyPage }) => renderLoveJourneyPage()),
 });
 
 const prefetchCommonRoutes = () => {
