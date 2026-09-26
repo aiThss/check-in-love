@@ -524,7 +524,15 @@ async function renderRoute(path: string, locationPath = getCurrentPath()): Promi
 }
 
 function normalizeRoutePage(result: HTMLElement | RoutePage): RoutePage {
-  return result instanceof HTMLElement ? { element: result } : result;
+  if (!(result instanceof HTMLElement)) return result;
+
+  const page = result as HTMLElement & Partial<Omit<RoutePage, 'element'>>;
+  return {
+    element: page,
+    activate: page.activate,
+    deactivate: page.deactivate,
+    destroy: page.destroy,
+  };
 }
 
 function renderMessage(host: HTMLElement, title: string, description: string): void {

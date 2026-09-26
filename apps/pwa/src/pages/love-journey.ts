@@ -125,7 +125,9 @@ function triggerHeartSparkles(originX: number, originY: number): void {
 }
 
 export function renderLoveJourneyPage(): HTMLElement {
-  const root = document.createElement('div');
+  const root = document.createElement('div') as HTMLElement & {
+    destroy?: () => void;
+  };
   root.className = 'page journey-page animate-fade-in';
 
   let places = loadStoredPlaces();
@@ -144,7 +146,7 @@ export function renderLoveJourneyPage(): HTMLElement {
         ← Về Home
       </button>
     </div>
-    <h1 class="journey-title">Bản đồ hẹn hò & 100 Điều ước</h1>
+    <h1 class="journey-title">Bản đồ hẹn hò & Điều ước</h1>
     <p class="journey-subtitle">
       Từng vùng đất hai đứa đã đi qua và những ước mơ ngọt ngào đang chờ cùng nhau chạm tới.
     </p>
@@ -183,7 +185,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       <span>🗺️</span> Bản đồ toạ độ
     </button>
     <button type="button" class="journey-tab-btn" data-tab="bucket">
-      <span>✨</span> 100 Điều ước
+      <span>✨</span> Điều ước
     </button>
   `;
   root.appendChild(tabContainer);
@@ -226,6 +228,9 @@ export function renderLoveJourneyPage(): HTMLElement {
   }
 
   window.addEventListener('resize', updateTabVisibility);
+  root.destroy = () => {
+    window.removeEventListener('resize', updateTabVisibility);
+  };
 
   // Update Stats Counter
   function updateStats(): void {
@@ -309,7 +314,7 @@ export function renderLoveJourneyPage(): HTMLElement {
             ${isVisited ? '❤️' : '🚩'}
             ${place.id === selectedPlaceId ? '<div class="journey-pin-pulse"></div>' : ''}
           </div>
-          <span class="journey-pin-label">${place.name}</span>
+          <span class="journey-pin-label">${escapeHtml(place.name)}</span>
         `;
 
         pinBtn.addEventListener('click', () => {
@@ -329,7 +334,7 @@ export function renderLoveJourneyPage(): HTMLElement {
         <div class="journey-place-detail-card">
           <div class="journey-place-detail-header">
             <div>
-              <h3 class="journey-place-detail-title">📍 ${selectedPlace.name}</h3>
+              <h3 class="journey-place-detail-title">📍 ${escapeHtml(selectedPlace.name)}</h3>
               <small style="color:var(--text-secondary);font-size:11px;">
                 Khu vực: ${formatRegion(selectedPlace.region)}
               </small>
@@ -340,13 +345,13 @@ export function renderLoveJourneyPage(): HTMLElement {
           </div>
 
           <p class="journey-place-detail-note">
-            ${selectedPlace.note || 'Chưa có ghi chú cho toạ độ này.'}
+            ${escapeHtml(selectedPlace.note || 'Chưa có ghi chú cho toạ độ này.')}
           </p>
 
           ${
             selectedPlace.visitedDate
               ? `<div style="font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;">
-                  <span>📅 Ngày ghé thăm:</span> <strong>${selectedPlace.visitedDate}</strong>
+                  <span>📅 Ngày ghé thăm:</span> <strong>${escapeHtml(selectedPlace.visitedDate)}</strong>
                 </div>`
               : ''
           }
@@ -365,6 +370,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       selectedSlot.querySelector('#btn-toggle-place-status')?.addEventListener('click', (e) => {
         const nextStatus = isVisited ? 'wishlist' : 'visited';
         selectedPlace.status = nextStatus;
+        if (nextStatus === 'wishlist') selectedPlace.visitedDate = undefined;
         if (nextStatus === 'visited' && !selectedPlace.visitedDate) {
           const now = new Date();
           selectedPlace.visitedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -411,7 +417,7 @@ export function renderLoveJourneyPage(): HTMLElement {
     bucketPanel.innerHTML = `
       <div class="journey-panel-header">
         <h2 class="journey-panel-title">
-          <span>📋</span> 100 Điều ước cùng nhau
+          <span>📋</span> Điều ước cùng nhau
         </h2>
         <button type="button" class="journey-add-pin-btn" id="btn-add-bucket">
           <span>+</span> Thêm điều ước
@@ -553,16 +559,16 @@ export function renderLoveJourneyPage(): HTMLElement {
       <div class="journey-modal-card">
         <div class="journey-modal-header">
           <h3 class="journey-modal-title">Thêm toạ độ hẹn hò</h3>
-          <button type="button" class="journey-modal-close-btn">&times;</button>
+          <button type="button" class="journey-modal-close-btn" aria-label="Đóng">&times;</button>
         </div>
         <form id="add-place-form" style="display:flex;flex-direction:column;gap:12px;">
           <div class="journey-form-group">
-            <label class="journey-form-label">Tên địa điểm / Thành phố</label>
-            <input class="journey-form-input" name="name" required placeholder="Ví dụ: Côn Đảo, Cát Bà, Buôn Ma Thuột..." />
+            <label class="journey-form-label" for="add-place-name">Tên địa điểm / Thành phố</label>
+            <input id="add-place-name" class="journey-form-input" name="name" required placeholder="Ví dụ: Côn Đảo, Cát Bà, Buôn Ma Thuột..." />
           </div>
           <div class="journey-form-group">
-            <label class="journey-form-label">Khu vực</label>
-            <select class="journey-form-select" name="region">
+            <label class="journey-form-label" for="add-place-region">Khu vực</label>
+            <select id="add-place-region" class="journey-form-select" name="region">
               <option value="north">Miền Bắc</option>
               <option value="central">Miền Trung</option>
               <option value="south">Miền Nam</option>
@@ -570,15 +576,15 @@ export function renderLoveJourneyPage(): HTMLElement {
             </select>
           </div>
           <div class="journey-form-group">
-            <label class="journey-form-label">Trạng thái</label>
-            <select class="journey-form-select" name="status">
+            <label class="journey-form-label" for="add-place-status">Trạng thái</label>
+            <select id="add-place-status" class="journey-form-select" name="status">
               <option value="wishlist">✨ Điểm đến ấp ủ muốn đi</option>
               <option value="visited">💖 Đã cùng nhau ghé thăm</option>
             </select>
           </div>
           <div class="journey-form-group">
-            <label class="journey-form-label">Ghi chú kỷ niệm</label>
-            <textarea class="journey-form-textarea" name="note" rows="2" placeholder="Kỷ niệm đẹp hoặc kế hoạch hai đứa..."></textarea>
+            <label class="journey-form-label" for="add-place-note">Ghi chú kỷ niệm</label>
+            <textarea id="add-place-note" class="journey-form-textarea" name="note" rows="2" placeholder="Kỷ niệm đẹp hoặc kế hoạch hai đứa..."></textarea>
           </div>
           <div class="journey-form-actions">
             <button type="button" class="btn-ghost" id="btn-cancel-modal">Hủy</button>
@@ -636,20 +642,20 @@ export function renderLoveJourneyPage(): HTMLElement {
       <div class="journey-modal-card">
         <div class="journey-modal-header">
           <h3 class="journey-modal-title">Chỉnh sửa toạ độ: ${escapeHtml(place.name)}</h3>
-          <button type="button" class="journey-modal-close-btn">&times;</button>
+          <button type="button" class="journey-modal-close-btn" aria-label="Đóng">&times;</button>
         </div>
         <form id="edit-place-form" style="display:flex;flex-direction:column;gap:12px;">
           <div class="journey-form-group">
-            <label class="journey-form-label">Tên địa điểm</label>
-            <input class="journey-form-input" name="name" value="${escapeHtml(place.name)}" required />
+            <label class="journey-form-label" for="edit-place-name">Tên địa điểm</label>
+            <input id="edit-place-name" class="journey-form-input" name="name" value="${escapeHtml(place.name)}" required />
           </div>
           <div class="journey-form-group">
-            <label class="journey-form-label">Ghi chú kỷ niệm</label>
-            <textarea class="journey-form-textarea" name="note" rows="3">${escapeHtml(place.note || '')}</textarea>
+            <label class="journey-form-label" for="edit-place-note">Ghi chú kỷ niệm</label>
+            <textarea id="edit-place-note" class="journey-form-textarea" name="note" rows="3">${escapeHtml(place.note || '')}</textarea>
           </div>
           <div class="journey-form-group">
-            <label class="journey-form-label">Ngày ghé thăm</label>
-            <input class="journey-form-input" type="date" name="visitedDate" value="${place.visitedDate || ''}" />
+            <label class="journey-form-label" for="edit-place-date">Ngày ghé thăm</label>
+            <input id="edit-place-date" class="journey-form-input" type="date" name="visitedDate" value="${escapeHtml(place.visitedDate || '')}" />
           </div>
           <div class="journey-form-actions">
             <button type="button" class="btn-ghost" id="btn-delete-place" style="margin-right:auto;color:#ef4444;">Xóa</button>
@@ -699,16 +705,16 @@ export function renderLoveJourneyPage(): HTMLElement {
       <div class="journey-modal-card">
         <div class="journey-modal-header">
           <h3 class="journey-modal-title">Thêm điều ước cùng nhau</h3>
-          <button type="button" class="journey-modal-close-btn">&times;</button>
+          <button type="button" class="journey-modal-close-btn" aria-label="Đóng">&times;</button>
         </div>
         <form id="add-bucket-form" style="display:flex;flex-direction:column;gap:12px;">
           <div class="journey-form-group">
-            <label class="journey-form-label">Điều ước / Mục tiêu của hai đứa</label>
-            <input class="journey-form-input" name="title" required placeholder="Ví dụ: Cùng đi cắm trại ngắm sao băng..." />
+            <label class="journey-form-label" for="add-bucket-title">Điều ước / Mục tiêu của hai đứa</label>
+            <input id="add-bucket-title" class="journey-form-input" name="title" required placeholder="Ví dụ: Cùng đi cắm trại ngắm sao băng..." />
           </div>
           <div class="journey-form-group">
-            <label class="journey-form-label">Danh mục</label>
-            <select class="journey-form-select" name="category">
+            <label class="journey-form-label" for="add-bucket-category">Danh mục</label>
+            <select id="add-bucket-category" class="journey-form-select" name="category">
               <option value="dating">🍷 Hẹn hò & Ẩm thực</option>
               <option value="travel">✈️ Du lịch & Khám phá</option>
               <option value="cozy">🏡 Đời thường ấm áp</option>
@@ -717,8 +723,8 @@ export function renderLoveJourneyPage(): HTMLElement {
             </select>
           </div>
           <div class="journey-form-group">
-            <label class="journey-form-label">Ghi chú (Tùy chọn)</label>
-            <textarea class="journey-form-textarea" name="note" rows="2" placeholder="Chi tiết hoặc thời điểm dự định..."></textarea>
+            <label class="journey-form-label" for="add-bucket-note">Ghi chú (Tùy chọn)</label>
+            <textarea id="add-bucket-note" class="journey-form-textarea" name="note" rows="2" placeholder="Chi tiết hoặc thời điểm dự định..."></textarea>
           </div>
           <div class="journey-form-actions">
             <button type="button" class="btn-ghost" id="btn-cancel-modal">Hủy</button>
@@ -769,16 +775,16 @@ export function renderLoveJourneyPage(): HTMLElement {
       <div class="journey-modal-card">
         <div class="journey-modal-header">
           <h3 class="journey-modal-title">Chỉnh sửa điều ước</h3>
-          <button type="button" class="journey-modal-close-btn">&times;</button>
+          <button type="button" class="journey-modal-close-btn" aria-label="Đóng">&times;</button>
         </div>
         <form id="edit-bucket-form" style="display:flex;flex-direction:column;gap:12px;">
           <div class="journey-form-group">
-            <label class="journey-form-label">Tiêu đề điều ước</label>
-            <input class="journey-form-input" name="title" value="${escapeHtml(item.title)}" required />
+            <label class="journey-form-label" for="edit-bucket-title">Tiêu đề điều ước</label>
+            <input id="edit-bucket-title" class="journey-form-input" name="title" value="${escapeHtml(item.title)}" required />
           </div>
           <div class="journey-form-group">
-            <label class="journey-form-label">Danh mục</label>
-            <select class="journey-form-select" name="category">
+            <label class="journey-form-label" for="edit-bucket-category">Danh mục</label>
+            <select id="edit-bucket-category" class="journey-form-select" name="category">
               <option value="dating"${item.category === 'dating' ? ' selected' : ''}>🍷 Hẹn hò & Ẩm thực</option>
               <option value="travel"${item.category === 'travel' ? ' selected' : ''}>✈️ Du lịch & Khám phá</option>
               <option value="cozy"${item.category === 'cozy' ? ' selected' : ''}>🏡 Đời thường ấm áp</option>
@@ -787,8 +793,8 @@ export function renderLoveJourneyPage(): HTMLElement {
             </select>
           </div>
           <div class="journey-form-group">
-            <label class="journey-form-label">Ghi chú</label>
-            <textarea class="journey-form-textarea" name="note" rows="2">${escapeHtml(item.note || '')}</textarea>
+            <label class="journey-form-label" for="edit-bucket-note">Ghi chú</label>
+            <textarea id="edit-bucket-note" class="journey-form-textarea" name="note" rows="2">${escapeHtml(item.note || '')}</textarea>
           </div>
           <div class="journey-form-actions">
             <button type="button" class="btn-ghost" id="btn-delete-bucket" style="margin-right:auto;color:#ef4444;">Xóa</button>

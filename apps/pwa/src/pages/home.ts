@@ -741,8 +741,10 @@ export function renderHomePage(): HTMLElement {
   contentArea.appendChild(renderSkeleton());
   page.appendChild(contentArea);
 
-  // Journey Banner — "Bản đồ hẹn hò & 100 Điều ước đôi"
-  const journeyBanner = document.createElement('div');
+  // Journey Banner — "Bản đồ hẹn hò & Điều ước đôi"
+  const journeyBanner = document.createElement('button');
+  journeyBanner.type = 'button';
+  journeyBanner.setAttribute('aria-label', 'Mở bản đồ hẹn hò và điều ước');
   journeyBanner.className = 'home-journey-banner card-solid';
   journeyBanner.style.cssText =
     'margin: 20px 16px 0; padding: 14px 16px; border-radius: 20px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; background: linear-gradient(135deg, rgba(255, 59, 127, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%), var(--surface); border: 1px solid var(--border); transition: transform 0.2s ease, border-color 0.2s ease;';
@@ -752,7 +754,7 @@ export function renderHomePage(): HTMLElement {
         🗺️
       </div>
       <div style="display:flex;flex-direction:column;gap:2px;">
-        <span style="font-size:14px;font-weight:700;color:var(--text-primary);letter-spacing:-0.01em;">Bản đồ hẹn hò & 100 Điều ước</span>
+        <span style="font-size:14px;font-weight:700;color:var(--text-primary);letter-spacing:-0.01em;">Bản đồ hẹn hò & Điều ước</span>
         <span style="font-size:12px;color:var(--text-secondary);">Ghi dấu từng toạ độ và ước mơ của hai đứa ✨</span>
       </div>
     </div>

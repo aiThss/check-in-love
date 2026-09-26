@@ -82,4 +82,61 @@ describe('Love Journey and Bucket List Page', () => {
     expect(bucketTab.classList.contains('active')).toBe(true);
     expect(tabBtns[0].classList.contains('active')).toBe(false);
   });
+
+  it('renders stored place content as text instead of markup', () => {
+    localStorage.setItem(
+      'lovecheck_journey_places',
+      JSON.stringify([
+        {
+          id: 'unsafe-place',
+          name: '<img src=x onerror=alert(1)>',
+          region: 'north',
+          x: 40,
+          y: 20,
+          status: 'wishlist',
+          note: '<strong>private note</strong>',
+        },
+      ]),
+    );
+
+    const page = renderLoveJourneyPage();
+    document.body.appendChild(page);
+
+    expect(page.querySelector('.journey-place-detail-title')?.textContent).toContain(
+      '<img src=x onerror=alert(1)>',
+    );
+    expect(page.querySelector('.journey-place-detail-note')?.textContent?.trim()).toBe(
+      '<strong>private note</strong>',
+    );
+    expect(page.querySelector('.journey-place-detail-title img')).toBeNull();
+    expect(page.querySelector('.journey-place-detail-note strong')).toBeNull();
+  });
+
+  it('clears the visited date when a place returns to the wishlist', () => {
+    localStorage.setItem(
+      'lovecheck_journey_places',
+      JSON.stringify([
+        {
+          id: 'visited-place',
+          name: 'Hà Nội',
+          region: 'north',
+          x: 40,
+          y: 20,
+          status: 'visited',
+          visitedDate: '2025-01-01',
+        },
+      ]),
+    );
+
+    const page = renderLoveJourneyPage();
+    document.body.appendChild(page);
+    page.querySelector<HTMLButtonElement>('#btn-toggle-place-status')?.click();
+
+    expect(page.textContent).not.toContain('Ngày ghé thăm:');
+    const storedPlace = JSON.parse(
+      localStorage.getItem('lovecheck_journey_places') || '[]',
+    )[0];
+    expect(storedPlace.status).toBe('wishlist');
+    expect(storedPlace).not.toHaveProperty('visitedDate');
+  });
 });
