@@ -1,15 +1,22 @@
+import { Map as MapLibreMap, Marker, LngLatBounds } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { navigate } from '../router';
 import { showToast } from '../components/toast';
+import { store } from '../store/index';
 
 export interface LovePlace {
   id: string;
   name: string;
-  region: 'north' | 'central' | 'south' | 'islands';
-  x: number; // 0 - 100%
-  y: number; // 0 - 100%
+  region?: 'north' | 'central' | 'south' | 'islands';
+  latitude: number;
+  longitude: number;
   status: 'visited' | 'wishlist';
   visitedDate?: string;
   note?: string;
+  photoUrl?: string;
+  // Preserved for backward-compatibility with v1 stored items
+  x?: number;
+  y?: number;
 }
 
 export type BucketCategory = 'dating' | 'travel' | 'cozy' | 'adventure' | 'future';
@@ -24,6 +31,47 @@ export interface BucketItem {
   isCustom?: boolean;
 }
 
+export interface KnownPlaceInfo {
+  name: string;
+  latitude: number;
+  longitude: number;
+  region: 'north' | 'central' | 'south' | 'islands';
+}
+
+export const KNOWN_VIETNAM_PLACES: KnownPlaceInfo[] = [
+  { name: 'Hà Nội', latitude: 21.0285, longitude: 105.8542, region: 'north' },
+  { name: 'Sa Pa', latitude: 22.3364, longitude: 103.8438, region: 'north' },
+  { name: 'Hạ Long', latitude: 20.9505, longitude: 107.0734, region: 'north' },
+  { name: 'Ninh Bình', latitude: 20.2506, longitude: 105.9745, region: 'north' },
+  { name: 'Hải Phòng', latitude: 20.8449, longitude: 106.6881, region: 'north' },
+  { name: 'Cát Bà', latitude: 20.7275, longitude: 107.0450, region: 'north' },
+  { name: 'Hà Giang', latitude: 22.8233, longitude: 104.9839, region: 'north' },
+  { name: 'Mộc Châu', latitude: 20.8442, longitude: 104.6494, region: 'north' },
+  { name: 'Tam Đảo', latitude: 21.4583, longitude: 105.6444, region: 'north' },
+  { name: 'Huế', latitude: 16.4637, longitude: 107.5909, region: 'central' },
+  { name: 'Đà Nẵng', latitude: 16.0544, longitude: 108.2022, region: 'central' },
+  { name: 'Hội An', latitude: 15.8801, longitude: 108.3380, region: 'central' },
+  { name: 'Quy Nhơn', latitude: 13.7820, longitude: 109.2197, region: 'central' },
+  { name: 'Nha Trang', latitude: 12.2388, longitude: 109.1967, region: 'central' },
+  { name: 'Đà Lạt', latitude: 11.9404, longitude: 108.4583, region: 'central' },
+  { name: 'Buôn Ma Thuột', latitude: 12.6675, longitude: 108.0383, region: 'central' },
+  { name: 'Pleiku', latitude: 13.9833, longitude: 108.0000, region: 'central' },
+  { name: 'Phan Thiết', latitude: 10.9333, longitude: 108.1000, region: 'south' },
+  { name: 'TP. Hồ Chí Minh', latitude: 10.8231, longitude: 106.6297, region: 'south' },
+  { name: 'Vũng Tàu', latitude: 10.3460, longitude: 107.0843, region: 'south' },
+  { name: 'Cần Thơ', latitude: 10.0452, longitude: 105.7469, region: 'south' },
+  { name: 'Phú Quốc', latitude: 10.2899, longitude: 103.9840, region: 'islands' },
+  { name: 'Côn Đảo', latitude: 8.6835, longitude: 106.6075, region: 'islands' },
+  { name: 'Lý Sơn', latitude: 15.3789, longitude: 109.1235, region: 'islands' },
+  { name: 'Phú Quý', latitude: 10.5186, longitude: 108.9482, region: 'islands' },
+  { name: 'Quảng Bình', latitude: 17.4687, longitude: 106.6225, region: 'central' },
+  { name: 'Nghệ An', latitude: 18.6734, longitude: 105.6813, region: 'north' },
+  { name: 'Thanh Hóa', latitude: 19.8067, longitude: 105.7852, region: 'north' },
+  { name: 'Tây Ninh', latitude: 11.3100, longitude: 106.0983, region: 'south' },
+  { name: 'Bến Tre', latitude: 10.2433, longitude: 106.3756, region: 'south' },
+  { name: 'An Giang', latitude: 10.5216, longitude: 105.1259, region: 'south' },
+];
+
 export const PLACES_STORAGE_KEY = 'lovecheck_journey_places';
 export const BUCKET_STORAGE_KEY = 'lovecheck_journey_bucket';
 export const MIGRATION_SEED_CLEANUP_KEY = 'lovecheck_journey_seed_cleanup_v1';
@@ -33,7 +81,7 @@ export const MIGRATION_SEED_CLEANUP_KEY = 'lovecheck_journey_seed_cleanup_v1';
  * Kept strictly as reference data for safe one-time migration cleanup.
  * Never used as defaults for new users.
  */
-const LEGACY_SEED_PLACES: LovePlace[] = [
+const LEGACY_SEED_PLACES = [
   { id: 'sapa', name: 'Sa Pa', region: 'north', x: 34, y: 12, status: 'wishlist', note: 'Săn mây Fansipan và nắm tay nhau giữa sương mù' },
   { id: 'hanoi', name: 'Hà Nội', region: 'north', x: 48, y: 18, status: 'visited', visitedDate: '2024-10-10', note: 'Dạo quanh Hồ Gươm mùa hoa sữa và thưởng thức cà phê trứng' },
   { id: 'halong', name: 'Hạ Long', region: 'north', x: 59, y: 19, status: 'wishlist', note: 'Đi du thuyền ngắm hoàng hôn buông xuống vịnh' },
@@ -49,7 +97,7 @@ const LEGACY_SEED_PLACES: LovePlace[] = [
   { id: 'phuquoc', name: 'Phú Quốc', region: 'islands', x: 33, y: 92, status: 'wishlist', note: 'Ngắm hoàng hôn lộng lẫy và thưởng thức hải sản đêm' },
 ];
 
-const LEGACY_SEED_BUCKET: BucketItem[] = [
+const LEGACY_SEED_BUCKET = [
   { id: 'b1', title: 'Ăn tối lãng mạn dưới ánh nến tại nhà', category: 'dating', completed: true, completedDate: '2024-11-15', note: 'Tự tay nấu mì ý và cắm hoa xinh' },
   { id: 'b2', title: 'Cùng đi xem một bộ phim suất chiếu nửa đêm', category: 'dating', completed: true, completedDate: '2024-10-31', note: 'Rạp vắng tanh chỉ có hai đứa' },
   { id: 'b3', title: 'Hẹn hò tại quán cà phê sách yên tĩnh', category: 'dating', completed: false, note: 'Mỗi đứa đọc một cuốn sách và nhâm nhi trà nóng' },
@@ -75,16 +123,84 @@ const CATEGORY_MAP: Record<BucketCategory, { label: string; icon: string }> = {
   future: { label: 'Tương lai', icon: '💍' },
 };
 
+/**
+ * Free pastel basemap styles using Carto Positron (light) & Dark Matter (dark) raster tiles.
+ * Extremely high-speed, zero API key required, perfectly matches the romantic travel diary aesthetic.
+ */
+const CARTO_POSITRON_STYLE = {
+  version: 8,
+  sources: {
+    'carto-tiles': {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png',
+        'https://d.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png',
+      ],
+      tileSize: 256,
+      attribution: '&copy; CARTO &copy; OpenStreetMap',
+    },
+  },
+  layers: [
+    {
+      id: 'carto-tiles-layer',
+      type: 'raster',
+      source: 'carto-tiles',
+      minzoom: 0,
+      maxzoom: 20,
+    },
+  ],
+};
+
+const CARTO_DARK_STYLE = {
+  version: 8,
+  sources: {
+    'carto-tiles': {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
+        'https://d.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
+      ],
+      tileSize: 256,
+      attribution: '&copy; CARTO &copy; OpenStreetMap',
+    },
+  },
+  layers: [
+    {
+      id: 'carto-tiles-layer',
+      type: 'raster',
+      source: 'carto-tiles',
+      minzoom: 0,
+      maxzoom: 20,
+    },
+  ],
+};
+
+function normalizeText(str: string): string {
+  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function isExactUnmodifiedSeedPlaces(items: unknown[]): boolean {
   if (!Array.isArray(items) || items.length === 0) return true;
   const seedMap = new Map(LEGACY_SEED_PLACES.map((p) => [p.id, p]));
   for (const item of items) {
     if (!item || typeof item !== 'object') return false;
     const p = item as Partial<LovePlace>;
-    if (!p.id || !seedMap.has(p.id)) return false; // Contains custom/foreign ID -> preserve!
+    if (!p.id || !seedMap.has(p.id)) return false;
     const original = seedMap.get(p.id)!;
     if (p.name !== original.name) return false;
-    if (p.region !== original.region) return false;
     if (p.status !== original.status) return false;
     if ((p.note || '') !== (original.note || '')) return false;
     if ((p.visitedDate || '') !== (original.visitedDate || '')) return false;
@@ -98,7 +214,7 @@ function isExactUnmodifiedSeedBucket(items: unknown[]): boolean {
   for (const item of items) {
     if (!item || typeof item !== 'object') return false;
     const b = item as Partial<BucketItem>;
-    if (!b.id || !seedMap.has(b.id)) return false; // Contains custom/foreign ID -> preserve!
+    if (!b.id || !seedMap.has(b.id)) return false;
     const original = seedMap.get(b.id)!;
     if (b.title !== original.title) return false;
     if (b.category !== original.category) return false;
@@ -123,7 +239,7 @@ export function runSeedCleanupMigration(): void {
           localStorage.setItem(PLACES_STORAGE_KEY, JSON.stringify([]));
         }
       } catch {
-        // If unparseable, do not blindly delete
+        // preserve on parse error
       }
     }
 
@@ -135,14 +251,81 @@ export function runSeedCleanupMigration(): void {
           localStorage.setItem(BUCKET_STORAGE_KEY, JSON.stringify([]));
         }
       } catch {
-        // If unparseable, do not blindly delete
+        // preserve on parse error
       }
     }
 
     localStorage.setItem(MIGRATION_SEED_CLEANUP_KEY, 'true');
   } catch {
-    // Storage quota or sandboxing errors
+    // ignore sandbox/quota errors
   }
+}
+
+export function migrateLegacyPlaces(rawList: unknown[]): LovePlace[] {
+  if (!Array.isArray(rawList)) return [];
+
+  let hasMigrationChanges = false;
+  const migrated: LovePlace[] = [];
+
+  for (const item of rawList) {
+    if (!item || typeof item !== 'object') continue;
+    const p = item as Partial<LovePlace>;
+    if (!p.id || !p.name) continue;
+
+    let lat = typeof p.latitude === 'number' && !Number.isNaN(p.latitude) ? p.latitude : undefined;
+    let lng = typeof p.longitude === 'number' && !Number.isNaN(p.longitude) ? p.longitude : undefined;
+    let region = p.region;
+
+    // Convert legacy x, y percentage schema to real geographical coordinates
+    if (lat === undefined || lng === undefined) {
+      hasMigrationChanges = true;
+      const normalizedName = normalizeText(p.name);
+      const match = KNOWN_VIETNAM_PLACES.find((k) => {
+        const kn = normalizeText(k.name);
+        return kn === normalizedName || normalizedName.includes(kn) || kn.includes(normalizedName);
+      });
+
+      if (match) {
+        lat = match.latitude;
+        lng = match.longitude;
+        if (!region) region = match.region;
+      } else if (typeof p.x === 'number' && typeof p.y === 'number') {
+        // Interpolate within Vietnam bounding box [102.0, 8.5] to [109.5, 23.4]
+        lat = 23.4 - (p.y / 100) * (23.4 - 8.5);
+        lng = 102.0 + (p.x / 100) * (109.5 - 102.0);
+      } else {
+        switch (region) {
+          case 'north': lat = 21.0285; lng = 105.8542; break;
+          case 'central': lat = 16.0544; lng = 108.2022; break;
+          case 'south': lat = 10.8231; lng = 106.6297; break;
+          case 'islands': lat = 10.2899; lng = 103.9840; break;
+          default: lat = 16.0544; lng = 108.2022; region = 'central'; break;
+        }
+      }
+    }
+
+    const place: LovePlace = {
+      id: String(p.id),
+      name: String(p.name),
+      region: region || 'central',
+      latitude: Number(lat.toFixed(6)),
+      longitude: Number(lng.toFixed(6)),
+      status: p.status === 'visited' ? 'visited' : 'wishlist',
+      visitedDate: typeof p.visitedDate === 'string' ? p.visitedDate : undefined,
+      note: typeof p.note === 'string' ? p.note : undefined,
+      photoUrl: typeof p.photoUrl === 'string' ? p.photoUrl : undefined,
+      x: p.x,
+      y: p.y,
+    };
+
+    migrated.push(place);
+  }
+
+  if (hasMigrationChanges) {
+    saveStoredPlaces(migrated);
+  }
+
+  return migrated;
 }
 
 export function isValidLovePlace(item: unknown): item is LovePlace {
@@ -150,8 +333,10 @@ export function isValidLovePlace(item: unknown): item is LovePlace {
   const p = item as Record<string, unknown>;
   if (typeof p.id !== 'string' || !p.id.trim()) return false;
   if (typeof p.name !== 'string' || !p.name.trim()) return false;
-  if (p.region !== 'north' && p.region !== 'central' && p.region !== 'south' && p.region !== 'islands') return false;
-  if (typeof p.x !== 'number' || Number.isNaN(p.x) || typeof p.y !== 'number' || Number.isNaN(p.y)) return false;
+  const hasLatLng = typeof p.latitude === 'number' && !Number.isNaN(p.latitude)
+    && typeof p.longitude === 'number' && !Number.isNaN(p.longitude);
+  const hasXY = typeof p.x === 'number' && typeof p.y === 'number';
+  if (!hasLatLng && !hasXY) return false;
   if (p.status !== 'visited' && p.status !== 'wishlist') return false;
   if (p.visitedDate !== undefined && typeof p.visitedDate !== 'string') return false;
   if (p.note !== undefined && typeof p.note !== 'string') return false;
@@ -177,7 +362,7 @@ export function loadStoredPlaces(): LovePlace[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isValidLovePlace);
+    return migrateLegacyPlaces(parsed);
   } catch {
     return [];
   }
@@ -231,6 +416,26 @@ function triggerHeartSparkles(originX: number, originY: number): void {
   }
 }
 
+function isDarkTheme(): boolean {
+  return document.documentElement.getAttribute('data-theme') === 'dark'
+    || (store.get().theme === 'dark')
+    || (store.get().theme === 'system' && Boolean(window.matchMedia?.('(prefers-color-scheme: dark)').matches));
+}
+
+function getJourneyLineCoordinates(places: LovePlace[]): [number, number][] {
+  return places
+    .filter((p) => p.status === 'visited')
+    .sort((a, b) => {
+      if (a.visitedDate && b.visitedDate) {
+        return a.visitedDate.localeCompare(b.visitedDate);
+      }
+      if (a.visitedDate) return -1;
+      if (b.visitedDate) return 1;
+      return 0;
+    })
+    .map((p) => [p.longitude, p.latitude]);
+}
+
 export function renderLoveJourneyPage(): HTMLElement {
   const root = document.createElement('div') as HTMLElement & {
     destroy?: () => void;
@@ -240,10 +445,14 @@ export function renderLoveJourneyPage(): HTMLElement {
   let places = loadStoredPlaces();
   let bucketItems = loadStoredBucket();
   let selectedPlaceId: string = places[0]?.id || '';
-  let activeTab: 'map' | 'bucket' = 'map';
+  let activeTab: 'map' | 'bucket' = window.location.pathname.includes('bucket') ? 'bucket' : 'map';
   let activeFilter: 'all' | 'incomplete' | 'completed' | BucketCategory = 'all';
+  let activeMapFilter: 'all' | 'visited' | 'wishlist' = 'all';
 
-  // 1. Header
+  let map: MapLibreMap | null = null;
+  let activeMarkers: Marker[] = [];
+
+  // 1. Hero Header
   const hero = document.createElement('header');
   hero.className = 'journey-hero';
   hero.innerHTML = `
@@ -255,7 +464,7 @@ export function renderLoveJourneyPage(): HTMLElement {
     </div>
     <h1 class="journey-title">Bản đồ hẹn hò & Điều ước</h1>
     <p class="journey-subtitle">
-      Từng vùng đất hai đứa đã đi qua và những ước mơ ngọt ngào đang chờ cùng nhau chạm tới.
+      Từng vùng đất hai đứa đã cùng nhau đặt chân tới và những ước mơ ngọt ngào đang chờ hai bạn chạm tới.
     </p>
     <div class="journey-stats-strip">
       <div class="journey-stat-card">
@@ -288,10 +497,10 @@ export function renderLoveJourneyPage(): HTMLElement {
   const tabContainer = document.createElement('div');
   tabContainer.className = 'journey-tabs';
   tabContainer.innerHTML = `
-    <button type="button" class="journey-tab-btn active" data-tab="map">
+    <button type="button" class="journey-tab-btn${activeTab === 'map' ? ' active' : ''}" data-tab="map">
       <span>🗺️</span> Bản đồ toạ độ
     </button>
-    <button type="button" class="journey-tab-btn" data-tab="bucket">
+    <button type="button" class="journey-tab-btn${activeTab === 'bucket' ? ' active' : ''}" data-tab="bucket">
       <span>✨</span> Điều ước
     </button>
   `;
@@ -314,7 +523,7 @@ export function renderLoveJourneyPage(): HTMLElement {
   bucketPanel.id = 'journey-bucket-section';
   mainGrid.appendChild(bucketPanel);
 
-  // Handle Tab Switch on Mobile
+  // Tab switcher
   tabContainer.querySelectorAll<HTMLButtonElement>('.journey-tab-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab as 'map' | 'bucket';
@@ -332,14 +541,20 @@ export function renderLoveJourneyPage(): HTMLElement {
       mapPanel.style.display = activeTab === 'map' ? 'flex' : 'none';
       bucketPanel.style.display = activeTab === 'bucket' ? 'flex' : 'none';
     }
+    if (activeTab === 'map' && map) {
+      setTimeout(() => {
+        try {
+          map?.resize();
+        } catch {
+          // ignore
+        }
+      }, 50);
+    }
   }
 
   window.addEventListener('resize', updateTabVisibility);
-  root.destroy = () => {
-    window.removeEventListener('resize', updateTabVisibility);
-  };
 
-  // Update Stats Counter
+  // Stats updater
   function updateStats(): void {
     const visitedPlaces = places.filter((p) => p.status === 'visited').length;
     const completedBucket = bucketItems.filter((b) => b.completed).length;
@@ -374,180 +589,404 @@ export function renderLoveJourneyPage(): HTMLElement {
         </button>
       </div>
 
-      <div class="journey-map-canvas-wrap" id="journey-map-canvas">
-        <svg class="journey-map-svg" viewBox="0 0 100 135" preserveAspectRatio="none" aria-label="Bản đồ Việt Nam">
-          <!-- Stylized Map Contours -->
-          <path d="M 28 8 Q 48 6, 68 18 Q 62 28, 48 30 Q 52 42, 60 50 Q 72 65, 76 75 Q 70 85, 48 88 Q 38 90, 32 94 Q 28 92, 34 85 Q 46 80, 52 75 Q 56 60, 50 45 Q 42 35, 30 25 Z"
-            fill="rgba(255, 59, 127, 0.07)"
-            stroke="rgba(255, 59, 127, 0.28)"
-            stroke-width="1.2"
-            stroke-dasharray="2,2"
-          />
-          <!-- Coastline waves -->
-          <path d="M 72 25 Q 76 35, 82 45 Q 86 60, 84 75" fill="none" stroke="rgba(78, 168, 222, 0.28)" stroke-width="0.8" />
-          <path d="M 76 30 Q 80 40, 86 50 Q 90 65, 88 80" fill="none" stroke="rgba(78, 168, 222, 0.16)" stroke-width="0.6" />
-          <!-- Islands -->
-          <circle cx="82" cy="58" r="2.2" fill="rgba(255, 59, 127, 0.25)" />
-          <circle cx="85" cy="62" r="1.6" fill="rgba(255, 59, 127, 0.25)" />
-          <circle cx="86" cy="88" r="2.4" fill="rgba(255, 59, 127, 0.25)" />
-          <text x="86" y="55" font-size="3" fill="var(--text-secondary)" opacity="0.6">Hoàng Sa</text>
-          <text x="88" y="85" font-size="3" fill="var(--text-secondary)" opacity="0.6">Trường Sa</text>
-        </svg>
+      <div class="journey-map-canvas-wrap" id="journey-map-wrap">
+        <div id="journey-map-container" class="journey-map-container"></div>
 
-        <!-- Dynamic Pins -->
-        <div id="journey-pins-container"></div>
+        <!-- Floating Map Controls Bar -->
+        <div class="journey-map-floating-bar" aria-label="Bộ điều khiển bản đồ">
+          <div class="journey-map-filter-group">
+            <button type="button" class="journey-map-filter-btn${activeMapFilter === 'all' ? ' active' : ''}" data-map-filter="all">Tất cả</button>
+            <button type="button" class="journey-map-filter-btn${activeMapFilter === 'visited' ? ' active' : ''}" data-map-filter="visited">💖 Đã đi</button>
+            <button type="button" class="journey-map-filter-btn${activeMapFilter === 'wishlist' ? ' active' : ''}" data-map-filter="wishlist">✨ Ấp ủ</button>
+          </div>
+          <div class="journey-map-actions-group">
+            <button type="button" class="journey-map-ctrl-btn" id="journey-btn-reset" title="Toàn cảnh">🎯</button>
+            <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-in" title="Phóng to">+</button>
+            <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-out" title="Thu nhỏ">−</button>
+          </div>
+        </div>
+
+        <!-- Selected Place Floating Card or Empty State Overlay -->
+        <div id="journey-selected-place-slot" class="journey-selected-place-slot"></div>
       </div>
-
-      <!-- Selected Place Detail Card or Empty State -->
-      <div id="journey-selected-place-slot"></div>
     `;
-
-    const pinsContainer = mapPanel.querySelector<HTMLElement>('#journey-pins-container');
-    const selectedSlot = mapPanel.querySelector<HTMLElement>('#journey-selected-place-slot');
-
-    if (pinsContainer) {
-      pinsContainer.innerHTML = '';
-      places.forEach((place) => {
-        const pinBtn = document.createElement('button');
-        pinBtn.type = 'button';
-        pinBtn.className = `journey-map-pin journey-pin-${place.status}`;
-        pinBtn.style.left = `${place.x}%`;
-        pinBtn.style.top = `${place.y}%`;
-        pinBtn.setAttribute('aria-label', `${place.name} - ${place.status === 'visited' ? 'Đã đi' : 'Ấp ủ'}`);
-
-        const isVisited = place.status === 'visited';
-        pinBtn.innerHTML = `
-          <div class="journey-pin-dot">
-            ${isVisited ? '❤️' : '🚩'}
-            ${place.id === selectedPlaceId ? '<div class="journey-pin-pulse"></div>' : ''}
-          </div>
-          <span class="journey-pin-label"></span>
-        `;
-        const labelEl = pinBtn.querySelector('.journey-pin-label');
-        if (labelEl) labelEl.textContent = place.name;
-
-        pinBtn.addEventListener('click', () => {
-          selectedPlaceId = place.id;
-          renderMapPanel();
-        });
-
-        pinsContainer.appendChild(pinBtn);
-      });
-    }
-
-    // Render detail card for selected place or empty state if places is empty
-    const selectedPlace = places.find((p) => p.id === selectedPlaceId) || places[0];
-
-    if (selectedSlot) {
-      if (!selectedPlace || places.length === 0) {
-        selectedSlot.innerHTML = `
-          <div class="journey-map-empty-state">
-            <span class="journey-empty-icon" aria-hidden="true">🗺️</span>
-            <h3 class="journey-empty-title">Chưa có điểm đến nào</h3>
-            <p class="journey-empty-text">Thêm nơi hai bạn đã đi hoặc đang muốn cùng nhau khám phá.</p>
-            <button type="button" class="btn-primary" id="btn-empty-add-place" style="margin-top:6px;padding:8px 16px;font-size:13px;">
-              + Thêm điểm đến
-            </button>
-          </div>
-        `;
-        selectedSlot.querySelector('#btn-empty-add-place')?.addEventListener('click', () => {
-          openAddPlaceModal();
-        });
-      } else {
-        const isVisited = selectedPlace.status === 'visited';
-        const card = document.createElement('div');
-        card.className = 'journey-place-detail-card';
-
-        const headerDiv = document.createElement('div');
-        headerDiv.className = 'journey-place-detail-header';
-
-        const leftHeader = document.createElement('div');
-        const titleEl = document.createElement('h3');
-        titleEl.className = 'journey-place-detail-title';
-        titleEl.textContent = `📍 ${selectedPlace.name}`;
-        const regionEl = document.createElement('small');
-        regionEl.style.cssText = 'color:var(--text-secondary);font-size:11px;';
-        regionEl.textContent = `Khu vực: ${formatRegion(selectedPlace.region)}`;
-        leftHeader.appendChild(titleEl);
-        leftHeader.appendChild(regionEl);
-
-        const statusBadge = document.createElement('span');
-        statusBadge.className = `journey-place-detail-status ${selectedPlace.status}`;
-        statusBadge.textContent = isVisited ? '💖 Đã cùng nhau ghé' : '✨ Điểm đến ấp ủ';
-
-        headerDiv.appendChild(leftHeader);
-        headerDiv.appendChild(statusBadge);
-        card.appendChild(headerDiv);
-
-        const noteP = document.createElement('p');
-        noteP.className = 'journey-place-detail-note';
-        noteP.textContent = selectedPlace.note || 'Chưa có ghi chú cho toạ độ này.';
-        card.appendChild(noteP);
-
-        if (selectedPlace.visitedDate) {
-          const dateRow = document.createElement('div');
-          dateRow.style.cssText = 'font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;';
-          const labelSpan = document.createElement('span');
-          labelSpan.textContent = '📅 Ngày ghé thăm:';
-          const valStrong = document.createElement('strong');
-          valStrong.textContent = selectedPlace.visitedDate;
-          dateRow.appendChild(labelSpan);
-          dateRow.appendChild(valStrong);
-          card.appendChild(dateRow);
-        }
-
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'journey-place-detail-actions';
-
-        const toggleBtn = document.createElement('button');
-        toggleBtn.type = 'button';
-        toggleBtn.className = 'btn-primary';
-        toggleBtn.id = 'btn-toggle-place-status';
-        toggleBtn.style.cssText = 'flex:1;padding:9px;font-size:12px;';
-        toggleBtn.textContent = isVisited ? 'Đánh dấu thành ấp ủ 🚩' : 'Đánh dấu đã ghé thăm 💖';
-        toggleBtn.addEventListener('click', (e) => {
-          const nextStatus = isVisited ? 'wishlist' : 'visited';
-          selectedPlace.status = nextStatus;
-          if (nextStatus === 'wishlist') selectedPlace.visitedDate = undefined;
-          if (nextStatus === 'visited' && !selectedPlace.visitedDate) {
-            const now = new Date();
-            selectedPlace.visitedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-          }
-          saveStoredPlaces(places);
-          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-          triggerHeartSparkles(rect.left + rect.width / 2, rect.top);
-          showToast(
-            nextStatus === 'visited'
-              ? `Tuyệt vời! Đã ghi dấu toạ độ ${selectedPlace.name} 💖`
-              : `Đã chuyển ${selectedPlace.name} về danh sách ấp ủ`,
-            'success',
-          );
-          renderMapPanel();
-          updateStats();
-        });
-
-        const editBtn = document.createElement('button');
-        editBtn.type = 'button';
-        editBtn.className = 'btn-ghost';
-        editBtn.id = 'btn-edit-place-note';
-        editBtn.style.cssText = 'padding:9px 12px;font-size:12px;';
-        editBtn.textContent = '✏️ Sửa';
-        editBtn.addEventListener('click', () => {
-          openEditPlaceModal(selectedPlace);
-        });
-
-        actionsDiv.appendChild(toggleBtn);
-        actionsDiv.appendChild(editBtn);
-        card.appendChild(actionsDiv);
-
-        selectedSlot.innerHTML = '';
-        selectedSlot.appendChild(card);
-      }
-    }
 
     mapPanel.querySelector('#btn-add-place')?.addEventListener('click', () => {
       openAddPlaceModal();
     });
+
+    // Map Controls Events
+    mapPanel.querySelectorAll<HTMLButtonElement>('.journey-map-filter-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeMapFilter = btn.dataset.mapFilter as 'all' | 'visited' | 'wishlist';
+        mapPanel.querySelectorAll('.journey-map-filter-btn').forEach((b) => b.classList.toggle('active', b === btn));
+        syncMarkers();
+        setupJourneyRouteLayer();
+      });
+    });
+
+    mapPanel.querySelector('#journey-btn-zoom-in')?.addEventListener('click', () => {
+      try {
+        map?.zoomIn({ duration: 300 });
+      } catch {
+        // ignore
+      }
+    });
+
+    mapPanel.querySelector('#journey-btn-zoom-out')?.addEventListener('click', () => {
+      try {
+        map?.zoomOut({ duration: 300 });
+      } catch {
+        // ignore
+      }
+    });
+
+    mapPanel.querySelector('#journey-btn-reset')?.addEventListener('click', () => {
+      fitMapToPlaces();
+    });
+
+    initMapInstance();
+    renderSelectedPlaceCard();
+  }
+
+  function initMapInstance(): void {
+    const mapContainer = mapPanel.querySelector<HTMLElement>('#journey-map-container');
+    if (!mapContainer) return;
+
+    if (map) {
+      try {
+        map.remove();
+      } catch {
+        // ignore
+      }
+      map = null;
+    }
+
+    const initialStyle = isDarkTheme() ? CARTO_DARK_STYLE : CARTO_POSITRON_STYLE;
+
+    try {
+      map = new MapLibreMap({
+        container: mapContainer,
+        style: initialStyle as any,
+        center: [106.8, 16.2],
+        zoom: 5.3,
+        minZoom: 3.5,
+        maxZoom: 18,
+        attributionControl: false,
+      });
+
+      map.on('load', () => {
+        setupJourneyRouteLayer();
+        fitMapToPlaces();
+      });
+
+      // Synchronously attach markers so DOM pins are available immediately
+      syncMarkers();
+    } catch {
+      // In environments where WebGL is unavailable (e.g. jsdom), safely fallback
+      syncMarkers();
+    }
+  }
+
+  function setupJourneyRouteLayer(): void {
+    if (!map) return;
+    try {
+      const coords = getJourneyLineCoordinates(places);
+      const geojson: any = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: coords,
+        },
+      };
+
+      if (map.getSource('journey-route')) {
+        (map.getSource('journey-route') as any).setData(geojson);
+        return;
+      }
+
+      map.addSource('journey-route', {
+        type: 'geojson',
+        data: geojson,
+      });
+
+      map.addLayer({
+        id: 'journey-route-glow',
+        type: 'line',
+        source: 'journey-route',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-color': '#ff3b7f',
+          'line-width': 6,
+          'line-opacity': 0.28,
+          'line-blur': 2.5,
+        },
+      });
+
+      map.addLayer({
+        id: 'journey-route-line',
+        type: 'line',
+        source: 'journey-route',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-color': '#ff3b7f',
+          'line-width': 2.8,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.9,
+        },
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  function fitMapToPlaces(): void {
+    if (!map) return;
+    try {
+      if (places.length === 0) {
+        map.fitBounds([[102.14, 8.18], [109.46, 23.39]], { padding: 30, duration: 800 });
+        return;
+      }
+      const bounds = new LngLatBounds();
+      places.forEach((p) => {
+        bounds.extend([p.longitude, p.latitude]);
+      });
+      map.fitBounds(bounds, {
+        padding: { top: 60, bottom: 120, left: 40, right: 40 },
+        maxZoom: 10,
+        duration: 800,
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  function syncMarkers(): void {
+    // Clean up active markers
+    activeMarkers.forEach((m) => {
+      try {
+        m.remove();
+      } catch {
+        // ignore
+      }
+    });
+    activeMarkers = [];
+
+    const mapContainer = mapPanel.querySelector<HTMLElement>('#journey-map-container');
+    if (!mapContainer) return;
+
+    // Clean up any fallback pins directly inside mapContainer
+    mapContainer.querySelectorAll('.journey-map-pin').forEach((el) => el.remove());
+
+    const visiblePlaces = places.filter((p) => {
+      if (activeMapFilter === 'visited') return p.status === 'visited';
+      if (activeMapFilter === 'wishlist') return p.status === 'wishlist';
+      return true;
+    });
+
+    visiblePlaces.forEach((place) => {
+      const isSelected = place.id === selectedPlaceId;
+      const isVisited = place.status === 'visited';
+
+      const pinBtn = document.createElement('button');
+      pinBtn.type = 'button';
+      pinBtn.className = `journey-map-pin journey-pin-${place.status}${isSelected ? ' is-selected' : ''}`;
+      pinBtn.setAttribute('aria-label', `${place.name} - ${isVisited ? 'Đã đi' : 'Ấp ủ'}`);
+
+      if (isVisited && place.photoUrl) {
+        pinBtn.innerHTML = `
+          <div class="journey-pin-avatar">
+            <img src="${escapeHtml(place.photoUrl)}" alt="${escapeHtml(place.name)}" />
+            <span class="journey-pin-mini-badge">💖</span>
+            ${isSelected ? '<div class="journey-pin-pulse"></div>' : ''}
+          </div>
+          <span class="journey-pin-label">${escapeHtml(place.name)}</span>
+        `;
+      } else if (isVisited) {
+        pinBtn.innerHTML = `
+          <div class="journey-pin-dot visited">
+            <svg class="journey-pin-heart-svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+            ${isSelected ? '<div class="journey-pin-pulse"></div>' : ''}
+          </div>
+          <span class="journey-pin-label">${escapeHtml(place.name)}</span>
+        `;
+      } else {
+        pinBtn.innerHTML = `
+          <div class="journey-pin-dot wishlist">
+            <svg class="journey-pin-star-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            ${isSelected ? '<div class="journey-pin-pulse"></div>' : ''}
+          </div>
+          <span class="journey-pin-label">${escapeHtml(place.name)}</span>
+        `;
+      }
+
+      pinBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectedPlaceId = place.id;
+        syncMarkers();
+        renderSelectedPlaceCard();
+        if (map) {
+          try {
+            map.easeTo({
+              center: [place.longitude, place.latitude],
+              zoom: Math.max(map.getZoom(), 8.5),
+              duration: 600,
+            });
+          } catch {
+            // ignore
+          }
+        }
+      });
+
+      if (map) {
+        try {
+          const marker = new Marker({ element: pinBtn, anchor: 'center' })
+            .setLngLat([place.longitude, place.latitude])
+            .addTo(map);
+          activeMarkers.push(marker);
+        } catch {
+          mapContainer.appendChild(pinBtn);
+        }
+      } else {
+        mapContainer.appendChild(pinBtn);
+      }
+    });
+  }
+
+  function renderSelectedPlaceCard(): void {
+    const selectedSlot = mapPanel.querySelector<HTMLElement>('#journey-selected-place-slot');
+    if (!selectedSlot) return;
+
+    if (places.length === 0) {
+      selectedSlot.innerHTML = `
+        <div class="journey-map-empty-state">
+          <span class="journey-empty-icon" aria-hidden="true">🗺️</span>
+          <h3 class="journey-empty-title">Chưa có điểm đến nào</h3>
+          <p class="journey-empty-text">Thêm nơi hai bạn đã đi hoặc đang muốn cùng nhau khám phá.</p>
+          <button type="button" class="btn-primary" id="btn-empty-add-place" style="margin-top:6px;padding:8px 16px;font-size:13px;">
+            + Thêm điểm đến
+          </button>
+        </div>
+      `;
+      selectedSlot.querySelector('#btn-empty-add-place')?.addEventListener('click', () => {
+        openAddPlaceModal();
+      });
+      return;
+    }
+
+    const selectedPlace = places.find((p) => p.id === selectedPlaceId) || places[0];
+    selectedPlaceId = selectedPlace.id;
+    const isVisited = selectedPlace.status === 'visited';
+
+    const card = document.createElement('div');
+    card.className = 'journey-place-detail-card';
+
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'journey-place-detail-header';
+
+    const leftHeader = document.createElement('div');
+    const titleEl = document.createElement('h3');
+    titleEl.className = 'journey-place-detail-title';
+    titleEl.textContent = `📍 ${selectedPlace.name}`;
+    const regionEl = document.createElement('small');
+    regionEl.style.cssText = 'color:var(--text-secondary);font-size:11px;';
+    regionEl.textContent = `Khu vực: ${formatRegion(selectedPlace.region)}`;
+    leftHeader.appendChild(titleEl);
+    leftHeader.appendChild(regionEl);
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `journey-place-detail-status ${selectedPlace.status}`;
+    statusBadge.textContent = isVisited ? '💖 Đã cùng nhau ghé' : '✨ Điểm đến ấp ủ';
+
+    headerDiv.appendChild(leftHeader);
+    headerDiv.appendChild(statusBadge);
+    card.appendChild(headerDiv);
+
+    if (selectedPlace.photoUrl) {
+      const cover = document.createElement('img');
+      cover.className = 'journey-place-cover-img';
+      cover.src = selectedPlace.photoUrl;
+      cover.alt = selectedPlace.name;
+      cover.loading = 'lazy';
+      card.appendChild(cover);
+    }
+
+    const noteP = document.createElement('p');
+    noteP.className = 'journey-place-detail-note';
+    noteP.textContent = selectedPlace.note || 'Chưa có ghi chú cho toạ độ này.';
+    card.appendChild(noteP);
+
+    if (selectedPlace.visitedDate) {
+      const dateRow = document.createElement('div');
+      dateRow.style.cssText = 'font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = '📅 Ngày ghé thăm:';
+      const valStrong = document.createElement('strong');
+      valStrong.textContent = selectedPlace.visitedDate;
+      dateRow.appendChild(labelSpan);
+      dateRow.appendChild(valStrong);
+      card.appendChild(dateRow);
+    }
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'journey-place-detail-actions';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'btn-primary';
+    toggleBtn.id = 'btn-toggle-place-status';
+    toggleBtn.style.cssText = 'flex:1;padding:9px;font-size:12px;';
+    toggleBtn.textContent = isVisited ? 'Đánh dấu thành ấp ủ 🚩' : 'Đánh dấu đã ghé thăm 💖';
+    toggleBtn.addEventListener('click', (e) => {
+      const nextStatus = isVisited ? 'wishlist' : 'visited';
+      selectedPlace.status = nextStatus;
+      if (nextStatus === 'wishlist') selectedPlace.visitedDate = undefined;
+      if (nextStatus === 'visited' && !selectedPlace.visitedDate) {
+        const now = new Date();
+        selectedPlace.visitedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      }
+      saveStoredPlaces(places);
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      triggerHeartSparkles(rect.left + rect.width / 2, rect.top);
+      showToast(
+        nextStatus === 'visited'
+          ? `Tuyệt vời! Đã ghi dấu toạ độ ${selectedPlace.name} 💖`
+          : `Đã chuyển ${selectedPlace.name} về danh sách ấp ủ`,
+        'success',
+      );
+      syncMarkers();
+      setupJourneyRouteLayer();
+      renderSelectedPlaceCard();
+      updateStats();
+    });
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn-ghost';
+    editBtn.id = 'btn-edit-place-note';
+    editBtn.style.cssText = 'padding:9px 12px;font-size:12px;';
+    editBtn.textContent = '✏️ Sửa';
+    editBtn.addEventListener('click', () => {
+      openEditPlaceModal(selectedPlace);
+    });
+
+    actionsDiv.appendChild(toggleBtn);
+    actionsDiv.appendChild(editBtn);
+    card.appendChild(actionsDiv);
+
+    selectedSlot.innerHTML = '';
+    selectedSlot.appendChild(card);
   }
 
   // ── Render Bucket List Panel ─────────────────────────────────
@@ -601,7 +1040,6 @@ export function renderLoveJourneyPage(): HTMLElement {
       <div class="journey-bucket-list" id="journey-bucket-list-slot"></div>
     `;
 
-    // Filter Buttons
     bucketPanel.querySelectorAll<HTMLButtonElement>('.journey-filter-pill').forEach((btn) => {
       btn.addEventListener('click', () => {
         activeFilter = btn.dataset.filter as 'all' | 'incomplete' | 'completed' | BucketCategory;
@@ -764,9 +1202,19 @@ export function renderLoveJourneyPage(): HTMLElement {
           <button type="button" class="journey-modal-close-btn" aria-label="Đóng">&times;</button>
         </div>
         <form id="add-place-form" style="display:flex;flex-direction:column;gap:12px;">
-          <div class="journey-form-group">
+          <div class="journey-form-group" style="position:relative;">
             <label class="journey-form-label" for="add-place-name">Tên địa điểm / Thành phố</label>
-            <input id="add-place-name" class="journey-form-input" name="name" required placeholder="Ví dụ: Côn Đảo, Cát Bà, Buôn Ma Thuột..." />
+            <input id="add-place-name" class="journey-form-input" name="name" required placeholder="Ví dụ: Đà Lạt, Sa Pa, Phú Quốc, Hội An..." autocomplete="off" />
+            <div id="add-place-autocomplete" class="journey-autocomplete-menu" style="display:none;"></div>
+            <div class="journey-chip-group">
+              <span style="font-size:11px;color:var(--text-secondary);align-self:center;">Gợi ý:</span>
+              <button type="button" class="journey-chip-btn" data-place="Đà Lạt">Đà Lạt</button>
+              <button type="button" class="journey-chip-btn" data-place="Đà Nẵng">Đà Nẵng</button>
+              <button type="button" class="journey-chip-btn" data-place="Hà Nội">Hà Nội</button>
+              <button type="button" class="journey-chip-btn" data-place="Phú Quốc">Phú Quốc</button>
+              <button type="button" class="journey-chip-btn" data-place="Hội An">Hội An</button>
+              <button type="button" class="journey-chip-btn" data-place="Sa Pa">Sa Pa</button>
+            </div>
           </div>
           <div class="journey-form-group">
             <label class="journey-form-label" for="add-place-region">Khu vực</label>
@@ -784,9 +1232,17 @@ export function renderLoveJourneyPage(): HTMLElement {
               <option value="visited">💖 Đã cùng nhau ghé thăm</option>
             </select>
           </div>
+          <div class="journey-form-group" id="group-visited-date" style="display:none;">
+            <label class="journey-form-label" for="add-place-date">Ngày ghé thăm</label>
+            <input id="add-place-date" class="journey-form-input" type="date" name="visitedDate" />
+          </div>
+          <div class="journey-form-group">
+            <label class="journey-form-label" for="add-place-photo">Link ảnh kỷ niệm (Tùy chọn)</label>
+            <input id="add-place-photo" class="journey-form-input" name="photoUrl" placeholder="https://..." />
+          </div>
           <div class="journey-form-group">
             <label class="journey-form-label" for="add-place-note">Ghi chú kỷ niệm</label>
-            <textarea id="add-place-note" class="journey-form-textarea" name="note" rows="2" placeholder="Kỷ niệm đẹp hoặc kế hoạch hai đứa..."></textarea>
+            <textarea id="add-place-note" class="journey-form-textarea" name="note" rows="2" placeholder="Kỷ niệm ngọt ngào hoặc kế hoạch của hai bạn..."></textarea>
           </div>
           <div class="journey-form-actions">
             <button type="button" class="btn-ghost" id="btn-cancel-modal">Hủy</button>
@@ -802,6 +1258,82 @@ export function renderLoveJourneyPage(): HTMLElement {
     modal.querySelector('.journey-modal-close-btn')?.addEventListener('click', closeModal);
     modal.querySelector('#btn-cancel-modal')?.addEventListener('click', closeModal);
 
+    const nameInput = modal.querySelector<HTMLInputElement>('#add-place-name')!;
+    const regionSelect = modal.querySelector<HTMLSelectElement>('#add-place-region')!;
+    const statusSelect = modal.querySelector<HTMLSelectElement>('#add-place-status')!;
+    const dateGroup = modal.querySelector<HTMLElement>('#group-visited-date')!;
+    const dateInput = modal.querySelector<HTMLInputElement>('#add-place-date')!;
+    const autoMenu = modal.querySelector<HTMLElement>('#add-place-autocomplete')!;
+
+    statusSelect.addEventListener('change', () => {
+      const isV = statusSelect.value === 'visited';
+      dateGroup.style.display = isV ? 'flex' : 'none';
+      if (isV && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+      }
+    });
+
+    const selectPreset = (cityName: string) => {
+      const found = KNOWN_VIETNAM_PLACES.find((k) => k.name === cityName);
+      if (found) {
+        nameInput.value = found.name;
+        regionSelect.value = found.region;
+        nameInput.dataset.lat = String(found.latitude);
+        nameInput.dataset.lng = String(found.longitude);
+      } else {
+        nameInput.value = cityName;
+      }
+      autoMenu.style.display = 'none';
+    };
+
+    modal.querySelectorAll<HTMLButtonElement>('.journey-chip-btn').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        if (chip.dataset.place) selectPreset(chip.dataset.place);
+      });
+    });
+
+    nameInput.addEventListener('input', () => {
+      const val = nameInput.value.trim();
+      delete nameInput.dataset.lat;
+      delete nameInput.dataset.lng;
+
+      if (!val) {
+        autoMenu.style.display = 'none';
+        return;
+      }
+
+      const norm = normalizeText(val);
+      const matches = KNOWN_VIETNAM_PLACES.filter((k) => normalizeText(k.name).includes(norm)).slice(0, 4);
+
+      if (matches.length === 0) {
+        autoMenu.style.display = 'none';
+        return;
+      }
+
+      autoMenu.innerHTML = matches
+        .map(
+          (m) => `
+        <div class="journey-autocomplete-item" data-name="${escapeHtml(m.name)}" data-region="${m.region}" data-lat="${m.latitude}" data-lng="${m.longitude}">
+          <strong>${escapeHtml(m.name)}</strong>
+          <span style="font-size:11px;color:var(--text-secondary);">${formatRegion(m.region)}</span>
+        </div>
+      `,
+        )
+        .join('');
+
+      autoMenu.style.display = 'block';
+
+      autoMenu.querySelectorAll<HTMLElement>('.journey-autocomplete-item').forEach((item) => {
+        item.addEventListener('click', () => {
+          nameInput.value = item.dataset.name || '';
+          if (item.dataset.region) regionSelect.value = item.dataset.region;
+          if (item.dataset.lat) nameInput.dataset.lat = item.dataset.lat;
+          if (item.dataset.lng) nameInput.dataset.lng = item.dataset.lng;
+          autoMenu.style.display = 'none';
+        });
+      });
+    });
+
     modal.querySelector<HTMLFormElement>('#add-place-form')?.addEventListener('submit', (e) => {
       e.preventDefault();
       const form = e.currentTarget as HTMLFormElement;
@@ -810,20 +1342,36 @@ export function renderLoveJourneyPage(): HTMLElement {
       const region = formData.get('region') as LovePlace['region'];
       const status = formData.get('status') as LovePlace['status'];
       const note = (formData.get('note') as string).trim();
+      const photoUrl = (formData.get('photoUrl') as string).trim();
+      const visitedDate = (formData.get('visitedDate') as string) || undefined;
 
       if (!name) return;
 
-      const coords = getRegionDefaultCoords(region);
+      let lat = nameInput.dataset.lat ? parseFloat(nameInput.dataset.lat) : undefined;
+      let lng = nameInput.dataset.lng ? parseFloat(nameInput.dataset.lng) : undefined;
+
+      if (lat === undefined || lng === undefined) {
+        const match = KNOWN_VIETNAM_PLACES.find((k) => normalizeText(k.name) === normalizeText(name));
+        if (match) {
+          lat = match.latitude;
+          lng = match.longitude;
+        } else {
+          const fallbackCoords = getRegionDefaultCoords(region);
+          lat = fallbackCoords.lat + (Math.random() * 0.1 - 0.05);
+          lng = fallbackCoords.lng + (Math.random() * 0.1 - 0.05);
+        }
+      }
 
       const newPlace: LovePlace = {
         id: `custom-place-${Date.now()}`,
         name,
         region,
-        x: coords.x + (Math.random() * 8 - 4),
-        y: coords.y + (Math.random() * 8 - 4),
+        latitude: Number(lat.toFixed(6)),
+        longitude: Number(lng.toFixed(6)),
         status,
-        note,
-        visitedDate: status === 'visited' ? new Date().toISOString().split('T')[0] : undefined,
+        note: note || undefined,
+        photoUrl: photoUrl || undefined,
+        visitedDate: status === 'visited' ? (visitedDate || new Date().toISOString().split('T')[0]) : undefined,
       };
 
       places.push(newPlace);
@@ -831,8 +1379,11 @@ export function renderLoveJourneyPage(): HTMLElement {
       selectedPlaceId = newPlace.id;
       closeModal();
       showToast(`Đã thêm toạ độ "${name}" vào bản đồ! 📍`, 'success');
-      renderMapPanel();
+      syncMarkers();
+      setupJourneyRouteLayer();
+      renderSelectedPlaceCard();
       updateStats();
+      fitMapToPlaces();
     });
   }
 
@@ -858,6 +1409,10 @@ export function renderLoveJourneyPage(): HTMLElement {
             <label class="journey-form-label" for="edit-place-date">Ngày ghé thăm</label>
             <input id="edit-place-date" class="journey-form-input" type="date" name="visitedDate" />
           </div>
+          <div class="journey-form-group">
+            <label class="journey-form-label" for="edit-place-photo">Link ảnh kỷ niệm (Tùy chọn)</label>
+            <input id="edit-place-photo" class="journey-form-input" name="photoUrl" placeholder="https://..." />
+          </div>
           <div class="journey-form-actions">
             <button type="button" class="btn-ghost" id="btn-delete-place" style="margin-right:auto;color:#ef4444;">Xóa</button>
             <button type="button" class="btn-ghost" id="btn-cancel-modal">Hủy</button>
@@ -873,6 +1428,8 @@ export function renderLoveJourneyPage(): HTMLElement {
     if (noteTextarea) noteTextarea.value = place.note || '';
     const dateInput = modal.querySelector<HTMLInputElement>('#edit-place-date');
     if (dateInput) dateInput.value = place.visitedDate || '';
+    const photoInput = modal.querySelector<HTMLInputElement>('#edit-place-photo');
+    if (photoInput) photoInput.value = place.photoUrl || '';
 
     document.body.appendChild(modal);
 
@@ -886,8 +1443,11 @@ export function renderLoveJourneyPage(): HTMLElement {
       selectedPlaceId = places[0]?.id || '';
       closeModal();
       showToast('Đã xóa toạ độ khỏi bản đồ', 'info');
-      renderMapPanel();
+      syncMarkers();
+      setupJourneyRouteLayer();
+      renderSelectedPlaceCard();
       updateStats();
+      fitMapToPlaces();
     });
 
     modal.querySelector<HTMLFormElement>('#edit-place-form')?.addEventListener('submit', (e) => {
@@ -895,13 +1455,16 @@ export function renderLoveJourneyPage(): HTMLElement {
       const form = e.currentTarget as HTMLFormElement;
       const formData = new FormData(form);
       place.name = (formData.get('name') as string).trim();
-      place.note = (formData.get('note') as string).trim();
+      place.note = (formData.get('note') as string).trim() || undefined;
       place.visitedDate = (formData.get('visitedDate') as string) || undefined;
+      place.photoUrl = (formData.get('photoUrl') as string).trim() || undefined;
 
       saveStoredPlaces(places);
       closeModal();
       showToast('Đã lưu thông tin toạ độ', 'success');
-      renderMapPanel();
+      syncMarkers();
+      setupJourneyRouteLayer();
+      renderSelectedPlaceCard();
       updateStats();
     });
   }
@@ -963,7 +1526,7 @@ export function renderLoveJourneyPage(): HTMLElement {
         title,
         category,
         completed: false,
-        note,
+        note: note || undefined,
         isCustom: true,
       };
 
@@ -1039,7 +1602,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       const formData = new FormData(form);
       item.title = (formData.get('title') as string).trim();
       item.category = formData.get('category') as BucketCategory;
-      item.note = (formData.get('note') as string).trim();
+      item.note = (formData.get('note') as string).trim() || undefined;
 
       saveStoredBucket(bucketItems);
       closeModal();
@@ -1049,7 +1612,7 @@ export function renderLoveJourneyPage(): HTMLElement {
     });
   }
 
-  function formatRegion(region: LovePlace['region']): string {
+  function formatRegion(region?: LovePlace['region']): string {
     switch (region) {
       case 'north':
         return 'Miền Bắc';
@@ -1059,23 +1622,82 @@ export function renderLoveJourneyPage(): HTMLElement {
         return 'Miền Nam';
       case 'islands':
         return 'Biển Đảo';
+      default:
+        return 'Việt Nam';
     }
   }
 
-  function getRegionDefaultCoords(region: LovePlace['region']): { x: number; y: number } {
+  function getRegionDefaultCoords(region?: LovePlace['region']): { lat: number; lng: number } {
     switch (region) {
       case 'north':
-        return { x: 48, y: 18 };
+        return { lat: 21.0285, lng: 105.8542 };
       case 'central':
-        return { x: 67, y: 50 };
+        return { lat: 16.0544, lng: 108.2022 };
       case 'south':
-        return { x: 55, y: 80 };
+        return { lat: 10.8231, lng: 106.6297 };
       case 'islands':
-        return { x: 38, y: 92 };
+        return { lat: 10.2899, lng: 103.9840 };
+      default:
+        return { lat: 16.0544, lng: 108.2022 };
     }
   }
 
-  // Initial render
+  // Theme synchronization for dynamic dark / light tiles
+  const unsubscribeStore = store.subscribe(() => {
+    if (map) {
+      try {
+        const isDark = isDarkTheme();
+        map.setStyle(isDark ? (CARTO_DARK_STYLE as any) : (CARTO_POSITRON_STYLE as any));
+        map.once('style.load', () => {
+          setupJourneyRouteLayer();
+          syncMarkers();
+        });
+      } catch {
+        // ignore
+      }
+    }
+  });
+
+  const themeObserver = new MutationObserver(() => {
+    if (map) {
+      try {
+        const isDark = isDarkTheme();
+        map.setStyle(isDark ? (CARTO_DARK_STYLE as any) : (CARTO_POSITRON_STYLE as any));
+        map.once('style.load', () => {
+          setupJourneyRouteLayer();
+          syncMarkers();
+        });
+      } catch {
+        // ignore
+      }
+    }
+  });
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // Lifecycle destroy
+  root.destroy = () => {
+    window.removeEventListener('resize', updateTabVisibility);
+    themeObserver.disconnect();
+    unsubscribeStore();
+    activeMarkers.forEach((m) => {
+      try {
+        m.remove();
+      } catch {
+        // ignore
+      }
+    });
+    activeMarkers = [];
+    if (map) {
+      try {
+        map.remove();
+      } catch {
+        // ignore
+      }
+      map = null;
+    }
+  };
+
+  // Initial renders
   renderMapPanel();
   renderBucketPanel();
   updateStats();

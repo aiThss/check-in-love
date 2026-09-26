@@ -8,7 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@checkinlove/shared": "*"
+    "@checkinlove/shared": "*",
+    "maplibre-gl": "^6.11.2"
   },
   "devDependencies": {
     "typescript": "^5.5.3",
