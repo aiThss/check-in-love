@@ -86,9 +86,43 @@ export const MIGRATION_SEED_CLEANUP_KEY = 'lovecheck_journey_seed_cleanup_v1';
 export const OPENFREEMAP_BRIGHT_STYLE = 'https://tiles.openfreemap.org/styles/bright';
 export const OPENFREEMAP_DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
 
+export const VIETNAM_SEA_LABELS = [
+  {
+    id: 'hainan',
+    title: 'Đảo Hải Nam',
+    latitude: 19.2,
+    longitude: 109.7,
+    variant: 'context',
+  },
+  {
+    id: 'hoang-sa',
+    title: 'QĐ. Hoàng Sa',
+    subtitle: 'Đà Nẵng · Việt Nam',
+    latitude: 16.5,
+    longitude: 112.25,
+    variant: 'territory',
+  },
+  {
+    id: 'bien-dong',
+    title: 'Biển Đông',
+    latitude: 13.35,
+    longitude: 111.15,
+    variant: 'sea',
+  },
+  {
+    id: 'truong-sa',
+    title: 'QĐ. Trường Sa',
+    subtitle: 'Khánh Hòa · Việt Nam',
+    latitude: 10.78,
+    longitude: 115.75,
+    variant: 'territory',
+  },
+] as const;
+
+// The label anchors above identify broad geographic areas, not maritime boundaries.
 export const VIETNAM_BOUNDS: [[number, number], [number, number]] = [
-  [102.14, 8.18],
-  [109.46, 23.39],
+  [102.0, 6.2],
+  [117.9, 23.5],
 ];
 
 /**
@@ -414,6 +448,7 @@ export function renderLoveJourneyPage(): HTMLElement {
 
   let map: MapLibreMap | null = null;
   let activeMarkers: Marker[] = [];
+  let seaLabelMarkers: Marker[] = [];
 
   // 1. Hero Header
   const hero = document.createElement('header');
@@ -563,7 +598,7 @@ export function renderLoveJourneyPage(): HTMLElement {
           <button type="button" class="journey-map-filter-btn${(activeMapFilter as string) === 'wishlist' ? ' active' : ''}" data-map-filter="wishlist">✨ Ấp ủ</button>
         </div>
         <div class="journey-map-actions-group">
-          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-reset" title="Toàn cảnh Việt Nam">🎯</button>
+          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-reset" title="Toàn cảnh Việt Nam & Biển Đông">🎯</button>
           <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-in" title="Phóng to">+</button>
           <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-out" title="Thu nhỏ">−</button>
         </div>
@@ -608,7 +643,7 @@ export function renderLoveJourneyPage(): HTMLElement {
   });
 
   mapPanel.querySelector('#journey-btn-reset')?.addEventListener('click', () => {
-    fitMapToPlaces();
+    fitMapToVietnam();
   });
 
   function initMapInstance(): void {
@@ -634,11 +669,64 @@ export function renderLoveJourneyPage(): HTMLElement {
       });
 
       // Synchronously attach markers so DOM pins are available immediately
+      syncSeaLabels();
       syncMarkers();
     } catch {
       // In environments where WebGL is unavailable (e.g. jsdom), safely fallback
+      syncSeaLabels();
       syncMarkers();
     }
+  }
+
+  function syncSeaLabels(): void {
+    seaLabelMarkers.forEach((marker) => {
+      try {
+        marker.remove();
+      } catch {
+        // ignore
+      }
+    });
+    seaLabelMarkers = [];
+
+    const mapContainer = mapPanel.querySelector<HTMLElement>('#journey-map-container');
+    if (!mapContainer) return;
+
+    mapContainer.querySelectorAll('.journey-sea-label').forEach((element) => element.remove());
+
+    VIETNAM_SEA_LABELS.forEach((label) => {
+      const labelElement = document.createElement('div');
+      labelElement.className = `journey-sea-label journey-sea-label--${label.variant}`;
+      labelElement.dataset.seaLabelId = label.id;
+      labelElement.setAttribute(
+        'aria-label',
+        'subtitle' in label ? `${label.title}, ${label.subtitle}` : label.title,
+      );
+      labelElement.innerHTML = `
+        <span class="journey-sea-label-text">
+          <strong>${label.title}</strong>
+          ${'subtitle' in label ? `<small>${label.subtitle}</small>` : ''}
+        </span>
+        ${label.variant === 'territory' ? '<span class="journey-sea-label-anchor" aria-hidden="true"></span>' : ''}
+      `;
+
+      if (map) {
+        try {
+          const marker = new Marker({
+            element: labelElement,
+            anchor: label.variant === 'territory' ? 'bottom' : 'center',
+            offset: label.variant === 'territory' ? [0, -2] : [0, 0],
+          })
+            .setLngLat([label.longitude, label.latitude])
+            .addTo(map);
+          seaLabelMarkers.push(marker);
+          return;
+        } catch {
+          // Fall through to a DOM-only label when MapLibre is unavailable.
+        }
+      }
+
+      mapContainer.appendChild(labelElement);
+    });
   }
 
   function setupJourneyRouteLayer(): void {
@@ -704,11 +792,7 @@ export function renderLoveJourneyPage(): HTMLElement {
     if (!map) return;
     try {
       if (places.length === 0) {
-        map.fitBounds(VIETNAM_BOUNDS, {
-          padding: { top: 40, bottom: 40, left: 30, right: 30 },
-          maxZoom: 6.8,
-          duration: 800,
-        });
+        fitMapToVietnam();
         return;
       }
       const bounds = new LngLatBounds();
@@ -718,6 +802,19 @@ export function renderLoveJourneyPage(): HTMLElement {
       map.fitBounds(bounds, {
         padding: { top: 60, bottom: 120, left: 40, right: 40 },
         maxZoom: 10,
+        duration: 800,
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  function fitMapToVietnam(): void {
+    if (!map) return;
+    try {
+      map.fitBounds(VIETNAM_BOUNDS, {
+        padding: { top: 40, bottom: 40, left: 30, right: 30 },
+        maxZoom: 6.8,
         duration: 800,
       });
     } catch {
@@ -1670,6 +1767,14 @@ export function renderLoveJourneyPage(): HTMLElement {
       }
     });
     activeMarkers = [];
+    seaLabelMarkers.forEach((marker) => {
+      try {
+        marker.remove();
+      } catch {
+        // ignore
+      }
+    });
+    seaLabelMarkers = [];
     if (map) {
       try {
         map.remove();

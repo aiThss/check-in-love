@@ -7,6 +7,8 @@ import {
   MIGRATION_SEED_CLEANUP_KEY,
   OPENFREEMAP_BRIGHT_STYLE,
   OPENFREEMAP_DARK_STYLE,
+  VIETNAM_BOUNDS,
+  VIETNAM_SEA_LABELS,
 } from './love-journey';
 
 vi.mock('../router', () => ({
@@ -210,7 +212,6 @@ describe('Love Journey and Bucket List Page', () => {
     // Absolutely no fake demo text
     expect(page.textContent).not.toContain('Hà Nội');
     expect(page.textContent).not.toContain('Sa Pa');
-    expect(page.textContent).not.toContain('Đà Nẵng');
     expect(page.textContent).not.toContain('2024-');
     expect(page.textContent).not.toContain('2025-');
   });
@@ -625,6 +626,31 @@ describe('Love Journey and Bucket List Page', () => {
     expect(sourceContent).not.toContain('CARTO_POSITRON_STYLE');
     expect(sourceContent).not.toContain('CARTO_DARK_STYLE');
     expect(cssContent).not.toContain('cartocdn.com');
+  });
+
+  it('shows the full East Sea context with Vietnamese labels for Hoang Sa and Truong Sa', () => {
+    expect(VIETNAM_BOUNDS[0][1]).toBeLessThanOrEqual(6.2);
+    expect(VIETNAM_BOUNDS[1][0]).toBeGreaterThanOrEqual(117.9);
+
+    const hoangSa = VIETNAM_SEA_LABELS.find((label) => label.id === 'hoang-sa');
+    const truongSa = VIETNAM_SEA_LABELS.find((label) => label.id === 'truong-sa');
+    expect(hoangSa).toMatchObject({
+      title: 'QĐ. Hoàng Sa',
+      subtitle: 'Đà Nẵng · Việt Nam',
+      latitude: 16.5,
+      longitude: 112.25,
+    });
+    expect(truongSa).toMatchObject({
+      title: 'QĐ. Trường Sa',
+      subtitle: 'Khánh Hòa · Việt Nam',
+      latitude: 10.78,
+      longitude: 115.75,
+    });
+
+    const page = renderLoveJourneyPage();
+    expect(page.querySelector('[data-sea-label-id="hainan"]')?.textContent).toContain('Đảo Hải Nam');
+    expect(page.querySelector('[data-sea-label-id="hoang-sa"]')?.textContent).toContain('Hoàng Sa');
+    expect(page.querySelector('[data-sea-label-id="truong-sa"]')?.textContent).toContain('Trường Sa');
   });
 
   it('ensures map attribution is restored and not hidden by CSS rules', async () => {

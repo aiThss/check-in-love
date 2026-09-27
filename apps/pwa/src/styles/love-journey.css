@@ -256,6 +256,105 @@
   height: 100%;
 }
 
+/* Vietnamese geographic labels layered above the neutral vector basemap. */
+.journey-sea-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #25334a;
+  font-family: inherit;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.journey-sea-label-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 7px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 7px;
+  box-shadow: 0 2px 7px rgba(30, 41, 59, 0.16);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  white-space: nowrap;
+}
+
+.journey-sea-label strong {
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.015em;
+}
+
+.journey-sea-label small {
+  color: #b91c1c;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.journey-sea-label-anchor {
+  width: 7px;
+  height: 7px;
+  margin-top: 3px;
+  background: #d70018;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(127, 29, 29, 0.35);
+}
+
+.journey-sea-label--territory .journey-sea-label-text {
+  border-color: rgba(215, 0, 24, 0.42);
+}
+
+.journey-sea-label--sea .journey-sea-label-text {
+  padding: 2px 4px;
+  color: #075985;
+  background: rgba(240, 249, 255, 0.66);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.journey-sea-label--sea strong {
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.journey-sea-label--context .journey-sea-label-text {
+  color: #475569;
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(148, 163, 184, 0.35);
+  box-shadow: none;
+}
+
+[data-theme='dark'] .journey-sea-label-text {
+  color: #f8fafc;
+  background: rgba(24, 20, 30, 0.88);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
+}
+
+[data-theme='dark'] .journey-sea-label small {
+  color: #fda4af;
+}
+
+[data-theme='dark'] .journey-sea-label--sea .journey-sea-label-text {
+  color: #7dd3fc;
+  background: rgba(8, 47, 73, 0.46);
+  box-shadow: none;
+}
+
+[data-theme='dark'] .journey-sea-label--context .journey-sea-label-text {
+  color: #cbd5e1;
+  background: rgba(24, 20, 30, 0.7);
+  box-shadow: none;
+}
+
 /* ── MapLibre Attribution Styling (Visible & Accessible) ────── */
 .maplibregl-ctrl-bottom-right {
   bottom: 8px !important;
