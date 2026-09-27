@@ -586,6 +586,22 @@ export function renderMessagesPage(): RoutePage {
     return thread.scrollHeight - thread.scrollTop - thread.clientHeight;
   }
 
+  function scrollToMessage(element: HTMLElement): void {
+    const threadRect = thread.getBoundingClientRect();
+    const messageRect = element.getBoundingClientRect();
+    const top = thread.scrollTop + messageRect.top - threadRect.top
+      - Math.max(0, (thread.clientHeight - messageRect.height) / 2);
+    const boundedTop = Math.max(0, Math.min(top, thread.scrollHeight - thread.clientHeight));
+    if (typeof thread.scrollTo === 'function') {
+      thread.scrollTo({
+        top: boundedTop,
+        behavior: isReducedMotion() ? 'auto' : 'smooth',
+      });
+    } else {
+      thread.scrollTop = boundedTop;
+    }
+  }
+
   function updateIndicator(): void {
     if (scrollState.isNearBottom && scrollState.pendingIncomingCount === 0) {
       indicator.hidden = true;
@@ -593,7 +609,7 @@ export function renderMessagesPage(): RoutePage {
     }
 
     const count = scrollState.pendingIncomingCount;
-    const isScrolledUp = distanceFromBottom() > 160;
+    const isScrolledUp = !scrollState.isNearBottom && distanceFromBottom() > NEAR_BOTTOM_DISTANCE;
     const nextContent = count > 0 ? String(count) : isScrolledUp ? 'latest' : '';
     indicator.hidden = !nextContent;
     if (nextContent === indicatorContent) return;
@@ -632,11 +648,14 @@ export function renderMessagesPage(): RoutePage {
     updateIndicator();
   }
 
-  function scrollToBottom(mode: 'initial' | 'follow' | 'send' = 'follow'): void {
+  function scrollToBottom(mode: 'initial' | 'follow' | 'send' | 'jump' = 'follow'): void {
     const top = thread.scrollHeight;
     setNearBottom(true);
     indicator.hidden = true;
-    if (mode === 'initial' || isReducedMotion() || typeof thread.scrollTo !== 'function') {
+    // Layout changes (especially decoded photos) must pin immediately. Starting
+    // another smooth animation for every image can interrupt the previous one
+    // and leave the conversation several messages above the real bottom.
+    if (mode === 'initial' || mode === 'follow' || isReducedMotion() || typeof thread.scrollTo !== 'function') {
       thread.scrollTop = top;
       return;
     }
@@ -711,10 +730,7 @@ export function renderMessagesPage(): RoutePage {
 
       if (targetView) {
         // Smoothly scroll to the photo inside the chat!
-        targetView.element.scrollIntoView({
-          behavior: isReducedMotion() ? 'auto' : 'smooth',
-          block: 'center',
-        });
+        scrollToMessage(targetView.element);
         targetView.element.classList.add('message-highlight');
         window.setTimeout(() => targetView?.element.classList.remove('message-highlight'), 1_500);
       } else if (reference.imageUrl) {
@@ -1173,7 +1189,10 @@ export function renderMessagesPage(): RoutePage {
     const reactions = document.createElement('div');
     reactions.className = 'message-reactions';
     reactions.hidden = true;
-    bubble.appendChild(reactions);
+    // Reactions are metadata, not part of the photo itself. Keeping them inside
+    // the clipped media bubble expands its background below only reacted photos.
+    if (hasPhoto) primary.appendChild(reactions);
+    else bubble.appendChild(reactions);
     const readStatus = document.createElement('small');
     readStatus.className = 'message-read-status';
     readStatus.hidden = true;
@@ -1297,10 +1316,7 @@ export function renderMessagesPage(): RoutePage {
     if (target) {
       beginReply(target);
       const view = messageViews.get(messageId);
-      view?.element.scrollIntoView({
-        behavior: isReducedMotion() ? 'auto' : 'smooth',
-        block: 'center',
-      });
+      if (view) scrollToMessage(view.element);
     } else {
       showToast('Không tìm thấy tin nhắn cần trả lời', 'info');
     }
@@ -1619,7 +1635,7 @@ export function renderMessagesPage(): RoutePage {
       showToast('Tin nhắn gốc chưa được tải', 'info');
       return;
     }
-    target.element.scrollIntoView({ behavior: isReducedMotion() ? 'auto' : 'smooth', block: 'center' });
+    scrollToMessage(target.element);
     target.element.classList.add('message-highlight');
     window.setTimeout(() => target.element.classList.remove('message-highlight'), 1_500);
   }
@@ -1630,7 +1646,7 @@ export function renderMessagesPage(): RoutePage {
   indicator.addEventListener('click', () => {
     scrollState.pendingIncomingCount = 0;
     updateIndicator();
-    scrollToBottom('follow');
+    scrollToBottom('jump');
   });
   // Keep the current text-input focus before the button's default pointer action
   // can dismiss the mobile keyboard. The subsequent click still submits normally.
@@ -1668,17 +1684,38 @@ export function renderMessagesPage(): RoutePage {
   };
   window.addEventListener('online', handleOnline);
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  let inputResizeFrame: number | null = null;
   const autoExpandInput = () => {
-    messageInput.style.height = 'auto';
-    const contentHeight = messageInput.scrollHeight;
-    const nextHeight = Math.min(contentHeight, 120);
-    messageInput.style.height = `${Math.max(24, nextHeight)}px`;
-    messageInput.style.overflowY = contentHeight > 120 ? 'auto' : 'hidden';
+    if (inputResizeFrame !== null) return;
+    inputResizeFrame = window.requestAnimationFrame(() => {
+      inputResizeFrame = null;
+      messageInput.style.height = 'auto';
+      const contentHeight = messageInput.scrollHeight;
+      const nextHeight = Math.min(contentHeight, 120);
+      messageInput.style.height = `${Math.max(24, nextHeight)}px`;
+      messageInput.style.overflowY = contentHeight > 120 ? 'auto' : 'hidden';
+    });
   };
   const resetInputHeight = () => {
+    if (inputResizeFrame !== null) {
+      window.cancelAnimationFrame(inputResizeFrame);
+      inputResizeFrame = null;
+    }
     messageInput.style.height = '24px';
     messageInput.style.overflowY = 'hidden';
   };
+
+  let composerResizeObserver: ResizeObserver | null = null;
+  if (typeof ResizeObserver !== 'undefined') {
+    composerResizeObserver = new ResizeObserver(([entry]) => {
+      const borderBoxHeight = entry?.borderBoxSize?.[0]?.blockSize;
+      const height = Math.ceil(
+        borderBoxHeight || form.getBoundingClientRect().height || entry?.contentRect.height || 0,
+      );
+      if (height > 0) page.style.setProperty('--messages-composer-height', `${height}px`);
+    });
+    composerResizeObserver.observe(form);
+  }
 
   const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
   messageInput.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -1850,6 +1887,8 @@ export function renderMessagesPage(): RoutePage {
       if (typingTimer !== null) window.clearTimeout(typingTimer);
       if (typingStopTimer !== null) window.clearTimeout(typingStopTimer);
       if (scrollFrame !== null) window.cancelAnimationFrame(scrollFrame);
+      if (inputResizeFrame !== null) window.cancelAnimationFrame(inputResizeFrame);
+      composerResizeObserver?.disconnect();
       observer?.disconnect();
       thread.removeEventListener('scroll', handleScroll);
       thread.removeEventListener('click', onThreadClick);

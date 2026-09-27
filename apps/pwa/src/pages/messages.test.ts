@@ -600,6 +600,19 @@ describe('Messages scroll and reply behavior', () => {
     expect(mocks.openMessageImageViewer).toHaveBeenCalledWith('/uploads/photo.jpg', 'photo');
   });
 
+  it('keeps photo reactions outside the media frame so they cannot change its aspect ratio', async () => {
+    const photo = message('reacted-photo', false);
+    photo.type = 'image';
+    photo.imageUrl = '/uploads/photo.jpg';
+    photo.reactions = [{ type: '❤️', count: 1, reactedByMe: false }];
+    const routePage = await mount([photo]);
+
+    const mediaFrame = routePage.element.querySelector<HTMLElement>('[data-message-id="reacted-photo"] .chat-bubble.has-photo')!;
+    const reactions = routePage.element.querySelector<HTMLElement>('[data-message-id="reacted-photo"] .message-reactions')!;
+    expect(mediaFrame.contains(reactions)).toBe(false);
+    expect(reactions.parentElement?.classList.contains('chat-checkin')).toBe(true);
+  });
+
   it('scrolls to an already loaded quoted original and cleans polling on destroy', async () => {
     const original = message('original');
     const reply = message('reply', true, 'reply');
@@ -607,10 +620,14 @@ describe('Messages scroll and reply behavior', () => {
       messageId: 'original', senderId: 'partner', senderName: 'Partner', type: 'text', textSnippet: 'original',
     };
     const routePage = await mount([original, reply]);
+    const thread = routePage.element.querySelector<HTMLElement>('.messages-thread')!;
     const originalElement = routePage.element.querySelector<HTMLElement>('[data-message-id="original"]')!;
-    originalElement.scrollIntoView = vi.fn();
+    setScrollMetrics(thread, 0);
+    thread.scrollTo = vi.fn();
+    vi.spyOn(thread, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 200 } as DOMRect);
+    vi.spyOn(originalElement, 'getBoundingClientRect').mockReturnValue({ top: 300, height: 40 } as DOMRect);
     routePage.element.querySelector<HTMLButtonElement>('[data-message-id="reply"] .message-quote')?.click();
-    expect(originalElement.scrollIntoView).toHaveBeenCalledOnce();
+    expect(thread.scrollTo).toHaveBeenCalledWith({ top: 220, behavior: 'smooth' });
 
     routePage.destroy?.();
     await vi.advanceTimersByTimeAsync(20_000);
@@ -627,14 +644,18 @@ describe('Messages scroll and reply behavior', () => {
       checkinId: 'memory-1', ownerId: 'partner', ownerName: 'Partner', type: 'photo', caption: 'Ngày đầu tiên', imageUrl: '/photo.jpg', createdAt: shared.createdAt,
     };
     const routePage = await mount([photoMsg, shared]);
+    const thread = routePage.element.querySelector<HTMLElement>('.messages-thread')!;
     const photoElement = routePage.element.querySelector<HTMLElement>('[data-message-id="photo-msg"]')!;
-    photoElement.scrollIntoView = vi.fn();
+    setScrollMetrics(thread, 100, 1200, 300);
+    thread.scrollTo = vi.fn();
+    vi.spyOn(thread, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 300 } as DOMRect);
+    vi.spyOn(photoElement, 'getBoundingClientRect').mockReturnValue({ top: 400, height: 120 } as DOMRect);
 
     const card = routePage.element.querySelector<HTMLButtonElement>('.message-referenced-checkin')!;
     expect(card.textContent).toContain('Kỷ niệm');
     expect(card.querySelector('img')?.getAttribute('src')).toBe('/photo.jpg');
     card.click();
-    expect(photoElement.scrollIntoView).toHaveBeenCalledOnce();
+    expect(thread.scrollTo).toHaveBeenCalledWith({ top: 410, behavior: 'smooth' });
   });
 
   it('sends a chat photo through CheckIn so the returned topic appears in both domains', async () => {

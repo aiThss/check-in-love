@@ -10,8 +10,8 @@
 }
 
 .messages-thread {
-  padding: 8px 2px calc(190px + var(--safe-bottom));
-  scroll-padding-bottom: calc(190px + var(--safe-bottom));
+  padding: 8px 2px calc(var(--messages-composer-height, 60px) + 130px + var(--safe-bottom));
+  scroll-padding-bottom: calc(var(--messages-composer-height, 60px) + 130px + var(--safe-bottom));
   overscroll-behavior-y: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
@@ -111,13 +111,15 @@
   opacity: 1;
 }
 
-/* Keep the fixed composer glassy without creating an opaque lower panel. */
+/* Avoid re-blurring a fixed surface on every Android WebView scroll frame. */
 .messages-page > .messages-composer {
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.94);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 [data-theme='dark'] .messages-page > .messages-composer {
-  background: rgba(40, 31, 36, 0.72);
+  background: rgba(40, 31, 36, 0.96);
 }
 
 /* Reply mode is a two-row card, not one oversized 999px pill. */
@@ -169,13 +171,6 @@
 
 [data-theme='dark'] .messages-composer.has-reply .messages-reply-preview {
   background: rgba(255, 255, 255, 0.05);
-}
-
-/* The reply card makes the composer taller. Give the scroll area matching runway
- * so the latest bubble can still be moved completely above the fixed controls. */
-.messages-page.has-message-reply .messages-thread {
-  padding-bottom: calc(250px + var(--safe-bottom));
-  scroll-padding-bottom: calc(250px + var(--safe-bottom));
 }
 
 /* Native image dragging can swallow pointer moves in Android WebView. The bubble
@@ -277,23 +272,13 @@
 /* With the keyboard open the nav is hidden and the composer is lifted by the
  * measured keyboard offset. Keep enough scroll runway beneath the last bubble. */
 :root.keyboard-open .messages-thread {
-  padding-bottom: calc(86px + var(--keyboard-offset));
-  scroll-padding-bottom: calc(86px + var(--keyboard-offset));
+  padding-bottom: calc(var(--messages-composer-height, 60px) + 26px + var(--keyboard-offset));
+  scroll-padding-bottom: calc(var(--messages-composer-height, 60px) + 26px + var(--keyboard-offset));
 }
 
 :root.is-ios.keyboard-open .messages-thread {
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-}
-
-:root.keyboard-open .messages-page.has-message-reply .messages-thread {
-  padding-bottom: calc(146px + var(--keyboard-offset));
-  scroll-padding-bottom: calc(146px + var(--keyboard-offset));
-}
-
-:root.is-ios.keyboard-open .messages-page.has-message-reply .messages-thread {
-  padding-bottom: calc(156px + env(safe-area-inset-bottom, 0px));
-  scroll-padding-bottom: calc(156px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--messages-composer-height, 60px) + 36px + env(safe-area-inset-bottom, 0px));
+  scroll-padding-bottom: calc(var(--messages-composer-height, 60px) + 36px + env(safe-area-inset-bottom, 0px));
 }
 
 @media (prefers-reduced-motion: reduce) {
