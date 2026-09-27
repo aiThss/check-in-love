@@ -8,6 +8,11 @@ export default defineConfig({
   resolve: {
     extensions: ['.ts', '.tsx', '.mjs', '.js', '.json'],
   },
+  optimizeDeps: {
+    // Keep MapLibre's module worker beside the package instead of rewriting it
+    // into Vite's dependency cache, where WebView cannot resolve the worker URL.
+    exclude: ['maplibre-gl'],
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,

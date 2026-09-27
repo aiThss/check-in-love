@@ -1,8 +1,11 @@
-import { Map as MapLibreMap, Marker, LngLatBounds } from 'maplibre-gl';
+import { Map as MapLibreMap, Marker, LngLatBounds, setWorkerUrl } from 'maplibre-gl';
+import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { navigate } from '../router';
 import { showToast } from '../components/toast';
 import { store } from '../store/index';
+
+setWorkerUrl(mapLibreWorkerUrl);
 
 export interface LovePlace {
   id: string;
@@ -80,7 +83,7 @@ export const MIGRATION_SEED_CLEANUP_KEY = 'lovecheck_journey_seed_cleanup_v1';
  * OpenFreeMap official vector styles.
  * Fully open-source, unlimited public vector tile hosting, zero API key required.
  */
-export const OPENFREEMAP_LIBERTY_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+export const OPENFREEMAP_BRIGHT_STYLE = 'https://tiles.openfreemap.org/styles/bright';
 export const OPENFREEMAP_DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
 
 export const VIETNAM_BOUNDS: [[number, number], [number, number]] = [
@@ -379,7 +382,7 @@ function isDarkTheme(): boolean {
 }
 
 function getMapStyle(): string {
-  return isDarkTheme() ? OPENFREEMAP_DARK_STYLE : OPENFREEMAP_LIBERTY_STYLE;
+  return isDarkTheme() ? OPENFREEMAP_DARK_STYLE : OPENFREEMAP_BRIGHT_STYLE;
 }
 
 function getJourneyLineCoordinates(places: LovePlace[]): [number, number][] {
@@ -621,7 +624,7 @@ export function renderLoveJourneyPage(): HTMLElement {
         center: [106.8, 16.2],
         zoom: 5.3,
         minZoom: 3.5,
-        maxZoom: 18,
+        maxZoom: 20,
         attributionControl: { compact: true },
       });
 

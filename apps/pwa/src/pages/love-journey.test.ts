@@ -5,7 +5,7 @@ import {
   PLACES_STORAGE_KEY,
   BUCKET_STORAGE_KEY,
   MIGRATION_SEED_CLEANUP_KEY,
-  OPENFREEMAP_LIBERTY_STYLE,
+  OPENFREEMAP_BRIGHT_STYLE,
   OPENFREEMAP_DARK_STYLE,
 } from './love-journey';
 
@@ -154,6 +154,7 @@ vi.mock('maplibre-gl', () => {
     Marker: MockMarker,
     NavigationControl: MockNavigationControl,
     LngLatBounds: MockLngLatBounds,
+    setWorkerUrl: vi.fn(),
     supported: () => true,
     default: {
       Map: MockMap,
@@ -611,8 +612,8 @@ describe('Love Journey and Bucket List Page', () => {
     expect(selectedSlot?.children.length).toBe(0);
   });
 
-  it('uses OpenFreeMap public vector styles and contains zero cartocdn references (Bug 1 regression)', async () => {
-    expect(OPENFREEMAP_LIBERTY_STYLE).toBe('https://tiles.openfreemap.org/styles/liberty');
+  it('uses the detailed OpenFreeMap Bright vector style and contains zero cartocdn references', async () => {
+    expect(OPENFREEMAP_BRIGHT_STYLE).toBe('https://tiles.openfreemap.org/styles/bright');
     expect(OPENFREEMAP_DARK_STYLE).toBe('https://tiles.openfreemap.org/styles/dark');
 
     const fs = await import('fs');
@@ -634,6 +635,12 @@ describe('Love Journey and Bucket List Page', () => {
     expect(cssContent).not.toMatch(/\.maplibregl-ctrl-attrib[^{]*\{[^}]*display\s*:\s*none/);
     expect(cssContent).not.toMatch(/\.maplibregl-ctrl-attrib[^{]*\{[^}]*visibility\s*:\s*hidden/);
     expect(cssContent).not.toMatch(/\.maplibregl-ctrl-attrib[^{]*\{[^}]*opacity\s*:\s*0/);
+    expect(cssContent).toMatch(
+      /\.maplibregl-ctrl-attrib\.maplibregl-compact:not\(\.maplibregl-compact-show\)\s*\{[^}]*min-width:\s*24px[^}]*min-height:\s*24px/s,
+    );
+    expect(cssContent).toMatch(
+      /\.maplibregl-ctrl-attrib-button\s*\{[^}]*width:\s*24px[^}]*height:\s*24px/s,
+    );
   });
 
   it('updates map style on theme change without losing journey route or markers', async () => {
