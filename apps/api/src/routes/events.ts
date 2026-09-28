@@ -4,7 +4,7 @@ import { env } from '../config/env';
 import { isDevelopmentOrigin } from '../utils/origin';
 
 export interface RealtimeEvent {
-  type: 'message' | 'message.updated' | 'message.reaction' | 'message.read' | 'message.typing' | 'message.presence' | 'chat.background.updated' | 'checkin' | 'reaction' | 'reply' | 'reminder';
+  type: 'message' | 'message.updated' | 'message.reaction' | 'message.read' | 'message.typing' | 'message.presence' | 'chat.background.updated' | 'checkin' | 'reaction' | 'reply' | 'reminder' | 'journey.updated';
   title: string;
   body: string;
   targetUrl?: string;
@@ -22,6 +22,10 @@ export interface RealtimeEvent {
     imageUrl?: string;
     label: string;
     updatedAt?: string;
+  };
+  journey?: {
+    places: any[];
+    bucketItems: any[];
   };
   timestamp?: number;
 }

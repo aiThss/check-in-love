@@ -157,11 +157,11 @@ export interface PushPayload {
   url?: string;
   tag?: string;
   messageId?: string;
-  kind?: 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message';
+  kind?: 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message' | 'journey';
   checkinId?: string;
   senderName?: string;
   senderAvatar?: string;
-  actionType?: 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message';
+  actionType?: 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message' | 'journey';
   targetUrl?: string;
   photoUrl?: string;
 }

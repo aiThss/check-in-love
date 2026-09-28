@@ -4,6 +4,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { navigate } from '../router';
 import { showToast } from '../components/toast';
 import { store } from '../store/index';
+import {
+  saveCoupleJourney,
+  syncCoupleJourneyWithServer,
+} from '../api/journey';
 
 setWorkerUrl(mapLibreWorkerUrl);
 
@@ -1043,6 +1047,11 @@ export function renderLoveJourneyPage(): HTMLElement {
         selectedPlace.visitedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       }
       saveStoredPlaces(places);
+      void saveCoupleJourney({
+        places,
+        actionType: nextStatus === 'visited' ? 'visit_place' : 'edit_place',
+        itemTitle: selectedPlace.name,
+      }).catch(() => {});
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       triggerHeartSparkles(rect.left + rect.width / 2, rect.top);
       showToast(
@@ -1258,6 +1267,11 @@ export function renderLoveJourneyPage(): HTMLElement {
           item.completedDate = undefined;
         }
         saveStoredBucket(bucketItems);
+        void saveCoupleJourney({
+          bucketItems,
+          actionType: nextState ? 'complete_bucket' : 'uncomplete_bucket',
+          itemTitle: item.title,
+        }).catch(() => {});
 
         const rect = checkBtn.getBoundingClientRect();
         triggerHeartSparkles(rect.left + rect.width / 2, rect.top);
@@ -1462,6 +1476,11 @@ export function renderLoveJourneyPage(): HTMLElement {
 
       places.push(newPlace);
       saveStoredPlaces(places);
+      void saveCoupleJourney({
+        places,
+        actionType: 'add_place',
+        itemTitle: newPlace.name,
+      }).catch(() => {});
       selectedPlaceId = newPlace.id;
       closeModal();
       showToast(`Đã thêm toạ độ "${name}" vào bản đồ! 📍`, 'success');
@@ -1525,8 +1544,14 @@ export function renderLoveJourneyPage(): HTMLElement {
     modal.querySelector('#btn-cancel-modal')?.addEventListener('click', closeModal);
 
     modal.querySelector('#btn-delete-place')?.addEventListener('click', () => {
+      const deletedName = place.name;
       places = places.filter((p) => p.id !== place.id);
       saveStoredPlaces(places);
+      void saveCoupleJourney({
+        places,
+        actionType: 'delete_place',
+        itemTitle: deletedName,
+      }).catch(() => {});
       selectedPlaceId = places[0]?.id || '';
       closeModal();
       showToast('Đã xóa toạ độ khỏi bản đồ', 'info');
@@ -1548,6 +1573,11 @@ export function renderLoveJourneyPage(): HTMLElement {
       place.photoUrl = (formData.get('photoUrl') as string).trim() || undefined;
 
       saveStoredPlaces(places);
+      void saveCoupleJourney({
+        places,
+        actionType: 'edit_place',
+        itemTitle: place.name,
+      }).catch(() => {});
       closeModal();
       showToast('Đã lưu thông tin toạ độ', 'success');
       syncMarkers();
@@ -1620,6 +1650,11 @@ export function renderLoveJourneyPage(): HTMLElement {
 
       bucketItems.unshift(newItem);
       saveStoredBucket(bucketItems);
+      void saveCoupleJourney({
+        bucketItems,
+        actionType: 'add_bucket',
+        itemTitle: newItem.title,
+      }).catch(() => {});
       closeModal();
       showToast('Đã thêm điều ước mới vào danh sách! ✨', 'success');
       renderBucketPanel();
@@ -1676,8 +1711,14 @@ export function renderLoveJourneyPage(): HTMLElement {
     modal.querySelector('#btn-cancel-modal')?.addEventListener('click', closeModal);
 
     modal.querySelector('#btn-delete-bucket')?.addEventListener('click', () => {
+      const deletedTitle = item.title;
       bucketItems = bucketItems.filter((i) => i.id !== item.id);
       saveStoredBucket(bucketItems);
+      void saveCoupleJourney({
+        bucketItems,
+        actionType: 'delete_bucket',
+        itemTitle: deletedTitle,
+      }).catch(() => {});
       closeModal();
       showToast('Đã xóa điều ước', 'info');
       renderBucketPanel();
@@ -1693,6 +1734,11 @@ export function renderLoveJourneyPage(): HTMLElement {
       item.note = (formData.get('note') as string).trim() || undefined;
 
       saveStoredBucket(bucketItems);
+      void saveCoupleJourney({
+        bucketItems,
+        actionType: 'edit_bucket',
+        itemTitle: item.title,
+      }).catch(() => {});
       closeModal();
       showToast('Đã lưu thay đổi điều ước', 'success');
       renderBucketPanel();
@@ -1754,8 +1800,34 @@ export function renderLoveJourneyPage(): HTMLElement {
   });
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+  // Real-time synchronization with cloud DB and partner
+  const handleRealtimeEvent = (e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    if (detail?.type === 'journey.updated' && detail.journey) {
+      if (Array.isArray(detail.journey.places)) {
+        places = detail.journey.places;
+        saveStoredPlaces(places);
+      }
+      if (Array.isArray(detail.journey.bucketItems)) {
+        bucketItems = detail.journey.bucketItems;
+        saveStoredBucket(bucketItems);
+      }
+      if (!selectedPlaceId && places[0]) {
+        selectedPlaceId = places[0].id;
+      }
+      syncMarkers();
+      setupJourneyRouteLayer();
+      renderSelectedPlaceCard();
+      renderMapEmptyState();
+      renderBucketPanel();
+      updateStats();
+    }
+  };
+  window.addEventListener('lovecheck:realtime-event', handleRealtimeEvent);
+
   // Lifecycle destroy
   root.destroy = () => {
+    window.removeEventListener('lovecheck:realtime-event', handleRealtimeEvent);
     window.removeEventListener('resize', updateTabVisibility);
     themeObserver.disconnect();
     unsubscribeStore();
@@ -1792,6 +1864,45 @@ export function renderLoveJourneyPage(): HTMLElement {
   renderBucketPanel();
   updateStats();
   updateTabVisibility();
+
+  // Background sync with cloud to ensure all local items (e.g. from APK) are merged with cloud DB
+  void syncCoupleJourneyWithServer(places, bucketItems)
+    .then((data) => {
+      if (!data) return;
+      const serverPlaces = Array.isArray(data.places) ? data.places : [];
+      const serverBucket = Array.isArray(data.bucketItems) ? data.bucketItems : [];
+
+      let hasChanges = false;
+      if (serverPlaces.length > 0 || places.length === 0) {
+        if (JSON.stringify(places) !== JSON.stringify(serverPlaces)) {
+          places = serverPlaces;
+          saveStoredPlaces(places);
+          hasChanges = true;
+        }
+      }
+      if (serverBucket.length > 0 || bucketItems.length === 0) {
+        if (JSON.stringify(bucketItems) !== JSON.stringify(serverBucket)) {
+          bucketItems = serverBucket;
+          saveStoredBucket(bucketItems);
+          hasChanges = true;
+        }
+      }
+
+      if (hasChanges) {
+        if (!selectedPlaceId && places[0]) {
+          selectedPlaceId = places[0].id;
+        }
+        syncMarkers();
+        setupJourneyRouteLayer();
+        renderSelectedPlaceCard();
+        renderMapEmptyState();
+        renderBucketPanel();
+        updateStats();
+      }
+    })
+    .catch(() => {
+      // Keep offline/local state if network unavailable
+    });
 
   return root;
 }

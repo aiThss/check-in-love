@@ -16,6 +16,7 @@ export interface RealtimeEventData {
     | 'reaction'
     | 'reply'
     | 'reminder'
+    | 'journey.updated'
     | 'connected';
   title?: string;
   body?: string;
@@ -26,6 +27,10 @@ export interface RealtimeEventData {
   messageId?: string;
   deleted?: boolean;
   chatBackground?: ChatBackgroundSnapshot;
+  journey?: {
+    places: any[];
+    bucketItems: any[];
+  };
   timestamp?: number;
 }
 
@@ -58,6 +63,19 @@ export function initRealtimeEvents(): void {
           logger.info('[SSE] Real-time event received', data);
 
           // 1. Dispatch custom event for in-app UI listeners
+          if (data.type === 'journey.updated' && data.journey) {
+            try {
+              if (Array.isArray(data.journey.places)) {
+                localStorage.setItem('lovecheck_journey_places', JSON.stringify(data.journey.places));
+              }
+              if (Array.isArray(data.journey.bucketItems)) {
+                localStorage.setItem('lovecheck_journey_bucket', JSON.stringify(data.journey.bucketItems));
+              }
+            } catch {
+              // ignore quota
+            }
+          }
+
           window.dispatchEvent(
             new CustomEvent('lovecheck:realtime-event', { detail: data }),
           );

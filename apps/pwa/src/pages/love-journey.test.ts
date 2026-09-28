@@ -19,6 +19,24 @@ vi.mock('../components/toast', () => ({
   showToast: vi.fn(),
 }));
 
+const journeyApiMocks = vi.hoisted(() => ({
+  saveCoupleJourney: vi.fn().mockImplementation(async (opts) => ({
+    places: opts.places || [],
+    bucketItems: opts.bucketItems || [],
+  })),
+  syncCoupleJourneyWithServer: vi.fn().mockImplementation(async (places, bucketItems) => ({
+    places,
+    bucketItems,
+  })),
+  fetchCoupleJourney: vi.fn().mockResolvedValue({ places: [], bucketItems: [] }),
+}));
+
+vi.mock('../api/journey', () => ({
+  saveCoupleJourney: journeyApiMocks.saveCoupleJourney,
+  syncCoupleJourneyWithServer: journeyApiMocks.syncCoupleJourneyWithServer,
+  fetchCoupleJourney: journeyApiMocks.fetchCoupleJourney,
+}));
+
 type MapEventHandler = (...args: any[]) => void;
 
 vi.mock('maplibre-gl', () => {
@@ -697,5 +715,94 @@ describe('Love Journey and Bucket List Page', () => {
 
     expect(typeof page.destroy).toBe('function');
     expect(() => page.destroy?.()).not.toThrow();
+  });
+
+  it('triggers cloud sync on initialization to merge local items with cloud', async () => {
+    localStorage.setItem(
+      BUCKET_STORAGE_KEY,
+      JSON.stringify([
+        { id: 'b-local', title: 'Ước mơ từ APK', category: 'dating', completed: false },
+      ]),
+    );
+    localStorage.setItem(MIGRATION_SEED_CLEANUP_KEY, 'true');
+
+    journeyApiMocks.syncCoupleJourneyWithServer.mockResolvedValueOnce({
+      places: [],
+      bucketItems: [
+        { id: 'b-local', title: 'Ước mơ từ APK', category: 'dating', completed: false },
+        { id: 'b-server', title: 'Ước mơ từ Cloud', category: 'travel', completed: true },
+      ],
+    });
+
+    const page = renderLoveJourneyPage();
+    document.body.appendChild(page);
+
+    expect(journeyApiMocks.syncCoupleJourneyWithServer).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.arrayContaining([expect.objectContaining({ id: 'b-local' })]),
+    );
+
+    // Wait for promise resolution
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Stored bucket should be updated with merged server items
+    const stored = JSON.parse(localStorage.getItem(BUCKET_STORAGE_KEY) || '[]');
+    expect(stored).toHaveLength(2);
+    expect(stored.some((i: any) => i.id === 'b-server')).toBe(true);
+  });
+
+  it('updates UI and localStorage immediately when real-time journey.updated event is received from partner', async () => {
+    localStorage.setItem(BUCKET_STORAGE_KEY, JSON.stringify([]));
+    localStorage.setItem(MIGRATION_SEED_CLEANUP_KEY, 'true');
+
+    const page = renderLoveJourneyPage();
+    document.body.appendChild(page);
+
+    // Partner completed a wish and emitted SSE event
+    window.dispatchEvent(
+      new CustomEvent('lovecheck:realtime-event', {
+        detail: {
+          type: 'journey.updated',
+          journey: {
+            places: [],
+            bucketItems: [
+              { id: 'b-partner', title: 'Điều ước do đối phương tạo', category: 'future', completed: true },
+            ],
+          },
+        },
+      }),
+    );
+
+    const stored = JSON.parse(localStorage.getItem(BUCKET_STORAGE_KEY) || '[]');
+    expect(stored).toHaveLength(1);
+    expect(stored[0].title).toBe('Điều ước do đối phương tạo');
+    expect(page.textContent).toContain('Điều ước do đối phương tạo');
+  });
+
+  it('calls saveCoupleJourney when user toggles or adds a wish', async () => {
+    localStorage.setItem(
+      BUCKET_STORAGE_KEY,
+      JSON.stringify([
+        { id: 'b-toggle', title: 'Xem sao băng', category: 'dating', completed: false },
+      ]),
+    );
+    localStorage.setItem(MIGRATION_SEED_CLEANUP_KEY, 'true');
+
+    const page = renderLoveJourneyPage();
+    document.body.appendChild(page);
+
+    const checkBtn = page.querySelector('.journey-checkbox-btn') as HTMLButtonElement;
+    expect(checkBtn).toBeTruthy();
+    checkBtn.click();
+
+    expect(journeyApiMocks.saveCoupleJourney).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionType: 'complete_bucket',
+        itemTitle: 'Xem sao băng',
+        bucketItems: expect.arrayContaining([
+          expect.objectContaining({ id: 'b-toggle', completed: true }),
+        ]),
+      }),
+    );
   });
 });

@@ -18,6 +18,7 @@ import pushRoutes from './routes/push';
 import randomRoutes from './routes/random';
 import { eventRoutes } from './routes/events';
 import chatBackgroundRoutes from './routes/chat-background';
+import journeyRoutes from './routes/journey';
 import { installCheckinReplyMessageSync } from './services/checkin-reply-message-sync';
 import { isDevelopmentOrigin } from './utils/origin';
 
@@ -116,6 +117,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(checkinsRoutes, { prefix: '/api' });
   await app.register(messagesRoutes, { prefix: '/api' });
   await app.register(chatBackgroundRoutes, { prefix: '/api' });
+  await app.register(journeyRoutes, { prefix: '/api' });
   await app.register(messageStickerRoutes, { prefix: '/api' });
   await app.register(randomRoutes, { prefix: '/api' });
   await app.register(pushRoutes, { prefix: '/api' });
