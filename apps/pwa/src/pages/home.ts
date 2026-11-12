@@ -674,7 +674,7 @@ export function renderHomePage(): HTMLElement {
   const partnerName = user?.partnerName ?? 'Người ấy';
 
   const page = document.createElement('div');
-  page.className = 'page animate-fade-in';
+  page.className = 'page home-page animate-fade-in';
 
   const topBar = document.createElement('div');
   topBar.className = 'top-bar';
@@ -692,7 +692,33 @@ export function renderHomePage(): HTMLElement {
   `;
 
   const rightActions = document.createElement('div');
-  rightActions.style.cssText = 'display:flex;gap:8px;';
+  rightActions.className = 'lg-quick-dock';
+  rightActions.setAttribute('aria-label', 'Thanh tác vụ nhanh');
+
+  const dockChips = document.createElement('div');
+  dockChips.className = 'lg-quick-dock-chips';
+
+  const homeChip = document.createElement('button');
+  homeChip.type = 'button';
+  homeChip.className = 'lg-dock-chip active';
+  homeChip.textContent = '💖 Hôm nay';
+  homeChip.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  const journeyChip = document.createElement('button');
+  journeyChip.type = 'button';
+  journeyChip.className = 'lg-dock-chip';
+  journeyChip.textContent = '🗺️ Bản đồ hẹn hò';
+  journeyChip.addEventListener('click', () => {
+    navigate('/app/journey');
+  });
+
+  dockChips.appendChild(homeChip);
+  dockChips.appendChild(journeyChip);
+
+  const dockActions = document.createElement('div');
+  dockActions.className = 'lg-quick-dock-actions';
 
   const themeBtn = document.createElement('button');
   themeBtn.className = 'btn-icon';
@@ -717,8 +743,10 @@ export function renderHomePage(): HTMLElement {
     loadCheckin();
   });
 
-  rightActions.appendChild(themeBtn);
-  rightActions.appendChild(refreshBtn);
+  dockActions.appendChild(themeBtn);
+  dockActions.appendChild(refreshBtn);
+  rightActions.appendChild(dockChips);
+  rightActions.appendChild(dockActions);
   topBar.appendChild(streakBadge);
   topBar.appendChild(rightActions);
   page.appendChild(topBar);

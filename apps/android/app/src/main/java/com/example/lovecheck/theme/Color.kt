@@ -2,10 +2,20 @@ package com.example.lovecheck.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Light Mode Palette — 100% Original Check IN Love Pastel Pink
+val LightBg = Color(0xFFF8E2E7)
+val LightSurface = Color(0xFFFFF4F7)
+val LightAccent = Color(0xFFFF3B7F)
+val LightAccentSecondary = Color(0xFFE0326E)
+val LightTextPrimary = Color(0xFF1A0E13)
+val LightTextSecondary = Color(0xFF6B5060)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+// Dark Mode Palette — 100% LoveMusic Liquid Glass Edition
+val LoveMusicDarkBg = Color(0xFF14001F)
+val LoveMusicDarkSurface = Color(0xFF240046)
+val LoveMusicPinkPrimary = Color(0xFFFF5C93)
+val LoveMusicPurpleSecondary = Color(0xFF9D4EDD)
+val LoveMusicRoseTertiary = Color(0xFFFF85A1)
+val LoveMusicAquaOrb = Color(0xFF00F5D4)
+val LoveMusicTextPrimary = Color(0xFFFFF0F5)
+val LoveMusicTextSecondary = Color(0xFFE5B8CE)

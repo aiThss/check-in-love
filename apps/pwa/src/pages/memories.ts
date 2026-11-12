@@ -397,20 +397,32 @@ export function renderMemoriesPage(): HTMLElement {
       <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.03em;">Kỷ niệm của hai đứa</h1>
       <p id="memories-count" style="font-size:13px;color:var(--text-secondary);">Đang tải khoảnh khắc...</p>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
-      <button id="search-btn" class="mem-icon-btn" aria-label="Tìm kỷ niệm">
-        <img src="/icons8-search-48.apng.png" alt="" width="26" height="26"
-          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
-          style="display:block;" />
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round"
-          style="display:none;width:20px;height:20px;">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-      </button>
-      <button id="refresh-btn" class="btn-icon" aria-label="Làm mới">${refreshIconMarkup}</button>
+    <div class="lg-quick-dock" aria-label="Thanh công cụ kỷ niệm">
+      <div class="lg-quick-dock-chips">
+        <button type="button" class="lg-dock-chip active" data-mem-filter="all">📸 Tất cả</button>
+        <button type="button" class="lg-dock-chip" data-mem-filter="journey">🗺️ Hành trình</button>
+      </div>
+      <div class="lg-quick-dock-actions">
+        <button id="search-btn" class="mem-icon-btn" aria-label="Tìm kỷ niệm">
+          <img src="/icons8-search-48.apng.png" alt="" width="26" height="26"
+            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+            style="display:block;" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"
+            style="display:none;width:20px;height:20px;">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </button>
+        <button id="refresh-btn" class="btn-icon" aria-label="Làm mới">${refreshIconMarkup}</button>
+      </div>
     </div>
   `;
+  header.querySelector('[data-mem-filter="all"]')?.addEventListener('click', () => {
+    root.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  header.querySelector('[data-mem-filter="journey"]')?.addEventListener('click', () => {
+    navigate('/app/journey');
+  });
   root.appendChild(header);
 
   // ── Search bar (hidden by default, slides open when search-btn clicked) ──

@@ -1,0 +1,316 @@
+/* ==========================================================================
+   LoveMusic Liquid Glass Interactive Physics & Optical System
+   - Light Mode: Preserves 100% original Check IN Love pastel pink palette,
+     adding only interactive Liquid Glass bulge, radial glow, sliding nav blob,
+     and ergonomic bottom quick dock.
+   - Dark Mode: 100% LoveMusic Liquid Glass Edition palette & ambient orbs.
+   ========================================================================== */
+
+/* 1. Ambient Glowing Background Orbs (Visible in Dark Mode, subtle in Light) */
+.lg-ambient-orbs {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+[data-theme='dark'] .lg-ambient-orbs {
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .lg-ambient-orbs {
+    opacity: 1;
+  }
+}
+
+.lg-ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(56px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.lg-ambient-orb--tl {
+  width: 260px;
+  height: 260px;
+  top: -70px;
+  left: -60px;
+  background: radial-gradient(circle, rgba(255, 133, 161, 0.42) 0%, rgba(255, 133, 161, 0) 72%);
+}
+
+.lg-ambient-orb--tr {
+  width: 300px;
+  height: 300px;
+  top: 22%;
+  right: -95px;
+  background: radial-gradient(circle, rgba(0, 245, 212, 0.24) 0%, rgba(0, 245, 212, 0) 72%);
+}
+
+.lg-ambient-orb--bl {
+  width: 340px;
+  height: 340px;
+  bottom: -90px;
+  left: 8%;
+  background: radial-gradient(circle, rgba(255, 92, 147, 0.36) 0%, rgba(157, 78, 221, 0.14) 52%, transparent 74%);
+}
+
+/* 2. Core Interactive Liquid Glass Surface (.lg-surface) */
+.lg-surface {
+  --press: 0;
+  --glow: 0;
+  --touch-x: 50%;
+  --touch-y: 50%;
+  --sx: 1;
+  --sy: 1;
+  --tx: 0px;
+  --ty: 0px;
+  --min-dim: 64px;
+
+  position: relative;
+  isolation: isolate;
+  backdrop-filter: url(#lg-lens) blur(calc(18px + var(--press, 0) * 4px)) saturate(175%) contrast(103%) brightness(104%);
+  -webkit-backdrop-filter: blur(calc(18px + var(--press, 0) * 4px)) saturate(175%) contrast(103%) brightness(104%);
+  transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) scale(var(--sx, 1), var(--sy, 1));
+  transform-origin: center center;
+  will-change: transform;
+}
+
+/* Specular Radial Touch / Hover Glow Overlay (matches drawInteractiveGlass in LoveMusic) */
+.lg-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  background: radial-gradient(
+    circle calc(var(--min-dim, 64px) * 1.25) at var(--touch-x, 50%) var(--touch-y, 50%),
+    rgba(var(--lg-glow-rgb, 255, 255, 255), var(--glow, 0)) 0%,
+    rgba(255, 255, 255, calc(var(--glow, 0) * 0.45)) 42%,
+    transparent 100%
+  );
+  mix-blend-mode: plus-lighter;
+  opacity: 1;
+}
+
+/* 3. Sliding & Bulging Frosted Blob inside Bottom Navigation */
+.bottom-nav-inner {
+  position: relative;
+  overflow: visible !important;
+}
+
+.nav-sliding-blob {
+  --blob-x: 0px;
+  --blob-w: 64px;
+  --blob-sx: 1;
+  --blob-sy: 1;
+  --blob-opacity: 1;
+
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: var(--blob-w, 64px);
+  height: calc(100% - 10px);
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--blob-opacity, 1);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.62) 0%,
+    rgba(255, 214, 230, 0.45) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 8px 22px -6px rgba(255, 59, 127, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.92) inset;
+  backdrop-filter: blur(18px) saturate(185%);
+  -webkit-backdrop-filter: blur(18px) saturate(185%);
+  transform: translate3d(var(--blob-x, 0px), 0, 0) scale(var(--blob-sx, 1), var(--blob-sy, 1));
+  transform-origin: center center;
+  will-change: transform, width;
+}
+
+[data-theme='dark'] .nav-sliding-blob {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 92, 147, 0.34) 0%,
+    rgba(157, 78, 221, 0.28) 100%
+  );
+  border: 1px solid rgba(255, 170, 205, 0.48);
+  box-shadow:
+    0 10px 26px -6px rgba(255, 92, 147, 0.42),
+    0 1px 0 rgba(255, 210, 232, 0.46) inset;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .nav-sliding-blob {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 92, 147, 0.34) 0%,
+      rgba(157, 78, 221, 0.28) 100%
+    );
+    border: 1px solid rgba(255, 170, 205, 0.48);
+    box-shadow:
+      0 10px 26px -6px rgba(255, 92, 147, 0.42),
+      0 1px 0 rgba(255, 210, 232, 0.46) inset;
+  }
+}
+
+.bottom-nav-inner .nav-item,
+.bottom-nav-inner .nav-checkin-btn {
+  position: relative;
+  z-index: 1;
+}
+
+.nav-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-item.active .nav-icon svg {
+  transform: scale(1.1);
+  filter: drop-shadow(0 2px 6px var(--accent-glow));
+}
+
+/* 4. Ergonomic One-Handed Bottom Quick Dock (Above .bottom-nav, like LoveMusic taskbar) */
+.lg-quick-dock {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 10px);
+  width: min(calc(100% - 28px), calc(var(--max-width) - 28px));
+  z-index: 88;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 9999px;
+  background: var(--lg-scrim);
+  border: 1px solid var(--lg-border);
+  box-shadow: var(--lg-shadow);
+  backdrop-filter: url(#lg-lens) blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+}
+
+.lg-quick-dock-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px;
+}
+
+.lg-quick-dock-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.lg-dock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid var(--liquid-glass-border);
+  background: rgba(255, 255, 255, 0.34);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.lg-dock-chip.active {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.52);
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+[data-theme='dark'] .lg-dock-chip:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 170, 205, 0.24);
+  color: var(--text-secondary);
+}
+
+.lg-quick-dock-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lg-quick-dock-actions .btn-icon,
+.lg-quick-dock-actions .mem-icon-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: 9999px;
+}
+
+/* Give page content extra bottom room so the floating quick dock never covers cards */
+.home-page,
+.memories-page {
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + var(--dock-height, 44px) + 28px) !important;
+}
+
+/* 5. LoveMusic Dark Mode Overrides (Overrides legacy purple-brown dark rules in components.css) */
+[data-theme='dark'] .card,
+[data-theme='dark'] .card-solid,
+[data-theme='dark'] .checkin-card,
+[data-theme='dark'] .recent-memory-card,
+[data-theme='dark'] .memory-item,
+[data-theme='dark'] .profile-section,
+[data-theme='dark'] .settings-group,
+[data-theme='dark'] .messages-composer,
+[data-theme='dark'] .bottom-nav-inner,
+[data-theme='dark'] .lg-quick-dock {
+  background: var(--lg-scrim) !important;
+  border-color: var(--lg-border) !important;
+  box-shadow: var(--lg-shadow) !important;
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .btn-icon,
+[data-theme='dark'] .btn-ghost,
+[data-theme='dark'] .mem-icon-btn,
+[data-theme='dark'] .messages-menu-button,
+[data-theme='dark'] .reaction-pill,
+[data-theme='dark'] .reply-button,
+[data-theme='dark'] .theme-choice {
+  background: linear-gradient(
+    145deg,
+    rgba(74, 20, 108, 0.64) 0%,
+    rgba(36, 0, 70, 0.54) 100%
+  ) !important;
+  border-color: rgba(255, 170, 205, 0.34) !important;
+  color: var(--text-primary) !important;
+  box-shadow:
+    0 8px 20px -8px rgba(8, 0, 18, 0.72),
+    0 1px 0 rgba(255, 205, 230, 0.28) inset !important;
+}
+
+[data-theme='dark'] .btn-primary,
+[data-theme='dark'] .nav-checkin-btn {
+  background: linear-gradient(135deg, #ff5c93 0%, #d83178 52%, #9d4edd 100%) !important;
+  border-color: rgba(255, 210, 232, 0.45) !important;
+  box-shadow:
+    0 12px 28px -8px rgba(255, 92, 147, 0.58),
+    0 1px 0 rgba(255, 255, 255, 0.42) inset !important;
+}

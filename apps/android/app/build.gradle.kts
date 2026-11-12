@@ -7,13 +7,13 @@ plugins {
 
 android {
     namespace = "com.example.lovecheck"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "com.example.lovecheck"
         minSdk = 24
         targetSdk = 36
-        versionCode = 58
-        versionName = "0.0.46"
+        versionCode = 59
+        versionName = "0.0.47"
     }
 
     signingConfigs {
@@ -112,4 +112,7 @@ dependencies {
 
   // Reliable background download for the latest photo widget update.
   implementation(libs.androidx.work.runtime)
+
+  // LoveMusic Liquid Glass shader backdrop
+  implementation(libs.backdrop)
 }

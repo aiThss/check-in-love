@@ -1,10 +1,10 @@
 /* ============================================================
    CSS Design Tokens — LoveCheck PWA
-   Light theme (default) + Dark theme via [data-theme="dark"]
+   Light theme (default, preserved 100%) + Dark theme (LoveMusic Liquid Glass DNA)
    ============================================================ */
 
 :root {
-  /* ── Backgrounds ──────────────────────────────────────────── */
+  /* ── Backgrounds (Light — Preserved 100%) ─────────────────── */
   --bg: #f8e2e7;
   --page-background: var(--bg);
   --surface: #ffffff;
@@ -20,25 +20,31 @@
 
   /* ── Accent ───────────────────────────────────────────────── */
   --accent: #ff3b7f;
+  --accent-pressed: #e02668;
   --accent-soft: #ffd6e7;
   --accent-glow: rgba(255, 59, 127, 0.18);
+  --violet: #9d4edd;
 
   /* ── Shadows ──────────────────────────────────────────────── */
   --shadow: 0 10px 30px rgba(160, 30, 70, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --shadow-elevated: 0 16px 36px rgba(160, 30, 70, 0.14), inset 0 1.5px 1px 0 rgba(255, 255, 255, 1), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.35);
 
-  /* ── Liquid Glass (iOS 26xxx Design) ────────────────────────── */
+  /* ── Liquid Glass (Light Mode Optical Tokens) ─────────────── */
   --liquid-glass-blur: blur(28px) saturate(190%) contrast(102%);
   --liquid-glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(255, 242, 247, 0.58) 100%);
   --liquid-glass-border: rgba(255, 255, 255, 0.65);
   --liquid-glass-shadow: 0 16px 44px -6px rgba(180, 40, 80, 0.12), 0 2px 8px rgba(0, 0, 0, 0.03), inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.3);
+  --lg-scrim: rgba(255, 255, 255, 0.38);
+  --lg-border: rgba(255, 255, 255, 0.72);
+  --lg-shadow: 0 12px 32px rgba(160, 30, 70, 0.12), inset 0 1.5px 1px rgba(255, 255, 255, 0.95), inset 0 -1px 1px rgba(255, 255, 255, 0.35);
+  --lg-glow-rgb: 255, 255, 255;
 
   /* ── Radii ────────────────────────────────────────────────── */
-  --radius-card: 28px;
+  --radius-card: 24px;
   --radius-pill: 999px;
   --radius-sm: 12px;
   --radius-md: 16px;
-  --radius-lg: 24px;
+  --radius-lg: 22px;
 
   /* ── Typography ───────────────────────────────────────────── */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -63,62 +69,93 @@
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* ── Nav ──────────────────────────────────────────────────── */
-  --nav-height: 86px;
+  /* ── Nav & Quick Dock ─────────────────────────────────────── */
+  --nav-height: 84px;
+  --dock-height: 44px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* ── Dark Theme ──────────────────────────────────────────────── */
+/* ── Dark Theme (LoveMusic Liquid Glass Edition DNA) ─────────── */
 [data-theme='dark'] {
-  --bg: #261824;
+  --bg: #14001f;
+  --bg-base: #14001f;
   --page-background:
-    radial-gradient(circle at 86% 8%, rgba(255, 83, 145, 0.2), transparent 30%),
-    radial-gradient(circle at 8% 78%, rgba(142, 87, 218, 0.18), transparent 32%),
-    linear-gradient(180deg, #261824 0%, #342039 52%, #632d4d 100%);
-  --surface: rgba(58, 31, 48, 0.88);
-  --surface-solid: #3b2331;
+    radial-gradient(circle 220px at 16% 12%, rgba(255, 133, 161, 0.42), transparent 70%),
+    radial-gradient(circle 240px at 88% 46%, rgba(0, 245, 212, 0.22), transparent 72%),
+    radial-gradient(circle 260px at 20% 86%, rgba(255, 92, 147, 0.38), transparent 72%),
+    linear-gradient(165deg, #3c0959 0%, #240046 42%, #14001f 100%);
+  --surface: rgba(36, 0, 70, 0.56);
+  --surface-solid: #240046;
   --text-primary: #ffffff;
-  --text-secondary: #b6afb4;
-  --text-tertiary: #91878d;
-  --border: rgba(255, 164, 198, 0.2);
-  --accent: #ff3b7f;
-  --accent-soft: rgba(255, 59, 127, 0.18);
-  --accent-glow: rgba(255, 59, 127, 0.28);
-  --shadow: 0 18px 46px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --shadow-elevated: 0 22px 50px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --text-secondary: rgba(255, 255, 255, 0.78);
+  --text-tertiary: rgba(255, 255, 255, 0.55);
+  --border: rgba(255, 170, 205, 0.24);
+  --accent: #ff5c93;
+  --accent-pressed: #ff3b7f;
+  --accent-soft: rgba(255, 92, 147, 0.2);
+  --accent-glow: rgba(255, 92, 147, 0.34);
+  --violet: #9d4edd;
+  --shadow: 0 18px 46px rgba(10, 0, 20, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.22);
+  --shadow-elevated: 0 22px 54px rgba(10, 0, 20, 0.56), inset 0 1px 1px rgba(255, 255, 255, 0.32), inset 0 -1px 1px rgba(255, 255, 255, 0.1);
 
-  /* ── Liquid Glass Dark ── */
-  --liquid-glass-blur: blur(30px) saturate(190%) contrast(104%);
-  --liquid-glass-bg: linear-gradient(135deg, rgba(52, 30, 46, 0.8) 0%, rgba(36, 20, 32, 0.68) 100%);
-  --liquid-glass-border: rgba(255, 170, 205, 0.22);
-  --liquid-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 1px 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
+  /* ── Liquid Glass Dark (LoveMusic Spec) ── */
+  --liquid-glass-blur: blur(28px) saturate(175%) contrast(104%) brightness(105%);
+  --liquid-glass-bg: linear-gradient(135deg, rgba(58, 16, 86, 0.56) 0%, rgba(20, 0, 31, 0.46) 100%);
+  --liquid-glass-border: rgba(255, 170, 205, 0.28);
+  --liquid-glass-shadow:
+    0 18px 46px -6px rgba(8, 0, 18, 0.55),
+    0 4px 14px rgba(0, 0, 0, 0.28),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -1px 1px 0 rgba(255, 92, 147, 0.14);
+  --lg-scrim: rgba(14, 0, 24, 0.34);
+  --lg-border: rgba(255, 170, 205, 0.28);
+  --lg-shadow:
+    0 10px 28px rgba(8, 0, 18, 0.42),
+    inset 0 1px 1px rgba(255, 255, 255, 0.42),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.12);
+  --lg-glow-rgb: 255, 255, 255;
 }
 
 /* ── System Dark Mode (fallback when theme is "system") ─────── */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #261824;
+    --bg: #14001f;
+    --bg-base: #14001f;
     --page-background:
-      radial-gradient(circle at 86% 8%, rgba(255, 83, 145, 0.2), transparent 30%),
-      radial-gradient(circle at 8% 78%, rgba(142, 87, 218, 0.18), transparent 32%),
-      linear-gradient(180deg, #261824 0%, #342039 52%, #632d4d 100%);
-    --surface: rgba(58, 31, 48, 0.88);
-    --surface-solid: #3b2331;
+      radial-gradient(circle 220px at 16% 12%, rgba(255, 133, 161, 0.42), transparent 70%),
+      radial-gradient(circle 240px at 88% 46%, rgba(0, 245, 212, 0.22), transparent 72%),
+      radial-gradient(circle 260px at 20% 86%, rgba(255, 92, 147, 0.38), transparent 72%),
+      linear-gradient(165deg, #3c0959 0%, #240046 42%, #14001f 100%);
+    --surface: rgba(36, 0, 70, 0.56);
+    --surface-solid: #240046;
     --text-primary: #ffffff;
-    --text-secondary: #b6afb4;
-    --text-tertiary: #91878d;
-    --border: rgba(255, 164, 198, 0.2);
-    --accent: #ff3b7f;
-    --accent-soft: rgba(255, 59, 127, 0.18);
-    --accent-glow: rgba(255, 59, 127, 0.28);
-    --shadow: 0 18px 46px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    --shadow-elevated: 0 22px 50px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --text-secondary: rgba(255, 255, 255, 0.78);
+    --text-tertiary: rgba(255, 255, 255, 0.55);
+    --border: rgba(255, 170, 205, 0.24);
+    --accent: #ff5c93;
+    --accent-pressed: #ff3b7f;
+    --accent-soft: rgba(255, 92, 147, 0.2);
+    --accent-glow: rgba(255, 92, 147, 0.34);
+    --violet: #9d4edd;
+    --shadow: 0 18px 46px rgba(10, 0, 20, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.22);
+    --shadow-elevated: 0 22px 54px rgba(10, 0, 20, 0.56), inset 0 1px 1px rgba(255, 255, 255, 0.32), inset 0 -1px 1px rgba(255, 255, 255, 0.1);
 
-    /* ── Liquid Glass Dark ── */
-    --liquid-glass-blur: blur(30px) saturate(190%) contrast(104%);
-    --liquid-glass-bg: linear-gradient(135deg, rgba(52, 30, 46, 0.8) 0%, rgba(36, 20, 32, 0.68) 100%);
-    --liquid-glass-border: rgba(255, 170, 205, 0.22);
-    --liquid-glass-shadow: 0 18px 46px -6px rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 1px 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.35);
+    /* ── Liquid Glass Dark (LoveMusic Spec) ── */
+    --liquid-glass-blur: blur(28px) saturate(175%) contrast(104%) brightness(105%);
+    --liquid-glass-bg: linear-gradient(135deg, rgba(58, 16, 86, 0.56) 0%, rgba(20, 0, 31, 0.46) 100%);
+    --liquid-glass-border: rgba(255, 170, 205, 0.28);
+    --liquid-glass-shadow:
+      0 18px 46px -6px rgba(8, 0, 18, 0.55),
+      0 4px 14px rgba(0, 0, 0, 0.28),
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.42),
+      inset 0 -1px 1px 0 rgba(255, 92, 147, 0.14);
+    --lg-scrim: rgba(14, 0, 24, 0.34);
+    --lg-border: rgba(255, 170, 205, 0.28);
+    --lg-shadow:
+      0 10px 28px rgba(8, 0, 18, 0.42),
+      inset 0 1px 1px rgba(255, 255, 255, 0.42),
+      inset 0 -1px 1px rgba(255, 255, 255, 0.12);
+    --lg-glow-rgb: 255, 255, 255;
   }
 }

@@ -48,8 +48,13 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.lovecheck.ui.glass.PlatformBackdrop
+import com.example.lovecheck.ui.glass.liquidGlass
+import com.example.lovecheck.ui.glass.rememberBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -568,11 +573,16 @@ class MainActivity : ComponentActivity() {
         setupDailyReminders(this)
 
         setContent {
+            val backdrop = rememberBackdrop()
             Box(modifier = Modifier.fillMaxSize()) {
                 AndroidView(
                     factory = { context ->
                         StickerWebView(context).apply {
                         webView = this
+                        val nightBits = context.resources.configuration.uiMode and
+                            android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                        val isNight = nightBits == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                        setBackgroundColor(if (isNight) 0xFF14001F.toInt() else 0xFFF8E2E7.toInt())
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
@@ -702,12 +712,15 @@ class MainActivity : ComponentActivity() {
                             loadUrl(initialUrlFromIntent(intent))
                         }
                     },
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .layerBackdrop(backdrop),
                 )
 
                 updateUiState?.let { state ->
                     UpdateBottomBar(
                         state = state,
+                        backdrop = backdrop,
                         onPrimary = { onUpdatePrimaryAction(state) },
                         onSecondary = { onUpdateSecondaryAction(state) },
                     )
@@ -1521,13 +1534,13 @@ class MainActivity : ComponentActivity() {
               <meta charset="utf-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
               <style>
-                html,body{margin:0;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+                html,body{margin:0;height:100%;background:linear-gradient(160deg,#240046 0%,#14001f 100%);color:#fff0f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
                 body{display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;box-sizing:border-box}
-                .box{max-width:340px}
+                .box{max-width:340px;padding:28px 24px;border-radius:28px;background:linear-gradient(135deg,rgba(58,16,86,0.62) 0%,rgba(20,0,31,0.52) 100%);border:1px solid rgba(255,170,205,0.32);box-shadow:0 18px 42px rgba(8,0,18,0.75)}
                 .icon{font-size:64px;margin-bottom:16px}
                 h1{font-size:24px;margin:0 0 10px}
                 p{color:#a3a3a3;line-height:1.5;margin:0 0 24px}
-                button{border:0;border-radius:999px;background:#ff3b7f;color:#fff;padding:14px 24px;font-weight:700;font-size:16px}
+                button{border:1px solid rgba(255,210,232,0.45);border-radius:999px;background:linear-gradient(135deg,#ff5c93 0%,#9d4edd 100%);color:#fff;padding:14px 28px;font-weight:700;font-size:16px;box-shadow:0 10px 24px rgba(255,92,147,0.45)}
               </style>
             </head>
             <body>
@@ -1599,6 +1612,7 @@ private data class UpdateDownloadSnapshot(
 @Composable
 private fun UpdateBottomBar(
     state: UpdateUiState,
+    backdrop: PlatformBackdrop,
     onPrimary: () -> Unit,
     onSecondary: () -> Unit,
 ) {
@@ -1620,6 +1634,7 @@ private fun UpdateBottomBar(
         UpdateStage.FAILED -> "Đóng"
     }
 
+    val barShape = RoundedCornerShape(26.dp)
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomCenter,
@@ -1627,10 +1642,19 @@ private fun UpdateBottomBar(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 12.dp, bottom = 14.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xF21F1B24)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                .padding(start = 12.dp, end = 12.dp, bottom = 14.dp)
+                .liquidGlass(
+                    backdrop = backdrop,
+                    shape = barShape,
+                    isInteractive = true,
+                    tintColor = Color(0xFFFF5C93),
+                    surfaceAlpha = 0.16f,
+                    maxScale = 1.03f,
+                )
+                .border(1.dp, Color(0x66FFAACD), barShape),
+            shape = barShape,
+            colors = CardDefaults.cardColors(containerColor = Color(0xCC240046)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 14.dp),
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
@@ -1642,7 +1666,7 @@ private fun UpdateBottomBar(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = title,
-                            color = Color.White,
+                            color = Color(0xFFFFF0F5),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -1651,7 +1675,7 @@ private fun UpdateBottomBar(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = state.detail,
-                            color = Color(0xFFC9C3D4),
+                            color = Color(0xFFE5B8CE),
                             fontSize = 13.sp,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -1665,7 +1689,7 @@ private fun UpdateBottomBar(
                             UpdateStage.READY -> "✓"
                             UpdateStage.FAILED -> "!"
                         },
-                        color = Color(0xFFFF6B98),
+                        color = Color(0xFFFF5C93),
                         fontSize = if (state.stage == UpdateStage.DOWNLOADING) 15.sp else 26.sp,
                         fontWeight = FontWeight.ExtraBold,
                     )
@@ -1678,8 +1702,8 @@ private fun UpdateBottomBar(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(7.dp),
-                        color = Color(0xFFFF477B),
-                        trackColor = Color(0xFF403847),
+                        color = Color(0xFFFF5C93),
+                        trackColor = Color(0xFF4A1040),
                     )
                 }
 
@@ -1694,9 +1718,9 @@ private fun UpdateBottomBar(
                             .weight(1f)
                             .height(46.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFE0DAE9),
+                            contentColor = Color(0xFFFFF0F5),
                         ),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(999.dp),
                     ) {
                         Text(secondaryLabel, fontWeight = FontWeight.Bold)
                     }
@@ -1707,12 +1731,12 @@ private fun UpdateBottomBar(
                             .weight(1f)
                             .height(46.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFF3B7F),
+                            containerColor = Color(0xFFFF5C93),
                             contentColor = Color.White,
-                            disabledContainerColor = Color(0xFF6B4353),
-                            disabledContentColor = Color(0xFFE3CBD3),
+                            disabledContainerColor = Color(0xFF6B3053),
+                            disabledContentColor = Color(0xFFE5B8CE),
                         ),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(999.dp),
                     ) {
                         Text(primaryLabel, fontWeight = FontWeight.ExtraBold)
                     }
