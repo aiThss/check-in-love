@@ -1,294 +1,195 @@
-import { MultipartFile } from '@fastify/multipart';
-import sharp from 'sharp';
-import { FastifyInstance } from 'fastify';
+import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { env } from '../config/env';
-import { Couple } from '../db/models/Couple';
-import { User } from '../db/models/User';
+import {
+  execute,
+  findCoupleById,
+  findCoupleMembers,
+  findPartnerUser,
+  findUserById,
+} from '../db/d1';
+import { toCoupleDto, toPartnerSummaryDto, toUserDto } from '../db/types';
 import { authenticate } from '../middleware/auth';
-import { storageService } from '../services/storage';
-import { recalculateStreak } from '../services/streak';
+import { emitRealtimeEvent } from '../services/realtime';
+import { deleteStoredFile, saveUploadedImage } from '../services/storage';
+import type { HonoAppEnv } from '../types/hono';
+import { AppError } from '../utils/errors';
 
-function toSafeUser(user: InstanceType<typeof User>) {
-  return {
-    id: user._id.toString(),
-    displayName: user.displayName,
-    partnerName: user.partnerName,
-    email: user.email,
-    email_aliases: user.email_aliases || [],
-    avatarUrl: user.avatarUrl,
-    partnerAvatarUrl: user.partnerAvatarUrl,
-    birthday: user.birthday,
-    partnerBirthday: user.partnerBirthday,
-    role: user.role,
-    status: user.status,
-    coupleId: user.coupleId.toString(),
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  };
-}
+export const meRoutes = new Hono<HonoAppEnv>();
 
-const nullableDateSchema = z
-  .string()
-  .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid date' })
-  .nullable();
-
-const patchMeSchema = z.object({
-  displayName: z.string().min(1).optional(),
-  partnerName: z.string().min(1).optional(),
-  loveStartDate: z
-    .string()
-    .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid date' })
-    .optional(),
-  birthday: nullableDateSchema.optional(),
-  partnerBirthday: nullableDateSchema.optional(),
+const updateProfileSchema = z.object({
+  displayName: z.string().trim().min(1).max(60).optional(),
+  partnerName: z.string().trim().min(1).max(60).optional(),
+  loveStartDate: z.string().trim().max(40).nullable().optional(),
+  birthday: z.string().trim().max(40).nullable().optional(),
+  partnerBirthday: z.string().trim().max(40).nullable().optional(),
 });
 
 const reminderSchema = z.object({
   enabled: z.boolean(),
-  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid reminder time'),
-  timezone: z.literal('Asia/Ho_Chi_Minh').default('Asia/Ho_Chi_Minh'),
+  time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Giờ nhắc phải có dạng HH:MM').optional(),
+  timezone: z.string().trim().min(1).max(80).optional(),
 });
 
-async function readMultipartBuffer(
-  part: MultipartFile,
-  maxBytes: number,
-): Promise<{ buffer: Buffer; mimetype: string; filename: string }> {
-  const chunks: Buffer[] = [];
-  let total = 0;
+meRoutes.get('/me', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  const couple = user.couple_id ? await findCoupleById(c.env.DB, user.couple_id) : null;
+  const members = couple ? await findCoupleMembers(c.env.DB, couple.id) : [];
+  const partner = members.find((m) => m.id !== user.id) ?? null;
 
-  for await (const chunk of part.file) {
-    total += chunk.length;
-    if (total > maxBytes) {
-      throw Object.assign(new Error('File too large'), { code: 'FILE_TOO_LARGE' });
-    }
-    chunks.push(chunk);
+  return c.json({
+    user: toUserDto(user),
+    couple: couple ? toCoupleDto(couple, members.map((m) => m.id)) : null,
+    partnerUser: partner ? toPartnerSummaryDto(partner) : undefined,
+  });
+});
+
+meRoutes.patch('/me', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateProfileSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Dữ liệu hồ sơ không hợp lệ', 400, 'VALIDATION_ERROR');
   }
 
-  return {
-    buffer: Buffer.concat(chunks),
-    mimetype: part.mimetype,
-    filename: part.filename,
-  };
-}
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  const nowIso = new Date().toISOString();
+  const data = parsed.data;
 
-export default async function meRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/me/reminder', { preHandler: authenticate }, async (request, reply) => {
-    const user = await User.findById(request.user.id).lean();
-    if (!user) {
-      return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
-    }
+  const nextDisplayName = data.displayName ?? user.display_name;
+  const nextPartnerName = data.partnerName ?? user.partner_name;
+  const nextBirthday = data.birthday !== undefined ? data.birthday : user.birthday;
+  const nextPartnerBirthday =
+    data.partnerBirthday !== undefined ? data.partnerBirthday : user.partner_birthday;
 
-    return reply.status(200).send({
-      reminder: user.checkinReminder ?? {
-        enabled: false,
-        time: '20:30',
-        timezone: 'Asia/Ho_Chi_Minh',
-      },
+  await execute(
+    c.env.DB,
+    `UPDATE users
+     SET display_name = ?, partner_name = ?, birthday = ?, partner_birthday = ?, updated_at = ?
+     WHERE id = ?`,
+    [nextDisplayName, nextPartnerName, nextBirthday, nextPartnerBirthday, nowIso, user.id],
+  );
+
+  if (data.loveStartDate !== undefined && user.couple_id) {
+    await execute(
+      c.env.DB,
+      'UPDATE couples SET love_start_date = ?, updated_at = ? WHERE id = ?',
+      [data.loveStartDate, nowIso, user.couple_id],
+    );
+  }
+
+  const partner = await findPartnerUser(c.env.DB, user.couple_id, user.id);
+  if (partner) {
+    await emitRealtimeEvent(c.env, partner.id, {
+      type: 'partner.updated',
+      senderId: user.id,
+      senderName: nextDisplayName,
     });
+  }
+
+  const updated = (await findUserById(c.env.DB, user.id))!;
+  return c.json({ user: toUserDto(updated) });
+});
+
+meRoutes.get('/me/reminder', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  return c.json({
+    reminderEnabled: Boolean(user.reminder_enabled),
+    reminderTime: user.reminder_time || '20:30',
+    reminderTimezone: user.reminder_timezone || 'Asia/Ho_Chi_Minh',
   });
+});
 
-  app.patch('/me/reminder', { preHandler: authenticate }, async (request, reply) => {
-    const parsed = reminderSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({
-        error: parsed.error.errors[0].message,
-        code: 'VALIDATION_ERROR',
-      });
-    }
+meRoutes.patch('/me/reminder', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  const body = await c.req.json().catch(() => null);
+  const parsed = reminderSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Cài đặt nhắc nhở không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
 
-    const user = await User.findByIdAndUpdate(
-      request.user.id,
-      {
-        $set: {
-          'checkinReminder.enabled': parsed.data.enabled,
-          'checkinReminder.time': parsed.data.time,
-          'checkinReminder.timezone': parsed.data.timezone,
-        },
-      },
-      { new: true },
-    ).lean();
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  const nowIso = new Date().toISOString();
+  const nextTime = parsed.data.time ?? user.reminder_time ?? '20:30';
+  const nextTz = parsed.data.timezone ?? user.reminder_timezone ?? 'Asia/Ho_Chi_Minh';
 
-    if (!user) {
-      return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
-    }
+  await execute(
+    c.env.DB,
+    `UPDATE users
+     SET reminder_enabled = ?,
+         reminder_time = ?,
+         reminder_timezone = ?,
+         reminder_last_sent_date = NULL,
+         reminder_lease_date = NULL,
+         updated_at = ?
+     WHERE id = ?`,
+    [parsed.data.enabled ? 1 : 0, nextTime, nextTz, nowIso, user.id],
+  );
 
-    return reply.status(200).send({ reminder: user.checkinReminder });
+  const updated = (await findUserById(c.env.DB, user.id))!;
+  return c.json({
+    reminderEnabled: Boolean(updated.reminder_enabled),
+    reminderTime: updated.reminder_time,
+    reminderTimezone: updated.reminder_timezone,
+    user: toUserDto(updated),
   });
+});
 
-  /**
-   * GET /me — Current user profile + couple + partner info
-   */
-  app.get('/me', { preHandler: authenticate }, async (request, reply) => {
-    const user = await User.findById(request.user.id);
-    if (!user) {
-      return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
-    }
+async function handleAvatarUpload(c: Context<HonoAppEnv>, isPartnerAvatar: boolean) {
+  const auth = c.get('user')!;
+  const config = c.get('config');
+  const formData = await c.req.formData().catch(() => null);
+  const fileEntry = formData?.get('avatar') ?? formData?.get('file') ?? formData?.get('photo');
+  if (!(fileEntry instanceof File)) {
+    throw new AppError('Vui lòng chọn tệp ảnh đại diện', 400, 'MISSING_FILE');
+  }
 
-    const couple = await Couple.findById(user.coupleId);
-    if (!couple) {
-      return reply.status(404).send({ error: 'Couple not found', code: 'NOT_FOUND' });
-    }
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  const oldPath = isPartnerAvatar ? user.partner_avatar_url : user.avatar_url;
+  const uploaded = await saveUploadedImage(c.env.STORAGE, config, fileEntry, 'avatars');
+  const nowIso = new Date().toISOString();
 
-    // Rebuild from actual check-in dates so old cached/stuck counters repair themselves.
-    const streakSnapshot = await recalculateStreak(couple._id.toString());
-
-    // Find partner: the other member of couple
-    const partnerMemberId = couple.memberIds.find(
-      (id) => id.toString() !== user._id.toString(),
+  if (isPartnerAvatar) {
+    await execute(
+      c.env.DB,
+      'UPDATE users SET partner_avatar_url = ?, updated_at = ? WHERE id = ?',
+      [uploaded.url, nowIso, user.id],
+    );
+  } else {
+    await execute(
+      c.env.DB,
+      'UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?',
+      [uploaded.url, nowIso, user.id],
     );
 
-    let partnerUser: ReturnType<typeof toSafeUser> | undefined;
-    if (partnerMemberId) {
-      const partner = await User.findById(partnerMemberId);
-      if (partner) {
-        partnerUser = toSafeUser(partner);
-      }
+    const partner = await findPartnerUser(c.env.DB, user.couple_id, user.id);
+    if (partner) {
+      await execute(
+        c.env.DB,
+        'UPDATE users SET partner_avatar_url = ?, updated_at = ? WHERE id = ?',
+        [uploaded.url, nowIso, partner.id],
+      );
+      await emitRealtimeEvent(c.env, partner.id, {
+        type: 'partner.avatar.updated',
+        partnerAvatarUrl: uploaded.url,
+        senderId: user.id,
+        senderName: user.display_name,
+        senderAvatar: uploaded.url,
+      });
     }
+  }
 
-    return reply.status(200).send({
-      user: toSafeUser(user),
-      couple: {
-        id: couple._id.toString(),
-        code: couple.code,
-        loveStartDate: couple.loveStartDate,
-        memberIds: couple.memberIds.map((id) => id.toString()),
-        streak: streakSnapshot.streak,
-        lastCheckinDate: streakSnapshot.lastCheckinDate,
-      },
-      partnerUser,
-    });
+  if (oldPath && oldPath.includes(uploaded.storagePath) === false) {
+    await deleteStoredFile(c.env.STORAGE, oldPath, config.R2_PUBLIC_URL);
+  }
+
+  const updated = (await findUserById(c.env.DB, user.id))!;
+  return c.json({
+    avatarUrl: isPartnerAvatar ? updated.partner_avatar_url : updated.avatar_url,
+    user: toUserDto(updated),
   });
-
-  /**
-   * PATCH /me — Update profile fields
-   */
-  app.patch('/me', { preHandler: authenticate }, async (request, reply) => {
-    const parsed = patchMeSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply
-        .status(400)
-        .send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
-    }
-
-    const { displayName, partnerName, loveStartDate, birthday, partnerBirthday } = parsed.data;
-
-    const user = await User.findById(request.user.id);
-    if (!user) {
-      return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
-    }
-
-    if (displayName !== undefined) user.displayName = displayName;
-    if (partnerName !== undefined) user.partnerName = partnerName;
-    if (birthday !== undefined) user.birthday = birthday ? new Date(birthday) : undefined;
-    if (partnerBirthday !== undefined) {
-      user.partnerBirthday = partnerBirthday ? new Date(partnerBirthday) : undefined;
-    }
-    await user.save();
-
-    if (loveStartDate !== undefined) {
-      await Couple.findByIdAndUpdate(user.coupleId, {
-        loveStartDate: new Date(loveStartDate),
-      });
-    }
-
-    return reply.status(200).send({ user: toSafeUser(user) });
-  });
-
-  /**
-   * POST /me/avatar — Upload user's own avatar
-   */
-  app.post(
-    '/me/avatar',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const maxBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
-
-      const data = await request.file();
-      if (!data) {
-        return reply
-          .status(400)
-          .send({ error: 'No file uploaded', code: 'NO_FILE' });
-      }
-
-      if (!data.mimetype.startsWith('image/')) {
-        return reply
-          .status(400)
-          .send({ error: 'Only image files are allowed', code: 'INVALID_MIME' });
-      }
-
-      let { buffer } = await readMultipartBuffer(data, maxBytes);
-
-      // Resize to max 512x512 while preserving aspect ratio
-      buffer = await sharp(buffer)
-        .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-        .toBuffer();
-
-      const { url, storagePath } = await storageService.saveFile(
-        buffer,
-        data.filename,
-        data.mimetype,
-      );
-
-      const user = await User.findByIdAndUpdate(
-        request.user.id,
-        { avatarUrl: url },
-        { new: true },
-      );
-
-      return reply.status(200).send({
-        avatarUrl: url,
-        storagePath,
-        user: user ? toSafeUser(user) : null,
-      });
-    },
-  );
-
-  /**
-   * POST /me/partner-avatar — Upload partner's avatar
-   */
-  app.post(
-    '/me/partner-avatar',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const maxBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
-
-      const data = await request.file();
-      if (!data) {
-        return reply
-          .status(400)
-          .send({ error: 'No file uploaded', code: 'NO_FILE' });
-      }
-
-      if (!data.mimetype.startsWith('image/')) {
-        return reply
-          .status(400)
-          .send({ error: 'Only image files are allowed', code: 'INVALID_MIME' });
-      }
-
-      let { buffer } = await readMultipartBuffer(data, maxBytes);
-
-      buffer = await sharp(buffer)
-        .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-        .toBuffer();
-
-      const { url, storagePath } = await storageService.saveFile(
-        buffer,
-        data.filename,
-        data.mimetype,
-      );
-
-      const user = await User.findByIdAndUpdate(
-        request.user.id,
-        { partnerAvatarUrl: url },
-        { new: true },
-      );
-
-      return reply.status(200).send({
-        partnerAvatarUrl: url,
-        storagePath,
-        user: user ? toSafeUser(user) : null,
-      });
-    },
-  );
 }
+
+meRoutes.post('/me/avatar', authenticate, (c) => handleAvatarUpload(c, false));
+meRoutes.post('/me/partner-avatar', authenticate, (c) => handleAvatarUpload(c, true));

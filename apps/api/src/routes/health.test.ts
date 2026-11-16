@@ -1,17 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
-import healthRoute from './health';
+import { describe, expect, it } from 'vitest';
+import { createApp } from '../app';
+import type { WorkerEnv } from '../config/env';
+import { createTestD1Database, MemoryR2Bucket } from '../db/sqlite-test-d1';
 
 describe('health route', () => {
-  it('registers and returns an OK response for health probes', async () => {
-    let handler: ((request: unknown, reply: any) => Promise<unknown>) | undefined;
-    const app = { get: vi.fn((_path: string, nextHandler: typeof handler) => { handler = nextHandler; }) };
-    await healthRoute(app as any);
-    const reply = { status: vi.fn(), send: vi.fn((value) => value) };
-    reply.status.mockReturnValue(reply);
+  it('returns an OK SQL/Workers health response for /health and /api/health', async () => {
+    const db = createTestD1Database();
+    const env = { DB: db, STORAGE: new MemoryR2Bucket(), NODE_ENV: 'test' } as unknown as WorkerEnv;
+    const app = createApp();
 
-    await handler?.({}, reply);
+    const rootRes = await app.request('http://localhost/health', {}, env);
+    expect(rootRes.status).toBe(200);
+    await expect(rootRes.json()).resolves.toMatchObject({
+      status: 'ok',
+      database: 'd1-sqlite',
+      runtime: 'cloudflare-workers',
+    });
 
-    expect(reply.status).toHaveBeenCalledWith(200);
-    expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ status: 'ok', version: '1.0.0' }));
+    const apiRes = await app.request('http://localhost/api/health', {}, env);
+    expect(apiRes.status).toBe(200);
+    await expect(apiRes.json()).resolves.toMatchObject({ status: 'ok' });
   });
 });

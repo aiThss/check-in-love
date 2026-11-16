@@ -152,8 +152,9 @@ type LocalDarkGlassVariant = keyof typeof localDarkGlassVariants;
 
 // Change only this id when testing the next remembered local-only palette.
 const selectedLocalDarkGlassVariant: LocalDarkGlassVariant = 'v6';
+const enableLegacyDarkOverride = false;
 
-if (isViteDev) {
+if (enableLegacyDarkOverride && isViteDev) {
   const palette = localDarkGlassVariants[selectedLocalDarkGlassVariant];
   const localDarkCardPreview = document.createElement('style');
   localDarkCardPreview.id = 'dev-local-dark-card-preview';

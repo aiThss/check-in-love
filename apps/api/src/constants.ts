@@ -1,4 +1,4 @@
-import { RandomCategory } from './db/models/RandomEvent';
+export type RandomCategory = 'questions' | 'snap' | 'today' | 'food' | 'universe';
 
 export interface RandomCategoryMeta {
   category: RandomCategory;

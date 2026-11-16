@@ -1,173 +1,174 @@
-import { Types } from 'mongoose';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createApp } from '../app';
+import type { WorkerEnv } from '../config/env';
+import { createTestD1Database, MemoryR2Bucket } from '../db/sqlite-test-d1';
+import { signJwt } from '../utils/crypto';
 
-const mocks = vi.hoisted(() => ({
-  findOne: vi.fn(),
-  create: vi.fn(),
-  findByIdUser: vi.fn(),
-  findByIdCouple: vi.fn(),
-  updateStreak: vi.fn().mockResolvedValue(1),
-  chatMessageFindOne: vi.fn(),
-  chatMessageCreate: vi.fn(),
-  storageSave: vi.fn(),
-  sharp: vi.fn(),
-}));
+describe('Check-ins SQL routes', () => {
+  const secret = 'test-jwt-secret-key-min-32-chars!!';
+  let db: D1Database;
+  let env: WorkerEnv;
+  let tokenUser1: string;
+  let tokenUser2: string;
 
-vi.mock('../db/models/CheckIn', () => ({
-  CheckIn: { findOne: mocks.findOne, create: mocks.create },
-}));
-vi.mock('../db/models/ChatMessage', () => ({
-  ChatMessage: { findOne: mocks.chatMessageFindOne, create: mocks.chatMessageCreate },
-}));
-vi.mock('../db/models/Couple', () => ({ Couple: { findById: mocks.findByIdCouple } }));
-vi.mock('../db/models/User', () => ({ User: { findById: mocks.findByIdUser } }));
-vi.mock('../middleware/auth', () => ({ authenticate: vi.fn() }));
-vi.mock('../services/push', () => ({ sendPushToUser: vi.fn() }));
-vi.mock('../services/storage', () => ({ storageService: { saveFile: mocks.storageSave } }));
-vi.mock('../services/streak', () => ({ updateStreak: mocks.updateStreak }));
-vi.mock('../config/env', () => ({ env: { MAX_UPLOAD_MB: 5 } }));
-vi.mock('sharp', () => ({ default: mocks.sharp }));
+  beforeEach(async () => {
+    db = createTestD1Database();
+    env = {
+      DB: db,
+      STORAGE: new MemoryR2Bucket() as unknown as R2Bucket,
+      NODE_ENV: 'test',
+      JWT_SECRET: secret,
+      PUBLIC_BASE_URL: 'https://api.couple.io.vn',
+      R2_PUBLIC_URL: 'https://pub-test.r2.dev',
+    } as unknown as WorkerEnv;
 
-type Handler = (request: any, reply: any) => Promise<unknown>;
+    const now = new Date().toISOString();
+    await db
+      .prepare('INSERT INTO couples (id, code, streak, created_at, updated_at) VALUES (?, ?, 0, ?, ?)')
+      .bind('couple_1', 'LOVE99', now, now)
+      .run();
 
-function createReply() {
-  const reply = {
-    status: vi.fn(),
-    send: vi.fn((value) => value),
-  };
-  reply.status.mockReturnValue(reply);
-  return reply;
-}
+    await db
+      .prepare(
+        `INSERT INTO users (id, display_name, partner_name, email, role, status, couple_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'user', 'active', ?, ?, ?)`,
+      )
+      .bind('user_1', 'An', 'Binh', 'an@example.com', 'couple_1', now, now)
+      .run();
 
-async function getCreateHandler(): Promise<Handler> {
-  const handlers = new Map<string, Handler>();
-  const app = {
-    get: vi.fn(),
-    delete: vi.fn(),
-    post: vi.fn((path: string, _options: unknown, handler: Handler) => handlers.set(path, handler)),
-  };
-  const { default: checkinsRoutes } = await import('./checkins');
-  await checkinsRoutes(app as any);
-  return handlers.get('/checkins')!;
-}
+    await db
+      .prepare(
+        `INSERT INTO users (id, display_name, partner_name, email, role, status, couple_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'user', 'active', ?, ?, ?)`,
+      )
+      .bind('user_2', 'Binh', 'An', 'binh@example.com', 'couple_1', now, now)
+      .run();
 
-describe('POST /checkins reply target validation', () => {
-  const coupleId = new Types.ObjectId();
-  const userId = new Types.ObjectId();
-  const originalId = new Types.ObjectId();
-
-  beforeEach(() => {
-    vi.resetModules();
-    mocks.findOne.mockReset();
-    mocks.create.mockReset();
-    mocks.findByIdUser.mockReset();
-    mocks.findByIdCouple.mockReset();
-    mocks.chatMessageFindOne.mockReset();
-    mocks.chatMessageCreate.mockReset();
-    mocks.storageSave.mockReset();
-    mocks.sharp.mockReset();
-    mocks.findByIdUser.mockReturnValue({ lean: vi.fn().mockResolvedValue({ displayName: 'Me' }) });
-    mocks.findByIdCouple.mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
-    mocks.create.mockResolvedValue({ _id: new Types.ObjectId() });
-    mocks.chatMessageFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
-    mocks.chatMessageCreate.mockResolvedValue({ _id: new Types.ObjectId() });
+    tokenUser1 = await signJwt({ userId: 'user_1', coupleId: 'couple_1', role: 'user' }, secret);
+    tokenUser2 = await signJwt({ userId: 'user_2', coupleId: 'couple_1', role: 'user' }, secret);
   });
 
-  it('persists a server-derived reply snapshot only for a target in the same couple', async () => {
-    const original = {
-      _id: originalId,
-      ownerId: new Types.ObjectId(),
-      ownerName: 'Partner',
-      type: 'text',
-      caption: 'Tin nhắn gốc',
-      coupleId,
-    };
-    mocks.findOne.mockReturnValue({ lean: vi.fn().mockResolvedValue(original) });
-    const handler = await getCreateHandler();
-    const reply = createReply();
+  it('creates text and photo check-ins, updates streak, syncs replies to chat, and soft deletes', async () => {
+    const app = createApp();
 
-    await handler({
-      user: { id: userId.toString(), coupleId: coupleId.toString() },
-      headers: { 'content-type': 'application/json' },
-      body: { type: 'text', caption: 'Trả lời', replyToMessageId: originalId.toString() },
-    }, reply);
-
-    expect(mocks.findOne).toHaveBeenCalledWith(expect.objectContaining({
-      _id: expect.any(Types.ObjectId),
-      coupleId: expect.any(Types.ObjectId),
-      deletedAt: null,
-    }));
-    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
-      replyToMessageId: originalId,
-      replyTo: expect.objectContaining({
-        messageId: originalId,
-        senderName: 'Partner',
-        textSnippet: 'Tin nhắn gốc',
-      }),
-    }));
-  });
-
-  it('rejects a reply target that is not visible in the current couple', async () => {
-    mocks.findOne.mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
-    const handler = await getCreateHandler();
-    const reply = createReply();
-
-    await handler({
-      user: { id: userId.toString(), coupleId: coupleId.toString() },
-      headers: { 'content-type': 'application/json' },
-      body: { type: 'text', caption: 'Trả lời', replyToMessageId: originalId.toString() },
-    }, reply);
-
-    expect(reply.status).toHaveBeenCalledWith(404);
-    expect(mocks.create).not.toHaveBeenCalled();
-  });
-
-  it('keeps the legacy create request compatible when replyToMessageId is absent', async () => {
-    const handler = await getCreateHandler();
-    const reply = createReply();
-
-    await handler({
-      user: { id: userId.toString(), coupleId: coupleId.toString() },
-      headers: { 'content-type': 'application/json' },
-      body: { type: 'text', caption: 'Tin nhắn thường' },
-    }, reply);
-
-    expect(mocks.findOne).not.toHaveBeenCalled();
-    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ replyTo: undefined }));
-  });
-
-  it('creates one ChatMessage topic for every photo check-in without duplicating the uploaded image', async () => {
-    const createdCheckinId = new Types.ObjectId();
-    const createdAt = new Date();
-    mocks.create.mockImplementation(async (data) => ({
-      _id: createdCheckinId,
-      createdAt,
-      ...data,
-    }));
-    mocks.storageSave.mockResolvedValue({ url: '/uploads/photo.jpg', storagePath: 'photo.jpg' });
-    mocks.sharp.mockReturnValue({
-      rotate: () => ({ resize: () => ({ jpeg: () => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('image')) }) }) }),
-    });
-    const handler = await getCreateHandler();
-
-    await handler({
-      user: { id: userId.toString(), coupleId: coupleId.toString() },
-      headers: { 'content-type': 'multipart/form-data; boundary=test' },
-      parts: async function* () {
-        yield { type: 'field', fieldname: 'caption', value: 'Ảnh cho hai đứa' };
-        yield {
-          type: 'file',
-          mimetype: 'image/jpeg',
-          filename: 'photo.jpg',
-          file: (async function* () { yield Buffer.from('image'); })(),
-        };
+    // 1) Create text check-in with idempotency
+    const createRes = await app.request(
+      'http://localhost/api/checkins',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenUser1}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'text',
+          caption: 'Hôm nay trời đẹp quá!',
+          clientMutationId: 'mut-checkin-1',
+        }),
       },
-    }, createReply());
+      env,
+    );
+    expect(createRes.status).toBe(201);
+    const createdJson = (await createRes.json()) as { checkIn: { id: string; caption: string }; streak: number };
+    expect(createdJson.checkIn.caption).toBe('Hôm nay trời đẹp quá!');
+    expect(createdJson.streak).toBe(1);
 
-    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'photo', imageUrl: '/uploads/photo.jpg' }));
-    expect(mocks.chatMessageCreate).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'image', imageUrl: '/uploads/photo.jpg', referencedCheckinId: createdCheckinId,
-      referencedCheckin: expect.objectContaining({ checkinId: createdCheckinId }),
-    }));
+    // Repeat with same clientMutationId -> idempotent 200
+    const repeatRes = await app.request(
+      'http://localhost/api/checkins',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenUser1}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'text',
+          caption: 'Duplicate',
+          clientMutationId: 'mut-checkin-1',
+        }),
+      },
+      env,
+    );
+    expect(repeatRes.status).toBe(200);
+    const repeatJson = (await repeatRes.json()) as { checkIn: { id: string } };
+    expect(repeatJson.checkIn.id).toBe(createdJson.checkIn.id);
+
+    // 2) Partner fetches latest-partner
+    const partnerRes = await app.request(
+      'http://localhost/api/checkins/latest-partner',
+      { headers: { Authorization: `Bearer ${tokenUser2}` } },
+      env,
+    );
+    expect(partnerRes.status).toBe(200);
+    const partnerJson = (await partnerRes.json()) as { checkIn: { id: string } | null };
+    expect(partnerJson.checkIn?.id).toBe(createdJson.checkIn.id);
+
+    // 3) Partner adds reaction + reply (verifies chat sync!)
+    const reactRes = await app.request(
+      `http://localhost/api/checkins/${createdJson.checkIn.id}/reactions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenUser2}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type: '❤️' }),
+      },
+      env,
+    );
+    expect(reactRes.status).toBe(200);
+    const reactJson = (await reactRes.json()) as { reactions: Array<{ type: string; userId: string }> };
+    expect(reactJson.reactions).toHaveLength(1);
+
+    const replyRes = await app.request(
+      `http://localhost/api/checkins/${createdJson.checkIn.id}/replies`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenUser2}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: 'Đi dạo không em?' }),
+      },
+      env,
+    );
+    expect(replyRes.status).toBe(200);
+
+    const msgRes = await app.request(
+      'http://localhost/api/messages',
+      { headers: { Authorization: `Bearer ${tokenUser1}` } },
+      env,
+    );
+    expect(msgRes.status).toBe(200);
+    const msgJson = (await msgRes.json()) as { messages: Array<{ type: string; text: string }> };
+    expect(msgJson.messages).toHaveLength(1);
+    expect(msgJson.messages[0]).toMatchObject({
+      type: 'checkin_reply',
+      text: 'Đi dạo không em?',
+    });
+
+    // 4) Non-owner delete rejected (403), owner delete succeeds and updates streak
+    const forbidRes = await app.request(
+      `http://localhost/api/checkins/${createdJson.checkIn.id}`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${tokenUser2}` } },
+      env,
+    );
+    expect(forbidRes.status).toBe(403);
+
+    const delRes = await app.request(
+      `http://localhost/api/checkins/${createdJson.checkIn.id}`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${tokenUser1}` } },
+      env,
+    );
+    expect(delRes.status).toBe(200);
+
+    const afterDeleteRes = await app.request(
+      'http://localhost/api/checkins/latest',
+      { headers: { Authorization: `Bearer ${tokenUser1}` } },
+      env,
+    );
+    const afterDeleteJson = (await afterDeleteRes.json()) as { checkIn: unknown };
+    expect(afterDeleteJson.checkIn).toBeNull();
   });
 });

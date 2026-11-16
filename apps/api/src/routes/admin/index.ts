@@ -1,618 +1,481 @@
-import bcrypt from 'bcryptjs';
-import { FastifyInstance } from 'fastify';
-import fs from 'fs';
-import jwt from 'jsonwebtoken';
-import { Types } from 'mongoose';
-import path from 'path';
+import { Hono } from 'hono';
 import { z } from 'zod';
-import { env } from '../../config/env';
-import { CheckIn } from '../../db/models/CheckIn';
-import { Couple } from '../../db/models/Couple';
-import { OtpCode } from '../../db/models/OtpCode';
-import { PushSubscription } from '../../db/models/PushSubscription';
-import { RandomEvent } from '../../db/models/RandomEvent';
-import { User } from '../../db/models/User';
-import { authenticateAdmin } from '../../middleware/adminAuth';
-import { storageService } from '../../services/storage';
+import { execute, queryAll, queryOne } from '../../db/d1';
+import {
+  type ChatMessageRow,
+  type CheckinRow,
+  type CoupleRow,
+  type RandomEventRow,
+  type UserRow,
+} from '../../db/types';
+import { authenticateAdmin } from '../../middleware/auth';
+import { deleteStoredFile } from '../../services/storage';
+import type { HonoAppEnv } from '../../types/hono';
+import { signJwt } from '../../utils/crypto';
+import { AppError } from '../../utils/errors';
+
+export const adminRoutes = new Hono<HonoAppEnv>();
+
+const RESET_CONFIRMATION = 'RESET CHECK IN LOVE';
 
 const adminLoginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   password: z.string().min(1),
 });
 
-const patchUserSchema = z.object({
-  status: z.enum(['active', 'blocked']).optional(),
-  displayName: z.string().min(1).optional(),
-  partnerName: z.string().min(1).optional(),
-});
-
-const patchCoupleSchema = z.object({
-  loveStartDate: z
-    .string()
-    .refine((v) => !isNaN(Date.parse(v)), { message: 'Invalid date' })
-    .optional(),
-  code: z.string().min(1).optional(),
-});
-
-const maintenanceResetSchema = z.object({
-  confirmation: z.literal('RESET CHECK IN LOVE'),
-});
-
-function timingSafeEqual(a: string, b: string): boolean {
-  // Use Buffer.equals which is timing-safe in Node.js for same-length buffers
-  const aBuf = Buffer.from(a, 'utf8');
-  const bBuf = Buffer.from(b, 'utf8');
-  if (aBuf.length !== bBuf.length) {
-    // Prevent short-circuit length comparison from leaking info
-    // by still doing a comparison
-    let result = 0;
-    const maxLen = Math.max(aBuf.length, bBuf.length);
-    for (let i = 0; i < maxLen; i++) {
-      result |= (aBuf[i] ?? 0) ^ (bBuf[i] ?? 0);
-    }
-    return result === 0 && aBuf.length === bBuf.length;
-  }
-  return aBuf.equals(bBuf);
+function parsePageLimit(query: Record<string, string>) {
+  const page = Math.max(1, Number.parseInt(query.page || '1', 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(query.limit || '20', 10) || 20));
+  return { page, limit, offset: (page - 1) * limit };
 }
 
-async function clearUploadDir(): Promise<void> {
-  const uploadDir = path.resolve(env.UPLOAD_DIR);
-  const root = path.parse(uploadDir).root;
-
-  if (uploadDir === root) {
-    throw new Error('Refusing to clear filesystem root as upload directory');
+adminRoutes.post('/login', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = adminLoginSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError('Email hoặc mật khẩu quản trị không hợp lệ', 400, 'VALIDATION_ERROR');
   }
 
-  await fs.promises.rm(uploadDir, { recursive: true, force: true });
-  await fs.promises.mkdir(uploadDir, { recursive: true });
-}
-
-function storagePathFromUploadUrl(uploadUrl?: string): string | undefined {
-  if (!uploadUrl) return undefined;
-
-  const marker = '/uploads/';
-  const markerIndex = uploadUrl.indexOf(marker);
-  if (markerIndex === -1) return undefined;
-
-  try {
-    return decodeURIComponent(uploadUrl.slice(markerIndex + marker.length));
-  } catch {
-    return uploadUrl.slice(markerIndex + marker.length);
+  const config = c.get('config');
+  if (
+    !config.ADMIN_EMAIL ||
+    !config.ADMIN_PASSWORD ||
+    parsed.data.email.toLowerCase() !== config.ADMIN_EMAIL.toLowerCase() ||
+    parsed.data.password !== config.ADMIN_PASSWORD
+  ) {
+    throw new AppError('Thông tin đăng nhập quản trị không đúng', 401, 'INVALID_CREDENTIALS');
   }
-}
 
-async function deleteStoredFiles(
-  storagePaths: Array<string | undefined>,
-  app: FastifyInstance,
-): Promise<void> {
-  const uniquePaths = Array.from(
-    new Set(storagePaths.filter((path): path is string => Boolean(path))),
+  const token = await signJwt(
+    { sub: 'admin', role: 'admin', email: config.ADMIN_EMAIL },
+    config.JWT_SECRET,
+    7 * 24 * 60 * 60,
   );
 
-  const results = await Promise.allSettled(
-    uniquePaths.map((storagePath) => storageService.deleteFile(storagePath)),
-  );
+  return c.json({ token, admin: { email: config.ADMIN_EMAIL, role: 'admin' } });
+});
 
-  results.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      app.log.error(
-        { err: result.reason, storagePath: uniquePaths[index] },
-        'Failed to delete stored file',
-      );
-    }
+adminRoutes.get('/summary', authenticateAdmin, async (c) => {
+  const [usersRow, blockedRow, couplesRow, checkinsRow, randomRow] = await Promise.all([
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM users'),
+    queryOne<{ cnt: number }>(c.env.DB, "SELECT COUNT(*) AS cnt FROM users WHERE status = 'blocked'"),
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM couples'),
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM checkins WHERE deleted_at IS NULL'),
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM random_events'),
+  ]);
+
+  return c.json({
+    totalUsers: Number(usersRow?.cnt ?? 0),
+    blockedUsers: Number(blockedRow?.cnt ?? 0),
+    totalCouples: Number(couplesRow?.cnt ?? 0),
+    totalCheckIns: Number(checkinsRow?.cnt ?? 0),
+    totalRandomEvents: Number(randomRow?.cnt ?? 0),
   });
-}
+});
 
-export default async function adminRoutes(app: FastifyInstance): Promise<void> {
-  /**
-   * POST /admin/login — Authenticate as admin
-   */
-  app.post('/admin/login', async (request, reply) => {
-    const parsed = adminLoginSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({
-        error: parsed.error.errors[0].message,
-        code: 'VALIDATION_ERROR',
-      });
-    }
-
-    const { email, password } = parsed.data;
-
-    // Timing-safe email comparison
-    const emailMatch = timingSafeEqual(email, env.ADMIN_EMAIL);
-    if (!emailMatch) {
-      // Still compute bcrypt to prevent timing attacks based on email check short-circuit
-      await bcrypt.compare(password, '$2a$12$invalidhashfortimingprotection00000000000');
-      return reply
-        .status(401)
-        .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
-    }
-
-    // Try bcrypt compare first (if password was stored hashed), else plain
-    const passwordMatch = timingSafeEqual(password, env.ADMIN_PASSWORD);
-    if (!passwordMatch) {
-      return reply
-        .status(401)
-        .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
-    }
-
-    const token = jwt.sign({ role: 'admin', sub: 'admin' }, env.JWT_SECRET, {
-      expiresIn: '24h',
-    });
-
-    return reply.status(200).send({ token });
+adminRoutes.get('/maintenance/reset', authenticateAdmin, (c) => {
+  const config = c.get('config');
+  return c.json({
+    enabled: config.ADMIN_ENABLE_TEST_RESET,
+    confirmation: RESET_CONFIRMATION,
   });
+});
 
-  /**
-   * GET /admin/summary — Dashboard aggregation stats
-   */
-  app.get(
-    '/admin/summary',
-    { preHandler: authenticateAdmin },
-    async (_request, reply) => {
-      const [totalUsers, totalCouples, totalCheckIns, blockedUsers, totalRandomEvents] =
-        await Promise.all([
-          User.countDocuments({ role: 'user' }),
-          Couple.countDocuments(),
-          CheckIn.countDocuments({ deletedAt: null }),
-          User.countDocuments({ status: 'blocked' }),
-          RandomEvent.countDocuments(),
-        ]);
+adminRoutes.post('/maintenance/reset', authenticateAdmin, async (c) => {
+  const config = c.get('config');
+  if (!config.ADMIN_ENABLE_TEST_RESET) {
+    throw new AppError('Chức năng reset đang bị tắt trên server', 403, 'RESET_DISABLED');
+  }
 
-      return reply.status(200).send({
-        totalUsers,
-        totalCouples,
-        totalCheckIns,
-        blockedUsers,
-        totalRandomEvents,
-      });
-    },
+  const body = (await c.req.json().catch(() => null)) as { confirmation?: string } | null;
+  if (body?.confirmation !== RESET_CONFIRMATION) {
+    throw new AppError(`Chuỗi xác nhận phải là "${RESET_CONFIRMATION}"`, 400, 'INVALID_CONFIRMATION');
+  }
+
+  const checkinsWithMedia = await queryAll<{ storage_path: string | null }>(
+    c.env.DB,
+    'SELECT storage_path FROM checkins WHERE storage_path IS NOT NULL',
+  );
+  const messagesWithMedia = await queryAll<{ storage_path: string | null }>(
+    c.env.DB,
+    'SELECT storage_path FROM chat_messages WHERE storage_path IS NOT NULL',
   );
 
-  /**
-   * GET /admin/maintenance/reset — Test reset feature flag status
-   */
-  app.get(
-    '/admin/maintenance/reset',
-    { preHandler: authenticateAdmin },
-    async (_request, reply) => {
-      return reply.status(200).send({
-        enabled: env.ADMIN_ENABLE_TEST_RESET,
-        confirmation: 'RESET CHECK IN LOVE',
-      });
+  for (const row of [...checkinsWithMedia, ...messagesWithMedia]) {
+    if (row.storage_path) {
+      await deleteStoredFile(c.env.STORAGE, row.storage_path, config.R2_PUBLIC_URL);
+    }
+  }
+
+  const [usersCnt, couplesCnt, checkinsCnt, randomCnt, pushCnt, otpCnt] = await Promise.all([
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM users'),
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM couples'),
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM checkins'),
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM random_events'),
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM push_subscriptions'),
+    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM otp_codes'),
+  ]);
+
+  await execute(c.env.DB, 'DELETE FROM chat_messages');
+  await execute(c.env.DB, 'DELETE FROM checkins');
+  await execute(c.env.DB, 'DELETE FROM couple_journeys');
+  await execute(c.env.DB, 'DELETE FROM random_events');
+  await execute(c.env.DB, 'DELETE FROM push_subscriptions');
+  await execute(c.env.DB, 'DELETE FROM otp_codes');
+  await execute(c.env.DB, 'DELETE FROM users');
+  await execute(c.env.DB, 'DELETE FROM couples');
+  await execute(c.env.DB, 'DELETE FROM system_kv');
+
+  return c.json({
+    success: true,
+    deleted: {
+      users: Number(usersCnt?.cnt ?? 0),
+      couples: Number(couplesCnt?.cnt ?? 0),
+      checkIns: Number(checkinsCnt?.cnt ?? 0),
+      randomEvents: Number(randomCnt?.cnt ?? 0),
+      pushSubscriptions: Number(pushCnt?.cnt ?? 0),
+      otpCodes: Number(otpCnt?.cnt ?? 0),
     },
+  });
+});
+
+adminRoutes.get('/users', authenticateAdmin, async (c) => {
+  const { page, limit, offset } = parsePageLimit(c.req.query());
+  const search = c.req.query('search')?.trim();
+
+  let whereSql = '1 = 1';
+  const params: unknown[] = [];
+  if (search) {
+    whereSql = '(u.display_name LIKE ? OR u.email LIKE ? OR c.code LIKE ?)';
+    const like = `%${search}%`;
+    params.push(like, like, like);
+  }
+
+  const countRow = await queryOne<{ cnt: number }>(
+    c.env.DB,
+    `SELECT COUNT(*) AS cnt
+     FROM users u
+     LEFT JOIN couples c ON u.couple_id = c.id
+     WHERE ${whereSql}`,
+    params,
+  );
+  const total = Number(countRow?.cnt ?? 0);
+
+  const rows = await queryAll<UserRow & { couple_code: string | null }>(
+    c.env.DB,
+    `SELECT u.*, c.code AS couple_code
+     FROM users u
+     LEFT JOIN couples c ON u.couple_id = c.id
+     WHERE ${whereSql}
+     ORDER BY u.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset],
   );
 
-  /**
-   * POST /admin/maintenance/reset — Clear all app test data
-   */
-  app.post(
-    '/admin/maintenance/reset',
-    { preHandler: authenticateAdmin },
-    async (request, reply) => {
-      if (!env.ADMIN_ENABLE_TEST_RESET) {
-        return reply.status(403).send({
-          error: 'Test reset is disabled',
-          code: 'RESET_DISABLED',
-        });
-      }
+  const users = rows.map((row) => ({
+    _id: row.id,
+    id: row.id,
+    displayName: row.display_name,
+    partnerName: row.partner_name,
+    email: row.email ?? undefined,
+    avatarUrl: row.avatar_url ?? undefined,
+    status: row.status,
+    role: row.role,
+    coupleId: row.couple_id
+      ? { _id: row.couple_id, id: row.couple_id, code: row.couple_code ?? undefined }
+      : null,
+    coupleCode: row.couple_code ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
 
-      const parsed = maintenanceResetSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: 'Type RESET CHECK IN LOVE to confirm',
-          code: 'CONFIRMATION_REQUIRED',
-        });
-      }
-
-      const [
-        users,
-        couples,
-        checkIns,
-        randomEvents,
-        pushSubscriptions,
-        otpCodes,
-      ] = await Promise.all([
-        User.deleteMany({}),
-        Couple.deleteMany({}),
-        CheckIn.deleteMany({}),
-        RandomEvent.deleteMany({}),
-        PushSubscription.deleteMany({}),
-        OtpCode.deleteMany({}),
-      ]);
-
-      await clearUploadDir();
-
-      return reply.status(200).send({
-        success: true,
-        deleted: {
-          users: users.deletedCount ?? 0,
-          couples: couples.deletedCount ?? 0,
-          checkIns: checkIns.deletedCount ?? 0,
-          randomEvents: randomEvents.deletedCount ?? 0,
-          pushSubscriptions: pushSubscriptions.deletedCount ?? 0,
-          otpCodes: otpCodes.deletedCount ?? 0,
-        },
-      });
+  return c.json({
+    users,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     },
+  });
+});
+
+adminRoutes.patch('/users/:id', authenticateAdmin, async (c) => {
+  const userId = c.req.param('id');
+  const body = (await c.req.json().catch(() => null)) as { status?: string } | null;
+  if (body?.status !== 'active' && body?.status !== 'blocked') {
+    throw new AppError('Trạng thái người dùng không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+
+  const nowIso = new Date().toISOString();
+  const res = await execute(
+    c.env.DB,
+    'UPDATE users SET status = ?, updated_at = ? WHERE id = ?',
+    [body.status, nowIso, userId],
+  );
+  if ((res.meta?.changes ?? 0) === 0) {
+    throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
+  }
+
+  const updated = await queryOne<UserRow & { couple_code: string | null }>(
+    c.env.DB,
+    `SELECT u.*, c.code AS couple_code
+     FROM users u
+     LEFT JOIN couples c ON u.couple_id = c.id
+     WHERE u.id = ? LIMIT 1`,
+    [userId],
   );
 
-  /**
-   * GET /admin/users — Paginated user list
-   */
-  app.get(
-    '/admin/users',
-    { preHandler: authenticateAdmin },
-    async (request, reply) => {
-      const query = request.query as {
-        page?: string;
-        limit?: string;
-        search?: string;
-      };
+  return c.json({
+    user: updated
+      ? {
+          _id: updated.id,
+          id: updated.id,
+          displayName: updated.display_name,
+          email: updated.email ?? undefined,
+          avatarUrl: updated.avatar_url ?? undefined,
+          status: updated.status,
+          coupleId: updated.couple_id
+            ? { _id: updated.couple_id, id: updated.couple_id, code: updated.couple_code ?? undefined }
+            : null,
+          createdAt: updated.created_at,
+          updatedAt: updated.updated_at,
+        }
+      : null,
+  });
+});
 
-      const page = Math.max(1, parseInt(query.page ?? '1', 10));
-      const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? '20', 10)));
-      const skip = (page - 1) * limit;
+adminRoutes.delete('/users/:id', authenticateAdmin, async (c) => {
+  const userId = c.req.param('id');
+  const existing = await queryOne<UserRow>(
+    c.env.DB,
+    'SELECT * FROM users WHERE id = ? LIMIT 1',
+    [userId],
+  );
+  if (!existing) {
+    throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
+  }
 
-      const filter: Record<string, unknown> = { role: 'user' };
-      if (query.search) {
-        const regex = new RegExp(query.search, 'i');
-        filter.$or = [
-          { displayName: regex },
-          { email: regex },
-          { email_aliases: regex },
-        ];
-      }
+  const checkins = await queryAll<CheckinRow>(
+    c.env.DB,
+    'SELECT storage_path FROM checkins WHERE owner_id = ? AND storage_path IS NOT NULL',
+    [userId],
+  );
+  const messages = await queryAll<ChatMessageRow>(
+    c.env.DB,
+    'SELECT storage_path FROM chat_messages WHERE sender_id = ? AND storage_path IS NOT NULL',
+    [userId],
+  );
+  for (const row of [...checkins, ...messages]) {
+    if (row.storage_path) {
+      await deleteStoredFile(c.env.STORAGE, row.storage_path, c.get('config').R2_PUBLIC_URL);
+    }
+  }
 
-      const [users, total] = await Promise.all([
-        User.find(filter)
-          .select('-passwordHash')
-          .populate('coupleId', 'code')
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .lean(),
-        User.countDocuments(filter),
-      ]);
+  await execute(c.env.DB, 'DELETE FROM users WHERE id = ?', [userId]);
+  return c.json({ success: true });
+});
 
-      return reply.status(200).send({
-        users,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
-    },
+adminRoutes.get('/couples', authenticateAdmin, async (c) => {
+  const { page, limit, offset } = parsePageLimit(c.req.query());
+  const countRow = await queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM couples');
+  const total = Number(countRow?.cnt ?? 0);
+
+  const coupleRows = await queryAll<CoupleRow>(
+    c.env.DB,
+    'SELECT * FROM couples ORDER BY created_at DESC LIMIT ? OFFSET ?',
+    [limit, offset],
   );
 
-  /**
-   * PATCH /admin/users/:id — Update a user
-   */
-  app.patch(
-    '/admin/users/:id',
-    { preHandler: authenticateAdmin },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
+  const coupleIds = coupleRows.map((cRow) => cRow.id);
+  const membersByCouple = new Map<string, UserRow[]>();
+  if (coupleIds.length > 0) {
+    const placeholders = coupleIds.map(() => '?').join(', ');
+    const memberRows = await queryAll<UserRow>(
+      c.env.DB,
+      `SELECT * FROM users WHERE couple_id IN (${placeholders})`,
+      coupleIds,
+    );
+    for (const member of memberRows) {
+      if (!member.couple_id) continue;
+      const arr = membersByCouple.get(member.couple_id) ?? [];
+      arr.push(member);
+      membersByCouple.set(member.couple_id, arr);
+    }
+  }
 
-      const parsed = patchUserSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
+  const couples = coupleRows.map((row) => ({
+    _id: row.id,
+    id: row.id,
+    code: row.code,
+    loveStartDate: row.love_start_date ?? undefined,
+    streak: row.streak,
+    memberIds: (membersByCouple.get(row.id) ?? []).map((m) => ({
+      _id: m.id,
+      id: m.id,
+      displayName: m.display_name,
+      email: m.email ?? undefined,
+      avatarUrl: m.avatar_url ?? undefined,
+      status: m.status,
+    })),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
 
-      const updates: Record<string, unknown> = {};
-      if (parsed.data.status !== undefined) updates.status = parsed.data.status;
-      if (parsed.data.displayName !== undefined)
-        updates.displayName = parsed.data.displayName;
-      if (parsed.data.partnerName !== undefined)
-        updates.partnerName = parsed.data.partnerName;
-
-      const user = await User.findByIdAndUpdate(
-        new Types.ObjectId(id),
-        updates,
-        { new: true },
-      ).select('-passwordHash');
-
-      if (!user) {
-        return reply
-          .status(404)
-          .send({ error: 'User not found', code: 'NOT_FOUND' });
-      }
-
-      return reply.status(200).send({ user });
+  return c.json({
+    couples,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     },
+  });
+});
+
+adminRoutes.patch('/couples/:id', authenticateAdmin, async (c) => {
+  const coupleId = c.req.param('id');
+  const body = (await c.req.json().catch(() => null)) as { loveStartDate?: string } | null;
+  if (!body || typeof body.loveStartDate !== 'string') {
+    throw new AppError('Ngày bắt đầu yêu không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+
+  const nowIso = new Date().toISOString();
+  const res = await execute(
+    c.env.DB,
+    'UPDATE couples SET love_start_date = ?, updated_at = ? WHERE id = ?',
+    [body.loveStartDate.trim() || null, nowIso, coupleId],
+  );
+  if ((res.meta?.changes ?? 0) === 0) {
+    throw new AppError('Không tìm thấy couple', 404, 'COUPLE_NOT_FOUND');
+  }
+
+  const row = (await queryOne<CoupleRow>(c.env.DB, 'SELECT * FROM couples WHERE id = ? LIMIT 1', [coupleId]))!;
+  const members = await queryAll<UserRow>(c.env.DB, 'SELECT * FROM users WHERE couple_id = ?', [coupleId]);
+
+  return c.json({
+    couple: {
+      _id: row.id,
+      id: row.id,
+      code: row.code,
+      loveStartDate: row.love_start_date ?? undefined,
+      streak: row.streak,
+      memberIds: members.map((m) => ({
+        _id: m.id,
+        id: m.id,
+        displayName: m.display_name,
+        email: m.email ?? undefined,
+        avatarUrl: m.avatar_url ?? undefined,
+        status: m.status,
+      })),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    },
+  });
+});
+
+adminRoutes.get('/checkins', authenticateAdmin, async (c) => {
+  const { page, limit, offset } = parsePageLimit(c.req.query());
+  const includeDeleted = c.req.query('includeDeleted') === 'true';
+
+  const whereSql = includeDeleted ? '1 = 1' : 'ci.deleted_at IS NULL';
+  const countRow = await queryOne<{ cnt: number }>(
+    c.env.DB,
+    `SELECT COUNT(*) AS cnt FROM checkins ci WHERE ${whereSql}`,
+  );
+  const total = Number(countRow?.cnt ?? 0);
+
+  const rows = await queryAll<CheckinRow & { owner_avatar: string | null }>(
+    c.env.DB,
+    `SELECT ci.*, u.avatar_url AS owner_avatar
+     FROM checkins ci
+     LEFT JOIN users u ON ci.owner_id = u.id
+     WHERE ${whereSql}
+     ORDER BY ci.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [limit, offset],
   );
 
-  /**
-   * DELETE /admin/users/:id — Hard delete a test user and owned data
-   */
-  app.delete(
-    '/admin/users/:id',
-    { preHandler: authenticateAdmin },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
+  const checkIns = rows.map((row) => ({
+    _id: row.id,
+    id: row.id,
+    ownerId: row.owner_id,
+    ownerName: row.owner_name,
+    ownerAvatar: row.owner_avatar ?? undefined,
+    type: row.type,
+    caption: row.caption ?? undefined,
+    mood: row.mood ?? undefined,
+    imageUrl: row.image_url ?? undefined,
+    deletedAt: row.deleted_at ?? undefined,
+    coupleId: row.couple_id,
+    createdAt: row.created_at,
+  }));
 
-      if (!Types.ObjectId.isValid(id)) {
-        return reply
-          .status(400)
-          .send({ error: 'Invalid user id', code: 'VALIDATION_ERROR' });
-      }
-
-      const userId = new Types.ObjectId(id);
-      const user = await User.findById(userId);
-
-      if (!user || user.role !== 'user') {
-        return reply
-          .status(404)
-          .send({ error: 'User not found', code: 'NOT_FOUND' });
-      }
-
-      const coupleId = user.coupleId;
-      const couple = await Couple.findById(coupleId).lean();
-      const remainingMemberIds =
-        couple?.memberIds.filter((memberId) => !memberId.equals(userId)) ?? [];
-      const shouldDeleteCouple = Boolean(couple && remainingMemberIds.length === 0);
-
-      const checkInFilter = shouldDeleteCouple ? { coupleId } : { ownerId: userId };
-      const randomEventFilter = shouldDeleteCouple
-        ? { coupleId }
-        : { userId };
-      const pushFilter = shouldDeleteCouple ? { coupleId } : { userId };
-
-      const checkInsToDelete = await CheckIn.find(checkInFilter)
-        .select('storagePath')
-        .lean();
-
-      await deleteStoredFiles(
-        [
-          ...checkInsToDelete.map((checkIn) => checkIn.storagePath),
-          storagePathFromUploadUrl(user.avatarUrl),
-          storagePathFromUploadUrl(user.partnerAvatarUrl),
-        ],
-        app,
-      );
-
-      const otpDeletePromise = user.email
-        ? OtpCode.deleteMany({ email: user.email.toLowerCase() })
-        : Promise.resolve({ deletedCount: 0 });
-
-      const [
-        userDelete,
-        checkInsDelete,
-        randomEventsDelete,
-        pushSubscriptionsDelete,
-        otpCodesDelete,
-      ] = await Promise.all([
-        User.deleteOne({ _id: userId }),
-        CheckIn.deleteMany(checkInFilter),
-        RandomEvent.deleteMany(randomEventFilter),
-        PushSubscription.deleteMany(pushFilter),
-        otpDeletePromise,
-      ]);
-
-      let couplesDeleted = 0;
-      let reactionsRemoved = 0;
-
-      if (shouldDeleteCouple) {
-        const coupleDelete = await Couple.deleteOne({ _id: coupleId });
-        couplesDeleted = coupleDelete.deletedCount ?? 0;
-      } else if (couple) {
-        await Couple.updateOne(
-          { _id: coupleId },
-          { $pull: { memberIds: userId } },
-        );
-
-        const reactionUpdate = await CheckIn.updateMany(
-          {
-            $or: [
-              { 'reactions.userId': userId },
-              { 'replies.userId': userId },
-            ],
-          },
-          { $pull: { reactions: { userId }, replies: { userId } } },
-        );
-        reactionsRemoved = reactionUpdate.modifiedCount ?? 0;
-      }
-
-      return reply.status(200).send({
-        success: true,
-        deleted: {
-          users: userDelete.deletedCount ?? 0,
-          couples: couplesDeleted,
-          checkIns: checkInsDelete.deletedCount ?? 0,
-          randomEvents: randomEventsDelete.deletedCount ?? 0,
-          pushSubscriptions: pushSubscriptionsDelete.deletedCount ?? 0,
-          otpCodes: otpCodesDelete.deletedCount ?? 0,
-        },
-        updated: {
-          reactions: reactionsRemoved,
-        },
-      });
+  return c.json({
+    checkIns,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     },
+  });
+});
+
+adminRoutes.delete('/checkins/:id', authenticateAdmin, async (c) => {
+  const checkinId = c.req.param('id');
+  const existing = await queryOne<CheckinRow>(
+    c.env.DB,
+    'SELECT * FROM checkins WHERE id = ? LIMIT 1',
+    [checkinId],
+  );
+  if (!existing) {
+    throw new AppError('Không tìm thấy check-in', 404, 'CHECKIN_NOT_FOUND');
+  }
+
+  const nowIso = new Date().toISOString();
+  await execute(
+    c.env.DB,
+    'UPDATE checkins SET deleted_at = COALESCE(deleted_at, ?), updated_at = ? WHERE id = ?',
+    [nowIso, nowIso, checkinId],
+  );
+  return c.json({ success: true });
+});
+
+adminRoutes.get('/random-events', authenticateAdmin, async (c) => {
+  const { page, limit, offset } = parsePageLimit(c.req.query());
+  const countRow = await queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM random_events');
+  const total = Number(countRow?.cnt ?? 0);
+
+  const rows = await queryAll<RandomEventRow & { user_name: string | null; couple_code: string | null }>(
+    c.env.DB,
+    `SELECT re.*, u.display_name AS user_name, co.code AS couple_code
+     FROM random_events re
+     LEFT JOIN users u ON re.user_id = u.id
+     LEFT JOIN couples co ON re.couple_id = co.id
+     ORDER BY re.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [limit, offset],
   );
 
-  /**
-   * GET /admin/couples — Paginated couples list with members
-   */
-  app.get(
-    '/admin/couples',
-    { preHandler: authenticateAdmin },
-    async (request, reply) => {
-      const query = request.query as { page?: string; limit?: string };
+  const events = rows.map((row) => ({
+    _id: row.id,
+    id: row.id,
+    category: row.category,
+    prompt: row.prompt,
+    detail: row.detail ?? undefined,
+    userId: { _id: row.user_id, id: row.user_id, displayName: row.user_name ?? 'Ẩn danh' },
+    coupleId: { _id: row.couple_id, id: row.couple_id, code: row.couple_code ?? undefined },
+    createdAt: row.created_at,
+  }));
 
-      const page = Math.max(1, parseInt(query.page ?? '1', 10));
-      const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? '20', 10)));
-      const skip = (page - 1) * limit;
-
-      const [couples, total] = await Promise.all([
-        Couple.find()
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .populate('memberIds', 'displayName email avatarUrl status')
-          .lean(),
-        Couple.countDocuments(),
-      ]);
-
-      return reply.status(200).send({
-        couples,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
+  return c.json({
+    events,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     },
-  );
-
-  /**
-   * PATCH /admin/couples/:id — Update couple
-   */
-  app.patch(
-    '/admin/couples/:id',
-    { preHandler: authenticateAdmin },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
-
-      const parsed = patchCoupleSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      const updates: Record<string, unknown> = {};
-      if (parsed.data.loveStartDate !== undefined)
-        updates.loveStartDate = new Date(parsed.data.loveStartDate);
-      if (parsed.data.code !== undefined)
-        updates.code = parsed.data.code.toUpperCase();
-
-      const couple = await Couple.findByIdAndUpdate(
-        new Types.ObjectId(id),
-        updates,
-        { new: true },
-      );
-
-      if (!couple) {
-        return reply
-          .status(404)
-          .send({ error: 'Couple not found', code: 'NOT_FOUND' });
-      }
-
-      return reply.status(200).send({ couple });
-    },
-  );
-
-  /**
-   * GET /admin/checkins — Paginated check-ins with optional filters
-   */
-  app.get(
-    '/admin/checkins',
-    { preHandler: authenticateAdmin },
-    async (request, reply) => {
-      const query = request.query as {
-        page?: string;
-        limit?: string;
-        coupleId?: string;
-        includeDeleted?: string;
-      };
-
-      const page = Math.max(1, parseInt(query.page ?? '1', 10));
-      const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? '20', 10)));
-      const skip = (page - 1) * limit;
-      const includeDeleted = query.includeDeleted === 'true';
-
-      const filter: Record<string, unknown> = {};
-      if (!includeDeleted) {
-        filter.deletedAt = null;
-      }
-      if (query.coupleId) {
-        filter.coupleId = new Types.ObjectId(query.coupleId);
-      }
-
-      const [checkIns, total] = await Promise.all([
-        CheckIn.find(filter)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .lean(),
-        CheckIn.countDocuments(filter),
-      ]);
-
-      return reply.status(200).send({
-        checkIns,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
-    },
-  );
-
-  /**
-   * DELETE /admin/checkins/:id — Soft delete any check-in
-   */
-  app.delete(
-    '/admin/checkins/:id',
-    { preHandler: authenticateAdmin },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
-
-      const checkIn = await CheckIn.findById(new Types.ObjectId(id));
-      if (!checkIn) {
-        return reply
-          .status(404)
-          .send({ error: 'Check-in not found', code: 'NOT_FOUND' });
-      }
-
-      checkIn.deletedAt = new Date();
-      await checkIn.save();
-
-      return reply.status(200).send({ success: true });
-    },
-  );
-
-  /**
-   * GET /admin/random-events — Paginated random events with user info
-   */
-  app.get(
-    '/admin/random-events',
-    { preHandler: authenticateAdmin },
-    async (request, reply) => {
-      const query = request.query as { page?: string; limit?: string };
-
-      const page = Math.max(1, parseInt(query.page ?? '1', 10));
-      const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? '20', 10)));
-      const skip = (page - 1) * limit;
-
-      const [events, total] = await Promise.all([
-        RandomEvent.find()
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .populate('userId', 'displayName email')
-          .populate('coupleId', 'code')
-          .lean(),
-        RandomEvent.countDocuments(),
-      ]);
-
-      return reply.status(200).send({
-        events,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
-    },
-  );
-}
+  });
+});

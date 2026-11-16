@@ -1,197 +1,154 @@
-import { FastifyInstance } from 'fastify';
-import { Types } from 'mongoose';
+import { Hono } from 'hono';
 import { z } from 'zod';
-import { env } from '../config/env';
-import { PushSubscription } from '../db/models/PushSubscription';
-import { User } from '../db/models/User';
+import { execute, findUserById, queryAll } from '../db/d1';
+import { parseJsonSafe, type PushSubscriptionRow } from '../db/types';
 import { authenticate } from '../middleware/auth';
 import { sendPushToUser } from '../services/push';
-import { emitRealtimeEvent } from './events';
+import type { HonoAppEnv } from '../types/hono';
+import { AppError } from '../utils/errors';
+import { generateId } from '../utils/id';
 
-const subscribeBodySchema = z.object({
-  endpoint: z.string().url(),
+export const pushRoutes = new Hono<HonoAppEnv>();
+
+const subscribeWebSchema = z.object({
+  endpoint: z.string().trim().url('Endpoint push không hợp lệ'),
   keys: z.object({
-    auth: z.string().min(1),
-    p256dh: z.string().min(1),
+    auth: z.string().trim().min(1),
+    p256dh: z.string().trim().min(1),
   }),
-  userAgent: z.string().optional(),
+  userAgent: z.string().trim().max(500).optional(),
 });
 
-const unsubscribeBodySchema = z.object({
-  endpoint: z.string().url(),
+const fcmTokenSchema = z.object({
+  token: z.string().trim().min(10, 'FCM token không hợp lệ').max(4096),
 });
 
-export default async function pushRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/push/config', async (_request, reply) => {
-    return reply.status(200).send({
-      enabled: Boolean(env.VAPID_PUBLIC_KEY),
-      publicKey: env.VAPID_PUBLIC_KEY ?? null,
-    });
+pushRoutes.get('/push/config', authenticate, (c) => {
+  const config = c.get('config');
+  const enabled = Boolean(config.VAPID_PUBLIC_KEY && config.VAPID_PRIVATE_KEY);
+  return c.json({
+    enabled,
+    publicKey: enabled ? config.VAPID_PUBLIC_KEY : null,
+  });
+});
+
+pushRoutes.post('/push/subscribe', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = subscribeWebSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Dữ liệu push không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+
+  const nowIso = new Date().toISOString();
+  await execute(
+    c.env.DB,
+    `INSERT INTO push_subscriptions (
+      id, user_id, couple_id, endpoint, keys_auth, keys_p256dh, user_agent, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET
+      user_id = excluded.user_id,
+      couple_id = excluded.couple_id,
+      keys_auth = excluded.keys_auth,
+      keys_p256dh = excluded.keys_p256dh,
+      user_agent = excluded.user_agent,
+      updated_at = excluded.updated_at`,
+    [
+      generateId(),
+      auth.id,
+      auth.coupleId,
+      parsed.data.endpoint,
+      parsed.data.keys.auth,
+      parsed.data.keys.p256dh,
+      parsed.data.userAgent ?? null,
+      nowIso,
+      nowIso,
+    ],
+  );
+
+  return c.json({ success: true });
+});
+
+pushRoutes.post('/push/unsubscribe', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  const body = (await c.req.json().catch(() => null)) as { endpoint?: string } | null;
+  if (body?.endpoint) {
+    await execute(
+      c.env.DB,
+      'DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?',
+      [auth.id, body.endpoint.trim()],
+    );
+  } else {
+    await execute(c.env.DB, 'DELETE FROM push_subscriptions WHERE user_id = ?', [auth.id]);
+  }
+  return c.json({ success: true });
+});
+
+pushRoutes.post('/push/subscribe-fcm', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  const body = await c.req.json().catch(() => null);
+  const parsed = fcmTokenSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'FCM token không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  const existing = parseJsonSafe<string[]>(user.fcm_tokens_json, []);
+  const next = Array.from(new Set([parsed.data.token, ...existing])).slice(0, 10);
+
+  await execute(
+    c.env.DB,
+    'UPDATE users SET fcm_tokens_json = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(next), new Date().toISOString(), user.id],
+  );
+
+  return c.json({ success: true, tokenCount: next.length });
+});
+
+pushRoutes.post('/push/unsubscribe-fcm', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  const body = (await c.req.json().catch(() => null)) as { token?: string } | null;
+  const user = await findUserById(c.env.DB, auth.id);
+  if (!user) return c.json({ success: true });
+
+  const existing = parseJsonSafe<string[]>(user.fcm_tokens_json, []);
+  const next = body?.token ? existing.filter((t) => t !== body.token!.trim()) : [];
+
+  await execute(
+    c.env.DB,
+    'UPDATE users SET fcm_tokens_json = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(next), new Date().toISOString(), user.id],
+  );
+
+  return c.json({ success: true });
+});
+
+pushRoutes.post('/push/test', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  const user = await findUserById(c.env.DB, auth.id);
+  const subs = await queryAll<PushSubscriptionRow>(
+    c.env.DB,
+    'SELECT id FROM push_subscriptions WHERE user_id = ?',
+    [auth.id],
+  );
+
+  const fcmTokens = parseJsonSafe<string[]>(user?.fcm_tokens_json, []);
+  const result = await sendPushToUser(c.env, c.get('config'), auth.id, {
+    title: 'Check IN Love 💕',
+    body: 'Thông báo đẩy đang hoạt động mượt mà!',
+    url: '/app/home',
+    tag: 'push-test',
+    type: 'test',
   });
 
-  /**
-   * POST /push/subscribe — Register or update a push subscription
-   */
-  app.post(
-    '/push/subscribe',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const parsed = subscribeBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      const { endpoint, keys, userAgent } = parsed.data;
-
-      await PushSubscription.findOneAndUpdate(
-        { endpoint },
-        {
-          userId: new Types.ObjectId(request.user.id),
-          coupleId: new Types.ObjectId(request.user.coupleId),
-          endpoint,
-          keys,
-          userAgent,
-        },
-        { upsert: true, new: true },
-      );
-
-      return reply.status(200).send({ success: true });
-    },
-  );
-
-  /**
-   * POST /push/unsubscribe — Remove a push subscription
-   */
-  app.post(
-    '/push/unsubscribe',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const parsed = unsubscribeBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      const { endpoint } = parsed.data;
-
-      await PushSubscription.deleteOne({
-        endpoint,
-        userId: new Types.ObjectId(request.user.id),
-      });
-
-      return reply.status(200).send({ success: true });
-    },
-  );
-
-  const subscribeFcmBodySchema = z.object({
-    fcmToken: z.string().min(1),
+  return c.json({
+    success: true,
+    subscriptions: subs.length,
+    fcmTokens: fcmTokens.length,
+    delivered: result,
   });
-
-  /**
-   * POST /push/subscribe-fcm — Register FCM token
-   */
-  app.post(
-    '/push/subscribe-fcm',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const parsed = subscribeFcmBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      const { fcmToken } = parsed.data;
-
-      await User.findByIdAndUpdate(
-        request.user.id,
-        { $addToSet: { fcmTokens: fcmToken } }
-      );
-
-      return reply.status(200).send({ success: true });
-    },
-  );
-
-  /**
-   * POST /push/unsubscribe-fcm — Unregister FCM token
-   */
-  app.post(
-    '/push/unsubscribe-fcm',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const parsed = subscribeFcmBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      const { fcmToken } = parsed.data;
-
-      await User.findByIdAndUpdate(
-        request.user.id,
-        { $pull: { fcmTokens: fcmToken } }
-      );
-
-      return reply.status(200).send({ success: true });
-    },
-  );
-
-  /**
-   * POST /push/test — Send a test push notification to the current user
-   */
-  app.post(
-    '/push/test',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const user = await User.findById(request.user.id).lean();
-      const userName = user?.displayName || 'Bạn';
-
-      try {
-        emitRealtimeEvent(request.user.id, {
-          type: 'reminder',
-          title: 'Kiểm tra thông báo 💕',
-          body: `Xin chào ${userName}! Thông báo Check IN Love đang hoạt động rất tốt ✨`,
-          targetUrl: '/app/home',
-          senderName: 'Check IN Love',
-          senderAvatar: user?.avatarUrl || '',
-        });
-
-        const result = await sendPushToUser(request.user.id, {
-          title: 'Kiểm tra thông báo 💕',
-          body: `Xin chào ${userName}! Thông báo Check IN Love đang hoạt động rất tốt ✨`,
-          senderName: 'Check IN Love',
-          senderAvatar: user?.avatarUrl || '',
-          actionType: 'reminder',
-          targetUrl: '/app/home',
-          url: '/app/home',
-        });
-
-        const targets: string[] = [];
-        if (result.fcm.sent > 0) targets.push(`${result.fcm.sent} app Android (FCM)`);
-        if (result.webPush.sent > 0) targets.push(`${result.webPush.sent} web browser`);
-
-        return reply.status(200).send({
-          success: true,
-          message: targets.length > 0
-            ? `Đã gửi thông báo thành công tới ${targets.join(' và ')}! ✨`
-            : 'Đã gửi thông báo tức thời tới ứng dụng của bạn! ✨',
-          details: result,
-        });
-      } catch (err: any) {
-        app.log.error({ err }, 'Failed to send test push notification');
-        return reply.status(500).send({
-          error: err?.message || 'Không thể gửi thông báo thử nghiệm',
-          code: 'PUSH_ERROR',
-        });
-      }
-    },
-  );
-}
+});

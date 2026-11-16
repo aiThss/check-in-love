@@ -1,0 +1,44 @@
+name = "check-in-love-api"
+account_id = "8ccdd0f39d9060b1de9fdb6132acbcb7"
+main = "src/worker.ts"
+compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "couple-db"
+database_id = "265081d5-bbc7-48a9-9dca-81b83b49a1f4"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "check-in-love-storage"
+
+[[durable_objects.bindings]]
+name = "REALTIME_HUB"
+class_name = "RealtimeHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RealtimeHub"]
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+NODE_ENV = "production"
+PUBLIC_BASE_URL = "https://api.couple.io.vn"
+MAX_UPLOAD_MB = "20"
+ALLOWED_ORIGINS = "https://couple.io.vn,https://admin.couple.io.vn"
+SMTP_HOST = "smtp.tino.vn"
+SMTP_PORT = "587"
+SMTP_SECURE = "false"
+SMTP_USER = "admin@couple.io.vn"
+SMTP_FROM = "Check IN Love 💕 <support@couple.io.vn>"
+VAPID_EMAIL = "admin@couple.io.vn"
+VAPID_PUBLIC_KEY = "BBouQESS-oMSVRcnq1q3HihBMTFrWsB_dtQG5sMLyKUQ7yLFBpZb9iT7645bdAK-YYj4VoawG4lt0fCwf6xWEUU"
+GOOGLE_CLIENT_ID = "894898478385-g6e1nfj90upono5559an4r443f13ds9s.apps.googleusercontent.com"
+ADMIN_ENABLE_TEST_RESET = "true"
+R2_ACCOUNT_ID = "8ccdd0f39d9060b1de9fdb6132acbcb7"
+R2_BUCKET_NAME = "check-in-love-storage"
+R2_PUBLIC_URL = "https://pub-55b9353a3b6545fc816821cc3c7dac73.r2.dev/"

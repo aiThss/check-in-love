@@ -79,3 +79,19 @@ check-in-love-firebase.json
 firebase-service-account.json
 *-firebase-adminsdk-*.json
 
+
+# Cloudflare Workers / Wrangler & local SQL/env secrets
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+wrangler.local.*
+*.db
+*.sqlite
+*.sqlite3
+apps/api/.dev.vars
+apps/api/.wrangler/
+apps/pwa/.env*
+!apps/pwa/.env.example
+apps/admin/.env*
+!apps/admin/.env.example

@@ -32,10 +32,6 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-const SUPPORTS_HOVER =
-  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
-    : false;
 let nav: HTMLElement | null = null;
 let blobEl: HTMLElement | null = null;
 let blobX = 0;
@@ -128,13 +124,9 @@ function applyActiveState(path: string): void {
     }
 
     if (!button.classList.contains('nav-checkin-btn')) {
-      // Touch browsers can keep :hover stuck after tapping. Keep inactive tabs
-      // explicitly transparent there so browser back never leaves two highlights.
-      button.style.background = active
-        ? 'var(--accent-soft)'
-        : SUPPORTS_HOVER
-          ? ''
-          : 'transparent';
+      // Keep inactive and active tab buttons transparent so .nav-sliding-blob
+      // renders as the unified Liquid Glass pill behind the active tab.
+      button.style.background = 'transparent';
     }
 
     if (!active && document.activeElement === button) button.blur();

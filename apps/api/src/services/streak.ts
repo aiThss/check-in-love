@@ -1,108 +1,75 @@
-import { Types } from 'mongoose';
-import { CheckIn } from '../db/models/CheckIn';
-import { Couple } from '../db/models/Couple';
+import { execute, queryAll, queryOne } from '../db/d1';
 
-const VN_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-interface DailyCheckin {
-  _id: string;
-  latestAt: Date;
-}
-
-export interface StreakSnapshot {
-  streak: number;
-  lastCheckinDate?: Date;
-}
-
-function getVNDayKey(date: Date): string {
-  const vnTime = new Date(date.getTime() + VN_OFFSET_MS);
-  const year = vnTime.getUTCFullYear();
-  const month = String(vnTime.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(vnTime.getUTCDate()).padStart(2, '0');
+export function getVNDateKey(date: Date = new Date()): string {
+  const vnDate = new Date(date.getTime() + VN_OFFSET_MS);
+  const year = vnDate.getUTCFullYear();
+  const month = String(vnDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(vnDate.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
-function shiftDayKey(dayKey: string, offsetDays: number): string {
-  const [year, month, day] = dayKey.split('-').map(Number);
-  const shifted = new Date(Date.UTC(year, month - 1, day + offsetDays));
-  return shifted.toISOString().slice(0, 10);
+export function getPreviousVNDateKey(dateKey: string): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const utcDate = new Date(Date.UTC(year, month - 1, day) - DAY_MS);
+  return utcDate.toISOString().slice(0, 10);
 }
 
-/**
- * Calculates the active daily streak in Vietnam time from distinct YYYY-MM-DD keys.
- * A streak remains active during the day after the latest check-in, then expires.
- */
-export function calculateCurrentStreak(
-  dayKeys: Iterable<string>,
-  now: Date = new Date(),
-): number {
-  const activeDays = new Set(dayKeys);
-  const today = getVNDayKey(now);
-  const yesterday = shiftDayKey(today, -1);
+export function getVNMinutesOfDay(date: Date = new Date()): number {
+  const vnDate = new Date(date.getTime() + VN_OFFSET_MS);
+  return vnDate.getUTCHours() * 60 + vnDate.getUTCMinutes();
+}
 
-  let cursor: string | null = activeDays.has(today)
-    ? today
-    : activeDays.has(yesterday)
-      ? yesterday
-      : null;
+export function calculateCurrentStreak(dateKeys: Iterable<string>, now: Date = new Date()): number {
+  const uniqueDates = new Set(Array.from(dateKeys).filter(Boolean));
+  if (uniqueDates.size === 0) return 0;
+
+  const today = getVNDateKey(now);
+  const yesterday = getPreviousVNDateKey(today);
+  let cursor = uniqueDates.has(today) ? today : uniqueDates.has(yesterday) ? yesterday : null;
+  if (!cursor) return 0;
 
   let streak = 0;
-  while (cursor && activeDays.has(cursor)) {
+  while (cursor && uniqueDates.has(cursor)) {
     streak += 1;
-    cursor = shiftDayKey(cursor, -1);
+    cursor = getPreviousVNDateKey(cursor);
   }
-
   return streak;
 }
 
-/**
- * Recalculates the streak from the actual non-deleted check-in history.
- * This self-heals stale counters and has no artificial maximum.
- */
-export async function recalculateStreak(coupleId: string): Promise<StreakSnapshot> {
-  const couple = await Couple.findById(coupleId);
-  if (!couple) {
-    throw new Error(`Couple not found: ${coupleId}`);
-  }
+export async function recalculateCoupleStreak(
+  db: D1Database,
+  coupleId: string,
+  now: Date = new Date(),
+): Promise<{ streak: number; lastCheckinDate: string | null }> {
+  const couple = await queryOne<{ id: string }>(
+    db,
+    'SELECT id FROM couples WHERE id = ? LIMIT 1',
+    [coupleId],
+  );
+  if (!couple) return { streak: 0, lastCheckinDate: null };
 
-  const dailyCheckins = await CheckIn.aggregate<DailyCheckin>([
-    {
-      $match: {
-        coupleId: new Types.ObjectId(coupleId),
-        deletedAt: null,
-      },
-    },
-    {
-      $group: {
-        _id: {
-          $dateToString: {
-            date: '$createdAt',
-            format: '%Y-%m-%d',
-            timezone: '+07:00',
-          },
-        },
-        latestAt: { $max: '$createdAt' },
-      },
-    },
-    { $sort: { _id: -1 } },
-  ]);
+  const rows = await queryAll<{ created_at: string }>(
+    db,
+    `SELECT created_at
+     FROM checkins
+     WHERE couple_id = ? AND deleted_at IS NULL
+     ORDER BY created_at DESC
+     LIMIT 3650`,
+    [coupleId],
+  );
 
-  const snapshot: StreakSnapshot = {
-    streak: calculateCurrentStreak(dailyCheckins.map((item) => item._id)),
-    lastCheckinDate: dailyCheckins[0]?.latestAt,
-  };
+  const dateKeys = rows.map((row) => getVNDateKey(new Date(row.created_at)));
+  const streak = calculateCurrentStreak(dateKeys, now);
+  const lastCheckinDate = dateKeys[0] ?? null;
 
-  couple.streak = snapshot.streak;
-  couple.lastCheckinDate = snapshot.lastCheckinDate;
-  await couple.save();
+  await execute(
+    db,
+    'UPDATE couples SET streak = ?, last_checkin_date = ?, updated_at = ? WHERE id = ?',
+    [streak, lastCheckinDate, now.toISOString(), coupleId],
+  );
 
-  return snapshot;
-}
-
-/**
- * Recalculates and persists the streak after a check-in.
- * Returns the updated streak value for existing callers.
- */
-export async function updateStreak(coupleId: string): Promise<number> {
-  return (await recalculateStreak(coupleId)).streak;
+  return { streak, lastCheckinDate };
 }

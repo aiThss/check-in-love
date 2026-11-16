@@ -1,698 +1,584 @@
-import { MultipartFile } from '@fastify/multipart';
-import { FastifyInstance } from 'fastify';
-import { Types } from 'mongoose';
-import sharp from 'sharp';
-import { z } from 'zod';
-import { env } from '../config/env';
-import { CheckIn, ReactionType } from '../db/models/CheckIn';
-import { ChatMessage } from '../db/models/ChatMessage';
-import { Couple } from '../db/models/Couple';
-import { User } from '../db/models/User';
+import { Hono } from 'hono';
+import {
+  execute,
+  findCoupleById,
+  findPartnerUser,
+  findUserById,
+  queryAll,
+  queryOne,
+} from '../db/d1';
+import {
+  parseJsonSafe,
+  toCheckinDto,
+  toMessageDto,
+  type ChatMessageRow,
+  type CheckinReactionItem,
+  type CheckinReplyItem,
+  type CheckinRow,
+  type MessageReplyReference,
+} from '../db/types';
 import { authenticate } from '../middleware/auth';
+import { syncCheckinRepliesPage, syncCheckinReplyToMessage } from '../services/checkin-reply-message-sync';
 import { sendPushToUser } from '../services/push';
-import { storageService } from '../services/storage';
-import { updateStreak } from '../services/streak';
-import { emitRealtimeEvent } from './events';
+import { emitRealtimeEvent } from '../services/realtime';
+import { deleteStoredFile, saveUploadedImage } from '../services/storage';
+import { recalculateCoupleStreak } from '../services/streak';
+import type { HonoAppEnv } from '../types/hono';
+import { AppError } from '../utils/errors';
+import { generateId } from '../utils/id';
 
-const createCheckInBodySchema = z.object({
-  type: z.enum(['text', 'mood']),
-  caption: z.string().max(280).optional(),
-  includeScratch: z.boolean().optional(),
-  surpriseText: z.string().trim().max(120).optional(),
-  mood: z
-    .enum(['happy', 'miss', 'tired', 'studying', 'out', 'eating', 'needhug'])
-    .optional(),
-  quickMessage: z.string().max(100).optional(),
-  clientMutationId: z.string().trim().min(1).max(100).optional(),
-  replyToMessageId: z.string().trim().min(1).optional(),
-});
+export const checkinRoutes = new Hono<HonoAppEnv>();
 
-const addReactionSchema = z.object({
-  type: z.string().trim().min(1).max(32),
-});
+const CHECKIN_TYPES = new Set(['photo', 'text', 'mood']);
 
-const addReplySchema = z.object({
-  message: z.string().trim().min(1).max(500),
-});
-
-const legacyReactionMap: Record<string, string> = {
-  heart: '❤️',
-  hug: '🤗',
-  kiss: '😘',
-  laugh: '😂',
-  miss: '🥺',
-  wow: '🥰',
-  fire: '🔥',
-  sad: '😭',
-};
-
-function normalizeReactionType(type: string): string {
-  const trimmed = type.trim();
-  return legacyReactionMap[trimmed] ?? trimmed;
-}
-
-function replySnippet(checkIn: { caption?: string; quickMessage?: string; imageUrl?: string }): string {
-  const value = (checkIn.caption ?? checkIn.quickMessage ?? (checkIn.imageUrl ? 'Ảnh' : 'Tin nhắn'))
-    .replace(/\s+/g, ' ')
-    .trim();
-  return value.slice(0, 160) || 'Tin nhắn';
-}
-
-async function readMultipartBuffer(
-  part: MultipartFile,
-  maxBytes: number,
-): Promise<{ buffer: Buffer; mimetype: string; filename: string }> {
-  const chunks: Buffer[] = [];
-  let total = 0;
-
-  for await (const chunk of part.file) {
-    total += chunk.length;
-    if (total > maxBytes) {
-      throw Object.assign(new Error('File too large'), { code: 'FILE_TOO_LARGE' });
-    }
-    chunks.push(chunk);
+checkinRoutes.get('/checkins', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
   }
 
-  return {
-    buffer: Buffer.concat(chunks),
-    mimetype: part.mimetype,
-    filename: part.filename,
+  const page = Math.max(1, Number.parseInt(c.req.query('page') || '1', 10) || 1);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '20', 10) || 20));
+  const after = c.req.query('after')?.trim();
+  const typeFilter = c.req.query('type')?.trim();
+
+  const whereClauses = ['couple_id = ?', 'deleted_at IS NULL'];
+  const params: unknown[] = [auth.coupleId];
+
+  if (after) {
+    const parsedAfter = new Date(after);
+    if (!Number.isNaN(parsedAfter.getTime())) {
+      whereClauses.push('created_at > ?');
+      params.push(parsedAfter.toISOString());
+    }
+  }
+
+  if (typeFilter && CHECKIN_TYPES.has(typeFilter)) {
+    whereClauses.push('type = ?');
+    params.push(typeFilter);
+  }
+
+  const whereSql = whereClauses.join(' AND ');
+  const offset = (page - 1) * limit;
+
+  const countRow = await queryOne<{ total: number }>(
+    c.env.DB,
+    `SELECT COUNT(*) AS total FROM checkins WHERE ${whereSql}`,
+    params,
+  );
+  const total = Number(countRow?.total ?? 0);
+
+  const rows = await queryAll<CheckinRow>(
+    c.env.DB,
+    `SELECT * FROM checkins WHERE ${whereSql} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+    [...params, limit, offset],
+  );
+
+  await syncCheckinRepliesPage(c.env.DB, auth.coupleId, rows);
+
+  return c.json({
+    checkIns: rows.map(toCheckinDto),
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+  });
+});
+
+checkinRoutes.get('/checkins/latest', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
+
+  const latest = await queryOne<CheckinRow>(
+    c.env.DB,
+    `SELECT * FROM checkins
+     WHERE couple_id = ? AND deleted_at IS NULL
+     ORDER BY created_at DESC, id DESC LIMIT 1`,
+    [auth.coupleId],
+  );
+
+  return c.json({ checkIn: latest ? toCheckinDto(latest) : null });
+});
+
+checkinRoutes.get('/checkins/latest-partner', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
+
+  const latest = await queryOne<CheckinRow>(
+    c.env.DB,
+    `SELECT * FROM checkins
+     WHERE couple_id = ? AND owner_id != ? AND deleted_at IS NULL
+     ORDER BY created_at DESC, id DESC LIMIT 1`,
+    [auth.coupleId, auth.id],
+  );
+
+  return c.json({ checkIn: latest ? toCheckinDto(latest) : null });
+});
+
+checkinRoutes.post('/checkins', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
+
+  const config = c.get('config');
+  const contentType = c.req.header('content-type') || '';
+
+  let type: string;
+  let caption: string | undefined;
+  let mood: string | undefined;
+  let surpriseText: string | undefined;
+  let quickMessage: string | undefined;
+  let includeScratch = true;
+  let clientMutationId: string | undefined;
+  let replyToMessageId: string | undefined;
+  let photoFile: File | null = null;
+
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await c.req.formData().catch(() => null);
+    if (!formData) {
+      throw new AppError('Dữ liệu form không hợp lệ', 400, 'VALIDATION_ERROR');
+    }
+    const getField = (key: string): string | undefined => {
+      const value = formData.get(key);
+      return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+    };
+
+    type = getField('type') || 'photo';
+    caption = getField('caption') ?? getField('text');
+    mood = getField('mood');
+    surpriseText = getField('surpriseText');
+    quickMessage = getField('quickMessage');
+    clientMutationId = getField('clientMutationId');
+    replyToMessageId = getField('replyToMessageId');
+    const scratchVal = formData.get('includeScratch');
+    if (typeof scratchVal === 'string') {
+      includeScratch = scratchVal !== 'false' && scratchVal !== '0';
+    }
+
+    const fileEntry = formData.get('photo') ?? formData.get('image') ?? formData.get('file');
+    if (fileEntry instanceof File && fileEntry.size > 0) {
+      photoFile = fileEntry;
+    }
+  } else {
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body) {
+      throw new AppError('Payload không hợp lệ', 400, 'VALIDATION_ERROR');
+    }
+    type = typeof body.type === 'string' && body.type.trim() ? body.type.trim() : 'text';
+    caption = typeof body.caption === 'string'
+      ? body.caption.trim()
+      : typeof body.text === 'string'
+        ? body.text.trim()
+        : undefined;
+    mood = typeof body.mood === 'string' ? body.mood.trim() : undefined;
+    surpriseText = typeof body.surpriseText === 'string' ? body.surpriseText.trim() : undefined;
+    quickMessage = typeof body.quickMessage === 'string' ? body.quickMessage.trim() : undefined;
+    includeScratch = body.includeScratch !== false && body.includeScratch !== 'false';
+    clientMutationId = typeof body.clientMutationId === 'string' && body.clientMutationId.trim()
+      ? body.clientMutationId.trim()
+      : undefined;
+    replyToMessageId = typeof body.replyToMessageId === 'string' && body.replyToMessageId.trim()
+      ? body.replyToMessageId.trim()
+      : undefined;
+  }
+
+  if (!CHECKIN_TYPES.has(type)) {
+    throw new AppError('Loại check-in không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+  if (type === 'photo' && !photoFile) {
+    throw new AppError('Vui lòng chọn ảnh để gửi check-in', 400, 'MISSING_PHOTO');
+  }
+  if (type === 'text' && !caption) {
+    throw new AppError('Vui lòng nhập nội dung ghi chú', 400, 'MISSING_CAPTION');
+  }
+  if (type === 'mood' && !mood) {
+    throw new AppError('Vui lòng chọn tâm trạng hiện tại', 400, 'MISSING_MOOD');
+  }
+
+  if (clientMutationId) {
+    const existing = await queryOne<CheckinRow>(
+      c.env.DB,
+      'SELECT * FROM checkins WHERE couple_id = ? AND client_mutation_id = ? LIMIT 1',
+      [auth.coupleId, clientMutationId],
+    );
+    if (existing) {
+      const couple = await findCoupleById(c.env.DB, auth.coupleId);
+      return c.json({ checkIn: toCheckinDto(existing), streak: couple?.streak ?? 0 }, 200);
+    }
+  }
+
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  let replyTo: MessageReplyReference | undefined;
+  if (replyToMessageId) {
+    const refMsg = await queryOne<ChatMessageRow>(
+      c.env.DB,
+      'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+      [replyToMessageId, auth.coupleId],
+    );
+    if (refMsg) {
+      replyTo = {
+        messageId: refMsg.id,
+        senderId: refMsg.sender_id,
+        senderName: refMsg.sender_name,
+        type: refMsg.type,
+        textSnippet: refMsg.text?.slice(0, 120) || undefined,
+        mediaUrl: refMsg.image_url ?? undefined,
+      };
+    }
+  }
+
+  let imageUrl: string | null = null;
+  let storagePath: string | null = null;
+  if (photoFile) {
+    const saved = await saveUploadedImage(c.env.STORAGE, config, photoFile, 'checkins');
+    imageUrl = saved.url;
+    storagePath = saved.storagePath;
+  }
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const checkinId = generateId();
+
+  await execute(
+    c.env.DB,
+    `INSERT INTO checkins (
+      id, couple_id, owner_id, owner_name, type, image_url, storage_path,
+      caption, include_scratch, surprise_text, mood, quick_message,
+      client_mutation_id, reply_to_message_id, reply_to_json,
+      reactions_json, replies_json, deleted_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', '[]', NULL, ?, ?)`,
+    [
+      checkinId,
+      auth.coupleId,
+      user.id,
+      user.display_name,
+      type,
+      imageUrl,
+      storagePath,
+      caption || null,
+      includeScratch ? 1 : 0,
+      surpriseText || null,
+      mood || null,
+      quickMessage || null,
+      clientMutationId || null,
+      replyTo?.messageId ?? null,
+      replyTo ? JSON.stringify(replyTo) : null,
+      nowIso,
+      nowIso,
+    ],
+  );
+
+  const createdRow = (await queryOne<CheckinRow>(
+    c.env.DB,
+    'SELECT * FROM checkins WHERE id = ? LIMIT 1',
+    [checkinId],
+  ))!;
+
+  const { streak } = await recalculateCoupleStreak(c.env.DB, auth.coupleId, now);
+
+  let createdChatMessage: ReturnType<typeof toMessageDto> | undefined;
+  if (quickMessage) {
+    const msgId = generateId();
+    const snapshot = {
+      checkinId: createdRow.id,
+      ownerId: createdRow.owner_id,
+      ownerName: createdRow.owner_name,
+      type: createdRow.type,
+      caption: createdRow.caption ?? undefined,
+      mood: createdRow.mood ?? undefined,
+      imageUrl: createdRow.image_url ?? undefined,
+      createdAt: createdRow.created_at,
+    };
+    await execute(
+      c.env.DB,
+      `INSERT INTO chat_messages (
+        id, couple_id, sender_id, sender_name, type, text,
+        referenced_checkin_id, referenced_checkin_json, read_by_json,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 'checkin_reply', ?, ?, ?, ?, ?, ?)`,
+      [
+        msgId,
+        auth.coupleId,
+        user.id,
+        user.display_name,
+        quickMessage,
+        createdRow.id,
+        JSON.stringify(snapshot),
+        JSON.stringify([user.id]),
+        nowIso,
+        nowIso,
+      ],
+    );
+    const msgRow = await queryOne<ChatMessageRow>(
+      c.env.DB,
+      'SELECT * FROM chat_messages WHERE id = ? LIMIT 1',
+      [msgId],
+    );
+    if (msgRow) createdChatMessage = toMessageDto(msgRow);
+  }
+
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, user.id);
+  if (partner) {
+    const notifBody =
+      type === 'photo'
+        ? caption || 'Vừa gửi cho bạn một khoảnh khắc ảnh mới 📸'
+        : type === 'mood'
+          ? `Đang cảm thấy ${mood}${caption ? `: ${caption}` : ''}`
+          : caption || 'Vừa gửi một ghi chú tình cảm mới 💌';
+
+    const pushTitle = `${user.display_name} vừa Check IN! 💕`;
+
+    await Promise.allSettled([
+      sendPushToUser(c.env, config, partner.id, {
+        title: pushTitle,
+        body: notifBody,
+        url: '/app/home',
+        tag: `checkin-${checkinId}`,
+        type: 'checkin',
+        checkinId,
+        senderName: user.display_name,
+        senderAvatar: user.avatar_url ?? undefined,
+        photoUrl: imageUrl ?? undefined,
+      }),
+      emitRealtimeEvent(c.env, partner.id, {
+        type: 'checkin.created',
+        checkinId,
+        senderId: user.id,
+        senderName: user.display_name,
+        senderAvatar: user.avatar_url ?? undefined,
+        title: pushTitle,
+        body: notifBody,
+        photoUrl: imageUrl ?? undefined,
+        url: '/app/home',
+        createdAt: nowIso,
+      }),
+    ]);
+  }
+
+  return c.json(
+    {
+      checkIn: toCheckinDto(createdRow),
+      streak,
+      ...(createdChatMessage ? { chatMessage: createdChatMessage } : {}),
+    },
+    201,
+  );
+});
+
+checkinRoutes.post('/checkins/:id/reactions', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
+
+  const checkinId = c.req.param('id');
+  const body = (await c.req.json().catch(() => null)) as { type?: string } | null;
+  const reactionType = body?.type?.trim();
+  if (!reactionType || reactionType.length > 32) {
+    throw new AppError('Loại cảm xúc không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+
+  const row = await queryOne<CheckinRow>(
+    c.env.DB,
+    'SELECT * FROM checkins WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+    [checkinId, auth.coupleId],
+  );
+  if (!row) {
+    throw new AppError('Không tìm thấy check-in', 404, 'CHECKIN_NOT_FOUND');
+  }
+
+  const existing = parseJsonSafe<CheckinReactionItem[]>(row.reactions_json, []);
+  const sameIdx = existing.findIndex((r) => r.userId === auth.id && r.type === reactionType);
+  let nextReactions: CheckinReactionItem[];
+  let added = false;
+
+  if (sameIdx >= 0) {
+    nextReactions = existing.filter((_, idx) => idx !== sameIdx);
+  } else {
+    nextReactions = [
+      ...existing.filter((r) => r.userId !== auth.id),
+      { userId: auth.id, type: reactionType, createdAt: new Date().toISOString() },
+    ];
+    added = true;
+  }
+
+  const nowIso = new Date().toISOString();
+  await execute(
+    c.env.DB,
+    'UPDATE checkins SET reactions_json = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(nextReactions), nowIso, row.id],
+  );
+
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  if (partner && added) {
+    const title = `${user.display_name} đã thả ${reactionType}`;
+    const msgBody = 'Xem cảm xúc mới trên kỷ niệm của hai bạn!';
+    await Promise.allSettled([
+      sendPushToUser(c.env, c.get('config'), partner.id, {
+        title,
+        body: msgBody,
+        url: '/app/home',
+        tag: `reaction-${row.id}`,
+        type: 'reaction',
+        checkinId: row.id,
+        senderName: user.display_name,
+        senderAvatar: user.avatar_url ?? undefined,
+      }),
+      emitRealtimeEvent(c.env, partner.id, {
+        type: 'checkin.reaction',
+        checkinId: row.id,
+        senderId: user.id,
+        senderName: user.display_name,
+        senderAvatar: user.avatar_url ?? undefined,
+        title,
+        body: msgBody,
+        url: '/app/home',
+      }),
+    ]);
+  } else if (partner) {
+    await emitRealtimeEvent(c.env, partner.id, {
+      type: 'checkin.reaction',
+      checkinId: row.id,
+      senderId: user.id,
+      title: '',
+      body: '',
+    });
+  }
+
+  return c.json({ reactions: nextReactions });
+});
+
+checkinRoutes.post('/checkins/:id/replies', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
+
+  const checkinId = c.req.param('id');
+  const body = (await c.req.json().catch(() => null)) as { message?: string } | null;
+  const message = body?.message?.trim();
+  if (!message || message.length > 1000) {
+    throw new AppError('Nội dung phản hồi phải từ 1 đến 1000 ký tự', 400, 'VALIDATION_ERROR');
+  }
+
+  const row = await queryOne<CheckinRow>(
+    c.env.DB,
+    'SELECT * FROM checkins WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+    [checkinId, auth.coupleId],
+  );
+  if (!row) {
+    throw new AppError('Không tìm thấy check-in', 404, 'CHECKIN_NOT_FOUND');
+  }
+
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  const nowIso = new Date().toISOString();
+  const existingReplies = parseJsonSafe<CheckinReplyItem[]>(row.replies_json, []);
+  const newReply: CheckinReplyItem = {
+    userId: user.id,
+    userName: user.display_name,
+    message,
+    createdAt: nowIso,
   };
-}
+  const nextReplies = [...existingReplies, newReply];
 
-export default async function checkinsRoutes(
-  app: FastifyInstance,
-): Promise<void> {
-  /**
-   * GET /checkins/latest — My latest check-in
-   */
-  app.get(
-    '/checkins/latest',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const checkIn = await CheckIn.findOne({
-        ownerId: new Types.ObjectId(request.user.id),
-        deletedAt: null,
-      })
-        .sort({ createdAt: -1 })
-        .lean();
-
-      return reply.status(200).send({ checkIn: checkIn ?? null });
-    },
+  await execute(
+    c.env.DB,
+    'UPDATE checkins SET replies_json = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(nextReplies), nowIso, row.id],
   );
 
-  /**
-   * GET /checkins/latest-partner — Partner's latest check-in
-   */
-  app.get(
-    '/checkins/latest-partner',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const couple = await Couple.findById(request.user.coupleId).lean();
-      if (!couple) {
-        return reply
-          .status(404)
-          .send({ error: 'Couple not found', code: 'NOT_FOUND' });
-      }
+  const syncedMsg = await syncCheckinReplyToMessage(c.env.DB, {
+    coupleId: auth.coupleId,
+    checkin: row,
+    senderId: user.id,
+    senderName: user.display_name,
+    messageText: message,
+    createdAt: nowIso,
+    readBy: [user.id],
+  });
 
-      const partnerMemberId = couple.memberIds.find(
-        (id) => id.toString() !== request.user.id,
-      );
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  if (partner) {
+    const title = `${user.display_name} đã phản hồi kỷ niệm`;
+    await Promise.allSettled([
+      sendPushToUser(c.env, c.get('config'), partner.id, {
+        title,
+        body: message,
+        url: '/app/messages',
+        tag: `reply-${row.id}`,
+        type: 'reply',
+        checkinId: row.id,
+        messageId: syncedMsg?.id,
+        senderName: user.display_name,
+        senderAvatar: user.avatar_url ?? undefined,
+      }),
+      emitRealtimeEvent(c.env, partner.id, {
+        type: 'checkin.reply',
+        checkinId: row.id,
+        messageId: syncedMsg?.id,
+        senderId: user.id,
+        senderName: user.display_name,
+        senderAvatar: user.avatar_url ?? undefined,
+        title,
+        body: message,
+        url: '/app/messages',
+      }),
+    ]);
+  }
 
-      if (!partnerMemberId) {
-        return reply.status(200).send({ checkIn: null });
-      }
+  return c.json({ replies: nextReplies });
+});
 
-      const checkIn = await CheckIn.findOne({
-        ownerId: partnerMemberId,
-        deletedAt: null,
-      })
-        .sort({ createdAt: -1 })
-        .lean();
+checkinRoutes.delete('/checkins/:id', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
 
-      return reply.status(200).send({ checkIn: checkIn ?? null });
-    },
+  const checkinId = c.req.param('id');
+  const row = await queryOne<CheckinRow>(
+    c.env.DB,
+    'SELECT * FROM checkins WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+    [checkinId, auth.coupleId],
+  );
+  if (!row) {
+    throw new AppError('Không tìm thấy check-in', 404, 'CHECKIN_NOT_FOUND');
+  }
+  if (row.owner_id !== auth.id) {
+    throw new AppError('Bạn chỉ có thể xóa check-in của chính mình', 403, 'FORBIDDEN');
+  }
+
+  const nowIso = new Date().toISOString();
+  await execute(
+    c.env.DB,
+    'UPDATE checkins SET deleted_at = ?, updated_at = ? WHERE id = ?',
+    [nowIso, nowIso, row.id],
   );
 
-  /**
-   * GET /checkins — Paginated couple check-ins
-   */
-  app.get(
-    '/checkins',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const query = request.query as {
-        page?: string;
-        limit?: string;
-        type?: string;
-        after?: string;
-      };
+  if (row.storage_path) {
+    await deleteStoredFile(c.env.STORAGE, row.storage_path, c.get('config').R2_PUBLIC_URL);
+  }
 
-      const page = Math.max(1, parseInt(query.page ?? '1', 10));
-      const limit = Math.min(50, Math.max(1, parseInt(query.limit ?? '20', 10)));
-      const skip = (page - 1) * limit;
+  await recalculateCoupleStreak(c.env.DB, auth.coupleId);
 
-      const filter: Record<string, unknown> = {
-        coupleId: new Types.ObjectId(request.user.coupleId),
-        deletedAt: null,
-      };
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  if (partner) {
+    await emitRealtimeEvent(c.env, partner.id, {
+      type: 'checkin.deleted',
+      checkinId: row.id,
+      senderId: auth.id,
+      title: '',
+      body: '',
+    });
+  }
 
-      if (query.type) {
-        filter.type = query.type;
-      }
-
-      if (query.after) {
-        const after = new Date(query.after);
-        if (!Number.isNaN(after.getTime())) {
-          // A reply to an older photo belongs in the current chat stream too.
-          filter.$or = [
-            { createdAt: { $gt: after } },
-            { 'replies.createdAt': { $gt: after } },
-          ];
-        }
-      }
-
-      const [checkIns, total] = await Promise.all([
-        CheckIn.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-        CheckIn.countDocuments(filter),
-      ]);
-
-      return reply.status(200).send({
-        checkIns,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
-    },
-  );
-
-  /**
-   * POST /checkins — Create a new check-in (photo, text, or mood)
-   */
-  app.post(
-    '/checkins',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const user = await User.findById(request.user.id).lean();
-      if (!user) {
-        return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
-      }
-
-      const contentType = request.headers['content-type'] ?? '';
-
-      let checkInData: {
-        type: 'photo' | 'text' | 'mood';
-        imageUrl?: string;
-        storagePath?: string;
-        caption?: string;
-        includeScratch?: boolean;
-        surpriseText?: string;
-        mood?: string;
-        quickMessage?: string;
-        clientMutationId?: string;
-        replyToMessageId?: string;
-        chatReplyToMessageId?: string;
-      };
-
-      if (contentType.includes('multipart/form-data')) {
-        // Photo check-in
-        const maxBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
-        const parts = request.parts();
-
-        let imageFile: {
-          buffer: Buffer;
-          mimetype: string;
-          filename: string;
-        } | null = null;
-        let caption: string | undefined;
-        let includeScratch = true;
-        let surpriseText: string | undefined;
-        let quickMessage: string | undefined;
-        let clientMutationId: string | undefined;
-        let replyToMessageId: string | undefined;
-        let chatReplyToMessageId: string | undefined;
-
-        for await (const part of parts) {
-          if (part.type === 'file') {
-            if (!part.mimetype.startsWith('image/')) {
-              return reply
-                .status(400)
-                .send({ error: 'Only image files are allowed', code: 'INVALID_MIME' });
-            }
-            imageFile = await readMultipartBuffer(part, maxBytes);
-          } else if (part.type === 'field') {
-            if (part.fieldname === 'caption') caption = part.value as string;
-            if (part.fieldname === 'includeScratch') includeScratch = String(part.value).toLowerCase() === 'true';
-            if (part.fieldname === 'surpriseText') surpriseText = String(part.value).trim() || undefined;
-            if (part.fieldname === 'quickMessage')
-              quickMessage = part.value as string;
-            if (part.fieldname === 'clientMutationId')
-              clientMutationId = String(part.value).trim() || undefined;
-            if (part.fieldname === 'replyToMessageId')
-              replyToMessageId = String(part.value).trim() || undefined;
-            if (part.fieldname === 'chatReplyToMessageId')
-              chatReplyToMessageId = String(part.value).trim() || undefined;
-          }
-        }
-
-        if (!imageFile) {
-          return reply
-            .status(400)
-            .send({ error: 'Image file required', code: 'NO_FILE' });
-        }
-
-        let { buffer } = imageFile;
-
-        // Keep photos sharp and crisp (up to 2560px for chat or 2048px for checkin)
-        // without pixelation or compression artifacts
-        const isChatPhoto = Boolean(chatReplyToMessageId);
-        const maxDimension = isChatPhoto ? 2560 : 2048;
-        const quality = isChatPhoto ? 92 : 90;
-
-        buffer = await sharp(buffer)
-          .rotate()
-          .resize(maxDimension, maxDimension, { fit: 'inside', withoutEnlargement: true })
-          .jpeg({ quality })
-          .toBuffer();
-
-        const saved = await storageService.saveFile(
-          buffer,
-          imageFile.filename,
-          'image/jpeg',
-        );
-
-        checkInData = {
-          type: 'photo',
-          imageUrl: saved.url,
-          storagePath: saved.storagePath,
-          caption,
-          includeScratch,
-          surpriseText,
-          quickMessage,
-          clientMutationId,
-          replyToMessageId,
-          chatReplyToMessageId,
-        };
-      } else {
-        // Text or mood check-in from JSON body
-        const parsed = createCheckInBodySchema.safeParse(request.body);
-        if (!parsed.success) {
-          return reply.status(400).send({
-            error: parsed.error.errors[0].message,
-            code: 'VALIDATION_ERROR',
-          });
-        }
-        checkInData = parsed.data;
-      }
-
-      const coupleId = new Types.ObjectId(request.user.coupleId);
-      if (checkInData.clientMutationId) {
-        const duplicate = await CheckIn.findOne({
-          coupleId,
-          clientMutationId: checkInData.clientMutationId,
-        }).lean();
-        if (duplicate) {
-          const chatMessage = duplicate.type === 'photo'
-            ? await ChatMessage.findOne({ referencedCheckinId: duplicate._id }).lean()
-            : undefined;
-          // A network interruption can happen after CheckIn is saved but before its
-          // paired chat message is written. Repair that partial write on retry.
-          if (!chatMessage && duplicate.type === 'photo' && duplicate.imageUrl) {
-            const repairedChatMessage = await ChatMessage.create({
-              coupleId: duplicate.coupleId,
-              senderId: duplicate.ownerId,
-              senderName: duplicate.ownerName,
-              type: 'image',
-              text: duplicate.caption ?? duplicate.quickMessage,
-              imageUrl: duplicate.imageUrl,
-              storagePath: duplicate.storagePath,
-              referencedCheckinId: duplicate._id,
-              referencedCheckin: {
-                checkinId: duplicate._id,
-                ownerId: duplicate.ownerId,
-                ownerName: duplicate.ownerName,
-                type: duplicate.type,
-                caption: duplicate.caption ?? duplicate.quickMessage,
-                mood: duplicate.mood,
-                imageUrl: duplicate.imageUrl,
-                createdAt: duplicate.createdAt,
-              },
-              clientMutationId: `checkin-photo:${duplicate._id.toString()}`,
-            });
-            return reply.status(200).send({
-              checkIn: duplicate,
-              chatMessage: repairedChatMessage,
-              duplicate: true,
-            });
-          }
-          return reply.status(200).send({
-            checkIn: duplicate,
-            chatMessage,
-            duplicate: true,
-          });
-        }
-      }
-
-      let replyTo: {
-        messageId: Types.ObjectId;
-        senderId: Types.ObjectId;
-        senderName: string;
-        type: 'photo' | 'text' | 'mood';
-        textSnippet: string;
-        mediaUrl?: string;
-      } | undefined;
-      if (checkInData.replyToMessageId) {
-        if (!Types.ObjectId.isValid(checkInData.replyToMessageId)) {
-          return reply.status(400).send({ error: 'Invalid reply message id', code: 'VALIDATION_ERROR' });
-        }
-
-        const original = await CheckIn.findOne({
-          _id: new Types.ObjectId(checkInData.replyToMessageId),
-          coupleId: new Types.ObjectId(request.user.coupleId),
-          deletedAt: null,
-        }).lean();
-        if (!original) {
-          return reply.status(404).send({ error: 'Reply target not found', code: 'NOT_FOUND' });
-        }
-
-        replyTo = {
-          messageId: original._id,
-          senderId: original.ownerId,
-          senderName: original.ownerName,
-          type: original.type,
-          textSnippet: replySnippet(original),
-          mediaUrl: original.imageUrl,
-        };
-      }
-
-      let chatReplyTo: {
-        messageId: Types.ObjectId;
-        senderId: Types.ObjectId;
-        senderName: string;
-        type: 'text' | 'image';
-        textSnippet: string;
-        mediaUrl?: string;
-      } | undefined;
-      if (checkInData.chatReplyToMessageId) {
-        if (!Types.ObjectId.isValid(checkInData.chatReplyToMessageId)) {
-          return reply.status(400).send({ error: 'Invalid chat reply message id', code: 'VALIDATION_ERROR' });
-        }
-        const original = await ChatMessage.findOne({
-          _id: new Types.ObjectId(checkInData.chatReplyToMessageId),
-          coupleId: new Types.ObjectId(request.user.coupleId),
-          deletedAt: null,
-        }).lean();
-        if (!original) {
-          return reply.status(404).send({ error: 'Chat reply target not found', code: 'NOT_FOUND' });
-        }
-        chatReplyTo = {
-          messageId: original._id,
-          senderId: original.senderId,
-          senderName: original.senderName,
-          type: original.type,
-          textSnippet: (original.text?.replace(/\s+/g, ' ').trim() || (original.imageUrl ? 'Ảnh' : 'Tin nhắn')).slice(0, 160),
-          mediaUrl: original.imageUrl,
-        };
-      }
-
-      const checkIn = await CheckIn.create({
-        coupleId,
-        ownerId: new Types.ObjectId(request.user.id),
-        ownerName: user.displayName,
-        ...checkInData,
-        replyToMessageId: replyTo?.messageId,
-        replyTo,
-        reactions: [],
-        replies: [],
-      });
-
-      let chatMessage;
-      if (checkIn.type === 'photo' && checkIn.imageUrl) {
-        chatMessage = await ChatMessage.create({
-          coupleId: checkIn.coupleId,
-          senderId: checkIn.ownerId,
-          senderName: checkIn.ownerName,
-          type: 'image',
-          text: checkIn.caption ?? checkIn.quickMessage,
-          imageUrl: checkIn.imageUrl,
-          storagePath: checkIn.storagePath,
-          replyToMessageId: chatReplyTo?.messageId,
-          replyTo: chatReplyTo,
-          referencedCheckinId: checkIn._id,
-          referencedCheckin: {
-            checkinId: checkIn._id,
-            ownerId: checkIn.ownerId,
-            ownerName: checkIn.ownerName,
-            type: checkIn.type,
-            caption: checkIn.caption ?? checkIn.quickMessage,
-            mood: checkIn.mood,
-            imageUrl: checkIn.imageUrl,
-            createdAt: checkIn.createdAt,
-          },
-          clientMutationId: `checkin-photo:${checkIn._id.toString()}`,
-        });
-      }
-
-      // Update streak
-      const newStreak = await updateStreak(request.user.coupleId);
-
-      // Notify partner
-      const couple = await Couple.findById(request.user.coupleId).lean();
-      const photoTopic = checkIn.type === 'photo';
-      if (couple) {
-        const partnerId = couple.memberIds.find(
-          (id) => id.toString() !== request.user.id,
-        );
-        if (partnerId) {
-          emitRealtimeEvent(partnerId.toString(), {
-            type: photoTopic ? 'message' : 'checkin',
-            title: photoTopic ? `${user.displayName} đã gửi ảnh mới 📸` : `${user.displayName} đã check-in! 💕`,
-            body: checkInData.caption ?? checkInData.quickMessage ?? 'Xem ngay nào!',
-            targetUrl: photoTopic ? '/app/messages' : '/app/home',
-            photoUrl: checkInData.imageUrl || '',
-            senderName: user.displayName,
-            senderAvatar: user.avatarUrl,
-          });
-
-          sendPushToUser(partnerId.toString(), {
-            title: photoTopic ? `${user.displayName} đã gửi ảnh mới` : `${user.displayName} đã check-in! 💕`,
-            body: checkInData.caption ?? checkInData.quickMessage ?? 'Xem ngay nào!',
-            icon: user.avatarUrl,
-            badge: '/icons/icon-192.png',
-            url: photoTopic ? '/app/messages' : '/app/home',
-            tag: `checkin-${checkIn._id.toString()}`,
-            kind: photoTopic ? 'message' : 'checkin',
-            checkinId: checkIn._id.toString(),
-            senderName: user.displayName,
-            senderAvatar: user.avatarUrl,
-            actionType: photoTopic ? 'message' : 'checkin',
-            targetUrl: photoTopic ? '/app/messages' : '/app/home',
-            photoUrl: checkInData.imageUrl || '',
-          }).catch((err) => {
-            app.log.error({ err }, 'Failed to send push notification');
-          });
-        }
-      }
-
-      return reply.status(201).send({ checkIn, chatMessage, streak: newStreak });
-    },
-  );
-
-  /**
-   * POST /checkins/:id/reactions — Toggle reaction on check-in
-   */
-  app.post(
-    '/checkins/:id/reactions',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
-
-      const parsed = addReactionSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      const type = normalizeReactionType(parsed.data.type);
-
-      const checkIn = await CheckIn.findOne({
-        _id: new Types.ObjectId(id),
-        coupleId: new Types.ObjectId(request.user.coupleId),
-        deletedAt: null,
-      });
-
-      if (!checkIn) {
-        return reply
-          .status(404)
-          .send({ error: 'Check-in not found', code: 'NOT_FOUND' });
-      }
-
-      const userId = new Types.ObjectId(request.user.id);
-      const existingIdx = checkIn.reactions.findIndex(
-        (r) =>
-          r.userId.toString() === request.user.id &&
-          normalizeReactionType(r.type) === type,
-      );
-
-      if (existingIdx !== -1) {
-        // Toggle off — remove existing reaction
-        checkIn.reactions.splice(existingIdx, 1);
-      } else {
-        // Add new reaction
-        checkIn.reactions.push({
-          userId,
-          type: type as ReactionType,
-          createdAt: new Date(),
-        });
-      }
-
-      await checkIn.save();
-
-      if (existingIdx === -1 && checkIn.ownerId.toString() !== request.user.id) {
-        const reactor = await User.findById(request.user.id).lean();
-        emitRealtimeEvent(checkIn.ownerId.toString(), {
-          type: 'reaction',
-          title: `${reactor?.displayName ?? 'Người ấy'} đã react check-in của bạn 💕`,
-          body: 'Mở app để xem reaction mới',
-          targetUrl: '/app/memories',
-          senderName: reactor?.displayName || 'Người ấy',
-          senderAvatar: reactor?.avatarUrl,
-        });
-
-        sendPushToUser(checkIn.ownerId.toString(), {
-          title: `${reactor?.displayName ?? 'Người ấy'} đã react check-in của bạn`,
-          body: 'Mở app để xem reaction mới',
-          icon: reactor?.avatarUrl,
-          badge: '/icons/icon-192.png',
-          url: '/app/memories',
-          tag: `reaction-${checkIn._id.toString()}`,
-          kind: 'reaction',
-          checkinId: checkIn._id.toString(),
-          senderName: reactor?.displayName || 'Người ấy',
-          senderAvatar: reactor?.avatarUrl,
-          actionType: 'reaction',
-          targetUrl: '/app/memories',
-        }).catch((err) => {
-          app.log.error({ err }, 'Failed to send reaction push notification');
-        });
-      }
-
-      return reply.status(200).send({ reactions: checkIn.reactions });
-    },
-  );
-
-  /**
-   * POST /checkins/:id/replies - Add a reply to a check-in
-   */
-  app.post(
-    '/checkins/:id/replies',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
-
-      const parsed = addReplySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      const [checkIn, user] = await Promise.all([
-        CheckIn.findOne({
-          _id: new Types.ObjectId(id),
-          coupleId: new Types.ObjectId(request.user.coupleId),
-          deletedAt: null,
-        }),
-        User.findById(request.user.id).lean(),
-      ]);
-
-      if (!checkIn) {
-        return reply
-          .status(404)
-          .send({ error: 'Check-in not found', code: 'NOT_FOUND' });
-      }
-
-      if (!user) {
-        return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
-      }
-
-      checkIn.replies.push({
-        userId: new Types.ObjectId(request.user.id),
-        userName: user.displayName,
-        message: parsed.data.message,
-        createdAt: new Date(),
-      });
-
-      await checkIn.save();
-
-      if (checkIn.ownerId.toString() !== request.user.id) {
-        emitRealtimeEvent(checkIn.ownerId.toString(), {
-          type: 'reply',
-          title: `${user.displayName} đã reply check-in của bạn`,
-          body: parsed.data.message,
-          targetUrl: '/app/messages',
-          senderName: user.displayName,
-          senderAvatar: user.avatarUrl,
-        });
-
-        sendPushToUser(checkIn.ownerId.toString(), {
-          title: `${user.displayName} đã reply check-in của bạn`,
-          body: parsed.data.message,
-          icon: user.avatarUrl,
-          badge: '/icons/icon-192.png',
-          url: '/app/messages',
-          tag: `reply-${checkIn._id.toString()}`,
-          kind: 'reply',
-          checkinId: checkIn._id.toString(),
-          senderName: user.displayName,
-          senderAvatar: user.avatarUrl,
-          actionType: 'reply',
-          targetUrl: '/app/messages',
-        }).catch((err) => {
-          app.log.error({ err }, 'Failed to send reply push notification');
-        });
-      }
-
-      return reply.status(201).send({ replies: checkIn.replies });
-    },
-  );
-
-  /**
-   * DELETE /checkins/:id - Soft delete a check-in
-   */
-  app.delete(
-    '/checkins/:id',
-    { preHandler: authenticate },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
-
-      const checkIn = await CheckIn.findById(new Types.ObjectId(id));
-      if (!checkIn) {
-        return reply
-          .status(404)
-          .send({ error: 'Check-in not found', code: 'NOT_FOUND' });
-      }
-
-      // Only owner or admin can delete
-      if (
-        checkIn.ownerId.toString() !== request.user.id &&
-        request.user.role !== 'admin'
-      ) {
-        return reply
-          .status(403)
-          .send({ error: 'Forbidden', code: 'FORBIDDEN' });
-      }
-
-      checkIn.deletedAt = new Date();
-      await checkIn.save();
-
-      return reply.status(200).send({ success: true });
-    },
-  );
-}
+  return c.json({ success: true });
+});

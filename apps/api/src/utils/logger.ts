@@ -1,5 +1,3 @@
-import { env } from '../config/env';
-
 export const logger = {
   info(msg: string, meta?: Record<string, unknown>): void {
     console.log(JSON.stringify({
@@ -34,7 +32,7 @@ export const logger = {
   },
 
   debug(msg: string, meta?: Record<string, unknown>): void {
-    if (env.NODE_ENV === 'development') {
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
       console.log(JSON.stringify({
         level: 'debug',
         time: new Date().toISOString(),

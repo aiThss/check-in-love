@@ -1,786 +1,587 @@
-import bcrypt from 'bcryptjs';
-import { FastifyInstance } from 'fastify';
-import { OAuth2Client } from 'google-auth-library';
-import jwt from 'jsonwebtoken';
+import { Hono } from 'hono';
 import { z } from 'zod';
-import { env } from '../config/env';
-import { OtpCode } from '../db/models/OtpCode';
-import { Couple } from '../db/models/Couple';
-import { User } from '../db/models/User';
-import { isEmailConfigured, sendOtpEmail } from '../services/email';
+import {
+  execute,
+  findCoupleById,
+  findCoupleMembers,
+  findUserByEmailOrAlias,
+  findUserById,
+  queryOne,
+} from '../db/d1';
+import {
+  parseJsonSafe,
+  toCoupleDto,
+  toUserDto,
+  type CoupleRow,
+  type OtpCodeRow,
+  type TrustedDevice,
+  type UserRow,
+} from '../db/types';
+import { sendOtpEmail } from '../services/email';
+import type { HonoAppEnv } from '../types/hono';
+import {
+  generateOtpCode,
+  hashPassword,
+  signJwt,
+  verifyGoogleIdToken,
+  verifyJwt,
+  verifyPassword,
+} from '../utils/crypto';
+import { AppError } from '../utils/errors';
+import { generateCoupleCode, generateId } from '../utils/id';
 
-// Safe user shape to return in responses (no passwordHash)
-function toSafeUser(user: InstanceType<typeof User>) {
+export const authRoutes = new Hono<HonoAppEnv>();
+
+const sendOtpSchema = z.object({
+  email: z.string().trim().email('Email không hợp lệ'),
+});
+
+const verifyOtpSchema = z.object({
+  email: z.string().trim().email('Email không hợp lệ'),
+  code: z.string().trim().regex(/^\d{6}$/, 'Mã OTP phải gồm 6 chữ số'),
+});
+
+const startSchema = z.object({
+  deviceId: z.string().trim().min(1).max(160).optional(),
+  displayName: z.string().trim().min(1, 'Vui lòng nhập tên của bạn').max(60),
+  partnerName: z.string().trim().max(60).optional().default(''),
+  coupleCode: z.string().trim().min(4, 'Mã cặp đôi tối thiểu 4 ký tự').max(20),
+  loveStartDate: z.string().trim().max(40).optional(),
+  email: z.string().trim().email('Email không hợp lệ').optional(),
+  password: z.string().min(6, 'Mật khẩu tối thiểu 6 ký tự').max(120).optional(),
+  otpCode: z.string().trim().optional(),
+});
+
+const loginSendOtpSchema = z.object({
+  email: z.string().trim().email('Email không hợp lệ'),
+  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
+});
+
+const loginSchema = z.object({
+  email: z.string().trim().email('Email không hợp lệ'),
+  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
+  otpCode: z.string().trim().optional(),
+  deviceId: z.string().trim().max(160).optional(),
+});
+
+const googleLoginSchema = z.object({
+  credential: z.string().trim().min(10, 'Google token không hợp lệ'),
+  deviceId: z.string().trim().max(160).optional(),
+});
+
+function upsertTrustedDevice(rawJson: string, deviceId: string | undefined, nowIso: string): string {
+  const existing = parseJsonSafe<TrustedDevice[]>(rawJson, []);
+  if (!deviceId) return JSON.stringify(existing);
+  const filtered = existing.filter((d) => d.deviceId !== deviceId).slice(0, 9);
+  filtered.unshift({ deviceId, lastUsedAt: nowIso });
+  return JSON.stringify(filtered);
+}
+
+async function checkOtpCooldown(db: D1Database, email: string, purpose: OtpCodeRow['purpose']): Promise<void> {
+  const latest = await queryOne<OtpCodeRow>(
+    db,
+    `SELECT * FROM otp_codes
+     WHERE lower(email) = ? AND purpose = ?
+     ORDER BY created_at DESC LIMIT 1`,
+    [email, purpose],
+  );
+  if (!latest) return;
+  const elapsedMs = Date.now() - new Date(latest.created_at).getTime();
+  if (elapsedMs >= 0 && elapsedMs < 45_000) {
+    const waitSec = Math.ceil((45_000 - elapsedMs) / 1000);
+    throw new AppError(`Vui lòng đợi ${waitSec} giây trước khi gửi lại mã OTP`, 429, 'RATE_LIMIT');
+  }
+}
+
+async function verifyAndConsumeOtp(
+  db: D1Database,
+  email: string,
+  code: string,
+  purposes: Array<OtpCodeRow['purpose']>,
+): Promise<boolean> {
+  const placeholders = purposes.map(() => '?').join(', ');
+  const nowIso = new Date().toISOString();
+  const row = await queryOne<OtpCodeRow>(
+    db,
+    `SELECT * FROM otp_codes
+     WHERE lower(email) = ? AND purpose IN (${placeholders}) AND expires_at > ?
+     ORDER BY created_at DESC LIMIT 1`,
+    [email, ...purposes, nowIso],
+  );
+  if (!row || row.code !== code) return false;
+  await execute(db, 'UPDATE otp_codes SET verified = 1 WHERE id = ?', [row.id]);
+  return true;
+}
+
+async function createAndJoinCouple(
+  db: D1Database,
+  params: {
+    userId: string;
+    displayName: string;
+    partnerName: string;
+    coupleCode: string;
+    loveStartDate?: string;
+    nowIso: string;
+  },
+): Promise<CoupleRow> {
+  const normalizedCode = params.coupleCode.trim().toUpperCase() || generateCoupleCode();
+  let couple = await queryOne<CoupleRow>(
+    db,
+    'SELECT * FROM couples WHERE upper(code) = ? LIMIT 1',
+    [normalizedCode],
+  );
+
+  if (couple) {
+    const members = await findCoupleMembers(db, couple.id);
+    const alreadyMember = members.some((m) => m.id === params.userId);
+    if (!alreadyMember && members.length >= 2) {
+      throw new AppError('Mã cặp đôi này đã đủ 2 người tham gia', 409, 'COUPLE_FULL');
+    }
+    if (params.loveStartDate && !couple.love_start_date) {
+      await execute(
+        db,
+        'UPDATE couples SET love_start_date = ?, updated_at = ? WHERE id = ?',
+        [params.loveStartDate, params.nowIso, couple.id],
+      );
+      couple = { ...couple, love_start_date: params.loveStartDate, updated_at: params.nowIso };
+    }
+    return couple;
+  }
+
+  const coupleId = generateId();
+  const newCouple: CoupleRow = {
+    id: coupleId,
+    code: normalizedCode,
+    love_start_date: params.loveStartDate || null,
+    streak: 0,
+    last_checkin_date: null,
+    chat_background_json: null,
+    created_at: params.nowIso,
+    updated_at: params.nowIso,
+  };
+  await execute(
+    db,
+    `INSERT INTO couples (id, code, love_start_date, streak, last_checkin_date, chat_background_json, created_at, updated_at)
+     VALUES (?, ?, ?, 0, NULL, NULL, ?, ?)`,
+    [newCouple.id, newCouple.code, newCouple.love_start_date, newCouple.created_at, newCouple.updated_at],
+  );
+  return newCouple;
+}
+
+async function buildAuthPayload(
+  db: D1Database,
+  jwtSecret: string,
+  user: UserRow,
+  couple: CoupleRow | null,
+  isNewUser = false,
+) {
+  const memberIds = couple
+    ? (await findCoupleMembers(db, couple.id)).map((m) => m.id)
+    : [];
+  const token = await signJwt(
+    { userId: user.id, coupleId: couple?.id ?? null, role: user.role },
+    jwtSecret,
+    30 * 24 * 60 * 60,
+  );
   return {
-    id: user._id.toString(),
-    displayName: user.displayName,
-    partnerName: user.partnerName,
-    email: user.email,
-    email_aliases: user.email_aliases || [],
-    avatarUrl: user.avatarUrl,
-    partnerAvatarUrl: user.partnerAvatarUrl,
-    role: user.role,
-    status: user.status,
-    coupleId: user.coupleId.toString(),
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
+    token,
+    user: toUserDto(user),
+    couple: couple ? toCoupleDto(couple, memberIds) : null,
+    isNewUser,
   };
 }
 
-function signToken(userId: string, coupleId: string, role: string): string {
-  return jwt.sign({ userId, coupleId, role }, env.JWT_SECRET, {
-    expiresIn: '30d',
+authRoutes.post('/auth/send-otp', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = sendOtpSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Email không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+
+  const email = parsed.data.email.toLowerCase();
+  const existing = await findUserByEmailOrAlias(c.env.DB, email);
+  if (existing) {
+    throw new AppError('Email này đã được đăng ký. Vui lòng đăng nhập.', 409, 'EMAIL_EXISTS');
+  }
+
+  await checkOtpCooldown(c.env.DB, email, 'auth');
+
+  const code = generateOtpCode();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
+
+  await execute(
+    c.env.DB,
+    `INSERT INTO otp_codes (id, email, code, purpose, expires_at, verified, created_at)
+     VALUES (?, ?, ?, 'auth', ?, 0, ?)`,
+    [generateId(), email, code, expiresAt, now.toISOString()],
+  );
+
+  const sent = await sendOtpEmail(c.get('config'), email, code, 'auth');
+  if (!sent) {
+    throw new AppError('Không thể gửi email OTP lúc này. Vui lòng thử lại.', 500, 'EMAIL_SEND_FAILED');
+  }
+
+  return c.json({ message: 'Mã OTP đã được gửi đến email của bạn', expiresIn: 300 });
+});
+
+authRoutes.post('/auth/verify-otp', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = verifyOtpSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Mã OTP không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+
+  const email = parsed.data.email.toLowerCase();
+  const ok = await verifyAndConsumeOtp(c.env.DB, email, parsed.data.code, ['auth']);
+  if (!ok) {
+    throw new AppError('Mã OTP không đúng hoặc đã hết hạn', 400, 'INVALID_OTP');
+  }
+
+  return c.json({ verified: true, message: 'Xác thực OTP thành công' });
+});
+
+authRoutes.post('/auth/start', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = startSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Dữ liệu khởi tạo không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+
+  const data = parsed.data;
+  const config = c.get('config');
+  const nowIso = new Date().toISOString();
+
+  // Check if called by an authenticated Google user completing onboarding
+  let authUser: UserRow | null = null;
+  const authHeader = c.req.header('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const tokenPayload = await verifyJwt<{ userId?: string; id?: string }>(
+      authHeader.slice(7).trim(),
+      config.JWT_SECRET,
+    );
+    const uid = tokenPayload?.userId ?? tokenPayload?.id;
+    if (uid) {
+      authUser = await findUserById(c.env.DB, String(uid));
+      if (authUser && authUser.status === 'blocked') {
+        throw new AppError('Tài khoản đã bị khóa', 403, 'USER_BLOCKED');
+      }
+    }
+  }
+
+  if (authUser) {
+    const couple = await createAndJoinCouple(c.env.DB, {
+      userId: authUser.id,
+      displayName: data.displayName,
+      partnerName: data.partnerName,
+      coupleCode: data.coupleCode,
+      loveStartDate: data.loveStartDate,
+      nowIso,
+    });
+
+    const members = await findCoupleMembers(c.env.DB, couple.id);
+    const partner = members.find((m) => m.id !== authUser!.id) ?? null;
+    const effectivePartnerName = data.partnerName || partner?.display_name || authUser.partner_name;
+
+    await execute(
+      c.env.DB,
+      `UPDATE users
+       SET display_name = ?,
+           partner_name = ?,
+           partner_avatar_url = COALESCE(partner_avatar_url, ?),
+           couple_id = ?,
+           trusted_devices_json = ?,
+           updated_at = ?
+       WHERE id = ?`,
+      [
+        data.displayName,
+        effectivePartnerName,
+        partner?.avatar_url ?? null,
+        couple.id,
+        upsertTrustedDevice(authUser.trusted_devices_json, data.deviceId, nowIso),
+        nowIso,
+        authUser.id,
+      ],
+    );
+
+    if (partner && (!partner.partner_name || partner.partner_avatar_url !== authUser.avatar_url)) {
+      await execute(
+        c.env.DB,
+        `UPDATE users
+         SET partner_name = CASE WHEN partner_name = '' THEN ? ELSE partner_name END,
+             partner_avatar_url = COALESCE(partner_avatar_url, ?),
+             updated_at = ?
+         WHERE id = ?`,
+        [data.displayName, authUser.avatar_url, nowIso, partner.id],
+      );
+    }
+
+    const updatedUser = (await findUserById(c.env.DB, authUser.id))!;
+    const response = await buildAuthPayload(c.env.DB, config.JWT_SECRET, updatedUser, couple, false);
+    return c.json(response, 200);
+  }
+
+  // Standard email + password registration flow
+  if (!data.email || !data.password) {
+    throw new AppError('Vui lòng nhập đầy đủ email và mật khẩu', 400, 'VALIDATION_ERROR');
+  }
+
+  const normalizedEmail = data.email.toLowerCase();
+  const existingUser = await findUserByEmailOrAlias(c.env.DB, normalizedEmail);
+  if (existingUser) {
+    throw new AppError('Email đã được đăng ký', 409, 'EMAIL_EXISTS');
+  }
+
+  let otpVerified: boolean;
+  if (data.otpCode) {
+    otpVerified = await verifyAndConsumeOtp(c.env.DB, normalizedEmail, data.otpCode, ['auth']);
+  } else {
+    const recentVerified = await queryOne<OtpCodeRow>(
+      c.env.DB,
+      `SELECT * FROM otp_codes
+       WHERE lower(email) = ? AND purpose = 'auth' AND verified = 1 AND expires_at > ?
+       ORDER BY created_at DESC LIMIT 1`,
+      [normalizedEmail, new Date(Date.now() - 15 * 60 * 1000).toISOString()],
+    );
+    otpVerified = Boolean(recentVerified);
+  }
+
+  if (!otpVerified) {
+    throw new AppError('Vui lòng xác thực mã OTP hợp lệ trước khi tạo tài khoản', 400, 'INVALID_OTP');
+  }
+
+  const userId = generateId();
+  const couple = await createAndJoinCouple(c.env.DB, {
+    userId,
+    displayName: data.displayName,
+    partnerName: data.partnerName,
+    coupleCode: data.coupleCode,
+    loveStartDate: data.loveStartDate,
+    nowIso,
   });
-}
 
-function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+  const members = await findCoupleMembers(c.env.DB, couple.id);
+  const partner = members.find((m) => m.id !== userId) ?? null;
+  const effectivePartnerName = data.partnerName || partner?.display_name || '';
+  const passwordHash = await hashPassword(data.password);
+  const trustedJson = upsertTrustedDevice('[]', data.deviceId, nowIso);
 
-const startBodySchema = z.object({
-  displayName: z.string().min(1),
-  partnerName: z.string().min(1),
-  coupleCode: z.string().min(1),
-  loveStartDate: z
-    .string()
-    .optional()
-    .refine((v) => !v || !isNaN(Date.parse(v)), {
-      message: 'Invalid date',
-    }),
-  email: z.string().email().optional(),
-  password: z.string().min(6).optional(),
-  deviceId: z.string().optional(),
-  otpCode: z.string().length(6).optional(),
-});
-
-const loginBodySchema = z.object({
-  email: z.string().email().optional(),
-  password: z.string().optional(),
-  otpCode: z.string().length(6).optional(),
-  deviceId: z.string().optional(),
-  coupleCode: z.string().optional(),
-});
-
-const loginSendOtpBodySchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
-
-const googleLoginBodySchema = z.object({
-  credential: z.string().min(1).max(5000),
-});
-
-const sendOtpBodySchema = z.object({
-  email: z.string().email(),
-});
-
-const verifyOtpBodySchema = z.object({
-  email: z.string().email(),
-  code: z.string().length(6),
-});
-
-export default async function authRoutes(app: FastifyInstance): Promise<void> {
-  /**
-   * POST /auth/send-otp
-   * Generate and send a 6-digit OTP code to the given email.
-   */
-  app.post(
-    '/auth/send-otp',
-    {
-      config: {
-        rateLimit: {
-          max: 5,
-          timeWindow: '10 minutes',
-        },
-      },
-    },
-    async (request, reply) => {
-      const parsed = sendOtpBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      const { email } = parsed.data;
-
-      // Check if email is already registered
-      const existingUser = await User.findOne({
-        $or: [
-          { email: email.toLowerCase() },
-          { email_aliases: email.toLowerCase() },
-        ],
-      });
-      if (existingUser) {
-        return reply.status(409).send({
-          error: 'Email này đã được sử dụng',
-          code: 'EMAIL_ALREADY_EXISTS',
-        });
-      }
-
-      // Check if Gmail is configured
-      if (!isEmailConfigured()) {
-        return reply.status(503).send({
-          error: 'Tính năng gửi email chưa được cấu hình',
-          code: 'EMAIL_NOT_CONFIGURED',
-        });
-      }
-
-      // Invalidate any existing OTPs for this email
-      await OtpCode.deleteMany({ email: email.toLowerCase(), purpose: 'signup' });
-
-      // Generate new OTP
-      const code = generateOtp();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-      await OtpCode.create({
-        email: email.toLowerCase(),
-        code,
-        purpose: 'signup',
-        expiresAt,
-        verified: false,
-      });
-
-      // Send email
-      try {
-        await sendOtpEmail(email, code);
-      } catch (err) {
-        app.log.error(err, 'Failed to send OTP email');
-        return reply.status(500).send({
-          error: 'Không thể gửi email. Vui lòng kiểm tra lại địa chỉ email.',
-          code: 'EMAIL_SEND_FAILED',
-        });
-      }
-
-      return reply.status(200).send({
-        message: `Mã xác thực đã được gửi tới ${email}`,
-        expiresIn: 600,
-      });
-    },
+  await execute(
+    c.env.DB,
+    `INSERT INTO users (
+      id, display_name, partner_name, email, email_aliases_json, password_hash,
+      partner_avatar_url, trusted_devices_json, fcm_tokens_json,
+      reminder_enabled, reminder_time, reminder_timezone, role, status, couple_id,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, '[]', ?, ?, ?, '[]', 0, '20:30', 'Asia/Ho_Chi_Minh', 'user', 'active', ?, ?, ?)`,
+    [
+      userId,
+      data.displayName,
+      effectivePartnerName,
+      normalizedEmail,
+      passwordHash,
+      partner?.avatar_url ?? null,
+      trustedJson,
+      couple.id,
+      nowIso,
+      nowIso,
+    ],
   );
 
-  /**
-   * POST /auth/verify-otp
-   * Verify the OTP code for a given email, mark it as verified.
-   */
-  app.post(
-    '/auth/verify-otp',
-    {
-      config: {
-        rateLimit: {
-          max: 10,
-          timeWindow: '10 minutes',
-        },
-      },
-    },
-    async (request, reply) => {
-      const parsed = verifyOtpBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
+  if (partner && !partner.partner_name) {
+    await execute(
+      c.env.DB,
+      'UPDATE users SET partner_name = ?, updated_at = ? WHERE id = ?',
+      [data.displayName, nowIso, partner.id],
+    );
+  }
 
-      const { email, code } = parsed.data;
+  const createdUser = (await findUserById(c.env.DB, userId))!;
+  const response = await buildAuthPayload(c.env.DB, config.JWT_SECRET, createdUser, couple, false);
+  return c.json(response, 201);
+});
 
-      const otpDoc = await OtpCode.findOne({
-        email: email.toLowerCase(),
-        purpose: 'signup',
-        verified: false,
-        expiresAt: { $gt: new Date() },
-      });
+authRoutes.post('/auth/login/send-otp', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = loginSendOtpSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Thông tin đăng nhập không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
 
-      if (!otpDoc) {
-        return reply.status(400).send({
-          error: 'Mã xác thực không hợp lệ hoặc đã hết hạn',
-          code: 'OTP_INVALID',
-        });
-      }
+  const email = parsed.data.email.toLowerCase();
+  const user = await findUserByEmailOrAlias(c.env.DB, email);
+  if (!user || !user.password_hash) {
+    throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
+  }
+  if (user.status === 'blocked') {
+    throw new AppError('Tài khoản đã bị khóa', 403, 'USER_BLOCKED');
+  }
 
-      if (otpDoc.code !== code) {
-        return reply.status(400).send({
-          error: 'Mã xác thực không đúng',
-          code: 'OTP_WRONG',
-        });
-      }
+  const passwordValid = await verifyPassword(parsed.data.password, user.password_hash);
+  if (!passwordValid) {
+    throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
+  }
 
-      // Mark as verified
-      otpDoc.verified = true;
-      await otpDoc.save();
+  await checkOtpCooldown(c.env.DB, email, 'login');
 
-      return reply.status(200).send({
-        verified: true,
-        message: 'Email đã được xác thực thành công',
-      });
-    },
+  const code = generateOtpCode();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
+
+  await execute(
+    c.env.DB,
+    `INSERT INTO otp_codes (id, email, code, purpose, expires_at, verified, created_at)
+     VALUES (?, ?, ?, 'login', ?, 0, ?)`,
+    [generateId(), email, code, expiresAt, now.toISOString()],
   );
 
-  /**
-   * POST /auth/start
-   * Onboarding: create user and join or create a couple.
-   * If email is provided, requires OTP to have been verified.
-   */
-  app.post(
-    '/auth/start',
-    {
-      config: {
-        rateLimit: {
-          max: 10,
-          timeWindow: '1 minute',
-        },
-      },
-    },
-    async (request, reply) => {
-      const parsed = startBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply
-          .status(400)
-          .send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
-      }
+  const sent = await sendOtpEmail(c.get('config'), email, code, 'login');
+  if (!sent) {
+    throw new AppError('Không thể gửi mã OTP lúc này', 500, 'EMAIL_SEND_FAILED');
+  }
 
-      const {
-        displayName,
-        partnerName,
-        coupleCode,
-        loveStartDate,
-        email,
-        password,
-        deviceId,
-        otpCode,
-      } = parsed.data;
+  return c.json({ message: 'Mã OTP đăng nhập đã được gửi đến email của bạn', expiresIn: 300 });
+});
 
-      let existingUser = null;
-      const authHeader = request.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const rawToken = authHeader.slice(7);
-          const decoded = jwt.verify(rawToken, env.JWT_SECRET) as { userId: string };
-          if (decoded && decoded.userId) {
-            existingUser = await User.findById(decoded.userId);
-          }
-        } catch {
-          // ignore invalid token
-        }
-      }
+authRoutes.post('/auth/login', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = loginSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Thông tin đăng nhập không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
 
-      if (existingUser) {
-        const normalizedCode = coupleCode.toUpperCase();
-        let couple = await Couple.findOne({ code: normalizedCode });
-        if (!couple) {
-          couple = await Couple.create({
-            code: normalizedCode,
-            loveStartDate: loveStartDate ? new Date(loveStartDate) : undefined,
-            memberIds: [],
-            streak: 0,
-          });
-        } else if (loveStartDate && !couple.loveStartDate) {
-          couple.loveStartDate = new Date(loveStartDate);
-          await couple.save();
-        }
+  const email = parsed.data.email.toLowerCase();
+  const user = await findUserByEmailOrAlias(c.env.DB, email);
+  if (!user || !user.password_hash) {
+    throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
+  }
+  if (user.status === 'blocked') {
+    throw new AppError('Tài khoản đã bị khóa', 403, 'USER_BLOCKED');
+  }
 
-        if (!couple.memberIds.map((id) => id.toString()).includes(existingUser._id.toString())) {
-          if (couple.memberIds.length >= 2) {
-            return reply.status(409).send({
-              error: 'Mã Cặp đôi này đã đủ 2 thành viên',
-              code: 'COUPLE_FULL',
-            });
-          }
-          couple.memberIds.push(existingUser._id);
-          await couple.save();
-        }
+  const passwordValid = await verifyPassword(parsed.data.password, user.password_hash);
+  if (!passwordValid) {
+    throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
+  }
 
-        existingUser.displayName = displayName || existingUser.displayName;
-        existingUser.partnerName = partnerName || existingUser.partnerName;
-        existingUser.coupleId = couple._id;
-        if (deviceId && !existingUser.trustedDevices.includes(deviceId)) {
-          existingUser.trustedDevices.push(deviceId);
-        }
-        await existingUser.save();
+  const trustedDevices = parseJsonSafe<TrustedDevice[]>(user.trusted_devices_json, []);
+  const isTrustedDevice = Boolean(
+    parsed.data.deviceId && trustedDevices.some((d) => d.deviceId === parsed.data.deviceId),
+  );
 
-        const token = signToken(
-          existingUser._id.toString(),
-          couple._id.toString(),
-          existingUser.role,
-        );
-
-        return reply.status(200).send({
-          token,
-          user: toSafeUser(existingUser),
-          couple: {
-            id: couple._id.toString(),
-            code: couple.code,
-            loveStartDate: couple.loveStartDate,
-            memberIds: couple.memberIds.map((id) => id.toString()),
-            streak: couple.streak,
-          },
-        });
-      }
-
-      // If email provided, verify OTP was completed
-      if (email) {
-        if (!otpCode) {
-          return reply.status(400).send({
-            error: 'Vui lòng xác thực email trước khi đăng ký',
-            code: 'OTP_REQUIRED',
-          });
-        }
-
-        // Check verified OTP exists
-        const verifiedOtp = await OtpCode.findOne({
-          email: email.toLowerCase(),
-          code: otpCode,
-          purpose: 'signup',
-          verified: true,
-          expiresAt: { $gt: new Date() },
-        });
-
-        if (!verifiedOtp) {
-          return reply.status(400).send({
-            error: 'Mã xác thực không hợp lệ. Vui lòng xác thực email lại.',
-            code: 'OTP_NOT_VERIFIED',
-          });
-        }
-      }
-
-      const normalizedCode = coupleCode.toUpperCase();
-
-      // Find or create the couple
-      let couple = await Couple.findOne({ code: normalizedCode });
-      if (!couple) {
-        couple = await Couple.create({
-          code: normalizedCode,
-          loveStartDate: loveStartDate ? new Date(loveStartDate) : undefined,
-          memberIds: [],
-          streak: 0,
-        });
-      }
-
-      // Check capacity
-      if (couple.memberIds.length >= 2) {
-        return reply.status(409).send({
-          error: 'Couple is already full',
-          code: 'COUPLE_FULL',
-        });
-      }
-
-      // Hash password if provided
-      let passwordHash: string | undefined;
-      if (email && password) {
-        passwordHash = await bcrypt.hash(password, 12);
-      }
-
-      // Create user
-      const user = await User.create({
-        displayName,
-        partnerName,
-        email: email ? email.toLowerCase() : undefined,
-        passwordHash,
-        trustedDevices: deviceId ? [deviceId] : [],
-        role: 'user',
-        status: 'active',
-        coupleId: couple._id,
-      });
-
-      // Add user to couple
-      couple.memberIds.push(user._id);
-      await couple.save();
-
-      // Clean up used OTP
-      if (email) {
-        await OtpCode.deleteMany({ email: email.toLowerCase(), purpose: 'signup' });
-      }
-
-      const token = signToken(
-        user._id.toString(),
-        couple._id.toString(),
-        'user',
+  const nowIso = new Date().toISOString();
+  if (!isTrustedDevice) {
+    if (!parsed.data.otpCode) {
+      throw new AppError('Vui lòng nhập mã OTP xác thực thiết bị', 400, 'OTP_REQUIRED');
+    }
+    const ok = await verifyAndConsumeOtp(c.env.DB, email, parsed.data.otpCode, ['login', 'auth']);
+    if (!ok) {
+      throw new AppError('Mã OTP không đúng hoặc đã hết hạn', 400, 'INVALID_OTP');
+    }
+    if (parsed.data.deviceId) {
+      await execute(
+        c.env.DB,
+        'UPDATE users SET trusted_devices_json = ?, updated_at = ? WHERE id = ?',
+        [upsertTrustedDevice(user.trusted_devices_json, parsed.data.deviceId, nowIso), nowIso, user.id],
       );
+    }
+  } else if (parsed.data.deviceId) {
+    await execute(
+      c.env.DB,
+      'UPDATE users SET trusted_devices_json = ?, updated_at = ? WHERE id = ?',
+      [upsertTrustedDevice(user.trusted_devices_json, parsed.data.deviceId, nowIso), nowIso, user.id],
+    );
+  }
 
-      return reply.status(201).send({
-        token,
-        user: toSafeUser(user),
-        couple: {
-          id: couple._id.toString(),
-          code: couple.code,
-          loveStartDate: couple.loveStartDate,
-          memberIds: couple.memberIds.map((id) => id.toString()),
-          streak: couple.streak,
-        },
-      });
-    },
+  const couple = user.couple_id ? await findCoupleById(c.env.DB, user.couple_id) : null;
+  const freshUser = (await findUserById(c.env.DB, user.id))!;
+  const response = await buildAuthPayload(
+    c.env.DB,
+    c.get('config').JWT_SECRET,
+    freshUser,
+    couple,
+    !freshUser.couple_id,
+  );
+  return c.json(response, 200);
+});
+
+authRoutes.post('/auth/google', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = googleLoginSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Google token không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
+
+  const config = c.get('config');
+  let payload;
+  try {
+    payload = await verifyGoogleIdToken(parsed.data.credential, config.GOOGLE_CLIENT_ID);
+  } catch (err) {
+    throw new AppError(err instanceof Error ? err.message : 'Xác thực Google thất bại', 401, 'INVALID_GOOGLE_TOKEN');
+  }
+
+  const normalizedEmail = payload.email?.trim().toLowerCase() ?? null;
+  let user = await queryOne<UserRow>(
+    c.env.DB,
+    'SELECT * FROM users WHERE google_id = ? LIMIT 1',
+    [payload.sub],
+  );
+  if (!user && normalizedEmail) {
+    user = await findUserByEmailOrAlias(c.env.DB, normalizedEmail);
+  }
+
+  const nowIso = new Date().toISOString();
+
+  if (user) {
+    if (user.status === 'blocked') {
+      throw new AppError('Tài khoản đã bị khóa', 403, 'USER_BLOCKED');
+    }
+    const nextAvatar = user.avatar_url || payload.picture || null;
+    await execute(
+      c.env.DB,
+      `UPDATE users
+       SET google_id = COALESCE(google_id, ?),
+           avatar_url = ?,
+           trusted_devices_json = ?,
+           updated_at = ?
+       WHERE id = ?`,
+      [
+        payload.sub,
+        nextAvatar,
+        upsertTrustedDevice(user.trusted_devices_json, parsed.data.deviceId, nowIso),
+        nowIso,
+        user.id,
+      ],
+    );
+    const updatedUser = (await findUserById(c.env.DB, user.id))!;
+    const couple = updatedUser.couple_id ? await findCoupleById(c.env.DB, updatedUser.couple_id) : null;
+    return c.json(
+      await buildAuthPayload(c.env.DB, config.JWT_SECRET, updatedUser, couple, !updatedUser.couple_id),
+      200,
+    );
+  }
+
+  const newUserId = generateId();
+  const displayName = payload.name?.trim() || normalizedEmail?.split('@')[0] || 'Người dùng mới';
+  await execute(
+    c.env.DB,
+    `INSERT INTO users (
+      id, display_name, partner_name, email, email_aliases_json, google_id, avatar_url,
+      trusted_devices_json, fcm_tokens_json, reminder_enabled, reminder_time,
+      reminder_timezone, role, status, couple_id, created_at, updated_at
+    ) VALUES (?, ?, '', ?, '[]', ?, ?, ?, '[]', 0, '20:30', 'Asia/Ho_Chi_Minh', 'user', 'active', NULL, ?, ?)`,
+    [
+      newUserId,
+      displayName,
+      normalizedEmail,
+      payload.sub,
+      payload.picture || null,
+      upsertTrustedDevice('[]', parsed.data.deviceId, nowIso),
+      nowIso,
+      nowIso,
+    ],
   );
 
-  /**
-   * POST /auth/login/send-otp
-   * Validate credentials and send a fresh OTP code for login.
-   */
-  app.post(
-    '/auth/login/send-otp',
-    {
-      config: {
-        rateLimit: {
-          max: 5,
-          timeWindow: '10 minutes',
-        },
-      },
-    },
-    async (request, reply) => {
-      const parsed = loginSendOtpBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      const { email, password } = parsed.data;
-      const user = await User.findOne({
-        $or: [
-          { email: email.toLowerCase() },
-          { email_aliases: email.toLowerCase() },
-        ],
-      });
-
-      if (!user || !user.passwordHash) {
-        return reply
-          .status(401)
-          .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
-      }
-
-      const valid = await bcrypt.compare(password, user.passwordHash);
-      if (!valid) {
-        return reply
-          .status(401)
-          .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
-      }
-
-      if (user.status === 'blocked') {
-        return reply
-          .status(403)
-          .send({ error: 'Tài khoản bị khóa', code: 'USER_BLOCKED' });
-      }
-
-      if (!isEmailConfigured()) {
-        return reply.status(503).send({
-          error: 'Tính năng gửi email chưa được cấu hình',
-          code: 'EMAIL_NOT_CONFIGURED',
-        });
-      }
-
-      await OtpCode.deleteMany({ email: email.toLowerCase(), purpose: 'login' });
-
-      const code = generateOtp();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-      await OtpCode.create({
-        email: email.toLowerCase(),
-        code,
-        purpose: 'login',
-        expiresAt,
-        verified: false,
-      });
-
-      try {
-        await sendOtpEmail(email, code);
-      } catch (err) {
-        app.log.error(err, 'Failed to send login OTP email');
-        return reply.status(500).send({
-          error: 'Không thể gửi email. Vui lòng kiểm tra lại địa chỉ email.',
-          code: 'EMAIL_SEND_FAILED',
-        });
-      }
-
-      return reply.status(200).send({
-        message: `Mã đăng nhập đã được gửi tới ${email}`,
-        expiresIn: 600,
-      });
-    },
-  );
-
-  /**
-   * POST /auth/login
-   * Login an existing user by email+password+OTP or deviceId+coupleCode.
-   */
-  app.post(
-    '/auth/login',
-    {
-      config: {
-        rateLimit: {
-          max: 10,
-          timeWindow: '1 minute',
-        },
-      },
-    },
-    async (request, reply) => {
-      const parsed = loginBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply
-          .status(400)
-          .send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
-      }
-
-      const { email, password, otpCode, deviceId, coupleCode } = parsed.data;
-
-      let user: InstanceType<typeof User> | null;
-
-      if (email && password) {
-        // Email + password + OTP login
-        user = await User.findOne({
-          $or: [
-            { email: email.toLowerCase() },
-            { email_aliases: email.toLowerCase() },
-          ],
-        });
-        if (!user || !user.passwordHash) {
-          return reply
-            .status(401)
-            .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
-        }
-        const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) {
-          return reply
-            .status(401)
-            .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
-        }
-
-        if (!otpCode) {
-          return reply.status(400).send({
-            error: 'Vui lòng nhập mã xác thực email',
-            code: 'OTP_REQUIRED',
-          });
-        }
-
-        const loginOtp = await OtpCode.findOne({
-          email: email.toLowerCase(),
-          code: otpCode,
-          purpose: 'login',
-          expiresAt: { $gt: new Date() },
-        });
-
-        if (!loginOtp) {
-          return reply.status(400).send({
-            error: 'Mã đăng nhập không hợp lệ hoặc đã hết hạn',
-            code: 'OTP_INVALID',
-          });
-        }
-      } else if (deviceId && coupleCode) {
-        // Device ID + couple code login
-        const normalizedCode = coupleCode.toUpperCase();
-        const couple = await Couple.findOne({ code: normalizedCode });
-        if (!couple) {
-          return reply
-            .status(401)
-            .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
-        }
-        // Find user who is in the couple and has this deviceId
-        user = await User.findOne({
-          coupleId: couple._id,
-          trustedDevices: deviceId,
-        });
-        if (!user) {
-          return reply
-            .status(401)
-            .send({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
-        }
-      } else {
-        return reply.status(400).send({
-          error: 'Provide email+password or deviceId+coupleCode',
-          code: 'VALIDATION_ERROR',
-        });
-      }
-
-      if (user.status === 'blocked') {
-        return reply
-          .status(403)
-          .send({ error: 'Tài khoản bị khóa', code: 'USER_BLOCKED' });
-      }
-
-      const couple = await Couple.findById(user.coupleId);
-      if (!couple) {
-        return reply
-          .status(500)
-          .send({ error: 'Couple not found', code: 'INTERNAL_ERROR' });
-      }
-
-      const token = signToken(
-        user._id.toString(),
-        couple._id.toString(),
-        user.role,
-      );
-
-      if (email && otpCode) {
-        await OtpCode.deleteMany({ email: email.toLowerCase(), purpose: 'login' });
-      }
-
-      return reply.status(200).send({
-        token,
-        user: toSafeUser(user),
-        couple: {
-          id: couple._id.toString(),
-          code: couple.code,
-          loveStartDate: couple.loveStartDate,
-          memberIds: couple.memberIds.map((id) => id.toString()),
-          streak: couple.streak,
-          lastCheckinDate: couple.lastCheckinDate,
-        },
-      });
-    },
-  );
-
-  /**
-   * POST /auth/google
-   * Verify a Google Identity Services ID token and log in an existing user.
-   * Google accounts are linked by verified email on the first successful login.
-   */
-  app.post(
-    '/auth/google',
-    {
-      config: {
-        rateLimit: {
-          max: 10,
-          timeWindow: '1 minute',
-        },
-      },
-    },
-    async (request, reply) => {
-      const parsed = googleLoginBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply
-          .status(400)
-          .send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
-      }
-
-      const isMockCredential =
-        parsed.data.credential.startsWith('mock-google-') ||
-        parsed.data.credential === 'mock-google-credential-dev';
-
-      let googlePayload;
-      if (isMockCredential) {
-        const mockKey = parsed.data.credential
-          .replace(/^mock-google-/, '')
-          .replace(/[^a-z0-9]+/gi, '-')
-          .toLowerCase() || 'default';
-        googlePayload = {
-          sub: `mock-google-user-id-${mockKey}`,
-          email: `test.google.${mockKey}@example.local`,
-          name: 'Google Test User',
-          email_verified: true,
-          picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
-        };
-      } else {
-        const clientId = env.GOOGLE_CLIENT_ID;
-        if (!clientId) {
-          return reply.status(503).send({
-            error: 'Đăng nhập Google chưa được cấu hình',
-            code: 'GOOGLE_AUTH_NOT_CONFIGURED',
-          });
-        }
-
-        try {
-          const googleClient = new OAuth2Client(clientId);
-          const ticket = await googleClient.verifyIdToken({
-            idToken: parsed.data.credential,
-            audience: clientId,
-          });
-          googlePayload = ticket.getPayload();
-        } catch (err) {
-          app.log.warn({ err }, 'Google ID token verification failed');
-          return reply.status(401).send({
-            error: 'Tài khoản Google không hợp lệ hoặc đã hết hạn',
-            code: 'GOOGLE_TOKEN_INVALID',
-          });
-        }
-      }
-
-      const googleId = googlePayload?.sub;
-      const googleEmail = googlePayload?.email?.trim().toLowerCase();
-      if (
-        !googlePayload ||
-        !googleId ||
-        !googleEmail ||
-        googlePayload.email_verified !== true
-      ) {
-        return reply.status(401).send({
-          error: 'Tài khoản Google chưa được xác thực email',
-          code: 'GOOGLE_EMAIL_NOT_VERIFIED',
-        });
-      }
-
-      let isNewUser = false;
-      let user = await User.findOne({ googleId });
-      if (!user) {
-        user = await User.findOne({
-          $or: [{ email: googleEmail }, { email_aliases: googleEmail }],
-        });
-      }
-
-      if (!user) {
-        isNewUser = true;
-        const dummyPassword = await bcrypt.hash(
-          Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
-          12,
-        );
-        user = await User.create({
-          email: googleEmail,
-          googleId,
-          passwordHash: dummyPassword,
-          displayName: googlePayload.name || googleEmail.split('@')[0],
-          avatarUrl: googlePayload.picture || undefined,
-          role: 'user',
-          status: 'active',
-          emailVerified: true,
-        });
-      }
-
-      if (user.googleId && user.googleId !== googleId) {
-        return reply.status(409).send({
-          error: 'Email này đã được liên kết với tài khoản Google khác',
-          code: 'GOOGLE_ACCOUNT_MISMATCH',
-        });
-      }
-
-      if (user.status === 'blocked') {
-        return reply
-          .status(403)
-          .send({ error: 'Tài khoản bị khóa', code: 'USER_BLOCKED' });
-      }
-
-      if (!user.googleId) {
-        user.googleId = googleId;
-        await user.save();
-      }
-
-      let coupleData = null;
-      let coupleIdStr = '';
-      if (user.coupleId) {
-        const couple = await Couple.findById(user.coupleId);
-        if (couple) {
-          coupleIdStr = couple._id.toString();
-          coupleData = {
-            id: couple._id.toString(),
-            code: couple.code,
-            loveStartDate: couple.loveStartDate,
-            memberIds: couple.memberIds.map((id) => id.toString()),
-            streak: couple.streak,
-            lastCheckinDate: couple.lastCheckinDate,
-          };
-        }
-      }
-
-      const token = signToken(
-        user._id.toString(),
-        coupleIdStr,
-        user.role,
-      );
-
-      return reply.status(200).send({
-        token,
-        user: toSafeUser(user),
-        couple: coupleData,
-        isNewUser,
-      });
-    },
-  );
-}
+  const createdUser = (await findUserById(c.env.DB, newUserId))!;
+  return c.json(await buildAuthPayload(c.env.DB, config.JWT_SECRET, createdUser, null, true), 201);
+});

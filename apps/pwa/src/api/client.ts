@@ -38,6 +38,9 @@ export function getApiUrl(): string {
     if (host === 'couple.io.vn') {
       return 'https://api.couple.io.vn/api';
     }
+    if (host === 'check-in-love.pages.dev' || host.endsWith('.check-in-love.pages.dev')) {
+      return 'https://check-in-love-api.aiths.workers.dev/api';
+    }
     if (host.startsWith('app.') || host.startsWith('pwa.')) {
       const parentDomain = host.replace(/^(app|pwa)\./, '');
       return `${protocol}//api.${parentDomain}/api`;

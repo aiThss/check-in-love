@@ -1,169 +1,144 @@
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { env } from '../config/env';
+import type { AppConfig } from '../config/env';
+import { AppError } from '../utils/errors';
 
-export interface StorageService {
-  saveFile(
-    buffer: Buffer,
-    filename: string,
-    mimeType: string,
-  ): Promise<{ url: string; storagePath: string }>;
-  deleteFile(storagePath: string): Promise<void>;
-}
+const ALLOWED_EXTENSIONS = new Map<string, string>([
+  ['image/jpeg', 'jpg'],
+  ['image/jpg', 'jpg'],
+  ['image/png', 'png'],
+  ['image/webp', 'webp'],
+  ['image/gif', 'gif'],
+  ['image/heic', 'heic'],
+  ['image/heif', 'heif'],
+]);
 
-class LocalStorageService implements StorageService {
-  private readonly uploadDir: string;
-  private readonly baseUrl: string;
-
-  constructor(uploadDir: string, baseUrl: string) {
-    this.uploadDir = uploadDir;
-    this.baseUrl = baseUrl;
+function detectImageType(bytes: Uint8Array, declaredMime: string, fileName?: string): { mime: string; ext: string } | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return { mime: 'image/jpeg', ext: 'jpg' };
   }
-
-  async saveFile(
-    buffer: Buffer,
-    filename: string,
-    mimeType: string,
-  ): Promise<{ url: string; storagePath: string }> {
-    const ext = this.getExtFromMime(mimeType) ?? path.extname(filename) ?? '';
-    const uniqueFilename = `${Date.now()}-${uuidv4()}${ext}`;
-
-    const now = new Date();
-    const year = now.getFullYear().toString();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-
-    const subDir = path.join(this.uploadDir, year, month);
-    await fs.promises.mkdir(subDir, { recursive: true });
-
-    const absolutePath = path.join(subDir, uniqueFilename);
-    await fs.promises.writeFile(absolutePath, buffer);
-
-    // Relative storage path: YYYY/MM/filename
-    const storagePath = `${year}/${month}/${uniqueFilename}`;
-    const url = `${this.baseUrl}/uploads/${storagePath}`;
-
-    return { url, storagePath };
-  }
-
-  async deleteFile(storagePath: string): Promise<void> {
-    const absolutePath = path.join(this.uploadDir, storagePath);
-    try {
-      await fs.promises.unlink(absolutePath);
-    } catch (err: unknown) {
-      const nodeErr = err as NodeJS.ErrnoException;
-      if (nodeErr.code !== 'ENOENT') {
-        throw err;
-      }
-      // File already gone — not an error
-    }
-  }
-
-  private getExtFromMime(mimeType: string): string {
-    const map: Record<string, string> = {
-      'image/jpeg': '.jpg',
-      'image/jpg': '.jpg',
-      'image/png': '.png',
-      'image/gif': '.gif',
-      'image/webp': '.webp',
-      'image/heic': '.heic',
-      'image/heif': '.heif',
-    };
-    return map[mimeType] ?? '.bin';
-  }
-}
-
-class R2StorageService implements StorageService {
-  private readonly s3Client: S3Client;
-  private readonly bucketName: string;
-  private readonly publicUrl: string;
-
-  constructor(
-    accountId: string,
-    accessKeyId: string,
-    secretAccessKey: string,
-    bucketName: string,
-    publicUrl: string,
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
   ) {
-    this.bucketName = bucketName;
-    this.publicUrl = publicUrl.endsWith('/') ? publicUrl.slice(0, -1) : publicUrl;
-
-    this.s3Client = new S3Client({
-      region: 'auto',
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
-      },
-    });
+    return { mime: 'image/png', ext: 'png' };
+  }
+  if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return { mime: 'image/gif', ext: 'gif' };
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return { mime: 'image/webp', ext: 'webp' };
+  }
+  // ISO BMFF (HEIC/HEIF/AVIF): 'ftyp' at bytes 4..7
+  if (bytes.length >= 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    const lowerMime = declaredMime.toLowerCase();
+    if (lowerMime.includes('heif')) return { mime: 'image/heif', ext: 'heif' };
+    return { mime: 'image/heic', ext: 'heic' };
   }
 
-  async saveFile(
-    buffer: Buffer,
-    filename: string,
-    mimeType: string,
-  ): Promise<{ url: string; storagePath: string }> {
-    const ext = this.getExtFromMime(mimeType) ?? path.extname(filename) ?? '';
-    const uniqueFilename = `${Date.now()}-${uuidv4()}${ext}`;
-
-    const now = new Date();
-    const year = now.getFullYear().toString();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-
-    // Relative storage path: YYYY/MM/filename
-    const storagePath = `${year}/${month}/${uniqueFilename}`;
-
-    await this.s3Client.send(
-      new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: storagePath,
-        Body: buffer,
-        ContentType: mimeType,
-      })
-    );
-
-    const url = `${this.publicUrl}/${storagePath}`;
-
-    return { url, storagePath };
+  const normalizedMime = declaredMime.toLowerCase().split(';')[0].trim();
+  const mappedExt = ALLOWED_EXTENSIONS.get(normalizedMime);
+  if (mappedExt) {
+    return { mime: normalizedMime === 'image/jpg' ? 'image/jpeg' : normalizedMime, ext: mappedExt };
   }
 
-  async deleteFile(storagePath: string): Promise<void> {
-    await this.s3Client.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: storagePath,
-      })
-    );
-  }
-
-  private getExtFromMime(mimeType: string): string {
-    const map: Record<string, string> = {
-      'image/jpeg': '.jpg',
-      'image/jpg': '.jpg',
-      'image/png': '.png',
-      'image/gif': '.gif',
-      'image/webp': '.webp',
-      'image/heic': '.heic',
-      'image/heif': '.heif',
-    };
-    return map[mimeType] ?? '.bin';
-  }
+  const extMatch = fileName?.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  if (extMatch === 'jpg' || extMatch === 'jpeg') return { mime: 'image/jpeg', ext: 'jpg' };
+  if (extMatch === 'png') return { mime: 'image/png', ext: 'png' };
+  if (extMatch === 'webp') return { mime: 'image/webp', ext: 'webp' };
+  if (extMatch === 'gif') return { mime: 'image/gif', ext: 'gif' };
+  return null;
 }
 
-const isR2Configured =
-  env.R2_ACCOUNT_ID &&
-  env.R2_ACCESS_KEY_ID &&
-  env.R2_SECRET_ACCESS_KEY &&
-  env.R2_BUCKET_NAME &&
-  env.R2_PUBLIC_URL;
+export interface StoredUpload {
+  url: string;
+  storagePath: string;
+}
 
-export const storageService: StorageService = isR2Configured
-  ? new R2StorageService(
-      env.R2_ACCOUNT_ID!,
-      env.R2_ACCESS_KEY_ID!,
-      env.R2_SECRET_ACCESS_KEY!,
-      env.R2_BUCKET_NAME!,
-      env.R2_PUBLIC_URL!,
-    )
-  : new LocalStorageService(env.UPLOAD_DIR, env.PUBLIC_BASE_URL);
+export async function saveUploadedImage(
+  bucket: R2Bucket,
+  config: AppConfig,
+  file: File,
+  folder: 'checkins' | 'avatars' | 'messages' | 'chat-backgrounds',
+): Promise<StoredUpload> {
+  const maxBytes = config.MAX_UPLOAD_MB * 1024 * 1024;
+  if (file.size <= 0) {
+    throw new AppError('Tệp ảnh trống', 400, 'EMPTY_FILE');
+  }
+  if (file.size > maxBytes) {
+    throw new AppError(`Ảnh vượt quá giới hạn ${config.MAX_UPLOAD_MB}MB`, 413, 'FILE_TOO_LARGE');
+  }
+
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  const detected = detectImageType(bytes, file.type || '', file.name);
+  if (!detected) {
+    throw new AppError('Định dạng ảnh không được hỗ trợ (chỉ hỗ trợ JPG, PNG, WebP, GIF, HEIC)', 400, 'INVALID_IMAGE_TYPE');
+  }
+
+  const now = new Date();
+  const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  const key = `${folder}/${monthKey}/${crypto.randomUUID()}.${detected.ext}`;
+
+  await bucket.put(key, bytes, {
+    httpMetadata: {
+      contentType: detected.mime,
+      cacheControl: 'public, max-age=31536000, immutable',
+    },
+  });
+
+  const url = config.R2_PUBLIC_URL
+    ? `${config.R2_PUBLIC_URL}/${key}`
+    : `${config.PUBLIC_BASE_URL}/uploads/${key}`;
+
+  return { url, storagePath: key };
+}
+
+export async function deleteStoredFile(
+  bucket: R2Bucket | undefined,
+  storagePathOrUrl: string | null | undefined,
+  r2PublicUrl?: string,
+): Promise<void> {
+  if (!bucket || !storagePathOrUrl) return;
+  const trimmed = storagePathOrUrl.trim();
+  if (!trimmed) return;
+
+  let key: string;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    const normalizedBase = (r2PublicUrl ?? '').replace(/\/+$/, '');
+    if (normalizedBase && trimmed.startsWith(`${normalizedBase}/`)) {
+      key = trimmed.slice(normalizedBase.length + 1);
+    } else {
+      const uploadsIndex = trimmed.indexOf('/uploads/');
+      if (uploadsIndex >= 0) {
+        key = trimmed.slice(uploadsIndex + '/uploads/'.length);
+      } else {
+        return;
+      }
+    }
+  } else {
+    key = trimmed.replace(/^\/+uploads\//, '').replace(/^\/+/, '');
+  }
+
+  if (!key) return;
+  try {
+    await bucket.delete(key);
+  } catch {
+    // Non-fatal storage cleanup error
+  }
+}

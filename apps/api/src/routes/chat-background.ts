@@ -1,184 +1,171 @@
-import { randomUUID } from 'node:crypto';
-import { MultipartFile } from '@fastify/multipart';
-import { FastifyInstance } from 'fastify';
-import { Types } from 'mongoose';
-import sharp from 'sharp';
-import { z } from 'zod';
-import { env } from '../config/env';
-import { ChatMessage } from '../db/models/ChatMessage';
-import { ChatBackgroundSnapshot, Couple } from '../db/models/Couple';
-import { User } from '../db/models/User';
+import { Hono } from 'hono';
+import {
+  execute,
+  findCoupleById,
+  findPartnerUser,
+  findUserById,
+  queryOne,
+} from '../db/d1';
+import {
+  parseJsonSafe,
+  toMessageDto,
+  type ChatBackgroundData,
+  type ChatMessageRow,
+  type ChatSystemEvent,
+} from '../db/types';
 import { authenticate } from '../middleware/auth';
-import { storageService } from '../services/storage';
-import { emitRealtimeEvent } from './events';
+import { emitRealtimeEvent } from '../services/realtime';
+import { deleteStoredFile, saveUploadedImage } from '../services/storage';
+import type { HonoAppEnv } from '../types/hono';
+import { AppError } from '../utils/errors';
+import { generateId } from '../utils/id';
 
-const CHAT_BACKGROUND_PRESETS = [
-  { id: 'default', label: 'Mặc định' },
-  { id: 'rose-garden', label: 'Hoa hồng' },
-  { id: 'sunset-horizon', label: 'Hoàng hôn biển' },
-  { id: 'lavender-stars', label: 'Đồi lavender' },
-  { id: 'mint-bloom', label: 'Lá nhiệt đới' },
-  { id: 'midnight-heart', label: 'Bãi biển hồng' },
-] as const;
+export const chatBackgroundRoutes = new Hono<HonoAppEnv>();
 
-const presetSchema = z.object({
-  kind: z.literal('preset'),
-  id: z.string().trim().min(1).max(80),
-});
-
-type SerializedChatBackground = {
-  kind: 'preset' | 'custom';
-  id?: string;
-  imageUrl?: string;
-  label: string;
-  updatedAt?: string;
+const PRESET_LABELS: Record<string, string> = {
+  default: 'Mặc định',
+  'rose-garden': 'Hoa hồng',
+  'sunset-horizon': 'Hoàng hôn biển',
+  'lavender-stars': 'Đồi lavender',
+  'mint-bloom': 'Lá nhiệt đới',
+  'midnight-heart': 'Bãi biển hồng',
 };
 
-function serializeBackground(background?: ChatBackgroundSnapshot | null): SerializedChatBackground | null {
-  if (!background) return null;
-  return {
-    kind: background.kind,
-    id: background.id,
-    imageUrl: background.imageUrl,
-    label: background.label,
-    updatedAt: background.updatedAt?.toISOString?.() ?? String(background.updatedAt),
-  };
-}
-
-async function readImage(part: MultipartFile): Promise<{ buffer: Buffer; filename: string }> {
-  if (!part.mimetype.startsWith('image/')) {
-    throw Object.assign(new Error('Only image files are allowed'), { statusCode: 400 });
+chatBackgroundRoutes.get('/chat-background', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
   }
 
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of part.file) {
-    total += chunk.length;
-    if (total > env.MAX_UPLOAD_MB * 1024 * 1024) {
-      throw Object.assign(new Error('File too large'), { statusCode: 400 });
-    }
-    chunks.push(chunk);
+  const couple = await findCoupleById(c.env.DB, auth.coupleId);
+  if (!couple) {
+    throw new AppError('Không tìm thấy nhóm cặp đôi', 404, 'COUPLE_NOT_FOUND');
   }
-  return { buffer: Buffer.concat(chunks), filename: part.filename };
-}
 
-function backgroundMessage(displayName: string, background: ChatBackgroundSnapshot): string {
-  if (background.kind === 'preset' && background.id === 'default') {
-    return `${displayName} đã khôi phục chủ đề mặc định`;
+  const background = parseJsonSafe<ChatBackgroundData | null>(couple.chat_background_json, null);
+  return c.json({ background });
+});
+
+chatBackgroundRoutes.patch('/chat-background', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
   }
-  return `${displayName} đã đổi chủ đề thành ${background.label}`;
-}
 
-export default async function chatBackgroundRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/chat-background', { preHandler: authenticate }, async (request, reply) => {
-    const couple = await Couple.findById(request.user.coupleId).lean();
-    if (!couple) {
-      return reply.status(404).send({ error: 'Couple not found', code: 'NOT_FOUND' });
-    }
-    return reply.send({ background: serializeBackground(couple.chatBackground) });
-  });
+  const couple = await findCoupleById(c.env.DB, auth.coupleId);
+  if (!couple) {
+    throw new AppError('Không tìm thấy nhóm cặp đôi', 404, 'COUPLE_NOT_FOUND');
+  }
 
-  app.patch('/chat-background', { preHandler: authenticate }, async (request, reply) => {
-    const user = await User.findById(request.user.id).lean();
-    if (!user) return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
+  const config = c.get('config');
+  const user = (await findUserById(c.env.DB, auth.id))!;
+  const previousBg = parseJsonSafe<ChatBackgroundData | null>(couple.chat_background_json, null);
+  const nowIso = new Date().toISOString();
+  const contentType = c.req.header('content-type') || '';
 
-    const coupleId = new Types.ObjectId(request.user.coupleId);
-    const previousCouple = await Couple.findById(coupleId).lean();
-    if (!previousCouple) {
-      return reply.status(404).send({ error: 'Couple not found', code: 'NOT_FOUND' });
-    }
+  let nextBg: ChatBackgroundData;
+  let systemText: string;
+  let systemEvent: ChatSystemEvent;
 
-    let nextBackground: Omit<ChatBackgroundSnapshot, 'updatedBy' | 'updatedByName' | 'updatedAt'>;
-    const contentType = request.headers['content-type'] ?? '';
-    if (contentType.includes('multipart/form-data')) {
-      let image: { buffer: Buffer; filename: string } | undefined;
-      for await (const part of request.parts()) {
-        if (part.type === 'file') image = await readImage(part);
-      }
-      if (!image) {
-        return reply.status(400).send({ error: 'Image file required', code: 'NO_FILE' });
-      }
-
-      const buffer = await sharp(image.buffer)
-        .rotate()
-        .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 85, progressive: true })
-        .toBuffer();
-      const saved = await storageService.saveFile(buffer, image.filename, 'image/jpeg');
-      nextBackground = {
-        kind: 'custom',
-        imageUrl: saved.url,
-        storagePath: saved.storagePath,
-        label: 'Ảnh tùy chọn',
-      };
-    } else {
-      const parsed = presetSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-      const preset = CHAT_BACKGROUND_PRESETS.find((item) => item.id === parsed.data.id);
-      if (!preset) {
-        return reply.status(400).send({ error: 'Unknown chat background', code: 'VALIDATION_ERROR' });
-      }
-      nextBackground = { kind: 'preset', id: preset.id, label: preset.label };
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await c.req.formData().catch(() => null);
+    const fileEntry = formData?.get('file') ?? formData?.get('image');
+    if (!(fileEntry instanceof File) || fileEntry.size <= 0) {
+      throw new AppError('Vui lòng chọn ảnh nền hợp lệ', 400, 'MISSING_FILE');
     }
 
-    const snapshot: ChatBackgroundSnapshot = {
-      ...nextBackground,
-      updatedBy: new Types.ObjectId(request.user.id),
-      updatedByName: user.displayName,
-      updatedAt: new Date(),
+    const uploaded = await saveUploadedImage(c.env.STORAGE, config, fileEntry, 'chat-backgrounds');
+    nextBg = {
+      kind: 'custom',
+      label: 'Ảnh nền riêng',
+      url: uploaded.url,
+      storagePath: uploaded.storagePath,
+      updatedById: user.id,
+      updatedByName: user.display_name,
+      updatedAt: nowIso,
     };
-    const updatedCouple = await Couple.findByIdAndUpdate(
-      coupleId,
-      { $set: { chatBackground: snapshot } },
-      { new: true, runValidators: true },
-    ).lean();
-    if (!updatedCouple) {
-      return reply.status(404).send({ error: 'Couple not found', code: 'NOT_FOUND' });
+    systemText = `${user.display_name} đã đổi ảnh nền trò chuyện`;
+    systemEvent = {
+      kind: 'background_changed',
+      backgroundKind: 'custom',
+      backgroundLabel: 'Ảnh nền riêng',
+    };
+  } else {
+    const body = (await c.req.json().catch(() => null)) as { kind?: string; id?: string } | null;
+    const presetId = body?.id?.trim();
+    if (body?.kind !== 'preset' || !presetId || !PRESET_LABELS[presetId]) {
+      throw new AppError('Chủ đề hình nền không hợp lệ', 400, 'VALIDATION_ERROR');
     }
 
-    const text = backgroundMessage(user.displayName, snapshot);
-    const message = await ChatMessage.create({
-      coupleId,
-      senderId: new Types.ObjectId(request.user.id),
-      senderName: user.displayName,
-      type: 'text',
-      text,
-      systemEvent: {
-        kind: 'background_changed',
-        backgroundKind: snapshot.kind,
-        backgroundId: snapshot.id,
-        backgroundLabel: snapshot.label,
-        backgroundImageUrl: snapshot.imageUrl,
-      },
-      clientMutationId: `chat-background:${coupleId.toString()}:${randomUUID()}`,
+    const label = PRESET_LABELS[presetId];
+    nextBg = {
+      kind: 'preset',
+      id: presetId,
+      label,
+      updatedById: user.id,
+      updatedByName: user.display_name,
+      updatedAt: nowIso,
+    };
+    systemText = `${user.display_name} đã đổi chủ đề thành ${label}`;
+    systemEvent = {
+      kind: 'background_changed',
+      backgroundKind: 'preset',
+      backgroundId: presetId,
+      backgroundLabel: label,
+    };
+  }
+
+  await execute(
+    c.env.DB,
+    'UPDATE couples SET chat_background_json = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(nextBg), nowIso, couple.id],
+  );
+
+  if (previousBg?.kind === 'custom' && previousBg.storagePath && previousBg.storagePath !== nextBg.storagePath) {
+    await deleteStoredFile(c.env.STORAGE, previousBg.storagePath, config.R2_PUBLIC_URL);
+  }
+
+  const messageId = generateId();
+  await execute(
+    c.env.DB,
+    `INSERT INTO chat_messages (
+      id, couple_id, sender_id, sender_name, type, text,
+      system_event_json, read_by_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 'text', ?, ?, ?, ?, ?)`,
+    [
+      messageId,
+      couple.id,
+      user.id,
+      user.display_name,
+      systemText,
+      JSON.stringify(systemEvent),
+      JSON.stringify([user.id]),
+      nowIso,
+      nowIso,
+    ],
+  );
+
+  const systemMessage = await queryOne<ChatMessageRow>(
+    c.env.DB,
+    'SELECT * FROM chat_messages WHERE id = ? LIMIT 1',
+    [messageId],
+  );
+
+  const partner = await findPartnerUser(c.env.DB, couple.id, user.id);
+  if (partner) {
+    await emitRealtimeEvent(c.env, partner.id, {
+      type: 'chat.background.updated',
+      title: '',
+      body: '',
+      senderId: user.id,
+      senderName: user.display_name,
+      chatBackground: nextBg as unknown as Record<string, unknown>,
+      messageId,
     });
+  }
 
-    const partnerId = updatedCouple.memberIds.find((id) => id.toString() !== request.user.id);
-    const serialized = serializeBackground(snapshot)!;
-    if (partnerId) {
-      emitRealtimeEvent(partnerId.toString(), {
-        type: 'chat.background.updated',
-        title: '',
-        body: '',
-        targetUrl: '/app/messages',
-        senderName: user.displayName,
-        messageId: message._id.toString(),
-        chatBackground: serialized,
-      });
-    }
-
-    const previousStoragePath = previousCouple.chatBackground?.storagePath;
-    if (previousStoragePath && previousStoragePath !== snapshot.storagePath) {
-      void storageService.deleteFile(previousStoragePath).catch(() => {
-        app.log.warn({ storagePath: previousStoragePath }, 'Failed to remove previous chat background');
-      });
-    }
-
-    return reply.status(200).send({ background: serialized, message });
+  return c.json({
+    background: nextBg,
+    message: systemMessage ? toMessageDto(systemMessage) : undefined,
   });
-}
+});

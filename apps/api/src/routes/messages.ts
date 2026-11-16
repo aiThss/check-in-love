@@ -1,713 +1,613 @@
-import { createHash } from 'node:crypto';
-import { MultipartFile } from '@fastify/multipart';
-import { FastifyInstance } from 'fastify';
-import { Types } from 'mongoose';
-import sharp from 'sharp';
-import { z } from 'zod';
-import { env } from '../config/env';
-import { ChatMessage, ChatMessageType, ChatSystemEvent } from '../db/models/ChatMessage';
-import { CheckIn } from '../db/models/CheckIn';
-import { Couple } from '../db/models/Couple';
-import { User } from '../db/models/User';
+import { Hono } from 'hono';
+import {
+  execute,
+  findPartnerUser,
+  findUserById,
+  queryAll,
+  queryOne,
+} from '../db/d1';
+import {
+  parseJsonSafe,
+  toMessageDto,
+  type ChatAttachment,
+  type ChatEditHistoryEntry,
+  type ChatMessageRow,
+  type ChatReactionGroup,
+  type CheckinRow,
+  type MessageReplyReference,
+  type ReferencedCheckinSnapshot,
+} from '../db/types';
 import { authenticate } from '../middleware/auth';
+import { syncCheckinRepliesPage } from '../services/checkin-reply-message-sync';
 import { sendPushToUser } from '../services/push';
-import { storageService } from '../services/storage';
-import { emitRealtimeEvent } from './events';
+import { emitRealtimeEvent } from '../services/realtime';
+import { deleteStoredFile, saveUploadedImage } from '../services/storage';
+import type { HonoAppEnv } from '../types/hono';
+import { AppError } from '../utils/errors';
+import { generateId } from '../utils/id';
 
-const LEGACY_SYNC_LIMIT = 250;
-const MESSAGE_IMAGE_MAX_SIZE = 2560;
+export const messageRoutes = new Hono<HonoAppEnv>();
 
-const listSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).default(30),
-  before: z.string().optional(),
-  after: z.string().optional(),
-}).refine((value) => !(value.before && value.after), {
-  message: 'before and after cannot be used together',
-});
-
-const textSchema = z.object({
-  type: z.literal('text'),
-  text: z.string().trim().min(1).max(1000),
-  replyToMessageId: z.string().trim().min(1).optional(),
-  referencedCheckinId: z.string().trim().min(1).optional(),
-  clientMutationId: z.string().trim().min(1).max(100).optional(),
-});
-
-const editSchema = z.object({
-  text: z.string().trim().min(1).max(1000),
-});
-
-const reactionSchema = z.object({
-  type: z.string().trim().min(1).max(32),
-});
-
-const readSchema = z.object({
-  messageIds: z.array(z.string().trim().min(1)).max(100).optional(),
-  upTo: z.string().trim().min(1).optional(),
-}).refine((value) => Boolean(value.messageIds?.length || value.upTo), {
-  message: 'messageIds or upTo is required',
-});
-
-const typingSchema = z.object({
-  isTyping: z.boolean(),
-});
-
-interface LegacyReplyRecord {
-  userId: Types.ObjectId;
-  userName: string;
-  message: string;
-  createdAt: Date;
+async function ensureLegacyRepliesSynced(db: D1Database, coupleId: string): Promise<void> {
+  const checkinsWithReplies = await queryAll<CheckinRow>(
+    db,
+    `SELECT * FROM checkins
+     WHERE couple_id = ? AND deleted_at IS NULL AND replies_json != '[]'
+     ORDER BY created_at DESC LIMIT 60`,
+    [coupleId],
+  );
+  if (checkinsWithReplies.length > 0) {
+    await syncCheckinRepliesPage(db, coupleId, checkinsWithReplies);
+  }
 }
 
-interface LegacyCheckinRecord {
-  _id: Types.ObjectId;
-  coupleId: Types.ObjectId;
-  ownerId: Types.ObjectId;
-  ownerName: string;
-  type: 'photo' | 'text' | 'mood';
-  imageUrl?: string;
-  storagePath?: string;
-  attachments?: Array<{ url: string; storagePath?: string; mimeType: string; width?: number; height?: number; sizeBytes?: number }>;
-  caption?: string;
-  quickMessage?: string;
-  mood?: string;
-  replies?: LegacyReplyRecord[];
-  createdAt: Date;
-  updatedAt?: Date;
-}
-
-interface LeanMessageRecord {
-  _id: Types.ObjectId;
-  coupleId: Types.ObjectId;
-  senderId: Types.ObjectId;
-  senderName: string;
-  type: ChatMessageType;
-  text?: string;
-  imageUrl?: string;
-  storagePath?: string;
-  replyToMessageId?: Types.ObjectId;
-  replyTo?: unknown;
-  referencedCheckinId?: Types.ObjectId;
-  referencedCheckin?: unknown;
-  systemEvent?: ChatSystemEvent;
-  clientMutationId?: string;
-  deletedAt?: Date;
-  editedAt?: Date;
-  editHistory?: Array<{ text: string; editedAt: Date }>;
-  readBy?: Types.ObjectId[];
-  reactions?: Array<{ type: string; userIds: Types.ObjectId[] }>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-async function readImage(part: MultipartFile): Promise<{ buffer: Buffer; filename: string }> {
-  if (!part.mimetype.startsWith('image/')) {
-    throw Object.assign(new Error('Only image files are allowed'), { statusCode: 400 });
+messageRoutes.get('/messages', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
   }
 
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of part.file) {
-    total += chunk.length;
-    if (total > env.MAX_UPLOAD_MB * 1024 * 1024) {
-      throw Object.assign(new Error('File too large'), { statusCode: 400 });
-    }
-    chunks.push(chunk);
-  }
-  return { buffer: Buffer.concat(chunks), filename: part.filename };
-}
+  await ensureLegacyRepliesSynced(c.env.DB, auth.coupleId);
 
-function snippet(message: { type: ChatMessageType; text?: string; imageUrl?: string }): string {
-  return (message.text?.replace(/\s+/g, ' ').trim() || (message.imageUrl ? 'Ảnh' : 'Tin nhắn')).slice(0, 160);
-}
+  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '30', 10) || 30));
+  const before = c.req.query('before')?.trim();
+  const after = c.req.query('after')?.trim();
 
-function checkinSnapshot(checkin: LegacyCheckinRecord) {
-  return {
-    checkinId: checkin._id,
-    ownerId: checkin.ownerId,
-    ownerName: checkin.ownerName,
-    type: checkin.type,
-    caption: checkin.caption ?? checkin.quickMessage,
-    mood: checkin.mood,
-    imageUrl: checkin.imageUrl,
-    createdAt: checkin.createdAt,
-  };
-}
+  let rows: ChatMessageRow[];
+  let hasMore: boolean;
 
-function deterministicObjectId(dateValue: Date, identity: string): Types.ObjectId {
-  const date = new Date(dateValue);
-  const timestamp = Math.max(0, Math.floor(date.getTime() / 1000))
-    .toString(16)
-    .padStart(8, '0')
-    .slice(-8);
-  const suffix = createHash('sha1').update(identity).digest('hex').slice(0, 16);
-  return new Types.ObjectId(`${timestamp}${suffix}`);
-}
-
-const syncedCouples = new Set<string>();
-
-/**
- * Bridges the old shared CheckIn stream into ChatMessage without duplicating media.
- * It is idempotent and preserves original timestamps, so historical photos/replies do
- * not jump to the bottom of the conversation after a deploy.
- */
-async function syncLegacyCheckinMessages(coupleId: Types.ObjectId): Promise<void> {
-  const coupleKey = coupleId.toString();
-  if (syncedCouples.has(coupleKey)) {
-    return;
-  }
-  const checkins = await CheckIn.find({
-    coupleId,
-    deletedAt: null,
-    $or: [
-      { type: 'photo' },
-      { 'replies.0': { $exists: true } },
-    ],
-  })
-    .sort({ createdAt: -1 })
-    .limit(LEGACY_SYNC_LIMIT)
-    .lean() as unknown as LegacyCheckinRecord[];
-
-  const operations: Array<{
-    updateOne: {
-      filter: Record<string, unknown>;
-      update: Record<string, unknown>;
-      upsert: true;
-    };
-  }> = [];
-
-  for (const checkin of checkins) {
-    const referencedCheckin = checkinSnapshot(checkin);
-
-    if (checkin.type === 'photo' && checkin.imageUrl) {
-      operations.push({
-        updateOne: {
-          filter: {
-            coupleId,
-            referencedCheckinId: checkin._id,
-            type: 'image',
-          },
-          update: {
-            $set: {
-              senderId: checkin.ownerId,
-              senderName: checkin.ownerName,
-              text: checkin.caption ?? checkin.quickMessage,
-              imageUrl: checkin.imageUrl,
-              storagePath: checkin.storagePath,
-              referencedCheckinId: checkin._id,
-              referencedCheckin,
-              updatedAt: checkin.updatedAt ?? checkin.createdAt,
-            },
-            $setOnInsert: {
-              _id: checkin._id,
-              coupleId,
-              type: 'image',
-              clientMutationId: `checkin-photo:${checkin._id.toString()}`,
-              createdAt: checkin.createdAt,
-              deletedAt: null,
-            },
-          },
-          upsert: true,
-        },
-      });
-    }
-
-    for (const legacyReply of checkin.replies ?? []) {
-      const createdAt = new Date(legacyReply.createdAt);
-      const identity = [
-        checkin._id.toString(),
-        legacyReply.userId.toString(),
-        createdAt.toISOString(),
-        legacyReply.message,
-      ].join(':');
-      const messageId = deterministicObjectId(createdAt, identity);
-      const clientMutationId = `legacy-reply:${messageId.toString()}`;
-
-      operations.push({
-        updateOne: {
-          filter: { coupleId, clientMutationId },
-          update: {
-            $setOnInsert: {
-              _id: messageId,
-              coupleId,
-              senderId: legacyReply.userId,
-              senderName: legacyReply.userName,
-              type: 'text',
-              text: legacyReply.message,
-              referencedCheckinId: checkin._id,
-              referencedCheckin,
-              clientMutationId,
-              createdAt,
-              updatedAt: createdAt,
-              deletedAt: null,
-            },
-          },
-          upsert: true,
-        },
-      });
-    }
+  if (after) {
+    const fetched = await queryAll<ChatMessageRow>(
+      c.env.DB,
+      `SELECT * FROM chat_messages
+       WHERE couple_id = ? AND id > ?
+       ORDER BY id ASC LIMIT ?`,
+      [auth.coupleId, after, limit + 1],
+    );
+    hasMore = fetched.length > limit;
+    rows = fetched.slice(0, limit);
+  } else if (before) {
+    const fetchedDesc = await queryAll<ChatMessageRow>(
+      c.env.DB,
+      `SELECT * FROM chat_messages
+       WHERE couple_id = ? AND id < ?
+       ORDER BY id DESC LIMIT ?`,
+      [auth.coupleId, before, limit + 1],
+    );
+    hasMore = fetchedDesc.length > limit;
+    rows = fetchedDesc.slice(0, limit).reverse();
+  } else {
+    const fetchedDesc = await queryAll<ChatMessageRow>(
+      c.env.DB,
+      `SELECT * FROM chat_messages
+       WHERE couple_id = ?
+       ORDER BY id DESC LIMIT ?`,
+      [auth.coupleId, limit + 1],
+    );
+    hasMore = fetchedDesc.length > limit;
+    rows = fetchedDesc.slice(0, limit).reverse();
   }
 
-  if (operations.length > 0) {
-    await ChatMessage.bulkWrite(operations, { ordered: false });
-  }
-
-  syncedCouples.add(coupleKey);
-}
-
-async function hydrateLiveCheckins(
-  messages: LeanMessageRecord[],
-  coupleId: Types.ObjectId,
-): Promise<LeanMessageRecord[]> {
-  const referencedIds = Array.from(new Set(
-    messages
-      .map((message) => message.referencedCheckinId?.toString())
-      .filter((value): value is string => Boolean(value)),
-  ));
-
-  if (referencedIds.length === 0) return messages;
-
-  const checkins = await CheckIn.find({
-    _id: { $in: referencedIds.map((id) => new Types.ObjectId(id)) },
-    coupleId,
-    deletedAt: null,
-  }).lean() as unknown as LegacyCheckinRecord[];
-
-  const liveById = new Map(checkins.map((checkin) => [checkin._id.toString(), checkin]));
-
-  return messages.map((message) => {
-    const liveCheckin = message.referencedCheckinId
-      ? liveById.get(message.referencedCheckinId.toString())
-      : undefined;
-    if (!liveCheckin) return message;
-
-    const next: LeanMessageRecord = {
-      ...message,
-      referencedCheckin: checkinSnapshot(liveCheckin),
-    };
-
-    // A photo topic is the same logical photo shown in Home and Memories. Keep its
-    // visible media/caption live while retaining the embedded snapshot as fallback.
-    if (message.type === 'image' && liveCheckin.type === 'photo') {
-      next.imageUrl = liveCheckin.imageUrl ?? message.imageUrl;
-      next.storagePath = liveCheckin.storagePath ?? message.storagePath;
-      next.text = liveCheckin.caption ?? liveCheckin.quickMessage ?? message.text;
-    }
-
-    return next;
+  return c.json({
+    messages: rows.map(toMessageDto),
+    pagination: {
+      hasMore,
+      beforeCursor: rows[0]?.id ?? null,
+      afterCursor: rows[rows.length - 1]?.id ?? null,
+    },
   });
-}
+});
 
-async function partnerIdFor(coupleId: Types.ObjectId, userId: string): Promise<string | undefined> {
-  const couple = await Couple.findById(coupleId).lean();
-  return couple?.memberIds.find((id) => id.toString() !== userId)?.toString();
-}
+messageRoutes.post('/messages', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
 
-export default async function messagesRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/messages', { preHandler: authenticate }, async (request, reply) => {
-    const parsed = listSchema.safeParse(request.query);
-    if (!parsed.success) {
-      return reply.status(400).send({
-        error: parsed.error.errors[0].message,
-        code: 'VALIDATION_ERROR',
-      });
+  const config = c.get('config');
+  const contentType = c.req.header('content-type') || '';
+
+  let type: ChatMessageRow['type'];
+  let text: string | undefined;
+  let replyToMessageId: string | undefined;
+  let referencedCheckinId: string | undefined;
+  let clientMutationId: string | undefined;
+  let imageFile: File | null = null;
+
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await c.req.formData().catch(() => null);
+    if (!formData) {
+      throw new AppError('Dữ liệu form không hợp lệ', 400, 'VALIDATION_ERROR');
     }
-
-    const { limit, before, after } = parsed.data;
-    if (before && !Types.ObjectId.isValid(before)) {
-      return reply.status(400).send({ error: 'Invalid before cursor', code: 'VALIDATION_ERROR' });
+    const getStr = (k: string) => {
+      const v = formData.get(k);
+      return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+    };
+    const rawType = getStr('type');
+    type = rawType === 'image' || rawType === 'sticker' || rawType === 'checkin_reply' ? rawType : 'image';
+    text = getStr('text');
+    replyToMessageId = getStr('replyToMessageId');
+    referencedCheckinId = getStr('referencedCheckinId');
+    clientMutationId = getStr('clientMutationId');
+    const fileEntry = formData.get('image') ?? formData.get('file') ?? formData.get('photo');
+    if (fileEntry instanceof File && fileEntry.size > 0) {
+      imageFile = fileEntry;
     }
-    if (after && !Types.ObjectId.isValid(after)) {
-      return reply.status(400).send({ error: 'Invalid after cursor', code: 'VALIDATION_ERROR' });
+  } else {
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body) {
+      throw new AppError('Payload tin nhắn không hợp lệ', 400, 'VALIDATION_ERROR');
     }
+    type = body.type === 'checkin_reply' ? 'checkin_reply' : 'text';
+    text = typeof body.text === 'string' && body.text.trim() ? body.text.trim() : undefined;
+    replyToMessageId =
+      typeof body.replyToMessageId === 'string' && body.replyToMessageId.trim()
+        ? body.replyToMessageId.trim()
+        : undefined;
+    referencedCheckinId =
+      typeof body.referencedCheckinId === 'string' && body.referencedCheckinId.trim()
+        ? body.referencedCheckinId.trim()
+        : undefined;
+    clientMutationId =
+      typeof body.clientMutationId === 'string' && body.clientMutationId.trim()
+        ? body.clientMutationId.trim()
+        : undefined;
+  }
 
-    const coupleId = new Types.ObjectId(request.user.coupleId);
-    try {
-      await syncLegacyCheckinMessages(coupleId);
-    } catch (error) {
-      app.log.warn({ err: error }, 'Failed to synchronize legacy check-ins into messages');
+  if (clientMutationId) {
+    const existing = await queryOne<ChatMessageRow>(
+      c.env.DB,
+      'SELECT * FROM chat_messages WHERE couple_id = ? AND client_mutation_id = ? LIMIT 1',
+      [auth.coupleId, clientMutationId],
+    );
+    if (existing) {
+      return c.json({ message: toMessageDto(existing) }, 200);
     }
+  }
 
-    const filter: Record<string, unknown> = { coupleId, deletedAt: null };
-    if (before) filter._id = { $lt: new Types.ObjectId(before) };
-    if (after) filter._id = { $gt: new Types.ObjectId(after) };
+  if (!text && !imageFile) {
+    throw new AppError('Tin nhắn không được để trống', 400, 'VALIDATION_ERROR');
+  }
+  if (text && text.length > 4000) {
+    throw new AppError('Tin nhắn tối đa 4000 ký tự', 400, 'VALIDATION_ERROR');
+  }
 
-    const rows = await ChatMessage.find(filter)
-      .sort({ _id: after ? 1 : -1 })
-      .limit(limit + 1)
-      .lean() as unknown as LeanMessageRecord[];
-    const hasMore = rows.length > limit;
-    const ordered = after ? rows.slice(0, limit) : rows.slice(0, limit).reverse();
-    const messages = await hydrateLiveCheckins(ordered, coupleId);
+  const user = (await findUserById(c.env.DB, auth.id))!;
 
-    return reply.send({
-      messages,
-      pagination: {
-        hasMore,
-        beforeCursor: messages[0]?._id?.toString() ?? null,
-        afterCursor: messages.at(-1)?._id?.toString() ?? null,
-        limit,
-      },
-    });
-  });
-
-  app.post('/messages', { preHandler: authenticate }, async (request, reply) => {
-    const user = await User.findById(request.user.id).lean();
-    if (!user) return reply.status(404).send({ error: 'User not found', code: 'NOT_FOUND' });
-
-    let type: ChatMessageType;
-    let text: string | undefined;
-    let imageUrl: string | undefined;
-    let storagePath: string | undefined;
-    let attachments: Array<{ url: string; storagePath?: string; mimeType: string; sizeBytes?: number }> | undefined;
-    let replyToMessageId: string | undefined;
-    let referencedCheckinId: string | undefined;
-    let clientMutationId: string | undefined;
-
-    if ((request.headers['content-type'] ?? '').includes('multipart/form-data')) {
-      let image: { buffer: Buffer; filename: string } | undefined;
-      for await (const part of request.parts()) {
-        if (part.type === 'file') image = await readImage(part);
-        else if (part.fieldname === 'text') text = String(part.value).trim() || undefined;
-        else if (part.fieldname === 'replyToMessageId') replyToMessageId = String(part.value).trim() || undefined;
-        else if (part.fieldname === 'referencedCheckinId') referencedCheckinId = String(part.value).trim() || undefined;
-        else if (part.fieldname === 'clientMutationId') clientMutationId = String(part.value).trim() || undefined;
-      }
-      if (!image) return reply.status(400).send({ error: 'Image file required', code: 'NO_FILE' });
-      const buffer = await sharp(image.buffer)
-        .rotate()
-        // Keep shared/gallery images consistent with check-in media while
-        // preserving their aspect ratio and never upscaling small originals.
-        .resize(MESSAGE_IMAGE_MAX_SIZE, MESSAGE_IMAGE_MAX_SIZE, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 92 })
-        .toBuffer();
-      const saved = await storageService.saveFile(buffer, image.filename, 'image/jpeg');
-      type = 'image';
-      imageUrl = saved.url;
-      storagePath = saved.storagePath;
-      attachments = [{ url: saved.url, storagePath: saved.storagePath, mimeType: 'image/jpeg', sizeBytes: buffer.length }];
-    } else {
-      const parsed = textSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
-      ({ type, text, replyToMessageId, referencedCheckinId, clientMutationId } = parsed.data);
-    }
-
-    const coupleId = new Types.ObjectId(request.user.coupleId);
-    if (clientMutationId) {
-      const duplicate = await ChatMessage.findOne({ coupleId, clientMutationId }).lean();
-      if (duplicate) return reply.status(200).send({ message: duplicate, duplicate: true });
-    }
-
-    let replyTo: {
-      messageId: Types.ObjectId;
-      senderId: Types.ObjectId;
-      senderName: string;
-      type: ChatMessageType;
-      textSnippet?: string;
-      mediaUrl?: string;
-    } | undefined;
-    if (replyToMessageId) {
-      if (!Types.ObjectId.isValid(replyToMessageId)) {
-        return reply.status(400).send({ error: 'Invalid reply message id', code: 'VALIDATION_ERROR' });
-      }
-      const original = await ChatMessage.findOne({
-        _id: new Types.ObjectId(replyToMessageId),
-        coupleId,
-        deletedAt: null,
-      }).lean();
-      if (!original) return reply.status(404).send({ error: 'Reply target not found', code: 'NOT_FOUND' });
+  let replyTo: MessageReplyReference | undefined;
+  if (replyToMessageId) {
+    const refMsg = await queryOne<ChatMessageRow>(
+      c.env.DB,
+      'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+      [replyToMessageId, auth.coupleId],
+    );
+    if (refMsg) {
       replyTo = {
-        messageId: original._id,
-        senderId: original.senderId,
-        senderName: original.senderName,
-        type: original.type,
-        textSnippet: snippet(original),
-        mediaUrl: original.imageUrl,
+        messageId: refMsg.id,
+        senderId: refMsg.sender_id,
+        senderName: refMsg.sender_name,
+        type: refMsg.type,
+        textSnippet: refMsg.text?.slice(0, 120) || undefined,
+        mediaUrl: refMsg.image_url ?? undefined,
       };
     }
+  }
 
-    let referencedCheckin: ReturnType<typeof checkinSnapshot> | undefined;
-    if (referencedCheckinId) {
-      if (!Types.ObjectId.isValid(referencedCheckinId)) {
-        return reply.status(400).send({
-          error: 'Invalid referenced check-in id',
-          code: 'VALIDATION_ERROR',
-        });
+  let referencedCheckin: ReferencedCheckinSnapshot | undefined;
+  if (referencedCheckinId) {
+    const checkin = await queryOne<CheckinRow>(
+      c.env.DB,
+      'SELECT * FROM checkins WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+      [referencedCheckinId, auth.coupleId],
+    );
+    if (checkin) {
+      referencedCheckin = {
+        checkinId: checkin.id,
+        ownerId: checkin.owner_id,
+        ownerName: checkin.owner_name,
+        type: checkin.type,
+        caption: checkin.caption ?? undefined,
+        mood: checkin.mood ?? undefined,
+        imageUrl: checkin.image_url ?? undefined,
+        createdAt: checkin.created_at,
+      };
+      if (type === 'text') {
+        type = 'checkin_reply';
       }
-      const checkin = await CheckIn.findOne({
-        _id: new Types.ObjectId(referencedCheckinId),
-        coupleId,
-        deletedAt: null,
-      }).lean() as unknown as LegacyCheckinRecord | null;
-      if (!checkin) {
-        return reply.status(404).send({
-          error: 'Referenced check-in not found',
-          code: 'NOT_FOUND',
-        });
-      }
-      referencedCheckin = checkinSnapshot(checkin);
     }
+  }
 
-    const message = await ChatMessage.create({
-      coupleId,
-      senderId: new Types.ObjectId(request.user.id),
-      senderName: user.displayName,
+  let imageUrl: string | null = null;
+  let storagePath: string | null = null;
+  const attachments: ChatAttachment[] = [];
+
+  if (imageFile) {
+    const saved = await saveUploadedImage(c.env.STORAGE, config, imageFile, 'messages');
+    imageUrl = saved.url;
+    storagePath = saved.storagePath;
+    attachments.push({ url: saved.url, storagePath: saved.storagePath });
+    if (type === 'text') type = 'image';
+  }
+
+  const messageId = generateId();
+  const nowIso = new Date().toISOString();
+
+  await execute(
+    c.env.DB,
+    `INSERT INTO chat_messages (
+      id, couple_id, sender_id, sender_name, type, text,
+      image_url, storage_path, attachments_json,
+      reply_to_message_id, reply_to_json,
+      referenced_checkin_id, referenced_checkin_json,
+      client_mutation_id, read_by_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      messageId,
+      auth.coupleId,
+      user.id,
+      user.display_name,
       type,
-      text,
+      text ?? null,
       imageUrl,
       storagePath,
-      attachments,
-      replyToMessageId: replyTo?.messageId,
-      replyTo,
-      referencedCheckinId: referencedCheckin?.checkinId,
-      referencedCheckin,
-      clientMutationId,
-    });
+      JSON.stringify(attachments),
+      replyTo?.messageId ?? null,
+      replyTo ? JSON.stringify(replyTo) : null,
+      referencedCheckin?.checkinId ?? null,
+      referencedCheckin ? JSON.stringify(referencedCheckin) : null,
+      clientMutationId ?? null,
+      JSON.stringify([user.id]),
+      nowIso,
+      nowIso,
+    ],
+  );
 
-    const couple = await Couple.findById(coupleId).lean();
-    const partnerId = couple?.memberIds.find((id) => id.toString() !== request.user.id);
-    if (partnerId) {
-      emitRealtimeEvent(partnerId.toString(), {
-        type: 'message',
-        messageId: message._id.toString(),
-        title: `${user.displayName} đã nhắn cho bạn`,
-        body: snippet({ type, text, imageUrl }),
-        targetUrl: '/app/messages',
-        photoUrl: imageUrl || '',
-        senderName: user.displayName,
-        senderAvatar: user.avatarUrl,
-      });
+  const createdRow = (await queryOne<ChatMessageRow>(
+    c.env.DB,
+    'SELECT * FROM chat_messages WHERE id = ? LIMIT 1',
+    [messageId],
+  ))!;
 
-      void sendPushToUser(partnerId.toString(), {
-        title: `${user.displayName} đã nhắn cho bạn`,
-        body: snippet({ type, text, imageUrl }),
-        icon: user.avatarUrl,
-        badge: '/icons/icon-192.png',
-        tag: `message-${message._id}`,
-        kind: 'message',
-        messageId: message._id.toString(),
-        actionType: 'message',
-        targetUrl: '/app/messages',
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  if (partner) {
+    const notifTitle = `${user.display_name}`;
+    const notifBody =
+      type === 'image'
+        ? text || 'Đã gửi cho bạn một hình ảnh 📷'
+        : text || 'Đã gửi một tin nhắn mới 💬';
+
+    await Promise.allSettled([
+      sendPushToUser(c.env, config, partner.id, {
+        title: notifTitle,
+        body: notifBody,
         url: '/app/messages',
-        senderName: user.displayName,
-        senderAvatar: user.avatarUrl,
-        photoUrl: imageUrl || '',
-      });
-    }
+        tag: `chat-${auth.coupleId}`,
+        type: 'chat_message',
+        messageId,
+        senderName: user.display_name,
+        senderAvatar: user.avatar_url ?? undefined,
+        photoUrl: imageUrl ?? undefined,
+      }),
+      emitRealtimeEvent(c.env, partner.id, {
+        type: 'message.created',
+        messageId,
+        senderId: user.id,
+        senderName: user.display_name,
+        senderAvatar: user.avatar_url ?? undefined,
+        title: notifTitle,
+        body: notifBody,
+        photoUrl: imageUrl ?? undefined,
+        url: '/app/messages',
+        createdAt: nowIso,
+      }),
+    ]);
+  }
 
-    return reply.status(201).send({ message });
-  });
+  return c.json({ message: toMessageDto(createdRow) }, 201);
+});
 
-  app.get('/messages/:id/context', { preHandler: authenticate }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    if (!Types.ObjectId.isValid(id)) {
-      return reply.status(400).send({ error: 'Invalid message id', code: 'VALIDATION_ERROR' });
-    }
+messageRoutes.get('/messages/:id/context', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
 
-    const coupleId = new Types.ObjectId(request.user.coupleId);
-    const message = await ChatMessage.findOne({
-      _id: new Types.ObjectId(id),
-      coupleId,
-      deletedAt: null,
-    }).lean() as unknown as LeanMessageRecord | null;
-    if (!message) return reply.status(404).send({ error: 'Message not found', code: 'NOT_FOUND' });
+  const targetId = c.req.param('id');
+  const target = await queryOne<ChatMessageRow>(
+    c.env.DB,
+    'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? LIMIT 1',
+    [targetId, auth.coupleId],
+  );
+  if (!target) {
+    throw new AppError('Không tìm thấy tin nhắn', 404, 'MESSAGE_NOT_FOUND');
+  }
 
-    const messages = await hydrateLiveCheckins([message], coupleId);
-    return reply.send({ messages });
-  });
+  const olderDesc = await queryAll<ChatMessageRow>(
+    c.env.DB,
+    'SELECT * FROM chat_messages WHERE couple_id = ? AND id < ? ORDER BY id DESC LIMIT 10',
+    [auth.coupleId, target.id],
+  );
+  const newerAsc = await queryAll<ChatMessageRow>(
+    c.env.DB,
+    'SELECT * FROM chat_messages WHERE couple_id = ? AND id > ? ORDER BY id ASC LIMIT 10',
+    [auth.coupleId, target.id],
+  );
 
-  app.patch('/messages/:id', { preHandler: authenticate }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    if (!Types.ObjectId.isValid(id)) {
-      return reply.status(400).send({ error: 'Invalid message id', code: 'VALIDATION_ERROR' });
-    }
+  const combined = [...olderDesc.reverse(), target, ...newerAsc];
+  return c.json({ messages: combined.map(toMessageDto) });
+});
 
-    const parsed = editSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
-    }
+messageRoutes.patch('/messages/:id', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
 
-    const message = await ChatMessage.findOne({
-      _id: new Types.ObjectId(id),
-      coupleId: new Types.ObjectId(request.user.coupleId),
-      deletedAt: null,
+  const messageId = c.req.param('id');
+  const body = (await c.req.json().catch(() => null)) as { text?: string } | null;
+  const nextText = body?.text?.trim();
+  if (!nextText || nextText.length > 4000) {
+    throw new AppError('Nội dung chỉnh sửa phải từ 1 đến 4000 ký tự', 400, 'VALIDATION_ERROR');
+  }
+
+  const row = await queryOne<ChatMessageRow>(
+    c.env.DB,
+    'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+    [messageId, auth.coupleId],
+  );
+  if (!row) {
+    throw new AppError('Không tìm thấy tin nhắn', 404, 'MESSAGE_NOT_FOUND');
+  }
+  if (row.sender_id !== auth.id) {
+    throw new AppError('Bạn chỉ có thể chỉnh sửa tin nhắn của chính mình', 403, 'FORBIDDEN');
+  }
+
+  const nowIso = new Date().toISOString();
+  const history = parseJsonSafe<ChatEditHistoryEntry[]>(row.edit_history_json, []);
+  if (row.text) {
+    history.push({ text: row.text, editedAt: nowIso });
+  }
+
+  await execute(
+    c.env.DB,
+    'UPDATE chat_messages SET text = ?, edited_at = ?, edit_history_json = ?, updated_at = ? WHERE id = ?',
+    [nextText, nowIso, JSON.stringify(history), nowIso, row.id],
+  );
+
+  const updated = (await queryOne<ChatMessageRow>(
+    c.env.DB,
+    'SELECT * FROM chat_messages WHERE id = ? LIMIT 1',
+    [row.id],
+  ))!;
+
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  if (partner) {
+    await emitRealtimeEvent(c.env, partner.id, {
+      type: 'message.updated',
+      messageId: row.id,
+      senderId: auth.id,
+      title: '',
+      body: '',
     });
-    if (!message) return reply.status(404).send({ error: 'Message not found', code: 'NOT_FOUND' });
-    if (message.senderId.toString() !== request.user.id) {
-      return reply.status(403).send({ error: 'Forbidden', code: 'FORBIDDEN' });
-    }
+  }
 
-    const editedAt = new Date();
-    const previousText = message.text?.trim();
-    if (previousText && previousText !== parsed.data.text) {
-      message.editHistory = [
-        ...(message.editHistory ?? []),
-        { text: previousText, editedAt: message.editedAt ?? editedAt },
-      ].slice(-20);
-    }
-    message.text = parsed.data.text;
-    message.editedAt = editedAt;
-    await message.save();
+  return c.json({ message: toMessageDto(updated) });
+});
 
-    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
-    if (partnerId) {
-      emitRealtimeEvent(partnerId, {
-        type: 'message.updated',
-        title: `${message.senderName} đã chỉnh sửa tin nhắn`,
-        body: snippet(message),
-        targetUrl: '/app/messages',
-        messageId: message._id.toString(),
-        senderName: message.senderName,
-      });
-    }
-    return reply.send({ message });
-  });
+messageRoutes.post('/messages/:id/reactions', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
 
-  app.post('/messages/:id/reactions', { preHandler: authenticate }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    if (!Types.ObjectId.isValid(id)) {
-      return reply.status(400).send({ error: 'Invalid message id', code: 'VALIDATION_ERROR' });
-    }
-    const parsed = reactionSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
-    }
+  const messageId = c.req.param('id');
+  const body = (await c.req.json().catch(() => null)) as { type?: string } | null;
+  const reactionType = body?.type?.trim();
+  if (!reactionType || reactionType.length > 32) {
+    throw new AppError('Biểu tượng cảm xúc không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
 
-    const message = await ChatMessage.findOne({
-      _id: new Types.ObjectId(id),
-      coupleId: new Types.ObjectId(request.user.coupleId),
-      deletedAt: null,
-    });
-    if (!message) return reply.status(404).send({ error: 'Message not found', code: 'NOT_FOUND' });
+  const row = await queryOne<ChatMessageRow>(
+    c.env.DB,
+    'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+    [messageId, auth.coupleId],
+  );
+  if (!row) {
+    throw new AppError('Không tìm thấy tin nhắn', 404, 'MESSAGE_NOT_FOUND');
+  }
 
-    const userId = new Types.ObjectId(request.user.id);
-    const reaction = message.reactions.find((item) => item.type === parsed.data.type);
-    const index = reaction?.userIds.findIndex((value) => value.toString() === request.user.id) ?? -1;
-    const active = index < 0;
-    if (reaction) {
-      if (active) reaction.userIds.push(userId);
-      else reaction.userIds.splice(index, 1);
-      if (reaction.userIds.length === 0) {
-        message.reactions = message.reactions.filter((item) => item.type !== parsed.data.type);
-      }
+  const groups = parseJsonSafe<ChatReactionGroup[]>(row.reactions_json, []);
+  let toggledOn = false;
+
+  const targetGroup = groups.find((g) => g.type === reactionType);
+  if (targetGroup && targetGroup.userIds.includes(auth.id)) {
+    targetGroup.userIds = targetGroup.userIds.filter((uid) => uid !== auth.id);
+  } else {
+    for (const group of groups) {
+      group.userIds = group.userIds.filter((uid) => uid !== auth.id);
+    }
+    if (targetGroup) {
+      targetGroup.userIds.push(auth.id);
     } else {
-      message.reactions.push({ type: parsed.data.type, userIds: [userId] });
+      groups.push({ type: reactionType, userIds: [auth.id] });
     }
-    await message.save();
+    toggledOn = true;
+  }
 
-    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
-    if (partnerId) {
-      emitRealtimeEvent(partnerId, {
-        type: 'message.reaction',
-        title: `${message.senderName} đã bày tỏ cảm xúc`,
-        body: active ? parsed.data.type : 'Đã bỏ cảm xúc',
-        targetUrl: '/app/messages',
-        messageId: message._id.toString(),
-        reactionType: parsed.data.type,
-        senderName: message.senderName,
-      });
-    }
-    return reply.send({ messageId: message._id, reactions: message.reactions, active });
-  });
+  const cleaned = groups.filter((g) => g.userIds.length > 0);
+  const nowIso = new Date().toISOString();
 
-  app.post('/messages/read', { preHandler: authenticate }, async (request, reply) => {
-    const parsed = readSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
-    }
-    const coupleId = new Types.ObjectId(request.user.coupleId);
-    const ids = parsed.data.messageIds ?? [];
-    if (ids.some((value) => !Types.ObjectId.isValid(value)) || (parsed.data.upTo && !Types.ObjectId.isValid(parsed.data.upTo))) {
-      return reply.status(400).send({ error: 'Invalid message id', code: 'VALIDATION_ERROR' });
-    }
-    const filter: Record<string, unknown> = { coupleId, deletedAt: null };
-    if (ids.length) filter._id = { $in: ids.map((value) => new Types.ObjectId(value)) };
-    if (parsed.data.upTo) filter._id = { ...(filter._id as object ?? {}), $lte: new Types.ObjectId(parsed.data.upTo) };
-    const result = await ChatMessage.updateMany(filter, { $addToSet: { readBy: new Types.ObjectId(request.user.id) } });
-    const partnerId = await partnerIdFor(coupleId, request.user.id);
-    if (partnerId) {
-      emitRealtimeEvent(partnerId, {
-        type: 'message.read',
-        title: 'Tin nhắn đã được đọc',
-        body: '',
-        targetUrl: '/app/messages',
-        messageId: parsed.data.upTo ?? ids.at(-1),
-      });
-    }
-    return reply.send({ success: true, modifiedCount: result.modifiedCount });
-  });
+  await execute(
+    c.env.DB,
+    'UPDATE chat_messages SET reactions_json = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(cleaned), nowIso, row.id],
+  );
 
-  app.post('/messages/typing', { preHandler: authenticate }, async (request, reply) => {
-    const parsed = typingSchema.safeParse(request.body);
-    if (!parsed.success) return reply.status(400).send({ error: parsed.error.errors[0].message, code: 'VALIDATION_ERROR' });
-    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
-    if (partnerId) {
-      const user = await User.findById(request.user.id).lean();
-      emitRealtimeEvent(partnerId, {
-        type: 'message.typing',
-        title: '',
-        body: '',
-        targetUrl: '/app/messages',
-        senderName: user?.displayName,
-        isTyping: parsed.data.isTyping,
-      });
-    }
-    return reply.send({ success: true });
-  });
-
-  app.post('/messages/presence', { preHandler: authenticate }, async (request, reply) => {
-    const body = request.body as { online?: boolean } | undefined;
-    const online = body?.online !== false;
-    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
-    if (partnerId) {
-      const user = await User.findById(request.user.id).lean();
-      emitRealtimeEvent(partnerId, {
-        type: 'message.presence',
-        title: '',
-        body: '',
-        targetUrl: '/app/messages',
-        senderName: user?.displayName,
-        online,
-      });
-    }
-    return reply.send({ success: true });
-  });
-
-  app.delete('/messages/:id', { preHandler: authenticate }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    if (!Types.ObjectId.isValid(id)) {
-      return reply.status(400).send({ error: 'Invalid message id', code: 'VALIDATION_ERROR' });
-    }
-
-    const message = await ChatMessage.findOne({
-      _id: new Types.ObjectId(id),
-      coupleId: new Types.ObjectId(request.user.coupleId),
-      deletedAt: null,
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  if (partner) {
+    await emitRealtimeEvent(c.env, partner.id, {
+      type: 'message.reaction',
+      messageId: row.id,
+      senderId: auth.id,
+      title: toggledOn ? '' : '',
+      body: '',
     });
-    if (!message) return reply.status(404).send({ error: 'Message not found', code: 'NOT_FOUND' });
-    if (message.senderId.toString() !== request.user.id) {
-      return reply.status(403).send({ error: 'Forbidden', code: 'FORBIDDEN' });
-    }
+  }
 
-    message.deletedAt = new Date();
-    await message.save();
-    const partnerId = await partnerIdFor(new Types.ObjectId(request.user.coupleId), request.user.id);
-    if (partnerId) {
-      emitRealtimeEvent(partnerId, {
-        type: 'message.updated',
-        title: `${message.senderName} đã thu hồi tin nhắn`,
-        body: 'Tin nhắn đã được thu hồi',
-        targetUrl: '/app/messages',
-        messageId: message._id.toString(),
-        senderName: message.senderName,
-        deleted: true,
+  return c.json({ reactions: cleaned });
+});
+
+messageRoutes.post('/messages/read', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
+
+  const body = (await c.req.json().catch(() => null)) as { messageIds?: string[]; upTo?: string } | null;
+  const targetIds = Array.isArray(body?.messageIds) ? body!.messageIds.filter(Boolean) : [];
+  const upToId = typeof body?.upTo === 'string' && body.upTo.trim() ? body.upTo.trim() : undefined;
+
+  let candidates: ChatMessageRow[];
+  if (targetIds.length > 0) {
+    const placeholders = targetIds.map(() => '?').join(', ');
+    candidates = await queryAll<ChatMessageRow>(
+      c.env.DB,
+      `SELECT * FROM chat_messages WHERE couple_id = ? AND id IN (${placeholders})`,
+      [auth.coupleId, ...targetIds],
+    );
+  } else if (upToId) {
+    candidates = await queryAll<ChatMessageRow>(
+      c.env.DB,
+      `SELECT * FROM chat_messages
+       WHERE couple_id = ? AND sender_id != ? AND id <= ?
+       ORDER BY id DESC LIMIT 100`,
+      [auth.coupleId, auth.id, upToId],
+    );
+  } else {
+    candidates = await queryAll<ChatMessageRow>(
+      c.env.DB,
+      `SELECT * FROM chat_messages
+       WHERE couple_id = ? AND sender_id != ?
+       ORDER BY id DESC LIMIT 100`,
+      [auth.coupleId, auth.id],
+    );
+  }
+
+  const nowIso = new Date().toISOString();
+  let updatedCount = 0;
+
+  for (const row of candidates) {
+    const readBy = parseJsonSafe<string[]>(row.read_by_json, []);
+    if (readBy.includes(auth.id)) continue;
+    readBy.push(auth.id);
+    await execute(
+      c.env.DB,
+      'UPDATE chat_messages SET read_by_json = ?, updated_at = ? WHERE id = ?',
+      [JSON.stringify(readBy), nowIso, row.id],
+    );
+    updatedCount += 1;
+  }
+
+  if (updatedCount > 0) {
+    const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+    if (partner) {
+      await emitRealtimeEvent(c.env, partner.id, {
+        type: 'message.read',
+        senderId: auth.id,
+        title: '',
+        body: '',
       });
     }
-    return reply.send({ success: true });
-  });
-}
+  }
+
+  return c.json({ success: true, updated: updatedCount });
+});
+
+messageRoutes.post('/messages/typing', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) return c.json({ ok: true });
+
+  const body = (await c.req.json().catch(() => null)) as { isTyping?: boolean } | null;
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  if (partner) {
+    await emitRealtimeEvent(c.env, partner.id, {
+      type: 'message.typing',
+      senderId: auth.id,
+      isTyping: Boolean(body?.isTyping),
+      title: '',
+      body: '',
+    });
+  }
+  return c.json({ ok: true });
+});
+
+messageRoutes.post('/messages/presence', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) return c.json({ ok: true });
+
+  const body = (await c.req.json().catch(() => null)) as { online?: boolean } | null;
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  if (partner) {
+    await emitRealtimeEvent(c.env, partner.id, {
+      type: 'message.presence',
+      senderId: auth.id,
+      online: Boolean(body?.online),
+      title: '',
+      body: '',
+    });
+  }
+  return c.json({ ok: true });
+});
+
+messageRoutes.delete('/messages/:id', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
+
+  const messageId = c.req.param('id');
+  const row = await queryOne<ChatMessageRow>(
+    c.env.DB,
+    'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+    [messageId, auth.coupleId],
+  );
+  if (!row) {
+    throw new AppError('Không tìm thấy tin nhắn', 404, 'MESSAGE_NOT_FOUND');
+  }
+  if (row.sender_id !== auth.id) {
+    throw new AppError('Bạn chỉ có thể thu hồi tin nhắn của chính mình', 403, 'FORBIDDEN');
+  }
+
+  const nowIso = new Date().toISOString();
+  const attachments = parseJsonSafe<ChatAttachment[]>(row.attachments_json, []);
+  for (const att of attachments) {
+    if (att.storagePath) {
+      await deleteStoredFile(c.env.STORAGE, att.storagePath, c.get('config').R2_PUBLIC_URL);
+    }
+  }
+  if (row.storage_path) {
+    await deleteStoredFile(c.env.STORAGE, row.storage_path, c.get('config').R2_PUBLIC_URL);
+  }
+
+  await execute(
+    c.env.DB,
+    `UPDATE chat_messages
+     SET deleted_at = ?, text = NULL, image_url = NULL, storage_path = NULL,
+         attachments_json = '[]', updated_at = ?
+     WHERE id = ?`,
+    [nowIso, nowIso, row.id],
+  );
+
+  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  if (partner) {
+    await emitRealtimeEvent(c.env, partner.id, {
+      type: 'message.deleted',
+      messageId: row.id,
+      senderId: auth.id,
+      title: '',
+      body: '',
+    });
+  }
+
+  return c.json({ success: true });
+});

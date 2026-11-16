@@ -1,88 +1,67 @@
-import { FastifyReply, FastifyRequest } from 'fastify';
-import jwt from 'jsonwebtoken';
-import { env } from '../config/env';
-import { User } from '../db/models/User';
+import type { MiddlewareHandler } from 'hono';
+import { findUserById } from '../db/d1';
+import type { HonoAppEnv } from '../types/hono';
+import { verifyJwt } from '../utils/crypto';
+import { AppError } from '../utils/errors';
 
-export interface JwtPayload {
-  userId: string;
-  coupleId: string;
-  role: 'user' | 'admin';
+interface UserTokenPayload {
+  userId?: string;
+  id?: string;
+  sub?: string;
+  coupleId?: string | null;
+  role?: 'user' | 'admin';
+  [key: string]: unknown;
 }
 
-// Extend FastifyRequest to carry the authenticated user
-declare module 'fastify' {
-  interface FastifyRequest {
-    user: {
-      id: string;
-      coupleId: string;
-      role: 'user' | 'admin';
-    };
-  }
-}
-
-function extractToken(request: FastifyRequest): string | null {
-  const authHeader = request.headers['authorization'];
+export const authenticate: MiddlewareHandler<HonoAppEnv> = async (c, next) => {
+  const authHeader = c.req.header('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-  return authHeader.slice(7);
-}
-
-export async function authenticate(
-  request: FastifyRequest,
-  reply: FastifyReply,
-): Promise<void> {
-  const token = extractToken(request);
-
-  if (!token) {
-    return reply.status(401).send({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+    throw new AppError('Phiên đăng nhập không hợp lệ', 401, 'UNAUTHORIZED');
   }
 
-  let payload: JwtPayload;
-  try {
-    payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
-  } catch {
-    return reply.status(401).send({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+  const token = authHeader.slice(7).trim();
+  const config = c.get('config');
+  const payload = await verifyJwt<UserTokenPayload>(token, config.JWT_SECRET);
+  const userId = payload?.userId ?? payload?.id ?? (payload?.role !== 'admin' ? payload?.sub : undefined);
+
+  if (!payload || !userId || payload.role === 'admin') {
+    throw new AppError('Token hết hạn hoặc không hợp lệ', 401, 'UNAUTHORIZED');
   }
 
-  const user = await User.findById(payload.userId).lean();
-  if (!user) {
-    return reply.status(401).send({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+  const userRow = await findUserById(c.env.DB, String(userId));
+  if (!userRow) {
+    throw new AppError('Tài khoản không tồn tại', 401, 'UNAUTHORIZED');
+  }
+  if (userRow.status === 'blocked') {
+    throw new AppError('Tài khoản đã bị khóa bởi quản trị viên', 403, 'USER_BLOCKED');
   }
 
-  if (user.status === 'blocked') {
-    return reply
-      .status(403)
-      .send({ error: 'Tài khoản bị khóa', code: 'USER_BLOCKED' });
+  c.set('user', {
+    id: userRow.id,
+    coupleId: userRow.couple_id,
+    role: userRow.role,
+  });
+
+  await next();
+};
+
+export const authenticateAdmin: MiddlewareHandler<HonoAppEnv> = async (c, next) => {
+  const authHeader = c.req.header('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new AppError('Chưa đăng nhập quản trị viên', 401, 'UNAUTHORIZED');
   }
 
-  request.user = {
-    id: payload.userId,
-    coupleId: payload.coupleId,
-    role: payload.role,
-  };
-}
-
-export async function optionalAuthenticate(
-  request: FastifyRequest,
-  _reply: FastifyReply,
-): Promise<void> {
-  const token = extractToken(request);
-  if (!token) {
-    return;
+  const token = authHeader.slice(7).trim();
+  const config = c.get('config');
+  const payload = await verifyJwt<{ role?: string; sub?: string; email?: string }>(token, config.JWT_SECRET);
+  if (!payload || payload.role !== 'admin' || payload.sub !== 'admin') {
+    throw new AppError('Không có quyền truy cập quản trị', 403, 'FORBIDDEN');
   }
 
-  try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
-    const user = await User.findById(payload.userId).lean();
-    if (user && user.status !== 'blocked') {
-      request.user = {
-        id: payload.userId,
-        coupleId: payload.coupleId,
-        role: payload.role,
-      };
-    }
-  } catch {
-    // Invalid token is silently ignored for optional auth
-  }
-}
+  c.set('admin', {
+    email: payload.email || config.ADMIN_EMAIL,
+    role: 'admin',
+  });
+
+  await next();
+};

@@ -1,153 +1,104 @@
-import bcrypt from 'bcryptjs';
-import { FastifyInstance } from 'fastify';
+import { Hono } from 'hono';
 import { z } from 'zod';
-import { OtpCode } from '../db/models/OtpCode';
-import { User } from '../db/models/User';
-import { isEmailConfigured, sendOtpEmail } from '../services/email';
+import { execute, findUserByEmailOrAlias, queryOne } from '../db/d1';
+import type { OtpCodeRow } from '../db/types';
+import { sendOtpEmail } from '../services/email';
+import type { HonoAppEnv } from '../types/hono';
+import { generateOtpCode, hashPassword } from '../utils/crypto';
+import { AppError } from '../utils/errors';
+import { generateId } from '../utils/id';
 
-const sendResetOtpBodySchema = z.object({
-  email: z.string().email(),
+export const passwordResetRoutes = new Hono<HonoAppEnv>();
+
+const sendResetSchema = z.object({
+  email: z.string().trim().email('Email không hợp lệ'),
 });
 
-const confirmResetBodySchema = z.object({
-  email: z.string().email(),
-  otpCode: z.string().regex(/^\d{6}$/, 'Mã xác thực phải gồm 6 chữ số'),
-  newPassword: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự').max(128),
+const confirmResetSchema = z.object({
+  email: z.string().trim().email('Email không hợp lệ'),
+  otpCode: z.string().trim().regex(/^\d{6}$/, 'Mã OTP phải gồm 6 chữ số'),
+  newPassword: z.string().min(6, 'Mật khẩu mới tối thiểu 6 ký tự').max(120),
 });
 
-function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+passwordResetRoutes.post('/auth/password-reset/send-otp', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = sendResetSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Email không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
 
-export default async function passwordResetRoutes(app: FastifyInstance): Promise<void> {
-  /**
-   * POST /auth/password-reset/send-otp
-   * Send a reset code without revealing whether an account exists.
-   */
-  app.post(
-    '/auth/password-reset/send-otp',
-    {
-      config: {
-        rateLimit: {
-          max: 5,
-          timeWindow: '10 minutes',
-        },
-      },
-    },
-    async (request, reply) => {
-      const parsed = sendResetOtpBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
+  const email = parsed.data.email.toLowerCase();
+  const user = await findUserByEmailOrAlias(c.env.DB, email);
+  if (!user) {
+    return c.json({ message: 'Nếu email tồn tại, mã khôi phục đã được gửi', expiresIn: 300 });
+  }
 
-      if (!isEmailConfigured()) {
-        return reply.status(503).send({
-          error: 'Tính năng gửi email chưa được cấu hình',
-          code: 'EMAIL_NOT_CONFIGURED',
-        });
-      }
+  const latest = await queryOne<OtpCodeRow>(
+    c.env.DB,
+    `SELECT * FROM otp_codes
+     WHERE lower(email) = ? AND purpose = 'reset'
+     ORDER BY created_at DESC LIMIT 1`,
+    [email],
+  );
+  if (latest) {
+    const elapsedMs = Date.now() - new Date(latest.created_at).getTime();
+    if (elapsedMs >= 0 && elapsedMs < 45_000) {
+      const waitSec = Math.ceil((45_000 - elapsedMs) / 1000);
+      throw new AppError(`Vui lòng đợi ${waitSec} giây trước khi gửi lại mã`, 429, 'RATE_LIMIT');
+    }
+  }
 
-      const email = parsed.data.email.toLowerCase();
-      const user = await User.findOne({
-        $or: [{ email }, { email_aliases: email }],
-      });
+  const code = generateOtpCode();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
 
-      await OtpCode.deleteMany({ email, purpose: 'password-reset' });
-
-      if (user) {
-        const code = generateOtp();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-        await OtpCode.create({
-          email,
-          code,
-          purpose: 'password-reset',
-          expiresAt,
-          verified: false,
-        });
-
-        try {
-          await sendOtpEmail(email, code);
-        } catch (err) {
-          app.log.error(err, 'Failed to send password reset OTP email');
-          return reply.status(500).send({
-            error: 'Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại.',
-            code: 'EMAIL_SEND_FAILED',
-          });
-        }
-      }
-
-      return reply.status(200).send({
-        message: 'Nếu email đã được đăng ký, mã đặt lại mật khẩu sẽ được gửi tới hộp thư của bạn.',
-        expiresIn: 600,
-      });
-    },
+  await execute(
+    c.env.DB,
+    `INSERT INTO otp_codes (id, email, code, purpose, expires_at, verified, created_at)
+     VALUES (?, ?, ?, 'reset', ?, 0, ?)`,
+    [generateId(), email, code, expiresAt, now.toISOString()],
   );
 
-  /**
-   * POST /auth/password-reset/confirm
-   * Verify the reset code and replace the account password.
-   */
-  app.post(
-    '/auth/password-reset/confirm',
-    {
-      config: {
-        rateLimit: {
-          max: 10,
-          timeWindow: '10 minutes',
-        },
-      },
-    },
-    async (request, reply) => {
-      const parsed = confirmResetBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: parsed.error.errors[0].message,
-          code: 'VALIDATION_ERROR',
-        });
-      }
+  const sent = await sendOtpEmail(c.get('config'), email, code, 'reset');
+  if (!sent) {
+    throw new AppError('Không thể gửi email khôi phục lúc này', 500, 'EMAIL_SEND_FAILED');
+  }
 
-      const { otpCode, newPassword } = parsed.data;
-      const email = parsed.data.email.toLowerCase();
+  return c.json({ message: 'Nếu email tồn tại, mã khôi phục đã được gửi', expiresIn: 300 });
+});
 
-      const [user, resetOtp] = await Promise.all([
-        User.findOne({
-          $or: [{ email }, { email_aliases: email }],
-        }),
-        OtpCode.findOne({
-          email,
-          code: otpCode,
-          purpose: 'password-reset',
-          expiresAt: { $gt: new Date() },
-        }),
-      ]);
+passwordResetRoutes.post('/auth/password-reset/confirm', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = confirmResetSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new AppError(parsed.error.issues[0]?.message || 'Dữ liệu không hợp lệ', 400, 'VALIDATION_ERROR');
+  }
 
-      if (!user || !resetOtp) {
-        return reply.status(400).send({
-          error: 'Mã xác thực không hợp lệ hoặc đã hết hạn',
-          code: 'OTP_INVALID',
-        });
-      }
-
-      user.passwordHash = await bcrypt.hash(newPassword, 12);
-      user.trustedDevices = [];
-      await user.save();
-
-      const accountEmails = [user.email, ...(user.email_aliases ?? [])].filter(
-        (value): value is string => Boolean(value),
-      );
-
-      await OtpCode.deleteMany({
-        email: { $in: accountEmails },
-        purpose: { $in: ['password-reset', 'login'] },
-      });
-
-      return reply.status(200).send({
-        message: 'Đặt lại mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới.',
-      });
-    },
+  const email = parsed.data.email.toLowerCase();
+  const nowIso = new Date().toISOString();
+  const otp = await queryOne<OtpCodeRow>(
+    c.env.DB,
+    `SELECT * FROM otp_codes
+     WHERE lower(email) = ? AND purpose = 'reset' AND verified = 0 AND expires_at > ?
+     ORDER BY created_at DESC LIMIT 1`,
+    [email, nowIso],
   );
-}
+  if (!otp || otp.code !== parsed.data.otpCode) {
+    throw new AppError('Mã OTP không đúng hoặc đã hết hạn', 400, 'INVALID_OTP');
+  }
+
+  const user = await findUserByEmailOrAlias(c.env.DB, email);
+  if (!user) {
+    throw new AppError('Tài khoản không tồn tại', 404, 'USER_NOT_FOUND');
+  }
+
+  const passwordHash = await hashPassword(parsed.data.newPassword);
+  await execute(
+    c.env.DB,
+    'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?',
+    [passwordHash, nowIso, user.id],
+  );
+  await execute(c.env.DB, 'UPDATE otp_codes SET verified = 1 WHERE id = ?', [otp.id]);
+
+  return c.json({ message: 'Đặt lại mật khẩu thành công' });
+});

@@ -11,6 +11,9 @@ function getApiUrl(): string {
     if (host === 'admin.couple.io.vn') {
       return 'https://api.couple.io.vn/api';
     }
+    if (host === 'check-in-love-admin.pages.dev' || host.endsWith('.check-in-love-admin.pages.dev')) {
+      return 'https://check-in-love-api.aiths.workers.dev/api';
+    }
     if (host.startsWith('admin.')) {
       const parentDomain = host.substring(6);
       return `${protocol}//api.${parentDomain}/api`;
@@ -86,9 +89,14 @@ export async function apiRequest<T>(
       body = null;
     }
 
+    const errObj = (body as { message?: string; error?: string | { message?: string } } | null);
+    const nestedError =
+      typeof errObj?.error === 'object' && errObj.error !== null
+        ? errObj.error.message
+        : errObj?.error;
     const message =
-      (body as { message?: string; error?: string })?.message ||
-      (body as { message?: string; error?: string })?.error ||
+      errObj?.message ||
+      nestedError ||
       `Request failed with status ${response.status}`;
 
     throw new ApiError(response.status, message, body);

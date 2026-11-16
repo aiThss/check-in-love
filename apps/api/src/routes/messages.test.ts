@@ -1,95 +1,156 @@
-import { Types } from 'mongoose';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createApp } from '../app';
+import type { WorkerEnv } from '../config/env';
+import { createTestD1Database, MemoryR2Bucket } from '../db/sqlite-test-d1';
+import { signJwt } from '../utils/crypto';
 
-const mocks = vi.hoisted(() => ({
-  messageFindOne: vi.fn(),
-  messageCreate: vi.fn(),
-  checkinFindOne: vi.fn(),
-  userFindById: vi.fn(),
-  coupleFindById: vi.fn(),
-  sendPush: vi.fn(),
-}));
+describe('Messages SQL routes', () => {
+  const secret = 'test-jwt-secret-key-min-32-chars!!';
+  let db: D1Database;
+  let env: WorkerEnv;
+  let token1: string;
+  let token2: string;
 
-vi.mock('../db/models/ChatMessage', () => ({
-  ChatMessage: { findOne: mocks.messageFindOne, create: mocks.messageCreate },
-}));
-vi.mock('../db/models/CheckIn', () => ({ CheckIn: { findOne: mocks.checkinFindOne } }));
-vi.mock('../db/models/Couple', () => ({ Couple: { findById: mocks.coupleFindById } }));
-vi.mock('../db/models/User', () => ({ User: { findById: mocks.userFindById } }));
-vi.mock('../middleware/auth', () => ({ authenticate: vi.fn() }));
-vi.mock('../services/push', () => ({ sendPushToUser: mocks.sendPush }));
-vi.mock('../services/storage', () => ({ storageService: { saveFile: vi.fn() } }));
-vi.mock('../config/env', () => ({ env: { MAX_UPLOAD_MB: 5 } }));
-vi.mock('sharp', () => ({ default: vi.fn() }));
+  beforeEach(async () => {
+    db = createTestD1Database();
+    env = {
+      DB: db,
+      STORAGE: new MemoryR2Bucket() as unknown as R2Bucket,
+      NODE_ENV: 'test',
+      JWT_SECRET: secret,
+    } as unknown as WorkerEnv;
 
-type Handler = (request: any, reply: any) => Promise<unknown>;
+    const now = new Date().toISOString();
+    await db
+      .prepare('INSERT INTO couples (id, code, streak, created_at, updated_at) VALUES (?, ?, 0, ?, ?)')
+      .bind('couple_msg', 'CHAT88', now, now)
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO users (id, display_name, partner_name, email, role, status, couple_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'user', 'active', ?, ?, ?)`,
+      )
+      .bind('u_me', 'Me', 'You', 'me@example.com', 'couple_msg', now, now)
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO users (id, display_name, partner_name, email, role, status, couple_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'user', 'active', ?, ?, ?)`,
+      )
+      .bind('u_you', 'You', 'Me', 'you@example.com', 'couple_msg', now, now)
+      .run();
 
-function createReply() {
-  const reply = { status: vi.fn(), send: vi.fn((value) => value) };
-  reply.status.mockReturnValue(reply);
-  return reply;
-}
-
-async function getCreateHandler(): Promise<Handler> {
-  const handlers = new Map<string, Handler>();
-  const app = {
-    get: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
-    post: vi.fn((path: string, _options: unknown, handler: Handler) => handlers.set(path, handler)),
-  };
-  const { default: messagesRoutes } = await import('./messages');
-  await messagesRoutes(app as any);
-  return handlers.get('/messages')!;
-}
-
-describe('POST /messages', () => {
-  const coupleId = new Types.ObjectId();
-  const userId = new Types.ObjectId();
-
-  beforeEach(() => {
-    vi.resetModules();
-    Object.values(mocks).forEach((mock) => mock.mockReset());
-    mocks.userFindById.mockReturnValue({ lean: vi.fn().mockResolvedValue({ displayName: 'Me' }) });
-    mocks.coupleFindById.mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
-    mocks.messageFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
-    mocks.messageCreate.mockResolvedValue({ _id: new Types.ObjectId(), type: 'text', text: 'Xin chào' });
+    token1 = await signJwt({ userId: 'u_me', coupleId: 'couple_msg', role: 'user' }, secret);
+    token2 = await signJwt({ userId: 'u_you', coupleId: 'couple_msg', role: 'user' }, secret);
   });
 
-  it('persists a ChatMessage and never creates a CheckIn for a text message', async () => {
-    const handler = await getCreateHandler();
-    const reply = createReply();
+  it('persists text messages, referenced checkins, edits, reactions, read receipts, and soft deletes', async () => {
+    const app = createApp();
+    const now = new Date().toISOString();
 
-    await handler({
-      user: { id: userId.toString(), coupleId: coupleId.toString() },
-      headers: { 'content-type': 'application/json' },
-      body: { type: 'text', text: 'Xin chào', clientMutationId: 'client-1' },
-    }, reply);
+    await db
+      .prepare(
+        `INSERT INTO checkins (id, couple_id, owner_id, owner_name, type, image_url, reactions_json, replies_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'photo', '/uploads/photo.jpg', '[]', '[]', ?, ?)`,
+      )
+      .bind('chk_ref_1', 'couple_msg', 'u_me', 'Me', now, now)
+      .run();
 
-    expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({
-      coupleId: expect.any(Types.ObjectId), senderId: expect.any(Types.ObjectId), type: 'text', text: 'Xin chào', clientMutationId: 'client-1',
-    }));
-    expect(mocks.checkinFindOne).not.toHaveBeenCalled();
-    expect(reply.status).toHaveBeenCalledWith(201);
-  });
+    const res1 = await app.request(
+      'http://localhost/api/messages',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token1}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'text',
+          text: 'Xin chào',
+          clientMutationId: 'client-1',
+        }),
+      },
+      env,
+    );
+    expect(res1.status).toBe(201);
+    const json1 = (await res1.json()) as { message: { id: string; text: string } };
+    expect(json1.message.text).toBe('Xin chào');
 
-  it('snapshots a referenced CheckIn without altering it', async () => {
-    const checkinId = new Types.ObjectId();
-    mocks.checkinFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue({
-      _id: checkinId, ownerId: userId, ownerName: 'Me', type: 'photo', imageUrl: '/uploads/photo.jpg', createdAt: new Date(), coupleId,
-    }) });
-    const handler = await getCreateHandler();
+    const resRef = await app.request(
+      'http://localhost/api/messages',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token2}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'text',
+          text: 'Nhớ ảnh này',
+          referencedCheckinId: 'chk_ref_1',
+        }),
+      },
+      env,
+    );
+    expect(resRef.status).toBe(201);
+    const jsonRef = (await resRef.json()) as {
+      message: { id: string; type: string; referencedCheckin?: { checkinId: string; ownerName: string } };
+    };
+    expect(jsonRef.message.type).toBe('checkin_reply');
+    expect(jsonRef.message.referencedCheckin).toMatchObject({
+      checkinId: 'chk_ref_1',
+      ownerName: 'Me',
+    });
 
-    await handler({
-      user: { id: userId.toString(), coupleId: coupleId.toString() },
-      headers: { 'content-type': 'application/json' },
-      body: { type: 'text', text: 'Nhớ ảnh này', referencedCheckinId: checkinId.toString() },
-    }, createReply());
+    // Edit own message
+    const editRes = await app.request(
+      `http://localhost/api/messages/${json1.message.id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token1}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: 'Chào buổi tối!' }),
+      },
+      env,
+    );
+    expect(editRes.status).toBe(200);
+    const editJson = (await editRes.json()) as { message: { text: string; editHistory: unknown[] } };
+    expect(editJson.message.text).toBe('Chào buổi tối!');
+    expect(editJson.message.editHistory).toHaveLength(1);
 
-    expect(mocks.checkinFindOne).toHaveBeenCalledWith(expect.objectContaining({ _id: expect.any(Types.ObjectId), coupleId: expect.any(Types.ObjectId) }));
-    expect(mocks.messageCreate).toHaveBeenCalledWith(expect.objectContaining({
-      referencedCheckinId: checkinId,
-      referencedCheckin: expect.objectContaining({ checkinId, ownerName: 'Me' }),
-    }));
+    // Toggle reaction + mark read
+    const reactRes = await app.request(
+      `http://localhost/api/messages/${json1.message.id}/reactions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token2}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type: '❤️' }),
+      },
+      env,
+    );
+    expect(reactRes.status).toBe(200);
+    expect((await reactRes.json()) as { reactions: unknown[] }).toMatchObject({
+      reactions: [{ type: '❤️', userIds: ['u_you'] }],
+    });
+
+    const readRes = await app.request(
+      'http://localhost/api/messages/read',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token2}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messageIds: [json1.message.id] }),
+      },
+      env,
+    );
+    expect(readRes.status).toBe(200);
+    await expect(readRes.json()).resolves.toMatchObject({ success: true, updated: 1 });
   });
 });

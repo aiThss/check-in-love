@@ -1,159 +1,136 @@
-import fastifyCors from '@fastify/cors';
-import fastifyHelmet from '@fastify/helmet';
-import fastifyMultipart from '@fastify/multipart';
-import fastifyRateLimit from '@fastify/rate-limit';
-import fastifyStatic from '@fastify/static';
-import Fastify, { FastifyInstance } from 'fastify';
-import path from 'path';
-import { env } from './config/env';
-import adminRoutes from './routes/admin/index';
-import authRoutes from './routes/auth';
-import checkinsRoutes from './routes/checkins';
-import healthRoutes from './routes/health';
-import meRoutes from './routes/me';
-import messagesRoutes from './routes/messages';
-import messageStickerRoutes from './routes/message-stickers';
-import passwordResetRoutes from './routes/password-reset';
-import pushRoutes from './routes/push';
-import randomRoutes from './routes/random';
+import { Hono } from 'hono';
+import { resolveConfig } from './config/env';
+import { adminRoutes } from './routes/admin';
+import { authRoutes } from './routes/auth';
+import { chatBackgroundRoutes } from './routes/chat-background';
+import { checkinRoutes } from './routes/checkins';
 import { eventRoutes } from './routes/events';
-import chatBackgroundRoutes from './routes/chat-background';
-import journeyRoutes from './routes/journey';
-import { installCheckinReplyMessageSync } from './services/checkin-reply-message-sync';
-import { isDevelopmentOrigin } from './utils/origin';
+import { healthRoutes } from './routes/health';
+import { journeyRoutes } from './routes/journey';
+import { meRoutes } from './routes/me';
+import { messageStickerRoutes } from './routes/message-stickers';
+import { messageRoutes } from './routes/messages';
+import { passwordResetRoutes } from './routes/password-reset';
+import { pushRoutes } from './routes/push';
+import { randomRoutes } from './routes/random';
+import type { HonoAppEnv } from './types/hono';
+import { AppError } from './utils/errors';
+import { logger } from './utils/logger';
+import { isAllowedOrigin } from './utils/origin';
 
-export async function buildApp(): Promise<FastifyInstance> {
-  const app = Fastify({
-    bodyLimit: env.MAX_UPLOAD_MB * 1024 * 1024 + 1024 * 1024,
-    logger:
-      env.NODE_ENV === 'development'
-        ? {
-            transport: {
-              target: 'pino-pretty',
-              options: { colorize: true },
-            },
-          }
-        : false,
+export function createApp(): Hono<HonoAppEnv> {
+  const app = new Hono<HonoAppEnv>();
+
+  // Resolve runtime config from Worker env per request
+  app.use('*', async (c, next) => {
+    c.set('config', resolveConfig(c.env));
+    await next();
   });
 
-  // Gracefully handle empty JSON body when Content-Type: application/json is sent
-  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
-    if (!body || (typeof body === 'string' && body.trim() === '')) {
-      done(null, {});
-      return;
-    }
-    try {
-      const json = JSON.parse(body as string);
-      done(null, json);
-    } catch (err: any) {
-      err.statusCode = 400;
-      done(err, undefined);
-    }
-  });
+  // Security headers + dynamic CORS matching ALLOWED_ORIGINS + *.couple.io.vn
+  app.use('*', async (c, next) => {
+    const config = c.get('config');
+    const origin = c.req.header('origin');
+    const allowedOrigin = isAllowedOrigin(origin, config);
 
-  // ─── Security ───────────────────────────────────────────────────────────────
-  await app.register(fastifyHelmet, {
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-  });
-
-  await app.register(fastifyCors, {
-    origin: (origin, cb) => {
-      // Allow requests with no origin (like mobile apps or curl)
-      if (!origin) {
-        cb(null, true);
-        return;
+    if (c.req.method === 'OPTIONS') {
+      const headers = new Headers();
+      if (allowedOrigin) {
+        headers.set('Access-Control-Allow-Origin', allowedOrigin);
+        headers.set('Access-Control-Allow-Credentials', 'true');
+        headers.set('Vary', 'Origin');
       }
-
-      const isAllowed = env.ALLOWED_ORIGINS.includes(origin) || isDevelopmentOrigin(origin);
-
-      if (isAllowed) {
-        cb(null, true);
-      } else {
-        cb(new Error('Not allowed by CORS'), false);
-      }
-    },
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  });
-
-  // ─── Rate Limiting ───────────────────────────────────────────────────────────
-  await app.register(fastifyRateLimit, {
-    global: true,
-    max: 200,
-    timeWindow: '1 minute',
-    errorResponseBuilder: (_request, context) => ({
-      error: 'Too many requests',
-      code: 'RATE_LIMITED',
-      retryAfter: context.after,
-    }),
-  });
-
-  // ─── File Uploads ────────────────────────────────────────────────────────────
-  await app.register(fastifyMultipart, {
-    limits: {
-      fileSize: env.MAX_UPLOAD_MB * 1024 * 1024,
-      files: 1,
-    },
-  });
-
-  // ─── Static Files (Uploads) ──────────────────────────────────────────────────
-  await app.register(fastifyStatic, {
-    root: path.resolve(env.UPLOAD_DIR),
-    prefix: '/uploads/',
-    decorateReply: false,
-  });
-
-  // Keep CheckIn replies and the Messages collection synchronized immediately.
-  installCheckinReplyMessageSync(app);
-
-  // ─── Routes ──────────────────────────────────────────────────────────────────
-  await app.register(healthRoutes, { prefix: '/api' });
-  // Keep a root liveness endpoint for container/platform health probes.
-  await app.register(healthRoutes);
-  await app.register(authRoutes, { prefix: '/api' });
-  await app.register(passwordResetRoutes, { prefix: '/api' });
-  await app.register(meRoutes, { prefix: '/api' });
-  await app.register(checkinsRoutes, { prefix: '/api' });
-  await app.register(messagesRoutes, { prefix: '/api' });
-  await app.register(chatBackgroundRoutes, { prefix: '/api' });
-  await app.register(journeyRoutes, { prefix: '/api' });
-  await app.register(messageStickerRoutes, { prefix: '/api' });
-  await app.register(randomRoutes, { prefix: '/api' });
-  await app.register(pushRoutes, { prefix: '/api' });
-  await app.register(eventRoutes, { prefix: '/api' });
-  await app.register(adminRoutes, { prefix: '/api' });
-
-  // ─── 404 Handler ─────────────────────────────────────────────────────────────
-  app.setNotFoundHandler((_request, reply) => {
-    return reply.status(404).send({
-      error: 'Route not found',
-      code: 'NOT_FOUND',
-    });
-  });
-
-  // ─── Global Error Handler ────────────────────────────────────────────────────
-  app.setErrorHandler((error, _request, reply) => {
-    app.log.error(error);
-
-    if (error.statusCode === 429) {
-      return reply.status(429).send({
-        error: 'Too many requests',
-        code: 'RATE_LIMITED',
-      });
+      headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+      headers.set('Access-Control-Max-Age', '86400');
+      return new Response(null, { status: 204, headers });
     }
 
-    const statusCode = error.statusCode ?? 500;
-    const message =
-      env.NODE_ENV === 'production' && statusCode === 500
-        ? 'Internal server error'
-        : error.message;
+    await next();
 
-    return reply.status(statusCode).send({
-      error: message,
-      code: 'INTERNAL_ERROR',
-    });
+    if (allowedOrigin) {
+      c.res.headers.set('Access-Control-Allow-Origin', allowedOrigin);
+      c.res.headers.set('Access-Control-Allow-Credentials', 'true');
+      c.res.headers.append('Vary', 'Origin');
+    }
+    c.res.headers.set('X-Content-Type-Options', 'nosniff');
+    c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   });
+
+  app.onError((err, c) => {
+    if (err instanceof AppError) {
+      return c.json(
+        {
+          error: {
+            code: err.code,
+            message: err.message,
+          },
+        },
+        err.statusCode as 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 | 503,
+      );
+    }
+
+    logger.error('Unhandled API error', err, { path: c.req.path, method: c.req.method });
+    return c.json(
+      {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Đã xảy ra lỗi máy chủ nội bộ',
+        },
+      },
+      500,
+    );
+  });
+
+  // Health & R2 upload fallback
+  app.route('/', healthRoutes);
+  app.get('/uploads/*', async (c) => {
+    const key = c.req.path.replace(/^\/+uploads\//, '');
+    if (!key || key.includes('..') || !c.env?.STORAGE) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Không tìm thấy tệp' } }, 404);
+    }
+    const obj = await c.env.STORAGE.get(key);
+    if (!obj) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Không tìm thấy tệp' } }, 404);
+    }
+    const headers = new Headers();
+    obj.writeHttpMetadata(headers);
+    if (!headers.has('cache-control')) {
+      headers.set('cache-control', 'public, max-age=31536000, immutable');
+    }
+    headers.set('etag', obj.httpEtag);
+    return new Response(obj.body, { headers });
+  });
+
+  // Core /api routes
+  const api = new Hono<HonoAppEnv>();
+  api.route('/', healthRoutes);
+  api.route('/', authRoutes);
+  api.route('/', passwordResetRoutes);
+  api.route('/', meRoutes);
+  api.route('/', checkinRoutes);
+  api.route('/', messageRoutes);
+  api.route('/', messageStickerRoutes);
+  api.route('/', chatBackgroundRoutes);
+  api.route('/', journeyRoutes);
+  api.route('/', randomRoutes);
+  api.route('/', pushRoutes);
+  api.route('/', eventRoutes);
+  api.route('/admin', adminRoutes);
+
+  app.route('/api', api);
+
+  app.notFound((c) =>
+    c.json(
+      {
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Đường dẫn API không tồn tại',
+        },
+      },
+      404,
+    ),
+  );
 
   return app;
 }

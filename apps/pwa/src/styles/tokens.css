@@ -1,161 +1,173 @@
-/* ============================================================
-   CSS Design Tokens — LoveCheck PWA
-   Light theme (default, preserved 100%) + Dark theme (LoveMusic Liquid Glass DNA)
-   ============================================================ */
-
+/* Design System Tokens — Check IN Love (Liquid Glass Edition) */
 :root {
-  /* ── Backgrounds (Light — Preserved 100%) ─────────────────── */
-  --bg: #f8e2e7;
-  --page-background: var(--bg);
-  --surface: #ffffff;
-  --surface-solid: #fff4f7;
+  color-scheme: light;
 
-  /* ── Text ─────────────────────────────────────────────────── */
-  --text-primary: #1f0f15;
-  --text-secondary: #6e4e58;
-  --text-tertiary: #987783;
+  /* Background & Ambient Mesh */
+  --bg: #fff5f8;
+  --bg-mesh:
+    radial-gradient(68% 48% at 10% 4%, rgba(255, 59, 127, 0.16) 0%, rgba(255, 59, 127, 0) 68%),
+    radial-gradient(62% 46% at 92% 10%, rgba(255, 138, 101, 0.14) 0%, rgba(255, 138, 101, 0) 66%),
+    radial-gradient(70% 50% at 50% 96%, rgba(192, 132, 252, 0.12) 0%, rgba(192, 132, 252, 0) 70%);
 
-  /* ── Borders ──────────────────────────────────────────────── */
-  --border: rgba(220, 60, 110, 0.18);
+  /* Layered Glass Surfaces */
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-hover: rgba(255, 255, 255, 0.9);
+  --surface-solid: #ffffff;
+  --surface-soft: rgba(255, 240, 246, 0.86);
 
-  /* ── Accent ───────────────────────────────────────────────── */
+  /* Optical Glass Variables */
+  --glass-chrome-bg: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.84) 0%,
+    rgba(255, 244, 248, 0.72) 100%
+  );
+  --glass-card-bg: linear-gradient(
+    155deg,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(255, 247, 250, 0.84) 100%
+  );
+  --glass-pill-bg: rgba(255, 255, 255, 0.76);
+  --glass-border: rgba(255, 255, 255, 0.88);
+  --glass-border-rim: rgba(255, 59, 127, 0.14);
+  --glass-specular-top: rgba(255, 255, 255, 0.96);
+  --glass-specular-bottom: rgba(255, 59, 127, 0.09);
+
+  /* Borders */
+  --border: rgba(45, 18, 30, 0.08);
+  --border-strong: rgba(45, 18, 30, 0.16);
+
+  /* Typography — WCAG >= 4.5:1 Contrast */
+  --text-primary: #211018;
+  --text-secondary: #5e3f4e;
+  --text-tertiary: #765666;
+  --text-on-accent: #ffffff;
+
+  /* Romantic Rose & Coral Accent */
   --accent: #ff3b7f;
-  --accent-pressed: #e02668;
-  --accent-soft: #ffd6e7;
-  --accent-glow: rgba(255, 59, 127, 0.18);
-  --violet: #9d4edd;
+  --accent-hover: #ea276b;
+  --accent-soft: rgba(255, 59, 127, 0.12);
+  --accent-soft-strong: rgba(255, 59, 127, 0.18);
+  --accent-gradient: linear-gradient(135deg, #ff3b7f 0%, #ff6b6b 100%);
+  --accent-glow: rgba(255, 59, 127, 0.28);
 
-  /* ── Shadows ──────────────────────────────────────────────── */
-  --shadow: 0 10px 30px rgba(160, 30, 70, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --shadow-elevated: 0 16px 36px rgba(160, 30, 70, 0.14), inset 0 1.5px 1px 0 rgba(255, 255, 255, 1), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.35);
+  /* Status Colors */
+  --success: #059669;
+  --success-soft: rgba(5, 150, 105, 0.12);
+  --warning: #d97706;
+  --warning-soft: rgba(217, 119, 6, 0.12);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.12);
 
-  /* ── Liquid Glass (Light Mode Optical Tokens) ─────────────── */
-  --liquid-glass-blur: blur(28px) saturate(190%) contrast(102%);
-  --liquid-glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.76) 0%, rgba(255, 242, 247, 0.58) 100%);
-  --liquid-glass-border: rgba(255, 255, 255, 0.65);
-  --liquid-glass-shadow: 0 16px 44px -6px rgba(180, 40, 80, 0.12), 0 2px 8px rgba(0, 0, 0, 0.03), inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.3);
-  --lg-scrim: rgba(255, 255, 255, 0.38);
-  --lg-border: rgba(255, 255, 255, 0.72);
-  --lg-shadow: 0 12px 32px rgba(160, 30, 70, 0.12), inset 0 1.5px 1px rgba(255, 255, 255, 0.95), inset 0 -1px 1px rgba(255, 255, 255, 0.35);
-  --lg-glow-rgb: 255, 255, 255;
+  /* Typography Scale */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', Consolas, monospace;
 
-  /* ── Radii ────────────────────────────────────────────────── */
-  --radius-card: 24px;
-  --radius-pill: 999px;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-hero: 34px;
+
+  /* Radius */
   --radius-sm: 12px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 30px;
+  --radius-full: 9999px;
 
-  /* ── Typography ───────────────────────────────────────────── */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-weight-light: 300;
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+  /* Elevation & Shadows */
+  --shadow-sm: 0 2px 10px rgba(45, 12, 26, 0.06);
+  --shadow: 0 12px 30px rgba(45, 12, 26, 0.08), inset 0 1px 0 var(--glass-specular-top);
+  --shadow-elevated: 0 20px 48px rgba(45, 12, 26, 0.14), inset 0 1px 0 var(--glass-specular-top);
+  --shadow-accent: 0 10px 26px rgba(255, 59, 127, 0.3);
 
-  /* ── Spacing ──────────────────────────────────────────────── */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 32px;
-  --space-2xl: 48px;
-
-  /* ── Animation ────────────────────────────────────────────── */
-  --duration-fast: 180ms;
-  --duration-normal: 250ms;
-  --duration-slow: 400ms;
-  --ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  /* ── Nav & Quick Dock ─────────────────────────────────────── */
-  --nav-height: 84px;
-  --dock-height: 44px;
+  /* Safe Areas & Layout */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-height: 70px;
+  --nav-bottom: max(12px, var(--safe-bottom));
+  --content-max: 520px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+
+  /* Z-index Scale */
+  --z-base: 1;
+  --z-sticky: 100;
+  --z-nav: 200;
+  --z-modal: 300;
+  --z-toast: 400;
 }
 
-/* ── Dark Theme (LoveMusic Liquid Glass Edition DNA) ─────────── */
+/* Dark Theme — Deep Plum Liquid Glass (LoveMusic Vibe + High Contrast) */
 [data-theme='dark'] {
-  --bg: #14001f;
-  --bg-base: #14001f;
-  --page-background:
-    radial-gradient(circle 220px at 16% 12%, rgba(255, 133, 161, 0.42), transparent 70%),
-    radial-gradient(circle 240px at 88% 46%, rgba(0, 245, 212, 0.22), transparent 72%),
-    radial-gradient(circle 260px at 20% 86%, rgba(255, 92, 147, 0.38), transparent 72%),
-    linear-gradient(165deg, #3c0959 0%, #240046 42%, #14001f 100%);
-  --surface: rgba(36, 0, 70, 0.56);
-  --surface-solid: #240046;
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.78);
-  --text-tertiary: rgba(255, 255, 255, 0.55);
-  --border: rgba(255, 170, 205, 0.24);
-  --accent: #ff5c93;
-  --accent-pressed: #ff3b7f;
-  --accent-soft: rgba(255, 92, 147, 0.2);
-  --accent-glow: rgba(255, 92, 147, 0.34);
-  --violet: #9d4edd;
-  --shadow: 0 18px 46px rgba(10, 0, 20, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.22);
-  --shadow-elevated: 0 22px 54px rgba(10, 0, 20, 0.56), inset 0 1px 1px rgba(255, 255, 255, 0.32), inset 0 -1px 1px rgba(255, 255, 255, 0.1);
+  color-scheme: dark;
 
-  /* ── Liquid Glass Dark (LoveMusic Spec) ── */
-  --liquid-glass-blur: blur(28px) saturate(175%) contrast(104%) brightness(105%);
-  --liquid-glass-bg: linear-gradient(135deg, rgba(58, 16, 86, 0.56) 0%, rgba(20, 0, 31, 0.46) 100%);
-  --liquid-glass-border: rgba(255, 170, 205, 0.28);
-  --liquid-glass-shadow:
-    0 18px 46px -6px rgba(8, 0, 18, 0.55),
-    0 4px 14px rgba(0, 0, 0, 0.28),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.42),
-    inset 0 -1px 1px 0 rgba(255, 92, 147, 0.14);
-  --lg-scrim: rgba(14, 0, 24, 0.34);
-  --lg-border: rgba(255, 170, 205, 0.28);
-  --lg-shadow:
-    0 10px 28px rgba(8, 0, 18, 0.42),
-    inset 0 1px 1px rgba(255, 255, 255, 0.42),
-    inset 0 -1px 1px rgba(255, 255, 255, 0.12);
-  --lg-glow-rgb: 255, 255, 255;
+  --bg: #12061b;
+  --bg-mesh:
+    radial-gradient(72% 52% at 12% 4%, rgba(255, 59, 127, 0.24) 0%, rgba(255, 59, 127, 0) 68%),
+    radial-gradient(64% 48% at 90% 10%, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0) 68%),
+    radial-gradient(72% 50% at 50% 96%, rgba(56, 189, 248, 0.14) 0%, rgba(56, 189, 248, 0) 70%);
+
+  --surface: rgba(36, 18, 49, 0.76);
+  --surface-hover: rgba(48, 25, 64, 0.88);
+  --surface-solid: #231130;
+  --surface-soft: rgba(44, 22, 58, 0.84);
+
+  --glass-chrome-bg: linear-gradient(
+    145deg,
+    rgba(46, 22, 62, 0.82) 0%,
+    rgba(28, 13, 39, 0.74) 100%
+  );
+  --glass-card-bg: linear-gradient(
+    155deg,
+    rgba(43, 21, 58, 0.88) 0%,
+    rgba(28, 13, 40, 0.82) 100%
+  );
+  --glass-pill-bg: rgba(54, 28, 72, 0.78);
+  --glass-border: rgba(255, 198, 226, 0.2);
+  --glass-border-rim: rgba(255, 118, 170, 0.22);
+  --glass-specular-top: rgba(255, 255, 255, 0.22);
+  --glass-specular-bottom: rgba(255, 59, 127, 0.16);
+
+  --border: rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  --text-primary: #fdf7fb;
+  --text-secondary: #e2cee4;
+  --text-tertiary: #bea0c4;
+  --text-on-accent: #ffffff;
+
+  --accent: #ff4d8d;
+  --accent-hover: #ff337c;
+  --accent-soft: rgba(255, 77, 141, 0.2);
+  --accent-soft-strong: rgba(255, 77, 141, 0.3);
+  --accent-glow: rgba(255, 77, 141, 0.34);
+
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.16);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.16);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.16);
+
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --shadow: 0 14px 36px rgba(0, 0, 0, 0.45), inset 0 1px 0 var(--glass-specular-top);
+  --shadow-elevated: 0 22px 54px rgba(0, 0, 0, 0.6), inset 0 1px 0 var(--glass-specular-top);
+  --shadow-accent: 0 12px 28px rgba(255, 59, 127, 0.38);
 }
 
-/* ── System Dark Mode (fallback when theme is "system") ─────── */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #14001f;
-    --bg-base: #14001f;
-    --page-background:
-      radial-gradient(circle 220px at 16% 12%, rgba(255, 133, 161, 0.42), transparent 70%),
-      radial-gradient(circle 240px at 88% 46%, rgba(0, 245, 212, 0.22), transparent 72%),
-      radial-gradient(circle 260px at 20% 86%, rgba(255, 92, 147, 0.38), transparent 72%),
-      linear-gradient(165deg, #3c0959 0%, #240046 42%, #14001f 100%);
-    --surface: rgba(36, 0, 70, 0.56);
-    --surface-solid: #240046;
-    --text-primary: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.78);
-    --text-tertiary: rgba(255, 255, 255, 0.55);
-    --border: rgba(255, 170, 205, 0.24);
-    --accent: #ff5c93;
-    --accent-pressed: #ff3b7f;
-    --accent-soft: rgba(255, 92, 147, 0.2);
-    --accent-glow: rgba(255, 92, 147, 0.34);
-    --violet: #9d4edd;
-    --shadow: 0 18px 46px rgba(10, 0, 20, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.22);
-    --shadow-elevated: 0 22px 54px rgba(10, 0, 20, 0.56), inset 0 1px 1px rgba(255, 255, 255, 0.32), inset 0 -1px 1px rgba(255, 255, 255, 0.1);
-
-    /* ── Liquid Glass Dark (LoveMusic Spec) ── */
-    --liquid-glass-blur: blur(28px) saturate(175%) contrast(104%) brightness(105%);
-    --liquid-glass-bg: linear-gradient(135deg, rgba(58, 16, 86, 0.56) 0%, rgba(20, 0, 31, 0.46) 100%);
-    --liquid-glass-border: rgba(255, 170, 205, 0.28);
-    --liquid-glass-shadow:
-      0 18px 46px -6px rgba(8, 0, 18, 0.55),
-      0 4px 14px rgba(0, 0, 0, 0.28),
-      inset 0 1px 1px 0 rgba(255, 255, 255, 0.42),
-      inset 0 -1px 1px 0 rgba(255, 92, 147, 0.14);
-    --lg-scrim: rgba(14, 0, 24, 0.34);
-    --lg-border: rgba(255, 170, 205, 0.28);
-    --lg-shadow:
-      0 10px 28px rgba(8, 0, 18, 0.42),
-      inset 0 1px 1px rgba(255, 255, 255, 0.42),
-      inset 0 -1px 1px rgba(255, 255, 255, 0.12);
-    --lg-glow-rgb: 255, 255, 255;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

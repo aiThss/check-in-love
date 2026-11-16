@@ -1,111 +1,58 @@
-import { FastifyInstance, FastifyReply } from 'fastify';
-import jwt from 'jsonwebtoken';
-import { env } from '../config/env';
-import { isDevelopmentOrigin } from '../utils/origin';
+import { Hono } from 'hono';
+import { findUserById } from '../db/d1';
+import type { HonoAppEnv } from '../types/hono';
+import { verifyJwt } from '../utils/crypto';
+import { AppError } from '../utils/errors';
 
-export interface RealtimeEvent {
-  type: 'message' | 'message.updated' | 'message.reaction' | 'message.read' | 'message.typing' | 'message.presence' | 'chat.background.updated' | 'checkin' | 'reaction' | 'reply' | 'reminder' | 'journey.updated';
-  title: string;
-  body: string;
-  targetUrl?: string;
-  photoUrl?: string;
-  senderName?: string;
-  senderAvatar?: string;
-  messageId?: string;
-  reactionType?: string;
-  isTyping?: boolean;
-  online?: boolean;
-  deleted?: boolean;
-  chatBackground?: {
-    kind: 'preset' | 'custom';
-    id?: string;
-    imageUrl?: string;
-    label: string;
-    updatedAt?: string;
-  };
-  journey?: {
-    places: any[];
-    bucketItems: any[];
-  };
-  timestamp?: number;
-}
+export const eventRoutes = new Hono<HonoAppEnv>();
 
-// User ID -> Set of SSE Reply streams
-const userConnections = new Map<string, Set<FastifyReply>>();
+eventRoutes.get('/events', async (c) => {
+  const authHeader = c.req.header('authorization');
+  const queryToken = c.req.query('token');
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7).trim()
+    : queryToken?.trim();
 
-export function emitRealtimeEvent(userId: string, event: RealtimeEvent): void {
-  const replies = userConnections.get(userId);
-  if (!replies || replies.size === 0) return;
-
-  const data = JSON.stringify({
-    ...event,
-    timestamp: event.timestamp || Date.now(),
-  });
-
-  const payload = `data: ${data}\n\n`;
-
-  for (const reply of replies) {
-    try {
-      reply.raw.write(payload);
-    } catch {
-      replies.delete(reply);
-    }
+  if (!token) {
+    throw new AppError('Thiếu token xác thực SSE', 401, 'UNAUTHORIZED');
   }
-}
 
-export async function eventRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/events', async (request, reply) => {
-    // Authenticate via query param ?token= or Authorization header
-    const token =
-      (request.query as { token?: string })?.token ||
-      request.headers.authorization?.replace(/^Bearer\s+/i, '');
+  const config = c.get('config');
+  const payload = await verifyJwt<{ userId?: string; id?: string; sub?: string; role?: string }>(
+    token,
+    config.JWT_SECRET,
+  );
+  const userId = payload?.userId ?? payload?.id ?? (payload?.role !== 'admin' ? payload?.sub : undefined);
+  if (!payload || !userId || payload.role === 'admin') {
+    throw new AppError('Token SSE không hợp lệ', 401, 'UNAUTHORIZED');
+  }
 
-    if (!token) {
-      return reply.status(401).send({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
-    }
+  const user = await findUserById(c.env.DB, String(userId));
+  if (!user || user.status === 'blocked') {
+    throw new AppError('Tài khoản không khả dụng', 403, 'USER_BLOCKED');
+  }
 
-    let userId: string;
-    try {
-      const decoded = jwt.verify(token, env.JWT_SECRET) as { id: string };
-      userId = decoded.id;
-    } catch {
-      return reply.status(401).send({ error: 'Invalid token', code: 'INVALID_TOKEN' });
-    }
-
-    reply.raw.setHeader('Content-Type', 'text/event-stream');
-    reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
-    reply.raw.setHeader('Connection', 'keep-alive');
-    const origin = request.headers.origin;
-    if (origin && (env.ALLOWED_ORIGINS.includes(origin) || isDevelopmentOrigin(origin))) {
-      reply.raw.setHeader('Access-Control-Allow-Origin', origin);
-      reply.raw.setHeader('Vary', 'Origin');
-    }
-    reply.raw.flushHeaders?.();
-
-    if (!userConnections.has(userId)) {
-      userConnections.set(userId, new Set());
-    }
-    userConnections.get(userId)!.add(reply);
-
-    // Send connected welcome event
-    reply.raw.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`);
-
-    // Keep connection alive with heartbeat comment every 20 seconds
-    const interval = setInterval(() => {
-      try {
-        reply.raw.write(': heartbeat\n\n');
-      } catch {
-        clearInterval(interval);
-      }
-    }, 20000);
-
-    request.raw.on('close', () => {
-      clearInterval(interval);
-      const set = userConnections.get(userId);
-      if (set) {
-        set.delete(reply);
-        if (set.size === 0) userConnections.delete(userId);
-      }
+  if (!c.env.REALTIME_HUB) {
+    // Graceful SSE fallback when Durable Object binding is absent in unit tests
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'connected' })}\n\n`));
+      },
     });
-  });
-}
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+      },
+    });
+  }
+
+  const stub = c.env.REALTIME_HUB.get(c.env.REALTIME_HUB.idFromName(user.id));
+  return stub.fetch(
+    new Request('https://realtime/connect', {
+      method: 'GET',
+      signal: c.req.raw.signal,
+    }),
+  );
+});
