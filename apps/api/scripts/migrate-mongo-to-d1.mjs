@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global console, process */
+/* global Buffer, console, process */
 /**
  * Converts a MongoDB JSON export (either a single bundle JSON containing
  * { couples, users, checkins, chatmessages, couplejourneys, pushsubscriptions, randomevents }
