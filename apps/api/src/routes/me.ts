@@ -7,10 +7,11 @@ import {
   findPartnerUser,
   findUserById,
 } from '../db/d1';
-import { toCoupleDto, toPartnerSummaryDto, toUserDto } from '../db/types';
+import { toCoupleDto, toUserDto } from '../db/types';
 import { authenticate } from '../middleware/auth';
 import { emitRealtimeEvent } from '../services/realtime';
 import { deleteStoredFile, isUploadedFile, saveUploadedImage } from '../services/storage';
+import { recalculateCoupleStreak } from '../services/streak';
 import type { HonoAppEnv } from '../types/hono';
 import { AppError } from '../utils/errors';
 
@@ -33,14 +34,22 @@ const reminderSchema = z.object({
 meRoutes.get('/me', authenticate, async (c) => {
   const auth = c.get('user')!;
   const user = (await findUserById(c.env.DB, auth.id))!;
-  const couple = user.couple_id ? await findCoupleById(c.env.DB, user.couple_id) : null;
+  let couple = user.couple_id ? await findCoupleById(c.env.DB, user.couple_id) : null;
+  if (couple) {
+    const streakSnapshot = await recalculateCoupleStreak(c.env.DB, couple.id);
+    couple = {
+      ...couple,
+      streak: streakSnapshot.streak,
+      last_checkin_date: streakSnapshot.lastCheckinDate,
+    };
+  }
   const members = couple ? await findCoupleMembers(c.env.DB, couple.id) : [];
   const partner = members.find((m) => m.id !== user.id) ?? null;
 
   return c.json({
     user: toUserDto(user),
     couple: couple ? toCoupleDto(couple, members.map((m) => m.id)) : null,
-    partnerUser: partner ? toPartnerSummaryDto(partner) : undefined,
+    partnerUser: partner ? toUserDto(partner) : undefined,
   });
 });
 
@@ -94,10 +103,16 @@ meRoutes.patch('/me', authenticate, async (c) => {
 meRoutes.get('/me/reminder', authenticate, async (c) => {
   const auth = c.get('user')!;
   const user = (await findUserById(c.env.DB, auth.id))!;
+  const reminder = {
+    enabled: Boolean(user.reminder_enabled),
+    time: user.reminder_time || '20:30',
+    timezone: user.reminder_timezone || 'Asia/Ho_Chi_Minh',
+  };
   return c.json({
-    reminderEnabled: Boolean(user.reminder_enabled),
-    reminderTime: user.reminder_time || '20:30',
-    reminderTimezone: user.reminder_timezone || 'Asia/Ho_Chi_Minh',
+    reminder,
+    reminderEnabled: reminder.enabled,
+    reminderTime: reminder.time,
+    reminderTimezone: reminder.timezone,
   });
 });
 
@@ -128,10 +143,16 @@ meRoutes.patch('/me/reminder', authenticate, async (c) => {
   );
 
   const updated = (await findUserById(c.env.DB, user.id))!;
+  const reminder = {
+    enabled: Boolean(updated.reminder_enabled),
+    time: updated.reminder_time,
+    timezone: updated.reminder_timezone,
+  };
   return c.json({
-    reminderEnabled: Boolean(updated.reminder_enabled),
-    reminderTime: updated.reminder_time,
-    reminderTimezone: updated.reminder_timezone,
+    reminder,
+    reminderEnabled: reminder.enabled,
+    reminderTime: reminder.time,
+    reminderTimezone: reminder.timezone,
     user: toUserDto(updated),
   });
 });

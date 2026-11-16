@@ -8,7 +8,7 @@ import { decryptBackupPayload, encryptBackupPayload, generateD1SeedSql, parseMon
 
 describe('migrate-mongo-to-d1 SQL converter', () => {
   it('converts MongoDB Extended JSON collections into valid D1 SQL and preserves legacy auth, media, checkins, and messages', async () => {
-    const rawBundle = JSON.stringify({
+    const rawBundle = `\uFEFF${JSON.stringify({
       couples: [
         {
           _id: { $oid: '673000000000000000000001' },
@@ -16,6 +16,11 @@ describe('migrate-mongo-to-d1 SQL converter', () => {
           loveStartDate: '2024-02-14',
           streak: { $numberInt: '12' },
           lastCheckinDate: '2026-11-15',
+          chatBackground: {
+            mode: 'custom',
+            label: 'Ảnh tùy chọn',
+            imageUrl: '/uploads/2026/06/bg.jpg',
+          },
           createdAt: { $date: '2026-01-01T00:00:00.000Z' },
           updatedAt: { $date: '2026-11-15T10:00:00.000Z' },
         },
@@ -26,9 +31,15 @@ describe('migrate-mongo-to-d1 SQL converter', () => {
           displayName: "Lan's Account",
           partnerName: 'Minh',
           email: 'lan@example.com',
-          emailAliases: ['lan.alt@example.com'],
+          email_aliases: ['lan.alt@example.com'],
           passwordHash: '$2a$10$abcdef',
           avatarUrl: '/uploads/avatars/lan.jpg',
+          trustedDevices: ['device-uuid-1'],
+          checkinReminder: {
+            enabled: true,
+            time: '21:15',
+            timezone: 'Asia/Ho_Chi_Minh',
+          },
           coupleId: { $oid: '673000000000000000000001' },
           role: 'user',
           status: 'active',
@@ -75,7 +86,7 @@ describe('migrate-mongo-to-d1 SQL converter', () => {
       ],
       pushsubscriptions: [],
       randomevents: [],
-    });
+    })}`;
 
     const parsed = parseMongoJsonContent(rawBundle);
     const { sql, counts } = generateD1SeedSql(parsed, {
@@ -99,12 +110,35 @@ describe('migrate-mongo-to-d1 SQL converter', () => {
     const env = { DB: db, STORAGE: new MemoryR2Bucket() as unknown as R2Bucket, NODE_ENV: 'test', JWT_SECRET: secret } as unknown as WorkerEnv;
     const token = await signJwt({ userId: '673000000000000000000011', coupleId: '673000000000000000000001', role: 'user' }, secret);
 
+    const seededCouple = await db
+      .prepare('SELECT code, streak FROM couples WHERE id = ?')
+      .bind('673000000000000000000001')
+      .first<{ code: string; streak: number }>();
+    expect(seededCouple).toEqual({ code: 'LOVE24', streak: 12 });
+
     const app = createApp();
     const meRes = await app.request('http://localhost/api/me', { headers: { Authorization: `Bearer ${token}` } }, env);
     expect(meRes.status).toBe(200);
     await expect(meRes.json()).resolves.toMatchObject({
-      user: { displayName: "Lan's Account", avatarUrl: 'https://pub-55b9353a3b6545fc816821cc3c7dac73.r2.dev/avatars/lan.jpg' },
-      couple: { code: 'LOVE24', streak: 12 },
+      user: {
+        displayName: "Lan's Account",
+        avatarUrl: 'https://pub-55b9353a3b6545fc816821cc3c7dac73.r2.dev/avatars/lan.jpg',
+        email_aliases: ['lan.alt@example.com'],
+      },
+      couple: {
+        code: 'LOVE24',
+        loveStartDate: '2024-02-14',
+        chatBackground: {
+          mode: 'custom',
+          imageUrl: 'https://pub-55b9353a3b6545fc816821cc3c7dac73.r2.dev/2026/06/bg.jpg',
+        },
+      },
+    });
+
+    const reminderRes = await app.request('http://localhost/api/me/reminder', { headers: { Authorization: `Bearer ${token}` } }, env);
+    expect(reminderRes.status).toBe(200);
+    await expect(reminderRes.json()).resolves.toMatchObject({
+      reminder: { enabled: true, time: '21:15', timezone: 'Asia/Ho_Chi_Minh' },
     });
 
     const chkRes = await app.request('http://localhost/api/checkins', { headers: { Authorization: `Bearer ${token}` } }, env);

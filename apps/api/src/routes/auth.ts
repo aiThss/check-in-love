@@ -70,9 +70,11 @@ const googleLoginSchema = z.object({
 });
 
 function upsertTrustedDevice(rawJson: string, deviceId: string | undefined, nowIso: string): string {
-  const existing = parseJsonSafe<TrustedDevice[]>(rawJson, []);
+  const existing = parseJsonSafe<Array<string | TrustedDevice>>(rawJson, []);
   if (!deviceId) return JSON.stringify(existing);
-  const filtered = existing.filter((d) => d.deviceId !== deviceId).slice(0, 9);
+  const filtered = existing
+    .filter((d) => (typeof d === 'string' ? d !== deviceId : d?.deviceId !== deviceId))
+    .slice(0, 9);
   filtered.unshift({ deviceId, lastUsedAt: nowIso });
   return JSON.stringify(filtered);
 }
@@ -464,9 +466,12 @@ authRoutes.post('/auth/login', async (c) => {
     throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
   }
 
-  const trustedDevices = parseJsonSafe<TrustedDevice[]>(user.trusted_devices_json, []);
+  const trustedDevices = parseJsonSafe<Array<string | TrustedDevice>>(user.trusted_devices_json, []);
   const isTrustedDevice = Boolean(
-    parsed.data.deviceId && trustedDevices.some((d) => d.deviceId === parsed.data.deviceId),
+    parsed.data.deviceId &&
+      trustedDevices.some((d) =>
+        typeof d === 'string' ? d === parsed.data.deviceId : d?.deviceId === parsed.data.deviceId,
+      ),
   );
 
   const nowIso = new Date().toISOString();

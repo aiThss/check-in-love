@@ -42,7 +42,13 @@ chatBackgroundRoutes.get('/chat-background', authenticate, async (c) => {
     throw new AppError('Không tìm thấy nhóm cặp đôi', 404, 'COUPLE_NOT_FOUND');
   }
 
-  const background = parseJsonSafe<ChatBackgroundData | null>(couple.chat_background_json, null);
+  const rawBg = parseJsonSafe<ChatBackgroundData | null>(couple.chat_background_json, null);
+  const background = rawBg
+    ? {
+        ...rawBg,
+        imageUrl: rawBg.imageUrl ?? rawBg.url,
+      }
+    : null;
   return c.json({ background });
 });
 
@@ -77,7 +83,8 @@ chatBackgroundRoutes.patch('/chat-background', authenticate, async (c) => {
     const uploaded = await saveUploadedImage(c.env.STORAGE, config, fileEntry, 'chat-backgrounds');
     nextBg = {
       kind: 'custom',
-      label: 'Ảnh nền riêng',
+      label: 'Ảnh tùy chọn',
+      imageUrl: uploaded.url,
       url: uploaded.url,
       storagePath: uploaded.storagePath,
       updatedById: user.id,

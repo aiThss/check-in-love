@@ -49,7 +49,7 @@ export function unwrapMongoValue(value) {
 }
 
 export function parseMongoJsonContent(rawText) {
-  const trimmed = rawText.trim();
+  const trimmed = rawText.replace(/^\uFEFF/, '').trim();
   if (!trimmed) return [];
   if (trimmed.startsWith('[')) {
     return JSON.parse(trimmed).map(unwrapMongoValue);
@@ -188,6 +188,13 @@ export function generateD1SeedSql(collections, options = {}) {
     coupleIds.add(String(id));
     counts.couples += 1;
     const nowIso = toIso(doc.updatedAt || doc.createdAt);
+    const bg = doc.chatBackground && typeof doc.chatBackground === 'object'
+      ? {
+          ...doc.chatBackground,
+          imageUrl: normalizeMediaUrl(doc.chatBackground.imageUrl ?? doc.chatBackground.url, doc.chatBackground.storagePath, r2PublicUrl),
+          url: normalizeMediaUrl(doc.chatBackground.url ?? doc.chatBackground.imageUrl, doc.chatBackground.storagePath, r2PublicUrl),
+        }
+      : null;
     statements.push(
       insertStmt(
         'couples',
@@ -198,7 +205,7 @@ export function generateD1SeedSql(collections, options = {}) {
           doc.loveStartDate ? String(doc.loveStartDate) : null,
           Number.isFinite(Number(doc.streak)) ? Number(doc.streak) : 0,
           doc.lastCheckinDate ? String(doc.lastCheckinDate) : null,
-          doc.chatBackground ? JSON.stringify(doc.chatBackground) : null,
+          bg ? JSON.stringify(bg) : null,
           toIso(doc.createdAt, nowIso),
           nowIso,
         ],
@@ -214,11 +221,15 @@ export function generateD1SeedSql(collections, options = {}) {
     counts.users += 1;
     const nowIso = toIso(doc.updatedAt || doc.createdAt);
     const coupleId = doc.coupleId && coupleIds.has(String(doc.coupleId)) ? String(doc.coupleId) : null;
-    const aliases = Array.isArray(doc.emailAliases)
-      ? doc.emailAliases.map((a) => String(a).trim().toLowerCase()).filter(Boolean)
-      : [];
+    const rawAliases = Array.isArray(doc.email_aliases)
+      ? doc.email_aliases
+      : Array.isArray(doc.emailAliases)
+        ? doc.emailAliases
+        : [];
+    const aliases = rawAliases.map((a) => String(a).trim().toLowerCase()).filter(Boolean);
     const trusted = Array.isArray(doc.trustedDevices) ? doc.trustedDevices : [];
     const fcmTokens = Array.isArray(doc.fcmTokens) ? doc.fcmTokens.map(String).filter(Boolean) : [];
+    const reminder = doc.checkinReminder && typeof doc.checkinReminder === 'object' ? doc.checkinReminder : {};
 
     statements.push(
       insertStmt(
@@ -244,10 +255,10 @@ export function generateD1SeedSql(collections, options = {}) {
           doc.partnerBirthday ? String(doc.partnerBirthday) : null,
           JSON.stringify(trusted),
           JSON.stringify(fcmTokens),
-          doc.reminderEnabled ? 1 : 0,
-          doc.reminderTime ? String(doc.reminderTime) : '20:30',
-          doc.reminderTimezone ? String(doc.reminderTimezone) : 'Asia/Ho_Chi_Minh',
-          doc.reminderLastSentDate ? String(doc.reminderLastSentDate) : null,
+          (reminder.enabled ?? doc.reminderEnabled) ? 1 : 0,
+          reminder.time ? String(reminder.time) : doc.reminderTime ? String(doc.reminderTime) : '20:30',
+          reminder.timezone ? String(reminder.timezone) : doc.reminderTimezone ? String(doc.reminderTimezone) : 'Asia/Ho_Chi_Minh',
+          reminder.lastSentDate ? String(reminder.lastSentDate) : doc.reminderLastSentDate ? String(doc.reminderLastSentDate) : null,
           doc.reminderLeaseDate ? String(doc.reminderLeaseDate) : null,
           doc.role === 'admin' ? 'admin' : 'user',
           doc.status === 'blocked' ? 'blocked' : 'active',
@@ -316,7 +327,7 @@ export function generateD1SeedSql(collections, options = {}) {
           doc.surpriseText ? String(doc.surpriseText) : null,
           doc.mood ? String(doc.mood) : null,
           doc.quickMessage ? String(doc.quickMessage) : null,
-          doc.clientMutationId ? String(doc.clientMutationId) : null,
+          doc.clientMutationId ? String(doc.clientMutationId).trim() || null : null,
           doc.replyToMessageId ? String(doc.replyToMessageId) : null,
           doc.replyTo ? JSON.stringify(doc.replyTo) : null,
           JSON.stringify(Array.isArray(doc.reactions) ? doc.reactions : []),
@@ -374,7 +385,7 @@ export function generateD1SeedSql(collections, options = {}) {
           doc.referencedCheckinId ? String(doc.referencedCheckinId) : null,
           doc.referencedCheckin ? JSON.stringify(doc.referencedCheckin) : null,
           doc.systemEvent ? JSON.stringify(doc.systemEvent) : null,
-          doc.clientMutationId ? String(doc.clientMutationId) : null,
+          doc.clientMutationId ? String(doc.clientMutationId).trim() || null : null,
           doc.deletedAt ? toIso(doc.deletedAt) : null,
           doc.editedAt ? toIso(doc.editedAt) : null,
           JSON.stringify(Array.isArray(doc.editHistory) ? doc.editHistory : []),

@@ -8,6 +8,7 @@ export interface ChatBackgroundData {
   kind: 'preset' | 'custom';
   id?: string;
   label?: string;
+  imageUrl?: string;
   url?: string;
   storagePath?: string;
   updatedById?: string;
@@ -218,6 +219,7 @@ export function toUserDto(row: UserRow) {
     displayName: row.display_name,
     partnerName: row.partner_name,
     email: row.email ?? undefined,
+    email_aliases: parseJsonSafe<string[]>(row.email_aliases_json, []),
     avatarUrl: row.avatar_url ?? undefined,
     partnerAvatarUrl: row.partner_avatar_url ?? undefined,
     birthday: row.birthday ?? undefined,
@@ -245,7 +247,23 @@ export function toPartnerSummaryDto(row: UserRow) {
 }
 
 export function toCoupleDto(row: CoupleRow, memberIds: string[]) {
-  const chatBackground = parseJsonSafe<ChatBackgroundData | null>(row.chat_background_json, null);
+  const rawBg = parseJsonSafe<ChatBackgroundData | null>(row.chat_background_json, null);
+  const chatBackground = rawBg
+    ? {
+        ...rawBg,
+        imageUrl: rawBg.imageUrl ?? rawBg.url,
+        url: rawBg.url ?? rawBg.imageUrl,
+      }
+    : null;
+
+  let totalDays = 0;
+  if (row.love_start_date) {
+    const startMs = Date.parse(row.love_start_date);
+    if (!Number.isNaN(startMs)) {
+      totalDays = Math.max(1, Math.floor((Date.now() - startMs) / 86_400_000) + 1);
+    }
+  }
+
   return {
     id: row.id,
     _id: row.id,
@@ -253,6 +271,7 @@ export function toCoupleDto(row: CoupleRow, memberIds: string[]) {
     memberIds,
     loveStartDate: row.love_start_date ?? undefined,
     streak: row.streak,
+    totalDays,
     lastCheckinDate: row.last_checkin_date ?? undefined,
     chatBackground: chatBackground ?? undefined,
     createdAt: row.created_at,
