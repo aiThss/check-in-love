@@ -21,7 +21,7 @@ import { authenticate } from '../middleware/auth';
 import { syncCheckinRepliesPage } from '../services/checkin-reply-message-sync';
 import { sendPushToUser } from '../services/push';
 import { emitRealtimeEvent } from '../services/realtime';
-import { deleteStoredFile, saveUploadedImage } from '../services/storage';
+import { deleteStoredFile, isUploadedFile, saveUploadedImage } from '../services/storage';
 import type { HonoAppEnv } from '../types/hono';
 import { AppError } from '../utils/errors';
 import { generateId } from '../utils/id';
@@ -130,7 +130,7 @@ messageRoutes.post('/messages', authenticate, async (c) => {
     referencedCheckinId = getStr('referencedCheckinId');
     clientMutationId = getStr('clientMutationId');
     const fileEntry = formData.get('image') ?? formData.get('file') ?? formData.get('photo');
-    if (fileEntry instanceof File && fileEntry.size > 0) {
+    if (isUploadedFile(fileEntry) && fileEntry.size > 0) {
       imageFile = fileEntry;
     }
   } else {

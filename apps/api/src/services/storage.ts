@@ -70,6 +70,15 @@ export interface StoredUpload {
   storagePath: string;
 }
 
+export function isUploadedFile(value: unknown): value is File {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as File).arrayBuffer === 'function' &&
+    typeof (value as File).size === 'number'
+  );
+}
+
 export async function saveUploadedImage(
   bucket: R2Bucket,
   config: AppConfig,

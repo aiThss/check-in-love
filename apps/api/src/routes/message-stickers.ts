@@ -4,7 +4,7 @@ import { toMessageDto, type ChatMessageRow } from '../db/types';
 import { authenticate } from '../middleware/auth';
 import { sendPushToUser } from '../services/push';
 import { emitRealtimeEvent } from '../services/realtime';
-import { saveUploadedImage } from '../services/storage';
+import { isUploadedFile, saveUploadedImage } from '../services/storage';
 import type { HonoAppEnv } from '../types/hono';
 import { AppError } from '../utils/errors';
 import { generateId } from '../utils/id';
@@ -23,7 +23,7 @@ messageStickerRoutes.post('/messages/sticker', authenticate, async (c) => {
   }
 
   const fileEntry = formData.get('file') ?? formData.get('image') ?? formData.get('sticker');
-  if (!(fileEntry instanceof File) || fileEntry.size <= 0) {
+  if (!isUploadedFile(fileEntry) || fileEntry.size <= 0) {
     throw new AppError('Tệp sticker không hợp lệ', 400, 'MISSING_FILE');
   }
 

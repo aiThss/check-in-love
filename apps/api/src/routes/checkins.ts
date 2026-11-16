@@ -21,7 +21,7 @@ import { authenticate } from '../middleware/auth';
 import { syncCheckinRepliesPage, syncCheckinReplyToMessage } from '../services/checkin-reply-message-sync';
 import { sendPushToUser } from '../services/push';
 import { emitRealtimeEvent } from '../services/realtime';
-import { deleteStoredFile, saveUploadedImage } from '../services/storage';
+import { deleteStoredFile, isUploadedFile, saveUploadedImage } from '../services/storage';
 import { recalculateCoupleStreak } from '../services/streak';
 import type { HonoAppEnv } from '../types/hono';
 import { AppError } from '../utils/errors';
@@ -163,7 +163,7 @@ checkinRoutes.post('/checkins', authenticate, async (c) => {
     }
 
     const fileEntry = formData.get('photo') ?? formData.get('image') ?? formData.get('file');
-    if (fileEntry instanceof File && fileEntry.size > 0) {
+    if (isUploadedFile(fileEntry) && fileEntry.size > 0) {
       photoFile = fileEntry;
     }
   } else {

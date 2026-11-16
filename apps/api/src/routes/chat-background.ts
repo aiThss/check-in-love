@@ -15,7 +15,7 @@ import {
 } from '../db/types';
 import { authenticate } from '../middleware/auth';
 import { emitRealtimeEvent } from '../services/realtime';
-import { deleteStoredFile, saveUploadedImage } from '../services/storage';
+import { deleteStoredFile, isUploadedFile, saveUploadedImage } from '../services/storage';
 import type { HonoAppEnv } from '../types/hono';
 import { AppError } from '../utils/errors';
 import { generateId } from '../utils/id';
@@ -70,7 +70,7 @@ chatBackgroundRoutes.patch('/chat-background', authenticate, async (c) => {
   if (contentType.includes('multipart/form-data')) {
     const formData = await c.req.formData().catch(() => null);
     const fileEntry = formData?.get('file') ?? formData?.get('image');
-    if (!(fileEntry instanceof File) || fileEntry.size <= 0) {
+    if (!isUploadedFile(fileEntry) || fileEntry.size <= 0) {
       throw new AppError('Vui lòng chọn ảnh nền hợp lệ', 400, 'MISSING_FILE');
     }
 

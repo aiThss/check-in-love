@@ -10,7 +10,7 @@ import {
 import { toCoupleDto, toPartnerSummaryDto, toUserDto } from '../db/types';
 import { authenticate } from '../middleware/auth';
 import { emitRealtimeEvent } from '../services/realtime';
-import { deleteStoredFile, saveUploadedImage } from '../services/storage';
+import { deleteStoredFile, isUploadedFile, saveUploadedImage } from '../services/storage';
 import type { HonoAppEnv } from '../types/hono';
 import { AppError } from '../utils/errors';
 
@@ -141,7 +141,7 @@ async function handleAvatarUpload(c: Context<HonoAppEnv>, isPartnerAvatar: boole
   const config = c.get('config');
   const formData = await c.req.formData().catch(() => null);
   const fileEntry = formData?.get('avatar') ?? formData?.get('file') ?? formData?.get('photo');
-  if (!(fileEntry instanceof File)) {
+  if (!isUploadedFile(fileEntry)) {
     throw new AppError('Vui lòng chọn tệp ảnh đại diện', 400, 'MISSING_FILE');
   }
 
