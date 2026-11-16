@@ -3695,9 +3695,11 @@ body::after {
 .install-step,
 .mood-btn,
 .photo-drop-area {
-  background: var(--glass-card-bg);
-  border: 1px solid var(--glass-border-rim);
-  box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.88) !important;
+  box-shadow: var(--shadow) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+  backdrop-filter: blur(24px) saturate(145%);
 }
 
 .card,
@@ -3721,9 +3723,11 @@ body::after {
 .memory-reply-count,
 .reaction-option,
 .reaction-custom-form input {
-  border-color: var(--glass-border-rim);
-  background: var(--glass-pill-bg);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--glass-specular-top);
+  border-color: rgba(255, 255, 255, 0.9) !important;
+  background: rgba(255, 255, 255, 0.64) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
 }
 
 .top-bar {
@@ -3933,7 +3937,7 @@ textarea:focus-visible,
 
 @media (max-width: 360px) {
   .nav-label {
-    font-size: 11px !important;
+    font-size: 9px !important;
   }
 
   .nav-checkin-btn {
@@ -3966,9 +3970,15 @@ textarea:focus-visible,
 [data-theme='dark'] .photo-drop-area,
 [data-theme='dark'] .modal,
 [data-theme='dark'] .bottom-nav-inner {
-  background: var(--glass-card-bg);
-  border: 1px solid var(--glass-border-rim);
-  box-shadow: var(--shadow);
+  background: linear-gradient(135deg, rgba(54, 30, 48, 0.8) 0%, rgba(36, 20, 32, 0.68) 100%) !important;
+  border: 1px solid rgba(255, 170, 205, 0.22) !important;
+  box-shadow:
+    0 20px 48px -6px rgba(0, 0, 0, 0.5),
+    0 2px 10px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(190%) contrast(104%) !important;
+  backdrop-filter: blur(30px) saturate(190%) contrast(104%) !important;
 }
 
 [data-theme='dark'] .btn-icon,
@@ -3984,9 +3994,9 @@ textarea:focus-visible,
 [data-theme='dark'] .memory-reply-count,
 [data-theme='dark'] .reaction-option,
 [data-theme='dark'] .reaction-custom-form input {
-  background: var(--glass-pill-bg);
-  border-color: var(--glass-border-rim);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--glass-specular-top);
+  background: rgba(77, 40, 62, 0.9) !important;
+  border-color: rgba(255, 164, 198, 0.2) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 214, 229, 0.08);
 }
 
 @media (prefers-reduced-motion: reduce) {

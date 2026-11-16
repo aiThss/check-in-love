@@ -11,6 +11,7 @@
     "dev:pwa": "npm run dev --workspace=apps/pwa",
     "dev:admin": "npm run dev --workspace=apps/admin",
     "build": "npm run build --workspaces",
+    "deploy:api": "npx wrangler deploy --config apps/api/wrangler.toml",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"

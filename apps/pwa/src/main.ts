@@ -4,9 +4,7 @@ import './styles/animations.css';
 import './styles/message-image-viewer.css';
 import './styles/auth-interaction-vibe.css';
 import './styles/love-journey.css';
-import './styles/liquid-glass.css';
 import { store } from './store/index';
-import { initLiquidGlass } from './components/liquid-glass';
 import { initRouter, navigate } from './router';
 import { clearPrivateClientState } from './session';
 import { logger } from './utils/logger';
@@ -24,7 +22,6 @@ import { showModal } from './components/modal';
 import { initDevHelper } from './components/dev-helper';
 
 store.initTheme();
-initLiquidGlass();
 initKeyboardViewport();
 initAuthFocusScroll();
 initMessageReplyGesture();
@@ -97,14 +94,14 @@ const localDarkGlassVariants = {
     shadow: '0 16px 38px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
   },
   v6: {
-    name: 'LoveMusic Liquid Glass',
-    surface: 'rgba(42, 12, 66, 0.72)',
-    solid: '#240046',
-    card: 'linear-gradient(135deg, rgba(58, 16, 86, 0.56) 0%, rgba(20, 0, 31, 0.46) 100%)',
-    child: 'linear-gradient(145deg, rgba(74, 20, 108, 0.64), rgba(36, 0, 70, 0.54))',
-    soft: 'rgba(255, 92, 147, 0.14)',
-    border: 'rgba(255, 170, 205, 0.28)',
-    shadow: '0 14px 36px -8px rgba(8, 0, 18, 0.75), inset 0 1px 0 rgba(255, 205, 230, 0.26)',
+    name: 'Pink Mist 08',
+    surface: 'rgba(43, 39, 48, 0.74)',
+    solid: 'rgba(57, 51, 61, 0.72)',
+    card: 'linear-gradient(145deg, rgba(116, 102, 121, 0.44), rgba(31, 27, 36, 0.8))',
+    child: 'linear-gradient(145deg, rgba(158, 142, 160, 0.21), rgba(58, 49, 62, 0.6))',
+    soft: 'rgba(236, 194, 229, 0.1)',
+    border: 'rgba(255, 232, 251, 0.2)',
+    shadow: '0 16px 38px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.13)',
   },
   v7: {
     name: 'Pink Mist 14',
@@ -152,9 +149,8 @@ type LocalDarkGlassVariant = keyof typeof localDarkGlassVariants;
 
 // Change only this id when testing the next remembered local-only palette.
 const selectedLocalDarkGlassVariant: LocalDarkGlassVariant = 'v6';
-const enableLegacyDarkOverride = false;
 
-if (enableLegacyDarkOverride && isViteDev) {
+if (isViteDev) {
   const palette = localDarkGlassVariants[selectedLocalDarkGlassVariant];
   const localDarkCardPreview = document.createElement('style');
   localDarkCardPreview.id = 'dev-local-dark-card-preview';
