@@ -10,10 +10,12 @@
  *   node apps/api/scripts/migrate-mongo-to-d1.mjs --input mongo-backup.json --output d1-seed.sql --apply
  */
 
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync, gzipSync } from 'node:zlib';
 
 const DEFAULT_R2_PUBLIC_URL = 'https://pub-55b9353a3b6545fc816821cc3c7dac73.r2.dev';
 
@@ -447,14 +449,68 @@ export function generateD1SeedSql(collections, options = {}) {
   return { sql: `${statements.join('\n')}\n`, counts };
 }
 
+const BACKUP_MAGIC = Buffer.from('CILBK1');
+
+export function encryptBackupPayload(jsonString, secret) {
+  const key = scryptSync(String(secret), 'checkinlove-d1-migration', 32);
+  const iv = randomBytes(12);
+  const compressed = gzipSync(Buffer.from(jsonString, 'utf8'));
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(compressed), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([BACKUP_MAGIC, iv, tag, encrypted]);
+}
+
+export function decryptBackupPayload(buf, secret) {
+  const raw = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+  if (raw.length < BACKUP_MAGIC.length + 28 || !raw.subarray(0, BACKUP_MAGIC.length).equals(BACKUP_MAGIC)) {
+    throw new Error('Invalid encrypted backup header');
+  }
+  const offset = BACKUP_MAGIC.length;
+  const iv = raw.subarray(offset, offset + 12);
+  const tag = raw.subarray(offset + 12, offset + 28);
+  const ciphertext = raw.subarray(offset + 28);
+  const key = scryptSync(String(secret), 'checkinlove-d1-migration', 32);
+  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  const compressed = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return gunzipSync(compressed).toString('utf8');
+}
+
+function readSecretFromDevVars(apiDir) {
+  const devVarsPath = join(apiDir, '.dev.vars');
+  if (!existsSync(devVarsPath)) return '';
+  const content = readFileSync(devVarsPath, 'utf8');
+  for (const line of content.split(/\r?\n/)) {
+    const match = line.match(/^JWT_SECRET=(.*)$/);
+    if (match) return match[1].trim().replace(/^['"]|['"]$/g, '');
+  }
+  return '';
+}
+
 function parseCliArgs(argv) {
-  const args = { input: '', output: 'd1-seed.sql', r2Url: DEFAULT_R2_PUBLIC_URL, apply: false };
+  const args = {
+    input: '',
+    fromR2: '',
+    decryptFile: '',
+    secret: '',
+    bucket: 'check-in-love-storage',
+    output: 'd1-seed.sql',
+    r2Url: DEFAULT_R2_PUBLIC_URL,
+    apply: false,
+    keepR2Temp: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--input' || arg === '-i') args.input = argv[++i] ?? '';
+    else if (arg === '--from-r2') args.fromR2 = argv[++i] ?? '';
+    else if (arg === '--decrypt-file') args.decryptFile = argv[++i] ?? '';
+    else if (arg === '--secret') args.secret = argv[++i] ?? '';
+    else if (arg === '--bucket') args.bucket = argv[++i] ?? 'check-in-love-storage';
     else if (arg === '--output' || arg === '-o') args.output = argv[++i] ?? 'd1-seed.sql';
     else if (arg === '--r2-url') args.r2Url = argv[++i] ?? DEFAULT_R2_PUBLIC_URL;
     else if (arg === '--apply') args.apply = true;
+    else if (arg === '--keep-r2-temp') args.keepR2Temp = true;
   }
   return args;
 }
@@ -462,12 +518,40 @@ function parseCliArgs(argv) {
 const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
   const args = parseCliArgs(process.argv.slice(2));
-  if (!args.input) {
-    console.error('Usage: node apps/api/scripts/migrate-mongo-to-d1.mjs --input <mongo-backup.json|dir> [--output d1-seed.sql] [--apply]');
+  const apiDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  let collections;
+
+  if (args.fromR2) {
+    const tempEncPath = resolve('mongo-backup.enc');
+    const getRes = spawnSync(
+      'npx',
+      ['wrangler', 'r2', 'object', 'get', `${args.bucket}/${args.fromR2}`, '--file', tempEncPath, '--remote'],
+      { cwd: apiDir, stdio: 'inherit', shell: true },
+    );
+    if ((getRes.status ?? 1) !== 0) process.exit(getRes.status ?? 1);
+    const secret = args.secret || readSecretFromDevVars(apiDir) || process.env.JWT_SECRET || '';
+    if (!secret) {
+      console.error('Missing JWT_SECRET for decryption (pass --secret or configure apps/api/.dev.vars)');
+      process.exit(1);
+    }
+    const jsonText = decryptBackupPayload(readFileSync(tempEncPath), secret);
+    unlinkSync(tempEncPath);
+    collections = normalizeCollectionMap(parseMongoJsonContent(jsonText));
+  } else if (args.decryptFile) {
+    const secret = args.secret || readSecretFromDevVars(apiDir) || process.env.JWT_SECRET || '';
+    if (!secret) {
+      console.error('Missing JWT_SECRET for decryption (pass --secret or configure apps/api/.dev.vars)');
+      process.exit(1);
+    }
+    const jsonText = decryptBackupPayload(readFileSync(resolve(args.decryptFile)), secret);
+    collections = normalizeCollectionMap(parseMongoJsonContent(jsonText));
+  } else if (args.input) {
+    collections = loadCollections(args.input);
+  } else {
+    console.error('Usage: node apps/api/scripts/migrate-mongo-to-d1.mjs [--input <json|dir> | --from-r2 <key> | --decrypt-file <enc>] [--output d1-seed.sql] [--apply]');
     process.exit(1);
   }
 
-  const collections = loadCollections(args.input);
   const { sql, counts } = generateD1SeedSql(collections, { r2PublicUrl: args.r2Url });
   const outFile = resolve(args.output);
   mkdirSync(dirname(outFile), { recursive: true });
@@ -476,12 +560,19 @@ if (isMain) {
   console.table(counts);
 
   if (args.apply) {
-    const apiDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
     const result = spawnSync(
       'npx',
       ['wrangler', 'd1', 'execute', 'couple-db', '--remote', '--file', outFile],
       { cwd: apiDir, stdio: 'inherit', shell: true },
     );
-    process.exit(result.status ?? 1);
+    if ((result.status ?? 1) !== 0) process.exit(result.status ?? 1);
+
+    if (args.fromR2 && !args.keepR2Temp) {
+      spawnSync(
+        'npx',
+        ['wrangler', 'r2', 'object', 'delete', `${args.bucket}/${args.fromR2}`, '--remote'],
+        { cwd: apiDir, stdio: 'inherit', shell: true },
+      );
+    }
   }
 }

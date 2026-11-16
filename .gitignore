@@ -100,3 +100,4 @@ apps/admin/.env*
 *seed*.sql
 d1-seed*.sql
 mongo-backup*.json
+*mongo-backup*.enc

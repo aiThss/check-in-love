@@ -4,7 +4,7 @@ import type { WorkerEnv } from '../config/env';
 import { createTestD1Database, MemoryR2Bucket } from '../db/sqlite-test-d1';
 import { signJwt } from '../utils/crypto';
 // @ts-expect-error ESM script without declaration file
-import { generateD1SeedSql, parseMongoJsonContent } from '../../scripts/migrate-mongo-to-d1.mjs';
+import { decryptBackupPayload, encryptBackupPayload, generateD1SeedSql, parseMongoJsonContent } from '../../scripts/migrate-mongo-to-d1.mjs';
 
 describe('migrate-mongo-to-d1 SQL converter', () => {
   it('converts MongoDB Extended JSON collections into valid D1 SQL and preserves legacy auth, media, checkins, and messages', async () => {
@@ -119,5 +119,14 @@ describe('migrate-mongo-to-d1 SQL converter', () => {
     expect(msgRes.status).toBe(200);
     const msgJson = (await msgRes.json()) as { messages: Array<{ text: string }> };
     expect(msgJson.messages[0].text).toBe('Nhớ anh quá 💕');
+  });
+
+  it('encrypts and decrypts AES-256-GCM compressed backup blobs for zero-SSH transfer via R2', () => {
+    const sample = JSON.stringify({ couples: [{ _id: 'c1', code: 'AB12' }], users: [] });
+    const encrypted = encryptBackupPayload(sample, 'super-secret-jwt-key');
+    expect(encrypted.subarray(0, 6).toString('utf8')).toBe('CILBK1');
+    const decrypted = decryptBackupPayload(encrypted, 'super-secret-jwt-key');
+    expect(decrypted).toBe(sample);
+    expect(() => decryptBackupPayload(encrypted, 'wrong-secret')).toThrow();
   });
 });
