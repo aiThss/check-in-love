@@ -95,3 +95,8 @@ apps/pwa/.env*
 !apps/pwa/.env.example
 apps/admin/.env*
 !apps/admin/.env.example
+
+# Migration dumps (never commit production data dumps)
+*seed*.sql
+d1-seed*.sql
+mongo-backup*.json

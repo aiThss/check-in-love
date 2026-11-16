@@ -12,6 +12,7 @@
     "dev:admin": "npm run dev --workspace=apps/admin",
     "build": "npm run build --workspaces",
     "deploy:api": "npx wrangler deploy --config apps/api/wrangler.toml",
+    "db:migrate:mongo": "node apps/api/scripts/migrate-mongo-to-d1.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"
