@@ -1,7 +1,7 @@
 import type { WorkerEnv } from '../config/env';
 import { resolveConfig } from '../config/env';
 import { execute, findPartnerUser, queryAll, queryOne } from '../db/d1';
-import { parseJsonSafe, type CheckinRow, type UserRow } from '../db/types';
+import { type CheckinRow, type UserRow } from '../db/types';
 import { logger } from '../utils/logger';
 import { sendPushToUser } from './push';
 import { emitRealtimeEvent } from './realtime';
@@ -149,7 +149,7 @@ export async function runScheduledTasks(env: WorkerEnv, now: Date = new Date()):
     if (hasCheckedInToday) {
       await execute(
         env.DB,
-        'UPDATE users SET reminder_last_sent_date = ?, updated_at = ? WHERE id = ?',
+        'UPDATE users SET reminder_last_sent_date = ?, reminder_lease_date = NULL, updated_at = ? WHERE id = ?',
         [localClock.dateKey, now.toISOString(), user.id],
       );
       continue;
@@ -158,26 +158,40 @@ export async function runScheduledTasks(env: WorkerEnv, now: Date = new Date()):
     const partner = await findPartnerUser(env.DB, user.couple_id, user.id);
     const partnerName = partner?.display_name || user.partner_name || 'người ấy';
 
-    await sendPushToUser(env, config, user.id, {
-      title: 'Đã đến giờ Check IN rồi 💕',
-      body: `Gửi một khoảnh khắc nhỏ trong ngày cho ${partnerName} nhé!`,
-      url: '/app/checkin',
-      tag: 'daily-reminder',
-      type: 'reminder',
-    });
+    try {
+      await sendPushToUser(env, config, user.id, {
+        title: 'Đã đến giờ Check IN rồi 💕',
+        body: `Gửi một khoảnh khắc nhỏ trong ngày cho ${partnerName} nhé!`,
+        url: '/app/checkin',
+        targetUrl: '/app/checkin',
+        tag: `checkin-reminder-${localClock.dateKey}`,
+        kind: 'reminder',
+        actionType: 'reminder',
+        type: 'reminder',
+        senderName: 'Check IN Love',
+      });
 
-    await emitRealtimeEvent(env, user.id, {
-      type: 'reminder',
-      title: 'Đã đến giờ Check IN rồi 💕',
-      body: `Gửi một khoảnh khắc nhỏ trong ngày cho ${partnerName} nhé!`,
-      url: '/app/checkin',
-    });
+      await emitRealtimeEvent(env, user.id, {
+        type: 'reminder',
+        title: 'Đã đến giờ Check IN rồi 💕',
+        body: `Gửi một khoảnh khắc nhỏ trong ngày cho ${partnerName} nhé!`,
+        targetUrl: '/app/checkin',
+        url: '/app/checkin',
+      });
 
-    await execute(
-      env.DB,
-      'UPDATE users SET reminder_last_sent_date = ?, updated_at = ? WHERE id = ?',
-      [localClock.dateKey, now.toISOString(), user.id],
-    );
+      await execute(
+        env.DB,
+        'UPDATE users SET reminder_last_sent_date = ?, reminder_lease_date = NULL, updated_at = ? WHERE id = ?',
+        [localClock.dateKey, now.toISOString(), user.id],
+      );
+    } catch (err) {
+      await execute(
+        env.DB,
+        'UPDATE users SET reminder_lease_date = NULL, updated_at = ? WHERE id = ? AND reminder_lease_date = ?',
+        [now.toISOString(), user.id, localClock.dateKey],
+      );
+      logger.error('Failed scheduled check-in reminder', err, { userId: user.id });
+    }
   }
 
   // 2) Fixed VN daily broadcasts (07:00, 12:00, 18:00, 23:00)
@@ -199,10 +213,6 @@ export async function runScheduledTasks(env: WorkerEnv, now: Date = new Date()):
 
     const vnToday = getVNDateKey(now);
     for (const user of users) {
-      const fcm = parseJsonSafe<string[]>(user.fcm_tokens_json, []);
-      const hasSub = fcm.length > 0 || (await queryOne<{ id: string }>(env.DB, 'SELECT id FROM push_subscriptions WHERE user_id = ? LIMIT 1', [user.id])) !== null;
-      if (!hasSub) continue;
-
       const latest = await queryOne<{ created_at: string }>(
         env.DB,
         'SELECT created_at FROM checkins WHERE owner_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1',
@@ -215,8 +225,12 @@ export async function runScheduledTasks(env: WorkerEnv, now: Date = new Date()):
         title: msg.title,
         body: msg.body,
         url: msg.url,
+        targetUrl: msg.url,
         tag: schedule.tag,
-        type: 'daily_broadcast',
+        kind: 'reminder',
+        actionType: 'reminder',
+        type: 'reminder',
+        senderName: 'Check IN Love',
       });
     }
   }

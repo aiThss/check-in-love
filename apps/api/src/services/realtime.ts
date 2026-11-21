@@ -10,13 +10,21 @@ export interface RealtimeEventPayload {
   title?: string;
   body?: string;
   photoUrl?: string;
+  targetUrl?: string;
   url?: string;
+  deleted?: boolean;
+  reactionType?: string;
   createdAt?: string;
   partnerAvatarUrl?: string;
   isTyping?: boolean;
   online?: boolean;
   chatBackground?: Record<string, unknown>;
+  journey?: {
+    places: unknown[];
+    bucketItems: unknown[];
+  };
   journeyUpdated?: boolean;
+  timestamp?: number;
   [key: string]: unknown;
 }
 
@@ -27,12 +35,18 @@ export async function emitRealtimeEvent(
 ): Promise<void> {
   if (!env?.REALTIME_HUB || !userId) return;
   try {
+    const resolvedTargetUrl = event.targetUrl ?? event.url;
+    const normalized: RealtimeEventPayload = {
+      ...event,
+      ...(resolvedTargetUrl ? { targetUrl: resolvedTargetUrl, url: resolvedTargetUrl } : {}),
+      timestamp: event.timestamp ?? Date.now(),
+    };
     const id = env.REALTIME_HUB.idFromName(userId);
     const stub = env.REALTIME_HUB.get(id);
     await stub.fetch('https://realtime/emit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(event),
+      body: JSON.stringify(normalized),
     });
   } catch {
     // Non-fatal real-time emit error

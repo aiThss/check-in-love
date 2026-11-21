@@ -25,6 +25,15 @@ export function generateId(): string {
   return `${tsHex}${seqHex}${randHex}`;
 }
 
+export async function deterministicObjectId(dateValue: Date | string, identity: string): Promise<string> {
+  const parsedMs = new Date(dateValue).getTime();
+  const timestampSec = Number.isNaN(parsedMs) ? 0 : Math.max(0, Math.floor(parsedMs / 1000));
+  const tsHex = timestampSec.toString(16).padStart(8, '0').slice(-8);
+  const digest = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(identity));
+  const hashHex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${tsHex}${hashHex.slice(0, 16)}`;
+}
+
 export function isValidId(value: unknown): value is string {
   return typeof value === 'string' && /^[a-zA-Z0-9_-]{8,64}$/.test(value.trim());
 }

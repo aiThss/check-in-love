@@ -4,6 +4,7 @@ import { execute, findUserById, queryAll } from '../db/d1';
 import { parseJsonSafe, type PushSubscriptionRow } from '../db/types';
 import { authenticate } from '../middleware/auth';
 import { sendPushToUser } from '../services/push';
+import { emitRealtimeEvent } from '../services/realtime';
 import type { HonoAppEnv } from '../types/hono';
 import { AppError } from '../utils/errors';
 import { generateId } from '../utils/id';
@@ -19,13 +20,18 @@ const subscribeWebSchema = z.object({
   userAgent: z.string().trim().max(500).optional(),
 });
 
-const fcmTokenSchema = z.object({
-  token: z.string().trim().min(10, 'FCM token không hợp lệ').max(4096),
-});
+const fcmTokenSchema = z
+  .object({
+    fcmToken: z.string().trim().min(1).max(4096).optional(),
+    token: z.string().trim().min(1).max(4096).optional(),
+  })
+  .refine((v) => Boolean(v.fcmToken || v.token), {
+    message: 'FCM token không hợp lệ',
+  });
 
-pushRoutes.get('/push/config', authenticate, (c) => {
+pushRoutes.get('/push/config', (c) => {
   const config = c.get('config');
-  const enabled = Boolean(config.VAPID_PUBLIC_KEY && config.VAPID_PRIVATE_KEY);
+  const enabled = Boolean(config.VAPID_PUBLIC_KEY);
   return c.json({
     enabled,
     publicKey: enabled ? config.VAPID_PUBLIC_KEY : null,
@@ -96,9 +102,10 @@ pushRoutes.post('/push/subscribe-fcm', authenticate, async (c) => {
     throw new AppError(parsed.error.issues[0]?.message || 'FCM token không hợp lệ', 400, 'VALIDATION_ERROR');
   }
 
+  const fcmToken = (parsed.data.fcmToken ?? parsed.data.token)!;
   const user = (await findUserById(c.env.DB, auth.id))!;
   const existing = parseJsonSafe<string[]>(user.fcm_tokens_json, []);
-  const next = Array.from(new Set([parsed.data.token, ...existing])).slice(0, 10);
+  const next = Array.from(new Set([fcmToken, ...existing])).slice(0, 10);
 
   await execute(
     c.env.DB,
@@ -111,12 +118,13 @@ pushRoutes.post('/push/subscribe-fcm', authenticate, async (c) => {
 
 pushRoutes.post('/push/unsubscribe-fcm', authenticate, async (c) => {
   const auth = c.get('user')!;
-  const body = (await c.req.json().catch(() => null)) as { token?: string } | null;
+  const body = (await c.req.json().catch(() => null)) as { fcmToken?: string; token?: string } | null;
   const user = await findUserById(c.env.DB, auth.id);
   if (!user) return c.json({ success: true });
 
+  const tokenToRemove = body?.fcmToken?.trim() || body?.token?.trim();
   const existing = parseJsonSafe<string[]>(user.fcm_tokens_json, []);
-  const next = body?.token ? existing.filter((t) => t !== body.token!.trim()) : [];
+  const next = tokenToRemove ? existing.filter((t) => t !== tokenToRemove) : [];
 
   await execute(
     c.env.DB,
@@ -130,6 +138,7 @@ pushRoutes.post('/push/unsubscribe-fcm', authenticate, async (c) => {
 pushRoutes.post('/push/test', authenticate, async (c) => {
   const auth = c.get('user')!;
   const user = await findUserById(c.env.DB, auth.id);
+  const userName = user?.display_name || 'Bạn';
   const subs = await queryAll<PushSubscriptionRow>(
     c.env.DB,
     'SELECT id FROM push_subscriptions WHERE user_id = ?',
@@ -137,18 +146,47 @@ pushRoutes.post('/push/test', authenticate, async (c) => {
   );
 
   const fcmTokens = parseJsonSafe<string[]>(user?.fcm_tokens_json, []);
+  const title = 'Kiểm tra thông báo 💕';
+  const msgBody = `Xin chào ${userName}! Thông báo Check IN Love đang hoạt động rất tốt ✨`;
+
+  await emitRealtimeEvent(c.env, auth.id, {
+    type: 'reminder',
+    title,
+    body: msgBody,
+    targetUrl: '/app/home',
+    url: '/app/home',
+    senderName: 'Check IN Love',
+    senderAvatar: user?.avatar_url ?? undefined,
+  });
+
   const result = await sendPushToUser(c.env, c.get('config'), auth.id, {
-    title: 'Check IN Love 💕',
-    body: 'Thông báo đẩy đang hoạt động mượt mà!',
+    title,
+    body: msgBody,
+    senderName: 'Check IN Love',
+    senderAvatar: user?.avatar_url ?? undefined,
+    actionType: 'reminder',
+    kind: 'reminder',
+    targetUrl: '/app/home',
     url: '/app/home',
     tag: 'push-test',
-    type: 'test',
+    type: 'reminder',
   });
+
+  const targets: string[] = [];
+  if (result.fcmSent > 0) targets.push(`${result.fcmSent} app Android (FCM)`);
+  if (result.webSent > 0) targets.push(`${result.webSent} web browser`);
 
   return c.json({
     success: true,
+    message: targets.length > 0
+      ? `Đã gửi thông báo thành công tới ${targets.join(' và ')}! ✨`
+      : 'Đã gửi thông báo tức thời tới ứng dụng của bạn! ✨',
     subscriptions: subs.length,
     fcmTokens: fcmTokens.length,
     delivered: result,
+    details: {
+      fcm: { sent: result.fcmSent },
+      webPush: { sent: result.webSent },
+    },
   });
 });

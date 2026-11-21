@@ -2,7 +2,10 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { execute, queryAll, queryOne } from '../../db/d1';
 import {
+  parseJsonSafe,
   type ChatMessageRow,
+  type CheckinReactionItem,
+  type CheckinReplyItem,
   type CheckinRow,
   type CoupleRow,
   type RandomEventRow,
@@ -57,7 +60,7 @@ adminRoutes.post('/login', async (c) => {
 
 adminRoutes.get('/summary', authenticateAdmin, async (c) => {
   const [usersRow, blockedRow, couplesRow, checkinsRow, randomRow] = await Promise.all([
-    queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM users'),
+    queryOne<{ cnt: number }>(c.env.DB, "SELECT COUNT(*) AS cnt FROM users WHERE role = 'user'"),
     queryOne<{ cnt: number }>(c.env.DB, "SELECT COUNT(*) AS cnt FROM users WHERE status = 'blocked'"),
     queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM couples'),
     queryOne<{ cnt: number }>(c.env.DB, 'SELECT COUNT(*) AS cnt FROM checkins WHERE deleted_at IS NULL'),
@@ -143,12 +146,12 @@ adminRoutes.get('/users', authenticateAdmin, async (c) => {
   const { page, limit, offset } = parsePageLimit(c.req.query());
   const search = c.req.query('search')?.trim();
 
-  let whereSql = '1 = 1';
+  let whereSql = "u.role = 'user'";
   const params: unknown[] = [];
   if (search) {
-    whereSql = '(u.display_name LIKE ? OR u.email LIKE ? OR c.code LIKE ?)';
+    whereSql += ' AND (u.display_name LIKE ? OR u.email LIKE ? OR u.email_aliases_json LIKE ? OR c.code LIKE ?)';
     const like = `%${search}%`;
-    params.push(like, like, like);
+    params.push(like, like, like, like);
   }
 
   const countRow = await queryOne<{ cnt: number }>(
@@ -202,16 +205,45 @@ adminRoutes.get('/users', authenticateAdmin, async (c) => {
 
 adminRoutes.patch('/users/:id', authenticateAdmin, async (c) => {
   const userId = c.req.param('id');
-  const body = (await c.req.json().catch(() => null)) as { status?: string } | null;
-  if (body?.status !== 'active' && body?.status !== 'blocked') {
-    throw new AppError('Trạng thái người dùng không hợp lệ', 400, 'VALIDATION_ERROR');
+  const body = (await c.req.json().catch(() => null)) as {
+    status?: string;
+    displayName?: string;
+    partnerName?: string;
+  } | null;
+
+  const setClauses: string[] = [];
+  const params: unknown[] = [];
+  if (body?.status !== undefined) {
+    if (body.status !== 'active' && body.status !== 'blocked') {
+      throw new AppError('Trạng thái người dùng không hợp lệ', 400, 'VALIDATION_ERROR');
+    }
+    setClauses.push('status = ?');
+    params.push(body.status);
+  }
+  if (body?.displayName !== undefined) {
+    const trimmed = body.displayName.trim();
+    if (!trimmed) throw new AppError('Tên hiển thị không hợp lệ', 400, 'VALIDATION_ERROR');
+    setClauses.push('display_name = ?');
+    params.push(trimmed);
+  }
+  if (body?.partnerName !== undefined) {
+    const trimmed = body.partnerName.trim();
+    if (!trimmed) throw new AppError('Tên người yêu không hợp lệ', 400, 'VALIDATION_ERROR');
+    setClauses.push('partner_name = ?');
+    params.push(trimmed);
+  }
+  if (setClauses.length === 0) {
+    throw new AppError('Không có trường nào cần cập nhật', 400, 'VALIDATION_ERROR');
   }
 
   const nowIso = new Date().toISOString();
+  setClauses.push('updated_at = ?');
+  params.push(nowIso, userId);
+
   const res = await execute(
     c.env.DB,
-    'UPDATE users SET status = ?, updated_at = ? WHERE id = ?',
-    [body.status, nowIso, userId],
+    `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`,
+    params,
   );
   if ((res.meta?.changes ?? 0) === 0) {
     throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
@@ -232,6 +264,7 @@ adminRoutes.patch('/users/:id', authenticateAdmin, async (c) => {
           _id: updated.id,
           id: updated.id,
           displayName: updated.display_name,
+          partnerName: updated.partner_name,
           email: updated.email ?? undefined,
           avatarUrl: updated.avatar_url ?? undefined,
           status: updated.status,
@@ -252,28 +285,126 @@ adminRoutes.delete('/users/:id', authenticateAdmin, async (c) => {
     'SELECT * FROM users WHERE id = ? LIMIT 1',
     [userId],
   );
-  if (!existing) {
+  if (!existing || existing.role !== 'user') {
     throw new AppError('Không tìm thấy người dùng', 404, 'USER_NOT_FOUND');
   }
 
+  const coupleId = existing.couple_id;
+  const remainingMembers = coupleId
+    ? await queryAll<{ id: string }>(
+        c.env.DB,
+        'SELECT id FROM users WHERE couple_id = ? AND id != ?',
+        [coupleId, userId],
+      )
+    : [];
+  const shouldDeleteCouple = Boolean(coupleId && remainingMembers.length === 0);
+
   const checkins = await queryAll<CheckinRow>(
     c.env.DB,
-    'SELECT storage_path FROM checkins WHERE owner_id = ? AND storage_path IS NOT NULL',
-    [userId],
+    shouldDeleteCouple
+      ? 'SELECT storage_path FROM checkins WHERE couple_id = ? AND storage_path IS NOT NULL'
+      : 'SELECT storage_path FROM checkins WHERE owner_id = ? AND storage_path IS NOT NULL',
+    [shouldDeleteCouple ? coupleId : userId],
   );
   const messages = await queryAll<ChatMessageRow>(
     c.env.DB,
-    'SELECT storage_path FROM chat_messages WHERE sender_id = ? AND storage_path IS NOT NULL',
-    [userId],
+    shouldDeleteCouple
+      ? 'SELECT storage_path FROM chat_messages WHERE couple_id = ? AND storage_path IS NOT NULL'
+      : 'SELECT storage_path FROM chat_messages WHERE sender_id = ? AND storage_path IS NOT NULL',
+    [shouldDeleteCouple ? coupleId : userId],
   );
   for (const row of [...checkins, ...messages]) {
     if (row.storage_path) {
       await deleteStoredFile(c.env.STORAGE, row.storage_path, c.get('config').R2_PUBLIC_URL);
     }
   }
+  if (existing.avatar_url) {
+    await deleteStoredFile(c.env.STORAGE, existing.avatar_url, c.get('config').R2_PUBLIC_URL);
+  }
+  if (existing.partner_avatar_url) {
+    await deleteStoredFile(c.env.STORAGE, existing.partner_avatar_url, c.get('config').R2_PUBLIC_URL);
+  }
 
-  await execute(c.env.DB, 'DELETE FROM users WHERE id = ?', [userId]);
-  return c.json({ success: true });
+  let otpDeleted = 0;
+  if (existing.email) {
+    const otpRes = await execute(c.env.DB, 'DELETE FROM otp_codes WHERE lower(email) = ?', [
+      existing.email.toLowerCase(),
+    ]);
+    otpDeleted = Number(otpRes.meta?.changes ?? 0);
+  }
+
+  const pushRes = await execute(
+    c.env.DB,
+    shouldDeleteCouple
+      ? 'DELETE FROM push_subscriptions WHERE couple_id = ?'
+      : 'DELETE FROM push_subscriptions WHERE user_id = ?',
+    [shouldDeleteCouple ? coupleId : userId],
+  );
+  const randomRes = await execute(
+    c.env.DB,
+    shouldDeleteCouple
+      ? 'DELETE FROM random_events WHERE couple_id = ?'
+      : 'DELETE FROM random_events WHERE user_id = ?',
+    [shouldDeleteCouple ? coupleId : userId],
+  );
+  const checkinsRes = await execute(
+    c.env.DB,
+    shouldDeleteCouple
+      ? 'DELETE FROM checkins WHERE couple_id = ?'
+      : 'DELETE FROM checkins WHERE owner_id = ?',
+    [shouldDeleteCouple ? coupleId : userId],
+  );
+  await execute(
+    c.env.DB,
+    shouldDeleteCouple
+      ? 'DELETE FROM chat_messages WHERE couple_id = ?'
+      : 'DELETE FROM chat_messages WHERE sender_id = ?',
+    [shouldDeleteCouple ? coupleId : userId],
+  );
+  const userRes = await execute(c.env.DB, 'DELETE FROM users WHERE id = ?', [userId]);
+
+  let couplesDeleted = 0;
+  let reactionsRemoved = 0;
+  if (shouldDeleteCouple && coupleId) {
+    const coupleRes = await execute(c.env.DB, 'DELETE FROM couples WHERE id = ?', [coupleId]);
+    couplesDeleted = Number(coupleRes.meta?.changes ?? 0);
+  } else if (coupleId) {
+    const partnerCheckins = await queryAll<CheckinRow>(
+      c.env.DB,
+      'SELECT id, reactions_json, replies_json FROM checkins WHERE couple_id = ?',
+      [coupleId],
+    );
+    const nowIso = new Date().toISOString();
+    for (const ci of partnerCheckins) {
+      const reactions = parseJsonSafe<CheckinReactionItem[]>(ci.reactions_json, []);
+      const replies = parseJsonSafe<CheckinReplyItem[]>(ci.replies_json, []);
+      const nextReactions = reactions.filter((r) => r.userId !== userId);
+      const nextReplies = replies.filter((r) => r.userId !== userId);
+      if (nextReactions.length !== reactions.length || nextReplies.length !== replies.length) {
+        await execute(
+          c.env.DB,
+          'UPDATE checkins SET reactions_json = ?, replies_json = ?, updated_at = ? WHERE id = ?',
+          [JSON.stringify(nextReactions), JSON.stringify(nextReplies), nowIso, ci.id],
+        );
+        reactionsRemoved += 1;
+      }
+    }
+  }
+
+  return c.json({
+    success: true,
+    deleted: {
+      users: Number(userRes.meta?.changes ?? 0),
+      couples: couplesDeleted,
+      checkIns: Number(checkinsRes.meta?.changes ?? 0),
+      randomEvents: Number(randomRes.meta?.changes ?? 0),
+      pushSubscriptions: Number(pushRes.meta?.changes ?? 0),
+      otpCodes: otpDeleted,
+    },
+    updated: {
+      reactions: reactionsRemoved,
+    },
+  });
 });
 
 adminRoutes.get('/couples', authenticateAdmin, async (c) => {
@@ -335,16 +466,37 @@ adminRoutes.get('/couples', authenticateAdmin, async (c) => {
 
 adminRoutes.patch('/couples/:id', authenticateAdmin, async (c) => {
   const coupleId = c.req.param('id');
-  const body = (await c.req.json().catch(() => null)) as { loveStartDate?: string } | null;
-  if (!body || typeof body.loveStartDate !== 'string') {
-    throw new AppError('Ngày bắt đầu yêu không hợp lệ', 400, 'VALIDATION_ERROR');
+  const body = (await c.req.json().catch(() => null)) as { loveStartDate?: string; code?: string } | null;
+  const setClauses: string[] = [];
+  const params: unknown[] = [];
+
+  if (body?.loveStartDate !== undefined) {
+    if (typeof body.loveStartDate !== 'string') {
+      throw new AppError('Ngày bắt đầu yêu không hợp lệ', 400, 'VALIDATION_ERROR');
+    }
+    setClauses.push('love_start_date = ?');
+    params.push(body.loveStartDate.trim() || null);
+  }
+  if (body?.code !== undefined) {
+    const normalized = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
+    if (!normalized) {
+      throw new AppError('Mã cặp đôi không hợp lệ', 400, 'VALIDATION_ERROR');
+    }
+    setClauses.push('code = ?');
+    params.push(normalized);
+  }
+  if (setClauses.length === 0) {
+    throw new AppError('Không có trường nào cần cập nhật', 400, 'VALIDATION_ERROR');
   }
 
   const nowIso = new Date().toISOString();
+  setClauses.push('updated_at = ?');
+  params.push(nowIso, coupleId);
+
   const res = await execute(
     c.env.DB,
-    'UPDATE couples SET love_start_date = ?, updated_at = ? WHERE id = ?',
-    [body.loveStartDate.trim() || null, nowIso, coupleId],
+    `UPDATE couples SET ${setClauses.join(', ')} WHERE id = ?`,
+    params,
   );
   if ((res.meta?.changes ?? 0) === 0) {
     throw new AppError('Không tìm thấy couple', 404, 'COUPLE_NOT_FOUND');
@@ -377,11 +529,22 @@ adminRoutes.patch('/couples/:id', authenticateAdmin, async (c) => {
 adminRoutes.get('/checkins', authenticateAdmin, async (c) => {
   const { page, limit, offset } = parsePageLimit(c.req.query());
   const includeDeleted = c.req.query('includeDeleted') === 'true';
+  const coupleId = c.req.query('coupleId')?.trim();
 
-  const whereSql = includeDeleted ? '1 = 1' : 'ci.deleted_at IS NULL';
+  const whereClauses: string[] = [];
+  const params: unknown[] = [];
+  if (!includeDeleted) {
+    whereClauses.push('ci.deleted_at IS NULL');
+  }
+  if (coupleId) {
+    whereClauses.push('ci.couple_id = ?');
+    params.push(coupleId);
+  }
+  const whereSql = whereClauses.length > 0 ? whereClauses.join(' AND ') : '1 = 1';
   const countRow = await queryOne<{ cnt: number }>(
     c.env.DB,
     `SELECT COUNT(*) AS cnt FROM checkins ci WHERE ${whereSql}`,
+    params,
   );
   const total = Number(countRow?.cnt ?? 0);
 
@@ -393,7 +556,7 @@ adminRoutes.get('/checkins', authenticateAdmin, async (c) => {
      WHERE ${whereSql}
      ORDER BY ci.created_at DESC
      LIMIT ? OFFSET ?`,
-    [limit, offset],
+    [...params, limit, offset],
   );
 
   const checkIns = rows.map((row) => ({

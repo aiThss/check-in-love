@@ -91,11 +91,12 @@ chatBackgroundRoutes.patch('/chat-background', authenticate, async (c) => {
       updatedByName: user.display_name,
       updatedAt: nowIso,
     };
-    systemText = `${user.display_name} đã đổi ảnh nền trò chuyện`;
+    systemText = `${user.display_name} đã đổi chủ đề thành Ảnh tùy chọn`;
     systemEvent = {
       kind: 'background_changed',
       backgroundKind: 'custom',
-      backgroundLabel: 'Ảnh nền riêng',
+      backgroundLabel: 'Ảnh tùy chọn',
+      backgroundImageUrl: uploaded.url,
     };
   } else {
     const body = (await c.req.json().catch(() => null)) as { kind?: string; id?: string } | null;
@@ -113,7 +114,9 @@ chatBackgroundRoutes.patch('/chat-background', authenticate, async (c) => {
       updatedByName: user.display_name,
       updatedAt: nowIso,
     };
-    systemText = `${user.display_name} đã đổi chủ đề thành ${label}`;
+    systemText = presetId === 'default'
+      ? `${user.display_name} đã khôi phục chủ đề mặc định`
+      : `${user.display_name} đã đổi chủ đề thành ${label}`;
     systemEvent = {
       kind: 'background_changed',
       backgroundKind: 'preset',
@@ -164,6 +167,7 @@ chatBackgroundRoutes.patch('/chat-background', authenticate, async (c) => {
       type: 'chat.background.updated',
       title: '',
       body: '',
+      targetUrl: '/app/messages',
       senderId: user.id,
       senderName: user.display_name,
       chatBackground: nextBg as unknown as Record<string, unknown>,

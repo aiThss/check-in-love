@@ -126,6 +126,7 @@ export interface ChatSystemEvent {
   backgroundKind: 'preset' | 'custom';
   backgroundId?: string;
   backgroundLabel?: string;
+  backgroundImageUrl?: string;
 }
 
 export interface ChatEditHistoryEntry {

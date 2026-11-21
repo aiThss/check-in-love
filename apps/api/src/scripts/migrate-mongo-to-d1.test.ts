@@ -151,8 +151,9 @@ describe('migrate-mongo-to-d1 SQL converter', () => {
 
     const msgRes = await app.request('http://localhost/api/messages', { headers: { Authorization: `Bearer ${token}` } }, env);
     expect(msgRes.status).toBe(200);
-    const msgJson = (await msgRes.json()) as { messages: Array<{ text: string }> };
-    expect(msgJson.messages[0].text).toBe('Nhớ anh quá 💕');
+    const msgJson = (await msgRes.json()) as { messages: Array<{ type: string; text?: string }> };
+    expect(msgJson.messages.map((m) => m.text)).toEqual(['Chào buổi sáng', 'Nhớ anh quá 💕']);
+    expect(msgJson.messages[0].type).toBe('image');
   });
 
   it('encrypts and decrypts AES-256-GCM compressed backup blobs for zero-SSH transfer via R2', () => {

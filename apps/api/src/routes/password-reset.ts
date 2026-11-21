@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { execute, findUserByEmailOrAlias, queryOne } from '../db/d1';
-import type { OtpCodeRow } from '../db/types';
+import { parseJsonSafe, type OtpCodeRow } from '../db/types';
 import { sendOtpEmail } from '../services/email';
 import type { HonoAppEnv } from '../types/hono';
 import { generateOtpCode, hashPassword } from '../utils/crypto';
@@ -95,10 +95,23 @@ passwordResetRoutes.post('/auth/password-reset/confirm', async (c) => {
   const passwordHash = await hashPassword(parsed.data.newPassword);
   await execute(
     c.env.DB,
-    'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?',
+    "UPDATE users SET password_hash = ?, trusted_devices_json = '[]', updated_at = ? WHERE id = ?",
     [passwordHash, nowIso, user.id],
   );
-  await execute(c.env.DB, 'UPDATE otp_codes SET verified = 1 WHERE id = ?', [otp.id]);
+  const aliases = parseJsonSafe<string[]>(user.email_aliases_json, []);
+  const accountEmails = Array.from(
+    new Set([email, user.email?.toLowerCase(), ...aliases.map((a) => a.toLowerCase())].filter(Boolean) as string[]),
+  );
+  if (accountEmails.length > 0) {
+    const placeholders = accountEmails.map(() => '?').join(', ');
+    await execute(
+      c.env.DB,
+      `DELETE FROM otp_codes WHERE lower(email) IN (${placeholders}) AND purpose IN ('reset', 'login')`,
+      accountEmails,
+    );
+  } else {
+    await execute(c.env.DB, 'UPDATE otp_codes SET verified = 1 WHERE id = ?', [otp.id]);
+  }
 
-  return c.json({ message: 'Đặt lại mật khẩu thành công' });
+  return c.json({ message: 'Đặt lại mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới.' });
 });

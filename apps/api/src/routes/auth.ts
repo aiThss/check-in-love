@@ -57,12 +57,17 @@ const loginSendOtpSchema = z.object({
   password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
 });
 
-const loginSchema = z.object({
-  email: z.string().trim().email('Email không hợp lệ'),
-  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
-  otpCode: z.string().trim().optional(),
-  deviceId: z.string().trim().max(160).optional(),
-});
+const loginSchema = z
+  .object({
+    email: z.string().trim().email('Email không hợp lệ').optional(),
+    password: z.string().min(1, 'Vui lòng nhập mật khẩu').optional(),
+    otpCode: z.string().trim().optional(),
+    deviceId: z.string().trim().max(160).optional(),
+    coupleCode: z.string().trim().max(20).optional(),
+  })
+  .refine((v) => Boolean((v.email && v.password) || (v.deviceId && v.coupleCode)), {
+    message: 'Vui lòng nhập email và mật khẩu hoặc deviceId và mã cặp đôi',
+  });
 
 const googleLoginSchema = z.object({
   credential: z.string().trim().min(10, 'Google token không hợp lệ'),
@@ -452,50 +457,82 @@ authRoutes.post('/auth/login', async (c) => {
     throw new AppError(parsed.error.issues[0]?.message || 'Thông tin đăng nhập không hợp lệ', 400, 'VALIDATION_ERROR');
   }
 
-  const email = parsed.data.email.toLowerCase();
-  const user = await findUserByEmailOrAlias(c.env.DB, email);
-  if (!user || !user.password_hash) {
-    throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
-  }
-  if (user.status === 'blocked') {
-    throw new AppError('Tài khoản đã bị khóa', 403, 'USER_BLOCKED');
-  }
-
-  const passwordValid = await verifyPassword(parsed.data.password, user.password_hash);
-  if (!passwordValid) {
-    throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
-  }
-
-  const trustedDevices = parseJsonSafe<Array<string | TrustedDevice>>(user.trusted_devices_json, []);
-  const isTrustedDevice = Boolean(
-    parsed.data.deviceId &&
-      trustedDevices.some((d) =>
-        typeof d === 'string' ? d === parsed.data.deviceId : d?.deviceId === parsed.data.deviceId,
-      ),
-  );
-
   const nowIso = new Date().toISOString();
-  if (!isTrustedDevice) {
-    if (!parsed.data.otpCode) {
-      throw new AppError('Vui lòng nhập mã OTP xác thực thiết bị', 400, 'OTP_REQUIRED');
+  let user: UserRow | null = null;
+
+  if (parsed.data.email && parsed.data.password) {
+    const email = parsed.data.email.toLowerCase();
+    user = await findUserByEmailOrAlias(c.env.DB, email);
+    if (!user || !user.password_hash) {
+      throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
     }
-    const ok = await verifyAndConsumeOtp(c.env.DB, email, parsed.data.otpCode, ['login', 'auth']);
-    if (!ok) {
-      throw new AppError('Mã OTP không đúng hoặc đã hết hạn', 400, 'INVALID_OTP');
+    if (user.status === 'blocked') {
+      throw new AppError('Tài khoản đã bị khóa', 403, 'USER_BLOCKED');
     }
-    if (parsed.data.deviceId) {
+
+    const passwordValid = await verifyPassword(parsed.data.password, user.password_hash);
+    if (!passwordValid) {
+      throw new AppError('Email hoặc mật khẩu không chính xác', 401, 'INVALID_CREDENTIALS');
+    }
+
+    const trustedDevices = parseJsonSafe<Array<string | TrustedDevice>>(user.trusted_devices_json, []);
+    const isTrustedDevice = Boolean(
+      parsed.data.deviceId &&
+        trustedDevices.some((d) =>
+          typeof d === 'string' ? d === parsed.data.deviceId : d?.deviceId === parsed.data.deviceId,
+        ),
+    );
+
+    if (!isTrustedDevice) {
+      if (!parsed.data.otpCode) {
+        throw new AppError('Vui lòng nhập mã OTP xác thực thiết bị', 400, 'OTP_REQUIRED');
+      }
+      const ok = await verifyAndConsumeOtp(c.env.DB, email, parsed.data.otpCode, ['login', 'auth']);
+      if (!ok) {
+        throw new AppError('Mã OTP không đúng hoặc đã hết hạn', 400, 'INVALID_OTP');
+      }
+      if (parsed.data.deviceId) {
+        await execute(
+          c.env.DB,
+          'UPDATE users SET trusted_devices_json = ?, updated_at = ? WHERE id = ?',
+          [upsertTrustedDevice(user.trusted_devices_json, parsed.data.deviceId, nowIso), nowIso, user.id],
+        );
+      }
+    } else if (parsed.data.deviceId) {
       await execute(
         c.env.DB,
         'UPDATE users SET trusted_devices_json = ?, updated_at = ? WHERE id = ?',
         [upsertTrustedDevice(user.trusted_devices_json, parsed.data.deviceId, nowIso), nowIso, user.id],
       );
     }
-  } else if (parsed.data.deviceId) {
-    await execute(
+  } else if (parsed.data.deviceId && parsed.data.coupleCode) {
+    const normalizedCode = parsed.data.coupleCode.trim().toUpperCase();
+    const coupleByCode = await queryOne<CoupleRow>(
       c.env.DB,
-      'UPDATE users SET trusted_devices_json = ?, updated_at = ? WHERE id = ?',
-      [upsertTrustedDevice(user.trusted_devices_json, parsed.data.deviceId, nowIso), nowIso, user.id],
+      'SELECT * FROM couples WHERE upper(code) = ? LIMIT 1',
+      [normalizedCode],
     );
+    if (!coupleByCode) {
+      throw new AppError('Thông tin đăng nhập không chính xác', 401, 'INVALID_CREDENTIALS');
+    }
+    const members = await findCoupleMembers(c.env.DB, coupleByCode.id);
+    user =
+      members.find((m) => {
+        const list = parseJsonSafe<Array<string | TrustedDevice>>(m.trusted_devices_json, []);
+        return list.some((d) =>
+          typeof d === 'string' ? d === parsed.data.deviceId : d?.deviceId === parsed.data.deviceId,
+        );
+      }) ?? null;
+    if (!user) {
+      throw new AppError('Thông tin đăng nhập không chính xác', 401, 'INVALID_CREDENTIALS');
+    }
+    if (user.status === 'blocked') {
+      throw new AppError('Tài khoản đã bị khóa', 403, 'USER_BLOCKED');
+    }
+  }
+
+  if (!user) {
+    throw new AppError('Thông tin đăng nhập không chính xác', 401, 'INVALID_CREDENTIALS');
   }
 
   const couple = user.couple_id ? await findCoupleById(c.env.DB, user.couple_id) : null;
@@ -538,6 +575,9 @@ authRoutes.post('/auth/google', async (c) => {
   const nowIso = new Date().toISOString();
 
   if (user) {
+    if (user.google_id && user.google_id !== payload.sub) {
+      throw new AppError('Email này đã được liên kết với tài khoản Google khác', 409, 'GOOGLE_ACCOUNT_MISMATCH');
+    }
     if (user.status === 'blocked') {
       throw new AppError('Tài khoản đã bị khóa', 403, 'USER_BLOCKED');
     }

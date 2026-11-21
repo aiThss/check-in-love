@@ -186,11 +186,13 @@ async function handleAvatarUpload(c: Context<HonoAppEnv>, isPartnerAvatar: boole
 
     const partner = await findPartnerUser(c.env.DB, user.couple_id, user.id);
     if (partner) {
-      await execute(
-        c.env.DB,
-        'UPDATE users SET partner_avatar_url = ?, updated_at = ? WHERE id = ?',
-        [uploaded.url, nowIso, partner.id],
-      );
+      if (!partner.partner_avatar_url) {
+        await execute(
+          c.env.DB,
+          'UPDATE users SET partner_avatar_url = ?, updated_at = ? WHERE id = ?',
+          [uploaded.url, nowIso, partner.id],
+        );
+      }
       await emitRealtimeEvent(c.env, partner.id, {
         type: 'partner.avatar.updated',
         partnerAvatarUrl: uploaded.url,
@@ -207,7 +209,10 @@ async function handleAvatarUpload(c: Context<HonoAppEnv>, isPartnerAvatar: boole
 
   const updated = (await findUserById(c.env.DB, user.id))!;
   return c.json({
-    avatarUrl: isPartnerAvatar ? updated.partner_avatar_url : updated.avatar_url,
+    ...(isPartnerAvatar
+      ? { partnerAvatarUrl: updated.partner_avatar_url, avatarUrl: updated.partner_avatar_url }
+      : { avatarUrl: updated.avatar_url }),
+    storagePath: uploaded.storagePath,
     user: toUserDto(updated),
   });
 }

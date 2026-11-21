@@ -131,30 +131,37 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
 
   // Handle 403 with USER_BLOCKED code
   if (response.status === 403) {
-    let errorData: { code?: string; message?: string } = {};
+    let errorData: { code?: string; message?: string; error?: string | { code?: string; message?: string } } = {};
     try {
       errorData = await response.clone().json();
     } catch {
       // ignore parse errors
     }
-    if (errorData.code === 'USER_BLOCKED') {
+    const errCode =
+      errorData.code ||
+      (typeof errorData.error === 'object' && errorData.error !== null ? errorData.error.code : undefined);
+    if (errCode === 'USER_BLOCKED') {
       navigate('/blocked', true);
       throw new ApiError('Tài khoản bị khóa', 'USER_BLOCKED', 403);
     }
   }
 
   if (!response.ok) {
-    let errorData: { message?: string; error?: string; code?: string } = {};
+    let errorData: { message?: string; error?: string | { code?: string; message?: string }; code?: string } = {};
     try {
       errorData = await response.clone().json();
     } catch {
       // ignore parse errors
     }
-    throw new ApiError(
-      errorData.message || errorData.error || `Lỗi ${response.status}`,
-      errorData.code || 'API_ERROR',
-      response.status,
-    );
+    const nestedError =
+      typeof errorData.error === 'object' && errorData.error !== null ? errorData.error : undefined;
+    const errorMessage =
+      errorData.message ||
+      nestedError?.message ||
+      (typeof errorData.error === 'string' ? errorData.error : undefined) ||
+      `Lỗi ${response.status}`;
+    const errorCode = errorData.code || nestedError?.code || 'API_ERROR';
+    throw new ApiError(errorMessage, errorCode, response.status);
   }
 
   // 204 No Content

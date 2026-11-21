@@ -80,7 +80,7 @@ export interface CheckIn {
   updatedAt: string;
 }
 
-export type ChatMessageType = 'text' | 'image';
+export type ChatMessageType = 'text' | 'image' | 'checkin_reply';
 
 export interface ChatMessageReplyReference {
   messageId: string;

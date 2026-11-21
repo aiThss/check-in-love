@@ -171,4 +171,77 @@ describe('Check-ins SQL routes', () => {
     const afterDeleteJson = (await afterDeleteRes.json()) as { checkIn: unknown };
     expect(afterDeleteJson.checkIn).toBeNull();
   });
+
+  it('creates paired image chatMessage for photo check-ins, supports chatReplyToMessageId, and scopes /checkins/latest to own user', async () => {
+    const app = createApp();
+
+    // Seed a chat message to reply to
+    const msgRes = await app.request(
+      'http://localhost/api/messages',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenUser2}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type: 'text', text: 'Gửi ảnh đi anh' }),
+      },
+      env,
+    );
+    expect(msgRes.status).toBe(201);
+    const msgJson = (await msgRes.json()) as { message: { id: string } };
+
+    // Create a photo check-in replying to that chat message
+    const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+    const form = new FormData();
+    form.append('type', 'photo');
+    form.append('caption', 'Ảnh mới chụp nè');
+    form.append('chatReplyToMessageId', msgJson.message.id);
+    form.append('file', new File([jpegBytes], 'photo.jpg', { type: 'image/jpeg' }));
+
+    const photoRes = await app.request(
+      'http://localhost/api/checkins',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenUser1}` },
+        body: form,
+      },
+      env,
+    );
+    expect(photoRes.status).toBe(201);
+    const photoJson = (await photoRes.json()) as {
+      checkIn: { id: string; imageUrl: string; caption: string };
+      chatMessage?: {
+        id: string;
+        type: string;
+        imageUrl: string;
+        text?: string;
+        referencedCheckinId?: string;
+        replyTo?: { messageId: string };
+      };
+    };
+    expect(photoJson.chatMessage).toBeDefined();
+    expect(photoJson.chatMessage?.type).toBe('image');
+    expect(photoJson.chatMessage?.imageUrl).toBe(photoJson.checkIn.imageUrl);
+    expect(photoJson.chatMessage?.text).toBe('Ảnh mới chụp nè');
+    expect(photoJson.chatMessage?.referencedCheckinId).toBe(photoJson.checkIn.id);
+    expect(photoJson.chatMessage?.replyTo?.messageId).toBe(msgJson.message.id);
+
+    // /checkins/latest must return only the requesting user's own check-in
+    const myLatest = await app.request(
+      'http://localhost/api/checkins/latest',
+      { headers: { Authorization: `Bearer ${tokenUser1}` } },
+      env,
+    );
+    expect(((await myLatest.json()) as { checkIn: { id: string } | null }).checkIn?.id).toBe(
+      photoJson.checkIn.id,
+    );
+
+    const partnerOwnLatest = await app.request(
+      'http://localhost/api/checkins/latest',
+      { headers: { Authorization: `Bearer ${tokenUser2}` } },
+      env,
+    );
+    expect(((await partnerOwnLatest.json()) as { checkIn: unknown }).checkIn).toBeNull();
+  });
 });

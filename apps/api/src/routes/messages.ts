@@ -18,27 +18,64 @@ import {
   type ReferencedCheckinSnapshot,
 } from '../db/types';
 import { authenticate } from '../middleware/auth';
-import { syncCheckinRepliesPage } from '../services/checkin-reply-message-sync';
+import {
+  syncLegacyCheckinsToMessagesOnce,
+  toReferencedCheckinSnapshot,
+} from '../services/checkin-reply-message-sync';
 import { sendPushToUser } from '../services/push';
 import { emitRealtimeEvent } from '../services/realtime';
-import { deleteStoredFile, isUploadedFile, saveUploadedImage } from '../services/storage';
+import { isUploadedFile, saveUploadedImage } from '../services/storage';
 import type { HonoAppEnv } from '../types/hono';
 import { AppError } from '../utils/errors';
 import { generateId } from '../utils/id';
 
 export const messageRoutes = new Hono<HonoAppEnv>();
 
-async function ensureLegacyRepliesSynced(db: D1Database, coupleId: string): Promise<void> {
-  const checkinsWithReplies = await queryAll<CheckinRow>(
+function snippet(message: { text?: string | null; imageUrl?: string | null }): string {
+  return (message.text?.replace(/\s+/g, ' ').trim() || (message.imageUrl ? 'Ảnh' : 'Tin nhắn')).slice(0, 160);
+}
+
+async function hydrateLiveCheckins(
+  db: D1Database,
+  coupleId: string,
+  rows: ChatMessageRow[],
+): Promise<ReturnType<typeof toMessageDto>[]> {
+  const referencedIds = Array.from(
+    new Set(
+      rows
+        .map((row) => row.referenced_checkin_id)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  if (referencedIds.length === 0) {
+    return rows.map(toMessageDto);
+  }
+
+  const placeholders = referencedIds.map(() => '?').join(', ');
+  const checkins = await queryAll<CheckinRow>(
     db,
     `SELECT * FROM checkins
-     WHERE couple_id = ? AND deleted_at IS NULL AND replies_json != '[]'
-     ORDER BY created_at DESC LIMIT 60`,
-    [coupleId],
+     WHERE couple_id = ? AND deleted_at IS NULL AND id IN (${placeholders})`,
+    [coupleId, ...referencedIds],
   );
-  if (checkinsWithReplies.length > 0) {
-    await syncCheckinRepliesPage(db, coupleId, checkinsWithReplies);
-  }
+
+  const liveById = new Map(checkins.map((ci) => [ci.id, ci]));
+
+  return rows.map((row) => {
+    const dto = toMessageDto(row);
+    const liveCheckin = row.referenced_checkin_id
+      ? liveById.get(row.referenced_checkin_id)
+      : undefined;
+    if (!liveCheckin) return dto;
+
+    dto.referencedCheckin = toReferencedCheckinSnapshot(liveCheckin);
+    if (dto.type === 'image' && liveCheckin.type === 'photo') {
+      dto.imageUrl = liveCheckin.image_url ?? dto.imageUrl;
+      dto.text = liveCheckin.caption ?? liveCheckin.quick_message ?? dto.text;
+    }
+    return dto;
+  });
 }
 
 messageRoutes.get('/messages', authenticate, async (c) => {
@@ -47,11 +84,15 @@ messageRoutes.get('/messages', authenticate, async (c) => {
     throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
   }
 
-  await ensureLegacyRepliesSynced(c.env.DB, auth.coupleId);
-
   const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '30', 10) || 30));
   const before = c.req.query('before')?.trim();
   const after = c.req.query('after')?.trim();
+
+  if (before && after) {
+    throw new AppError('Không thể dùng đồng thời before và after', 400, 'VALIDATION_ERROR');
+  }
+
+  await syncLegacyCheckinsToMessagesOnce(c.env.DB, auth.coupleId);
 
   let rows: ChatMessageRow[];
   let hasMore: boolean;
@@ -60,7 +101,7 @@ messageRoutes.get('/messages', authenticate, async (c) => {
     const fetched = await queryAll<ChatMessageRow>(
       c.env.DB,
       `SELECT * FROM chat_messages
-       WHERE couple_id = ? AND id > ?
+       WHERE couple_id = ? AND deleted_at IS NULL AND id > ?
        ORDER BY id ASC LIMIT ?`,
       [auth.coupleId, after, limit + 1],
     );
@@ -70,7 +111,7 @@ messageRoutes.get('/messages', authenticate, async (c) => {
     const fetchedDesc = await queryAll<ChatMessageRow>(
       c.env.DB,
       `SELECT * FROM chat_messages
-       WHERE couple_id = ? AND id < ?
+       WHERE couple_id = ? AND deleted_at IS NULL AND id < ?
        ORDER BY id DESC LIMIT ?`,
       [auth.coupleId, before, limit + 1],
     );
@@ -80,7 +121,7 @@ messageRoutes.get('/messages', authenticate, async (c) => {
     const fetchedDesc = await queryAll<ChatMessageRow>(
       c.env.DB,
       `SELECT * FROM chat_messages
-       WHERE couple_id = ?
+       WHERE couple_id = ? AND deleted_at IS NULL
        ORDER BY id DESC LIMIT ?`,
       [auth.coupleId, limit + 1],
     );
@@ -88,12 +129,15 @@ messageRoutes.get('/messages', authenticate, async (c) => {
     rows = fetchedDesc.slice(0, limit).reverse();
   }
 
+  const messages = await hydrateLiveCheckins(c.env.DB, auth.coupleId, rows);
+
   return c.json({
-    messages: rows.map(toMessageDto),
+    messages,
     pagination: {
       hasMore,
       beforeCursor: rows[0]?.id ?? null,
       afterCursor: rows[rows.length - 1]?.id ?? null,
+      limit,
     },
   });
 });
@@ -161,7 +205,7 @@ messageRoutes.post('/messages', authenticate, async (c) => {
       [auth.coupleId, clientMutationId],
     );
     if (existing) {
-      return c.json({ message: toMessageDto(existing) }, 200);
+      return c.json({ message: toMessageDto(existing), duplicate: true }, 200);
     }
   }
 
@@ -187,7 +231,7 @@ messageRoutes.post('/messages', authenticate, async (c) => {
         senderId: refMsg.sender_id,
         senderName: refMsg.sender_name,
         type: refMsg.type,
-        textSnippet: refMsg.text?.slice(0, 120) || undefined,
+        textSnippet: snippet({ text: refMsg.text, imageUrl: refMsg.image_url }),
         mediaUrl: refMsg.image_url ?? undefined,
       };
     }
@@ -201,16 +245,7 @@ messageRoutes.post('/messages', authenticate, async (c) => {
       [referencedCheckinId, auth.coupleId],
     );
     if (checkin) {
-      referencedCheckin = {
-        checkinId: checkin.id,
-        ownerId: checkin.owner_id,
-        ownerName: checkin.owner_name,
-        type: checkin.type,
-        caption: checkin.caption ?? undefined,
-        mood: checkin.mood ?? undefined,
-        imageUrl: checkin.image_url ?? undefined,
-        createdAt: checkin.created_at,
-      };
+      referencedCheckin = toReferencedCheckinSnapshot(checkin);
       if (type === 'text') {
         type = 'checkin_reply';
       }
@@ -270,26 +305,28 @@ messageRoutes.post('/messages', authenticate, async (c) => {
 
   const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
   if (partner) {
-    const notifTitle = `${user.display_name}`;
-    const notifBody =
-      type === 'image'
-        ? text || 'Đã gửi cho bạn một hình ảnh 📷'
-        : text || 'Đã gửi một tin nhắn mới 💬';
+    const notifTitle = `${user.display_name} đã nhắn cho bạn`;
+    const notifBody = snippet({ text, imageUrl });
 
     await Promise.allSettled([
       sendPushToUser(c.env, config, partner.id, {
         title: notifTitle,
         body: notifBody,
+        icon: user.avatar_url ?? undefined,
+        badge: '/icons/icon-192.png',
         url: '/app/messages',
-        tag: `chat-${auth.coupleId}`,
-        type: 'chat_message',
+        targetUrl: '/app/messages',
+        tag: `message-${messageId}`,
+        kind: 'message',
+        actionType: 'message',
+        type: 'message',
         messageId,
         senderName: user.display_name,
         senderAvatar: user.avatar_url ?? undefined,
         photoUrl: imageUrl ?? undefined,
       }),
       emitRealtimeEvent(c.env, partner.id, {
-        type: 'message.created',
+        type: 'message',
         messageId,
         senderId: user.id,
         senderName: user.display_name,
@@ -297,6 +334,7 @@ messageRoutes.post('/messages', authenticate, async (c) => {
         title: notifTitle,
         body: notifBody,
         photoUrl: imageUrl ?? undefined,
+        targetUrl: '/app/messages',
         url: '/app/messages',
         createdAt: nowIso,
       }),
@@ -315,26 +353,29 @@ messageRoutes.get('/messages/:id/context', authenticate, async (c) => {
   const targetId = c.req.param('id');
   const target = await queryOne<ChatMessageRow>(
     c.env.DB,
-    'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? LIMIT 1',
+    'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
     [targetId, auth.coupleId],
   );
   if (!target) {
     throw new AppError('Không tìm thấy tin nhắn', 404, 'MESSAGE_NOT_FOUND');
   }
 
-  const olderDesc = await queryAll<ChatMessageRow>(
-    c.env.DB,
-    'SELECT * FROM chat_messages WHERE couple_id = ? AND id < ? ORDER BY id DESC LIMIT 10',
-    [auth.coupleId, target.id],
-  );
-  const newerAsc = await queryAll<ChatMessageRow>(
-    c.env.DB,
-    'SELECT * FROM chat_messages WHERE couple_id = ? AND id > ? ORDER BY id ASC LIMIT 10',
-    [auth.coupleId, target.id],
-  );
+  const [olderDesc, newerAsc] = await Promise.all([
+    queryAll<ChatMessageRow>(
+      c.env.DB,
+      'SELECT * FROM chat_messages WHERE couple_id = ? AND deleted_at IS NULL AND id < ? ORDER BY id DESC LIMIT 10',
+      [auth.coupleId, target.id],
+    ),
+    queryAll<ChatMessageRow>(
+      c.env.DB,
+      'SELECT * FROM chat_messages WHERE couple_id = ? AND deleted_at IS NULL AND id > ? ORDER BY id ASC LIMIT 10',
+      [auth.coupleId, target.id],
+    ),
+  ]);
 
   const combined = [...olderDesc.reverse(), target, ...newerAsc];
-  return c.json({ messages: combined.map(toMessageDto) });
+  const messages = await hydrateLiveCheckins(c.env.DB, auth.coupleId, combined);
+  return c.json({ messages });
 });
 
 messageRoutes.patch('/messages/:id', authenticate, async (c) => {
@@ -364,14 +405,16 @@ messageRoutes.patch('/messages/:id', authenticate, async (c) => {
 
   const nowIso = new Date().toISOString();
   const history = parseJsonSafe<ChatEditHistoryEntry[]>(row.edit_history_json, []);
-  if (row.text) {
-    history.push({ text: row.text, editedAt: nowIso });
+  const previousText = row.text?.trim();
+  if (previousText && previousText !== nextText) {
+    history.push({ text: previousText, editedAt: row.edited_at ?? nowIso });
   }
+  const trimmedHistory = history.slice(-20);
 
   await execute(
     c.env.DB,
     'UPDATE chat_messages SET text = ?, edited_at = ?, edit_history_json = ?, updated_at = ? WHERE id = ?',
-    [nextText, nowIso, JSON.stringify(history), nowIso, row.id],
+    [nextText, nowIso, JSON.stringify(trimmedHistory), nowIso, row.id],
   );
 
   const updated = (await queryOne<ChatMessageRow>(
@@ -386,8 +429,10 @@ messageRoutes.patch('/messages/:id', authenticate, async (c) => {
       type: 'message.updated',
       messageId: row.id,
       senderId: auth.id,
-      title: '',
-      body: '',
+      senderName: row.sender_name,
+      title: `${row.sender_name} đã chỉnh sửa tin nhắn`,
+      body: snippet({ text: nextText, imageUrl: row.image_url }),
+      targetUrl: '/app/messages',
     });
   }
 
@@ -417,21 +462,21 @@ messageRoutes.post('/messages/:id/reactions', authenticate, async (c) => {
   }
 
   const groups = parseJsonSafe<ChatReactionGroup[]>(row.reactions_json, []);
-  let toggledOn = false;
+  let active: boolean;
 
   const targetGroup = groups.find((g) => g.type === reactionType);
-  if (targetGroup && targetGroup.userIds.includes(auth.id)) {
-    targetGroup.userIds = targetGroup.userIds.filter((uid) => uid !== auth.id);
-  } else {
-    for (const group of groups) {
-      group.userIds = group.userIds.filter((uid) => uid !== auth.id);
-    }
-    if (targetGroup) {
-      targetGroup.userIds.push(auth.id);
+  if (targetGroup) {
+    const idx = targetGroup.userIds.indexOf(auth.id);
+    if (idx >= 0) {
+      targetGroup.userIds.splice(idx, 1);
+      active = false;
     } else {
-      groups.push({ type: reactionType, userIds: [auth.id] });
+      targetGroup.userIds.push(auth.id);
+      active = true;
     }
-    toggledOn = true;
+  } else {
+    groups.push({ type: reactionType, userIds: [auth.id] });
+    active = true;
   }
 
   const cleaned = groups.filter((g) => g.userIds.length > 0);
@@ -445,16 +490,21 @@ messageRoutes.post('/messages/:id/reactions', authenticate, async (c) => {
 
   const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
   if (partner) {
+    const reactor = await findUserById(c.env.DB, auth.id);
+    const reactorName = reactor?.display_name ?? row.sender_name;
     await emitRealtimeEvent(c.env, partner.id, {
       type: 'message.reaction',
       messageId: row.id,
+      reactionType,
       senderId: auth.id,
-      title: toggledOn ? '' : '',
-      body: '',
+      senderName: reactorName,
+      title: active ? `${reactorName} đã bày tỏ cảm xúc` : '',
+      body: active ? reactionType : '',
+      targetUrl: '/app/messages',
     });
   }
 
-  return c.json({ reactions: cleaned });
+  return c.json({ messageId: row.id, reactions: cleaned, active });
 });
 
 messageRoutes.post('/messages/read', authenticate, async (c) => {
@@ -464,99 +514,114 @@ messageRoutes.post('/messages/read', authenticate, async (c) => {
   }
 
   const body = (await c.req.json().catch(() => null)) as { messageIds?: string[]; upTo?: string } | null;
-  const targetIds = Array.isArray(body?.messageIds) ? body!.messageIds.filter(Boolean) : [];
+  const targetIds = Array.isArray(body?.messageIds) ? body!.messageIds.filter(Boolean).slice(0, 100) : [];
   const upToId = typeof body?.upTo === 'string' && body.upTo.trim() ? body.upTo.trim() : undefined;
 
-  let candidates: ChatMessageRow[];
+  let candidates: Array<{ id: string; read_by_json: string }>;
   if (targetIds.length > 0) {
     const placeholders = targetIds.map(() => '?').join(', ');
-    candidates = await queryAll<ChatMessageRow>(
+    candidates = await queryAll<{ id: string; read_by_json: string }>(
       c.env.DB,
-      `SELECT * FROM chat_messages WHERE couple_id = ? AND id IN (${placeholders})`,
+      `SELECT id, read_by_json FROM chat_messages
+       WHERE couple_id = ? AND deleted_at IS NULL AND id IN (${placeholders})`,
       [auth.coupleId, ...targetIds],
     );
   } else if (upToId) {
-    candidates = await queryAll<ChatMessageRow>(
+    candidates = await queryAll<{ id: string; read_by_json: string }>(
       c.env.DB,
-      `SELECT * FROM chat_messages
-       WHERE couple_id = ? AND sender_id != ? AND id <= ?
+      `SELECT id, read_by_json FROM chat_messages
+       WHERE couple_id = ? AND deleted_at IS NULL AND sender_id != ? AND id <= ?
        ORDER BY id DESC LIMIT 100`,
       [auth.coupleId, auth.id, upToId],
     );
   } else {
-    candidates = await queryAll<ChatMessageRow>(
+    candidates = await queryAll<{ id: string; read_by_json: string }>(
       c.env.DB,
-      `SELECT * FROM chat_messages
-       WHERE couple_id = ? AND sender_id != ?
+      `SELECT id, read_by_json FROM chat_messages
+       WHERE couple_id = ? AND deleted_at IS NULL AND sender_id != ?
        ORDER BY id DESC LIMIT 100`,
       [auth.coupleId, auth.id],
     );
   }
 
   const nowIso = new Date().toISOString();
-  let updatedCount = 0;
+  const updateStatements: D1PreparedStatement[] = [];
 
   for (const row of candidates) {
     const readBy = parseJsonSafe<string[]>(row.read_by_json, []);
     if (readBy.includes(auth.id)) continue;
     readBy.push(auth.id);
-    await execute(
-      c.env.DB,
-      'UPDATE chat_messages SET read_by_json = ?, updated_at = ? WHERE id = ?',
-      [JSON.stringify(readBy), nowIso, row.id],
+    updateStatements.push(
+      c.env.DB
+        .prepare('UPDATE chat_messages SET read_by_json = ?, updated_at = ? WHERE id = ?')
+        .bind(JSON.stringify(readBy), nowIso, row.id),
     );
-    updatedCount += 1;
   }
 
+  const updatedCount = updateStatements.length;
   if (updatedCount > 0) {
+    await c.env.DB.batch(updateStatements);
     const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
     if (partner) {
       await emitRealtimeEvent(c.env, partner.id, {
         type: 'message.read',
         senderId: auth.id,
+        messageId: upToId ?? targetIds[targetIds.length - 1],
         title: '',
         body: '',
+        targetUrl: '/app/messages',
       });
     }
   }
 
-  return c.json({ success: true, updated: updatedCount });
+  return c.json({ success: true, updated: updatedCount, modifiedCount: updatedCount });
 });
 
 messageRoutes.post('/messages/typing', authenticate, async (c) => {
   const auth = c.get('user')!;
-  if (!auth.coupleId) return c.json({ ok: true });
+  if (!auth.coupleId) return c.json({ ok: true, success: true });
 
   const body = (await c.req.json().catch(() => null)) as { isTyping?: boolean } | null;
-  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  const [partner, user] = await Promise.all([
+    findPartnerUser(c.env.DB, auth.coupleId, auth.id),
+    findUserById(c.env.DB, auth.id),
+  ]);
   if (partner) {
     await emitRealtimeEvent(c.env, partner.id, {
       type: 'message.typing',
       senderId: auth.id,
+      senderName: user?.display_name,
       isTyping: Boolean(body?.isTyping),
       title: '',
       body: '',
+      targetUrl: '/app/messages',
     });
   }
-  return c.json({ ok: true });
+  return c.json({ ok: true, success: true });
 });
 
 messageRoutes.post('/messages/presence', authenticate, async (c) => {
   const auth = c.get('user')!;
-  if (!auth.coupleId) return c.json({ ok: true });
+  if (!auth.coupleId) return c.json({ ok: true, success: true });
 
   const body = (await c.req.json().catch(() => null)) as { online?: boolean } | null;
-  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+  const online = body?.online !== false;
+  const [partner, user] = await Promise.all([
+    findPartnerUser(c.env.DB, auth.coupleId, auth.id),
+    findUserById(c.env.DB, auth.id),
+  ]);
   if (partner) {
     await emitRealtimeEvent(c.env, partner.id, {
       type: 'message.presence',
       senderId: auth.id,
-      online: Boolean(body?.online),
+      senderName: user?.display_name,
+      online,
       title: '',
       body: '',
+      targetUrl: '/app/messages',
     });
   }
-  return c.json({ ok: true });
+  return c.json({ ok: true, success: true });
 });
 
 messageRoutes.delete('/messages/:id', authenticate, async (c) => {
@@ -579,21 +644,11 @@ messageRoutes.delete('/messages/:id', authenticate, async (c) => {
   }
 
   const nowIso = new Date().toISOString();
-  const attachments = parseJsonSafe<ChatAttachment[]>(row.attachments_json, []);
-  for (const att of attachments) {
-    if (att.storagePath) {
-      await deleteStoredFile(c.env.STORAGE, att.storagePath, c.get('config').R2_PUBLIC_URL);
-    }
-  }
-  if (row.storage_path) {
-    await deleteStoredFile(c.env.STORAGE, row.storage_path, c.get('config').R2_PUBLIC_URL);
-  }
 
   await execute(
     c.env.DB,
     `UPDATE chat_messages
-     SET deleted_at = ?, text = NULL, image_url = NULL, storage_path = NULL,
-         attachments_json = '[]', updated_at = ?
+     SET deleted_at = ?, updated_at = ?
      WHERE id = ?`,
     [nowIso, nowIso, row.id],
   );
@@ -601,11 +656,14 @@ messageRoutes.delete('/messages/:id', authenticate, async (c) => {
   const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
   if (partner) {
     await emitRealtimeEvent(c.env, partner.id, {
-      type: 'message.deleted',
+      type: 'message.updated',
+      deleted: true,
       messageId: row.id,
       senderId: auth.id,
-      title: '',
-      body: '',
+      senderName: row.sender_name,
+      title: `${row.sender_name} đã thu hồi tin nhắn`,
+      body: 'Tin nhắn đã được thu hồi',
+      targetUrl: '/app/messages',
     });
   }
 

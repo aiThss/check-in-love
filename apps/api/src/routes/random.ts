@@ -13,8 +13,27 @@ export const randomRoutes = new Hono<HonoAppEnv>();
 
 const VALID_CATEGORIES = new Set<string>(RANDOM_CATEGORIES.map((item) => item.category));
 
-randomRoutes.get('/random/categories', authenticate, (c) => {
-  return c.json({ categories: RANDOM_CATEGORIES });
+randomRoutes.get('/random/categories', authenticate, async (c) => {
+  const auth = c.get('user')!;
+  if (!auth.coupleId) {
+    throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
+  }
+
+  const rows = await queryAll<{ category: string; cnt: number }>(
+    c.env.DB,
+    `SELECT category, COUNT(*) AS cnt
+     FROM random_events
+     WHERE couple_id = ?
+     GROUP BY category`,
+    [auth.coupleId],
+  );
+  const countMap = new Map<string, number>(rows.map((r) => [r.category, Number(r.cnt)]));
+  const categories = RANDOM_CATEGORIES.map((cat) => ({
+    ...cat,
+    usageCount: countMap.get(cat.category) ?? 0,
+  }));
+
+  return c.json({ categories });
 });
 
 randomRoutes.get('/random/history', authenticate, async (c) => {
@@ -23,12 +42,13 @@ randomRoutes.get('/random/history', authenticate, async (c) => {
     throw new AppError('Bạn chưa tham gia nhóm cặp đôi', 400, 'NO_COUPLE');
   }
 
+  const limit = Math.min(50, Math.max(1, Number.parseInt(c.req.query('limit') || '10', 10) || 10));
   const rows = await queryAll<RandomEventRow>(
     c.env.DB,
     `SELECT * FROM random_events
      WHERE couple_id = ?
-     ORDER BY created_at DESC LIMIT 30`,
-    [auth.coupleId],
+     ORDER BY created_at DESC LIMIT ?`,
+    [auth.coupleId, limit],
   );
 
   return c.json({ events: rows.map(toRandomEventDto) });

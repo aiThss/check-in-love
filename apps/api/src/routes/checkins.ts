@@ -18,10 +18,13 @@ import {
   type MessageReplyReference,
 } from '../db/types';
 import { authenticate } from '../middleware/auth';
-import { syncCheckinRepliesPage, syncCheckinReplyToMessage } from '../services/checkin-reply-message-sync';
+import {
+  syncCheckinReplyToMessage,
+  toReferencedCheckinSnapshot,
+} from '../services/checkin-reply-message-sync';
 import { sendPushToUser } from '../services/push';
 import { emitRealtimeEvent } from '../services/realtime';
-import { deleteStoredFile, isUploadedFile, saveUploadedImage } from '../services/storage';
+import { isUploadedFile, saveUploadedImage } from '../services/storage';
 import { recalculateCoupleStreak } from '../services/streak';
 import type { HonoAppEnv } from '../types/hono';
 import { AppError } from '../utils/errors';
@@ -30,6 +33,88 @@ import { generateId } from '../utils/id';
 export const checkinRoutes = new Hono<HonoAppEnv>();
 
 const CHECKIN_TYPES = new Set(['photo', 'text', 'mood']);
+
+const LEGACY_REACTION_MAP: Record<string, string> = {
+  heart: '❤️',
+  hug: '🤗',
+  kiss: '😘',
+  laugh: '😂',
+  miss: '🥺',
+  wow: '🥰',
+  fire: '🔥',
+  sad: '😭',
+};
+
+function normalizeReactionType(type: string): string {
+  const trimmed = type.trim();
+  return LEGACY_REACTION_MAP[trimmed] ?? trimmed;
+}
+
+function replySnippet(input: { caption?: string | null; quickMessage?: string | null; imageUrl?: string | null }): string {
+  const value = (input.caption ?? input.quickMessage ?? (input.imageUrl ? 'Ảnh' : 'Tin nhắn'))
+    .replace(/\s+/g, ' ')
+    .trim();
+  return value.slice(0, 160) || 'Tin nhắn';
+}
+
+async function createPairedPhotoChatMessage(
+  db: D1Database,
+  checkin: CheckinRow,
+  chatReplyTo?: MessageReplyReference,
+): Promise<ChatMessageRow | null> {
+  if (checkin.type !== 'photo' || !checkin.image_url) return null;
+
+  const clientMutationId = `checkin-photo:${checkin.id}`;
+  const existing = await queryOne<ChatMessageRow>(
+    db,
+    `SELECT * FROM chat_messages
+     WHERE couple_id = ? AND (client_mutation_id = ? OR (referenced_checkin_id = ? AND type = 'image'))
+       AND deleted_at IS NULL
+     LIMIT 1`,
+    [checkin.couple_id, clientMutationId, checkin.id],
+  );
+  if (existing) return existing;
+
+  const msgId = generateId();
+  const snapshot = toReferencedCheckinSnapshot(checkin);
+  const attachments = [{ url: checkin.image_url, storagePath: checkin.storage_path ?? undefined }];
+  const nowIso = checkin.created_at || new Date().toISOString();
+
+  await execute(
+    db,
+    `INSERT OR IGNORE INTO chat_messages (
+      id, couple_id, sender_id, sender_name, type, text,
+      image_url, storage_path, attachments_json,
+      reply_to_message_id, reply_to_json,
+      referenced_checkin_id, referenced_checkin_json,
+      client_mutation_id, read_by_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 'image', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      msgId,
+      checkin.couple_id,
+      checkin.owner_id,
+      checkin.owner_name,
+      checkin.caption ?? checkin.quick_message ?? null,
+      checkin.image_url,
+      checkin.storage_path,
+      JSON.stringify(attachments),
+      chatReplyTo?.messageId ?? null,
+      chatReplyTo ? JSON.stringify(chatReplyTo) : null,
+      checkin.id,
+      JSON.stringify(snapshot),
+      clientMutationId,
+      JSON.stringify([checkin.owner_id]),
+      nowIso,
+      nowIso,
+    ],
+  );
+
+  return queryOne<ChatMessageRow>(
+    db,
+    'SELECT * FROM chat_messages WHERE couple_id = ? AND client_mutation_id = ? LIMIT 1',
+    [checkin.couple_id, clientMutationId],
+  );
+}
 
 checkinRoutes.get('/checkins', authenticate, async (c) => {
   const auth = c.get('user')!;
@@ -48,8 +133,9 @@ checkinRoutes.get('/checkins', authenticate, async (c) => {
   if (after) {
     const parsedAfter = new Date(after);
     if (!Number.isNaN(parsedAfter.getTime())) {
-      whereClauses.push('created_at > ?');
-      params.push(parsedAfter.toISOString());
+      const afterIso = parsedAfter.toISOString();
+      whereClauses.push('(created_at > ? OR updated_at > ?)');
+      params.push(afterIso, afterIso);
     }
   }
 
@@ -61,20 +147,19 @@ checkinRoutes.get('/checkins', authenticate, async (c) => {
   const whereSql = whereClauses.join(' AND ');
   const offset = (page - 1) * limit;
 
-  const countRow = await queryOne<{ total: number }>(
-    c.env.DB,
-    `SELECT COUNT(*) AS total FROM checkins WHERE ${whereSql}`,
-    params,
-  );
+  const [countRow, rows] = await Promise.all([
+    queryOne<{ total: number }>(
+      c.env.DB,
+      `SELECT COUNT(*) AS total FROM checkins WHERE ${whereSql}`,
+      params,
+    ),
+    queryAll<CheckinRow>(
+      c.env.DB,
+      `SELECT * FROM checkins WHERE ${whereSql} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
+    ),
+  ]);
   const total = Number(countRow?.total ?? 0);
-
-  const rows = await queryAll<CheckinRow>(
-    c.env.DB,
-    `SELECT * FROM checkins WHERE ${whereSql} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
-    [...params, limit, offset],
-  );
-
-  await syncCheckinRepliesPage(c.env.DB, auth.coupleId, rows);
 
   return c.json({
     checkIns: rows.map(toCheckinDto),
@@ -96,9 +181,9 @@ checkinRoutes.get('/checkins/latest', authenticate, async (c) => {
   const latest = await queryOne<CheckinRow>(
     c.env.DB,
     `SELECT * FROM checkins
-     WHERE couple_id = ? AND deleted_at IS NULL
+     WHERE couple_id = ? AND owner_id = ? AND deleted_at IS NULL
      ORDER BY created_at DESC, id DESC LIMIT 1`,
-    [auth.coupleId],
+    [auth.coupleId, auth.id],
   );
 
   return c.json({ checkIn: latest ? toCheckinDto(latest) : null });
@@ -138,6 +223,7 @@ checkinRoutes.post('/checkins', authenticate, async (c) => {
   let includeScratch = true;
   let clientMutationId: string | undefined;
   let replyToMessageId: string | undefined;
+  let chatReplyToMessageId: string | undefined;
   let photoFile: File | null = null;
 
   if (contentType.includes('multipart/form-data')) {
@@ -157,6 +243,7 @@ checkinRoutes.post('/checkins', authenticate, async (c) => {
     quickMessage = getField('quickMessage');
     clientMutationId = getField('clientMutationId');
     replyToMessageId = getField('replyToMessageId');
+    chatReplyToMessageId = getField('chatReplyToMessageId');
     const scratchVal = formData.get('includeScratch');
     if (typeof scratchVal === 'string') {
       includeScratch = scratchVal !== 'false' && scratchVal !== '0';
@@ -187,6 +274,9 @@ checkinRoutes.post('/checkins', authenticate, async (c) => {
     replyToMessageId = typeof body.replyToMessageId === 'string' && body.replyToMessageId.trim()
       ? body.replyToMessageId.trim()
       : undefined;
+    chatReplyToMessageId = typeof body.chatReplyToMessageId === 'string' && body.chatReplyToMessageId.trim()
+      ? body.chatReplyToMessageId.trim()
+      : undefined;
   }
 
   if (!CHECKIN_TYPES.has(type)) {
@@ -210,28 +300,80 @@ checkinRoutes.post('/checkins', authenticate, async (c) => {
     );
     if (existing) {
       const couple = await findCoupleById(c.env.DB, auth.coupleId);
-      return c.json({ checkIn: toCheckinDto(existing), streak: couple?.streak ?? 0 }, 200);
+      const pairedMsg = existing.type === 'photo' && existing.image_url
+        ? await createPairedPhotoChatMessage(c.env.DB, existing)
+        : null;
+      return c.json(
+        {
+          checkIn: toCheckinDto(existing),
+          ...(pairedMsg ? { chatMessage: toMessageDto(pairedMsg) } : {}),
+          streak: couple?.streak ?? 0,
+          duplicate: true,
+        },
+        200,
+      );
     }
   }
 
   const user = (await findUserById(c.env.DB, auth.id))!;
+
   let replyTo: MessageReplyReference | undefined;
   if (replyToMessageId) {
-    const refMsg = await queryOne<ChatMessageRow>(
+    const refCheckin = await queryOne<CheckinRow>(
       c.env.DB,
-      'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+      'SELECT * FROM checkins WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
       [replyToMessageId, auth.coupleId],
     );
-    if (refMsg) {
+    if (refCheckin) {
       replyTo = {
-        messageId: refMsg.id,
-        senderId: refMsg.sender_id,
-        senderName: refMsg.sender_name,
-        type: refMsg.type,
-        textSnippet: refMsg.text?.slice(0, 120) || undefined,
-        mediaUrl: refMsg.image_url ?? undefined,
+        messageId: refCheckin.id,
+        senderId: refCheckin.owner_id,
+        senderName: refCheckin.owner_name,
+        type: refCheckin.type,
+        textSnippet: replySnippet({
+          caption: refCheckin.caption,
+          quickMessage: refCheckin.quick_message,
+          imageUrl: refCheckin.image_url,
+        }),
+        mediaUrl: refCheckin.image_url ?? undefined,
       };
+    } else {
+      const refMsg = await queryOne<ChatMessageRow>(
+        c.env.DB,
+        'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+        [replyToMessageId, auth.coupleId],
+      );
+      if (refMsg) {
+        replyTo = {
+          messageId: refMsg.id,
+          senderId: refMsg.sender_id,
+          senderName: refMsg.sender_name,
+          type: refMsg.type,
+          textSnippet: (refMsg.text?.replace(/\s+/g, ' ').trim() || (refMsg.image_url ? 'Ảnh' : 'Tin nhắn')).slice(0, 160),
+          mediaUrl: refMsg.image_url ?? undefined,
+        };
+      }
     }
+  }
+
+  let chatReplyTo: MessageReplyReference | undefined;
+  if (chatReplyToMessageId) {
+    const original = await queryOne<ChatMessageRow>(
+      c.env.DB,
+      'SELECT * FROM chat_messages WHERE id = ? AND couple_id = ? AND deleted_at IS NULL LIMIT 1',
+      [chatReplyToMessageId, auth.coupleId],
+    );
+    if (!original) {
+      throw new AppError('Không tìm thấy tin nhắn cần trả lời', 404, 'NOT_FOUND');
+    }
+    chatReplyTo = {
+      messageId: original.id,
+      senderId: original.sender_id,
+      senderName: original.sender_name,
+      type: original.type,
+      textSnippet: (original.text?.replace(/\s+/g, ' ').trim() || (original.image_url ? 'Ảnh' : 'Tin nhắn')).slice(0, 160),
+      mediaUrl: original.image_url ?? undefined,
+    };
   }
 
   let imageUrl: string | null = null;
@@ -283,19 +425,14 @@ checkinRoutes.post('/checkins', authenticate, async (c) => {
 
   const { streak } = await recalculateCoupleStreak(c.env.DB, auth.coupleId, now);
 
+  // Every photo check-in is bridged into ChatMessage as a shared photo topic (matching NoSQL v1)
   let createdChatMessage: ReturnType<typeof toMessageDto> | undefined;
-  if (quickMessage) {
+  if (createdRow.type === 'photo' && createdRow.image_url) {
+    const photoMsg = await createPairedPhotoChatMessage(c.env.DB, createdRow, chatReplyTo);
+    if (photoMsg) createdChatMessage = toMessageDto(photoMsg);
+  } else if (quickMessage) {
     const msgId = generateId();
-    const snapshot = {
-      checkinId: createdRow.id,
-      ownerId: createdRow.owner_id,
-      ownerName: createdRow.owner_name,
-      type: createdRow.type,
-      caption: createdRow.caption ?? undefined,
-      mood: createdRow.mood ?? undefined,
-      imageUrl: createdRow.image_url ?? undefined,
-      createdAt: createdRow.created_at,
-    };
+    const snapshot = toReferencedCheckinSnapshot(createdRow);
     await execute(
       c.env.DB,
       `INSERT INTO chat_messages (
@@ -326,37 +463,52 @@ checkinRoutes.post('/checkins', authenticate, async (c) => {
 
   const partner = await findPartnerUser(c.env.DB, auth.coupleId, user.id);
   if (partner) {
+    const photoTopic = createdRow.type === 'photo';
     const notifBody =
       type === 'photo'
-        ? caption || 'Vừa gửi cho bạn một khoảnh khắc ảnh mới 📸'
+        ? caption || quickMessage || 'Xem ngay nào!'
         : type === 'mood'
           ? `Đang cảm thấy ${mood}${caption ? `: ${caption}` : ''}`
-          : caption || 'Vừa gửi một ghi chú tình cảm mới 💌';
+          : caption || quickMessage || 'Xem ngay nào!';
 
-    const pushTitle = `${user.display_name} vừa Check IN! 💕`;
+    const pushTitle = photoTopic
+      ? `${user.display_name} đã gửi ảnh mới`
+      : `${user.display_name} đã check-in! 💕`;
+    const sseTitle = photoTopic
+      ? `${user.display_name} đã gửi ảnh mới 📸`
+      : `${user.display_name} đã check-in! 💕`;
+    const targetUrl = photoTopic ? '/app/messages' : '/app/home';
 
     await Promise.allSettled([
       sendPushToUser(c.env, config, partner.id, {
         title: pushTitle,
         body: notifBody,
-        url: '/app/home',
+        icon: user.avatar_url ?? undefined,
+        badge: '/icons/icon-192.png',
+        url: targetUrl,
+        targetUrl,
         tag: `checkin-${checkinId}`,
-        type: 'checkin',
+        kind: photoTopic ? 'message' : 'checkin',
+        actionType: photoTopic ? 'message' : 'checkin',
+        type: photoTopic ? 'message' : 'checkin',
         checkinId,
+        messageId: createdChatMessage?.id,
         senderName: user.display_name,
         senderAvatar: user.avatar_url ?? undefined,
         photoUrl: imageUrl ?? undefined,
       }),
       emitRealtimeEvent(c.env, partner.id, {
-        type: 'checkin.created',
+        type: photoTopic ? 'message' : 'checkin',
         checkinId,
+        messageId: createdChatMessage?.id,
         senderId: user.id,
         senderName: user.display_name,
         senderAvatar: user.avatar_url ?? undefined,
-        title: pushTitle,
+        title: sseTitle,
         body: notifBody,
         photoUrl: imageUrl ?? undefined,
-        url: '/app/home',
+        targetUrl,
+        url: targetUrl,
         createdAt: nowIso,
       }),
     ]);
@@ -380,10 +532,11 @@ checkinRoutes.post('/checkins/:id/reactions', authenticate, async (c) => {
 
   const checkinId = c.req.param('id');
   const body = (await c.req.json().catch(() => null)) as { type?: string } | null;
-  const reactionType = body?.type?.trim();
-  if (!reactionType || reactionType.length > 32) {
+  const rawType = body?.type?.trim();
+  if (!rawType || rawType.length > 32) {
     throw new AppError('Loại cảm xúc không hợp lệ', 400, 'VALIDATION_ERROR');
   }
+  const reactionType = normalizeReactionType(rawType);
 
   const row = await queryOne<CheckinRow>(
     c.env.DB,
@@ -395,7 +548,9 @@ checkinRoutes.post('/checkins/:id/reactions', authenticate, async (c) => {
   }
 
   const existing = parseJsonSafe<CheckinReactionItem[]>(row.reactions_json, []);
-  const sameIdx = existing.findIndex((r) => r.userId === auth.id && r.type === reactionType);
+  const sameIdx = existing.findIndex(
+    (r) => r.userId === auth.id && normalizeReactionType(r.type) === reactionType,
+  );
   let nextReactions: CheckinReactionItem[];
   let added = false;
 
@@ -403,7 +558,7 @@ checkinRoutes.post('/checkins/:id/reactions', authenticate, async (c) => {
     nextReactions = existing.filter((_, idx) => idx !== sameIdx);
   } else {
     nextReactions = [
-      ...existing.filter((r) => r.userId !== auth.id),
+      ...existing,
       { userId: auth.id, type: reactionType, createdAt: new Date().toISOString() },
     ];
     added = true;
@@ -416,41 +571,50 @@ checkinRoutes.post('/checkins/:id/reactions', authenticate, async (c) => {
     [JSON.stringify(nextReactions), nowIso, row.id],
   );
 
-  const user = (await findUserById(c.env.DB, auth.id))!;
-  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
-  if (partner && added) {
-    const title = `${user.display_name} đã thả ${reactionType}`;
-    const msgBody = 'Xem cảm xúc mới trên kỷ niệm của hai bạn!';
+  if (added && row.owner_id !== auth.id) {
+    const user = (await findUserById(c.env.DB, auth.id))!;
+    const title = `${user.display_name} đã react check-in của bạn 💕`;
+    const msgBody = 'Mở app để xem reaction mới';
     await Promise.allSettled([
-      sendPushToUser(c.env, c.get('config'), partner.id, {
-        title,
+      sendPushToUser(c.env, c.get('config'), row.owner_id, {
+        title: `${user.display_name} đã react check-in của bạn`,
         body: msgBody,
-        url: '/app/home',
+        icon: user.avatar_url ?? undefined,
+        badge: '/icons/icon-192.png',
+        url: '/app/memories',
+        targetUrl: '/app/memories',
         tag: `reaction-${row.id}`,
+        kind: 'reaction',
+        actionType: 'reaction',
         type: 'reaction',
         checkinId: row.id,
         senderName: user.display_name,
         senderAvatar: user.avatar_url ?? undefined,
       }),
-      emitRealtimeEvent(c.env, partner.id, {
-        type: 'checkin.reaction',
+      emitRealtimeEvent(c.env, row.owner_id, {
+        type: 'reaction',
         checkinId: row.id,
         senderId: user.id,
         senderName: user.display_name,
         senderAvatar: user.avatar_url ?? undefined,
         title,
         body: msgBody,
-        url: '/app/home',
+        targetUrl: '/app/memories',
+        url: '/app/memories',
       }),
     ]);
-  } else if (partner) {
-    await emitRealtimeEvent(c.env, partner.id, {
-      type: 'checkin.reaction',
-      checkinId: row.id,
-      senderId: user.id,
-      title: '',
-      body: '',
-    });
+  } else {
+    const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+    if (partner) {
+      await emitRealtimeEvent(c.env, partner.id, {
+        type: 'reaction',
+        checkinId: row.id,
+        senderId: auth.id,
+        title: '',
+        body: '',
+        targetUrl: '/app/memories',
+      });
+    }
   }
 
   return c.json({ reactions: nextReactions });
@@ -505,23 +669,31 @@ checkinRoutes.post('/checkins/:id/replies', authenticate, async (c) => {
     readBy: [user.id],
   });
 
-  const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
-  if (partner) {
-    const title = `${user.display_name} đã phản hồi kỷ niệm`;
+  const recipientId = row.owner_id !== auth.id
+    ? row.owner_id
+    : (await findPartnerUser(c.env.DB, auth.coupleId, auth.id))?.id;
+
+  if (recipientId) {
+    const title = `${user.display_name} đã reply check-in của bạn`;
     await Promise.allSettled([
-      sendPushToUser(c.env, c.get('config'), partner.id, {
+      sendPushToUser(c.env, c.get('config'), recipientId, {
         title,
         body: message,
+        icon: user.avatar_url ?? undefined,
+        badge: '/icons/icon-192.png',
         url: '/app/messages',
+        targetUrl: '/app/messages',
         tag: `reply-${row.id}`,
+        kind: 'reply',
+        actionType: 'reply',
         type: 'reply',
         checkinId: row.id,
         messageId: syncedMsg?.id,
         senderName: user.display_name,
         senderAvatar: user.avatar_url ?? undefined,
       }),
-      emitRealtimeEvent(c.env, partner.id, {
-        type: 'checkin.reply',
+      emitRealtimeEvent(c.env, recipientId, {
+        type: 'reply',
         checkinId: row.id,
         messageId: syncedMsg?.id,
         senderId: user.id,
@@ -529,6 +701,7 @@ checkinRoutes.post('/checkins/:id/replies', authenticate, async (c) => {
         senderAvatar: user.avatar_url ?? undefined,
         title,
         body: message,
+        targetUrl: '/app/messages',
         url: '/app/messages',
       }),
     ]);
@@ -552,7 +725,7 @@ checkinRoutes.delete('/checkins/:id', authenticate, async (c) => {
   if (!row) {
     throw new AppError('Không tìm thấy check-in', 404, 'CHECKIN_NOT_FOUND');
   }
-  if (row.owner_id !== auth.id) {
+  if (row.owner_id !== auth.id && auth.role !== 'admin') {
     throw new AppError('Bạn chỉ có thể xóa check-in của chính mình', 403, 'FORBIDDEN');
   }
 
@@ -562,10 +735,6 @@ checkinRoutes.delete('/checkins/:id', authenticate, async (c) => {
     'UPDATE checkins SET deleted_at = ?, updated_at = ? WHERE id = ?',
     [nowIso, nowIso, row.id],
   );
-
-  if (row.storage_path) {
-    await deleteStoredFile(c.env.STORAGE, row.storage_path, c.get('config').R2_PUBLIC_URL);
-  }
 
   await recalculateCoupleStreak(c.env.DB, auth.coupleId);
 
@@ -577,6 +746,7 @@ checkinRoutes.delete('/checkins/:id', authenticate, async (c) => {
       senderId: auth.id,
       title: '',
       body: '',
+      targetUrl: '/app/home',
     });
   }
 

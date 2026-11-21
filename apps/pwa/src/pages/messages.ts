@@ -892,7 +892,7 @@ export function renderMessagesPage(): RoutePage {
     if (view.item.isOwn) {
       const actionRow = document.createElement('div');
       actionRow.className = 'message-action-row';
-      if (view.item.type === 'text') {
+      if (view.item.type === 'text' || view.item.type === 'checkin_reply') {
         const edit = document.createElement('button');
         edit.type = 'button';
         edit.className = 'message-action-button';
@@ -1505,13 +1505,13 @@ export function renderMessagesPage(): RoutePage {
       void refreshLatestMessages();
       return;
     }
-    if (data.type === 'message.updated' && data.deleted && data.messageId) {
+    if (((data.type === 'message.updated' && data.deleted) || data.type === 'message.deleted') && data.messageId) {
       messageViews.get(data.messageId)?.element.remove();
       messageViews.delete(data.messageId);
       messages.delete(data.messageId);
       return;
     }
-    if (data.type === 'message' || data.type?.startsWith('message.')) {
+    if (data.type === 'message' || data.type === 'reply' || data.type?.startsWith('message.')) {
       void refreshLatestMessages();
     }
   }

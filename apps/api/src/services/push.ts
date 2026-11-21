@@ -5,19 +5,53 @@ import { base64UrlEncode } from '../utils/crypto';
 import { logger } from '../utils/logger';
 import { sendWebPushNotification } from './webpush';
 
+export type PushActionType = 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message' | 'journey';
+
 export interface PushPayload {
   title: string;
   body: string;
   url?: string;
+  targetUrl?: string;
   icon?: string;
   badge?: string;
   tag?: string;
   type?: string;
+  kind?: PushActionType;
+  actionType?: PushActionType;
   checkinId?: string;
   messageId?: string;
   senderName?: string;
   senderAvatar?: string;
   photoUrl?: string;
+}
+
+function normalizePushActionType(payload: PushPayload): PushActionType {
+  if (payload.actionType) return payload.actionType;
+  if (payload.kind) return payload.kind;
+  switch (payload.type) {
+    case 'chat_message':
+    case 'message':
+      return 'message';
+    case 'checkin':
+      return 'checkin';
+    case 'reaction':
+      return 'reaction';
+    case 'reply':
+      return 'reply';
+    case 'journey':
+      return 'journey';
+    default:
+      return 'reminder';
+  }
+}
+
+function resolveAbsoluteMediaUrl(rawUrl: string | undefined, publicBaseUrl: string): string | undefined {
+  if (!rawUrl) return undefined;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  const base = (publicBaseUrl || 'https://api.couple.io.vn').replace(/\/+$/, '');
+  return `${base}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
 }
 
 interface FcmServiceAccount {
@@ -121,18 +155,27 @@ async function sendSingleFcm(
   accessToken: string,
   fcmToken: string,
   payload: PushPayload,
+  publicBaseUrl: string,
 ): Promise<{ ok: boolean; removeToken?: boolean }> {
+  const actionType = normalizePushActionType(payload);
+  const targetUrl = payload.targetUrl || payload.url || '/app/home';
+  const senderAvatar = resolveAbsoluteMediaUrl(payload.senderAvatar, publicBaseUrl);
+  const photoUrl = resolveAbsoluteMediaUrl(payload.photoUrl, publicBaseUrl);
+
   const dataPayload: Record<string, string> = {
     title: payload.title,
     body: payload.body,
-    url: payload.url || '/app/home',
-    type: payload.type || 'general',
+    actionType,
+    kind: actionType,
+    targetUrl,
+    url: targetUrl,
+    type: payload.type || actionType,
+    senderName: payload.senderName || 'Người ấy',
+    photoUrl: photoUrl || '',
   };
   if (payload.checkinId) dataPayload.checkinId = payload.checkinId;
   if (payload.messageId) dataPayload.messageId = payload.messageId;
-  if (payload.senderName) dataPayload.senderName = payload.senderName;
-  if (payload.senderAvatar) dataPayload.senderAvatar = payload.senderAvatar;
-  if (payload.photoUrl) dataPayload.photoUrl = payload.photoUrl;
+  if (senderAvatar) dataPayload.senderAvatar = senderAvatar;
 
   const endpoint = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(sa.project_id)}/messages:send`;
   const res = await fetch(endpoint, {
@@ -193,7 +236,7 @@ export async function sendPushToUser(
       const tokensToRemove = new Set<string>();
       await Promise.all(
         fcmTokens.map(async (token) => {
-          const result = await sendSingleFcm(sa, accessToken, token, payload);
+          const result = await sendSingleFcm(sa, accessToken, token, payload, config.PUBLIC_BASE_URL);
           if (result.ok) fcmSent += 1;
           else if (result.removeToken) tokensToRemove.add(token);
         }),
@@ -220,18 +263,26 @@ export async function sendPushToUser(
     );
 
     if (subs.length > 0) {
+      const actionType = normalizePushActionType(payload);
+      const targetUrl = payload.targetUrl || payload.url || '/app/home';
+      const senderAvatar = resolveAbsoluteMediaUrl(payload.senderAvatar, config.PUBLIC_BASE_URL);
+      const photoUrl = resolveAbsoluteMediaUrl(payload.photoUrl, config.PUBLIC_BASE_URL);
       const bodyStr = JSON.stringify({
         title: payload.title,
         body: payload.body,
-        url: payload.url || '/app/home',
-        icon: payload.icon || '/assets/icon-192.png',
-        badge: payload.badge || '/assets/badge-72.png',
-        tag: payload.tag || 'lovecheck-notif',
-        type: payload.type || 'general',
+        actionType,
+        kind: actionType,
+        targetUrl,
+        url: targetUrl,
+        icon: payload.icon || senderAvatar || '/icons/icon-192.png',
+        badge: payload.badge || '/icons/icon-192.png',
+        tag: payload.tag || `lovecheck-${actionType}`,
+        type: payload.type || actionType,
         checkinId: payload.checkinId,
         messageId: payload.messageId,
-        senderAvatar: payload.senderAvatar,
-        photoUrl: payload.photoUrl,
+        senderName: payload.senderName || 'Người ấy',
+        senderAvatar,
+        photoUrl: photoUrl || '',
       });
 
       const vapid = {

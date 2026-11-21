@@ -11,6 +11,12 @@ import { generateId } from '../utils/id';
 
 export const messageStickerRoutes = new Hono<HonoAppEnv>();
 
+const STICKER_QUERY_MARKER = 'lc-media=sticker';
+
+function markStickerUrl(url: string): string {
+  return `${url}${url.includes('?') ? '&' : '?'}${STICKER_QUERY_MARKER}`;
+}
+
 messageStickerRoutes.post('/messages/sticker', authenticate, async (c) => {
   const auth = c.get('user')!;
   if (!auth.coupleId) {
@@ -38,12 +44,13 @@ messageStickerRoutes.post('/messages/sticker', authenticate, async (c) => {
       [auth.coupleId, clientMutationId],
     );
     if (existing) {
-      return c.json({ message: toMessageDto(existing) }, 200);
+      return c.json({ message: toMessageDto(existing), duplicate: true }, 200);
     }
   }
 
   const config = c.get('config');
   const saved = await saveUploadedImage(c.env.STORAGE, config, fileEntry, 'messages');
+  const stickerUrl = markStickerUrl(saved.url);
   const user = (await findUserById(c.env.DB, auth.id))!;
 
   const messageId = generateId();
@@ -54,15 +61,15 @@ messageStickerRoutes.post('/messages/sticker', authenticate, async (c) => {
     `INSERT INTO chat_messages (
       id, couple_id, sender_id, sender_name, type, image_url, storage_path,
       attachments_json, client_mutation_id, read_by_json, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 'sticker', ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, 'image', ?, ?, ?, ?, ?, ?, ?)`,
     [
       messageId,
       auth.coupleId,
       user.id,
       user.display_name,
-      saved.url,
+      stickerUrl,
       saved.storagePath,
-      JSON.stringify([{ url: saved.url, storagePath: saved.storagePath }]),
+      JSON.stringify([{ url: stickerUrl, storagePath: saved.storagePath }]),
       clientMutationId ?? null,
       JSON.stringify([user.id]),
       nowIso,
@@ -78,28 +85,35 @@ messageStickerRoutes.post('/messages/sticker', authenticate, async (c) => {
 
   const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
   if (partner) {
-    const body = 'Đã gửi một sticker dễ thương ✨';
+    const title = `${user.display_name} đã nhắn cho bạn`;
+    const body = 'Đã gửi một sticker';
     await Promise.allSettled([
       sendPushToUser(c.env, config, partner.id, {
-        title: user.display_name,
+        title,
         body,
+        icon: user.avatar_url ?? undefined,
+        badge: '/icons/icon-192.png',
         url: '/app/messages',
-        tag: `chat-${auth.coupleId}`,
-        type: 'chat_message',
+        targetUrl: '/app/messages',
+        tag: `message-${messageId}`,
+        kind: 'message',
+        actionType: 'message',
+        type: 'message',
         messageId,
         senderName: user.display_name,
         senderAvatar: user.avatar_url ?? undefined,
-        photoUrl: saved.url,
+        photoUrl: stickerUrl,
       }),
       emitRealtimeEvent(c.env, partner.id, {
-        type: 'message.created',
+        type: 'message',
         messageId,
         senderId: user.id,
         senderName: user.display_name,
         senderAvatar: user.avatar_url ?? undefined,
-        title: user.display_name,
+        title,
         body,
-        photoUrl: saved.url,
+        photoUrl: stickerUrl,
+        targetUrl: '/app/messages',
         url: '/app/messages',
         createdAt: nowIso,
       }),

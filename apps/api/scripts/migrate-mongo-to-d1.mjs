@@ -360,6 +360,27 @@ export function generateD1SeedSql(collections, options = {}) {
         }))
       : [];
 
+    const replyTo = doc.replyTo && typeof doc.replyTo === 'object'
+      ? {
+          ...doc.replyTo,
+          ...(doc.replyTo.mediaUrl
+            ? { mediaUrl: normalizeMediaUrl(doc.replyTo.mediaUrl, null, r2PublicUrl) || doc.replyTo.mediaUrl }
+            : {}),
+        }
+      : null;
+    const referencedCheckin = doc.referencedCheckin && typeof doc.referencedCheckin === 'object'
+      ? {
+          ...doc.referencedCheckin,
+          ...(doc.referencedCheckin.imageUrl
+            ? {
+                imageUrl:
+                  normalizeMediaUrl(doc.referencedCheckin.imageUrl, null, r2PublicUrl) ||
+                  doc.referencedCheckin.imageUrl,
+              }
+            : {}),
+        }
+      : null;
+
     statements.push(
       insertStmt(
         'chat_messages',
@@ -381,9 +402,9 @@ export function generateD1SeedSql(collections, options = {}) {
           storagePath,
           JSON.stringify(attachments),
           doc.replyToMessageId ? String(doc.replyToMessageId) : null,
-          doc.replyTo ? JSON.stringify(doc.replyTo) : null,
+          replyTo ? JSON.stringify(replyTo) : null,
           doc.referencedCheckinId ? String(doc.referencedCheckinId) : null,
-          doc.referencedCheckin ? JSON.stringify(doc.referencedCheckin) : null,
+          referencedCheckin ? JSON.stringify(referencedCheckin) : null,
           doc.systemEvent ? JSON.stringify(doc.systemEvent) : null,
           doc.clientMutationId ? String(doc.clientMutationId).trim() || null : null,
           doc.deletedAt ? toIso(doc.deletedAt) : null,

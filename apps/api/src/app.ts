@@ -61,10 +61,9 @@ export function createApp(): Hono<HonoAppEnv> {
     if (err instanceof AppError) {
       return c.json(
         {
-          error: {
-            code: err.code,
-            message: err.message,
-          },
+          error: err.message,
+          message: err.message,
+          code: err.code,
         },
         err.statusCode as 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500 | 503,
       );
@@ -73,10 +72,9 @@ export function createApp(): Hono<HonoAppEnv> {
     logger.error('Unhandled API error', err, { path: c.req.path, method: c.req.method });
     return c.json(
       {
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Đã xảy ra lỗi máy chủ nội bộ',
-        },
+        error: 'Đã xảy ra lỗi máy chủ nội bộ',
+        message: 'Đã xảy ra lỗi máy chủ nội bộ',
+        code: 'INTERNAL_ERROR',
       },
       500,
     );
@@ -87,11 +85,11 @@ export function createApp(): Hono<HonoAppEnv> {
   app.get('/uploads/*', async (c) => {
     const key = c.req.path.replace(/^\/+uploads\//, '');
     if (!key || key.includes('..') || !c.env?.STORAGE) {
-      return c.json({ error: { code: 'NOT_FOUND', message: 'Không tìm thấy tệp' } }, 404);
+      return c.json({ error: 'Không tìm thấy tệp', message: 'Không tìm thấy tệp', code: 'NOT_FOUND' }, 404);
     }
     const obj = await c.env.STORAGE.get(key);
     if (!obj) {
-      return c.json({ error: { code: 'NOT_FOUND', message: 'Không tìm thấy tệp' } }, 404);
+      return c.json({ error: 'Không tìm thấy tệp', message: 'Không tìm thấy tệp', code: 'NOT_FOUND' }, 404);
     }
     const headers = new Headers();
     obj.writeHttpMetadata(headers);
@@ -123,10 +121,9 @@ export function createApp(): Hono<HonoAppEnv> {
   app.notFound((c) =>
     c.json(
       {
-        error: {
-          code: 'NOT_FOUND',
-          message: 'Đường dẫn API không tồn tại',
-        },
+        error: 'Đường dẫn API không tồn tại',
+        message: 'Đường dẫn API không tồn tại',
+        code: 'NOT_FOUND',
       },
       404,
     ),

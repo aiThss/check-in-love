@@ -125,12 +125,18 @@ journeyRoutes.put('/journey', authenticate, async (c) => {
   const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
   if (partner && user) {
     const notif = buildNotification(user.display_name, body.actionType, body.itemTitle);
+    const targetUrl = body.actionType?.includes('place') ? '/app/journey?tab=map' : '/app/journey?tab=bucket';
     if (notif) {
       await sendPushToUser(c.env, c.get('config'), partner.id, {
         title: notif.title,
         body: notif.body,
-        url: '/app/journey',
-        tag: `journey-${auth.coupleId}`,
+        icon: user.avatar_url ?? undefined,
+        badge: '/icons/icon-192.png',
+        url: targetUrl,
+        targetUrl,
+        tag: `journey-${Date.now()}`,
+        kind: 'journey',
+        actionType: 'journey',
         type: 'journey',
         senderName: user.display_name,
         senderAvatar: user.avatar_url ?? undefined,
@@ -139,12 +145,17 @@ journeyRoutes.put('/journey', authenticate, async (c) => {
     await emitRealtimeEvent(c.env, partner.id, {
       type: 'journey.updated',
       journeyUpdated: true,
+      journey: {
+        places: nextPlaces,
+        bucketItems: nextBucketItems,
+      },
       senderId: user.id,
       senderName: user.display_name,
       senderAvatar: user.avatar_url ?? undefined,
       title: notif?.title ?? '',
       body: notif?.body ?? '',
-      url: '/app/journey',
+      targetUrl,
+      url: targetUrl,
     });
   }
 
@@ -183,6 +194,11 @@ journeyRoutes.post('/journey/sync', authenticate, async (c) => {
     Array.isArray(body?.localBucketItems) ? body!.localBucketItems : [],
   );
 
+  const placesJson = JSON.stringify(mergedPlaces);
+  const bucketsJson = JSON.stringify(mergedBuckets);
+  const hasNewChanges =
+    !existing || placesJson !== existing.places_json || bucketsJson !== existing.bucket_items_json;
+
   const nowIso = new Date().toISOString();
   await execute(
     c.env.DB,
@@ -194,12 +210,30 @@ journeyRoutes.post('/journey/sync', authenticate, async (c) => {
        updated_at = excluded.updated_at`,
     [
       auth.coupleId,
-      JSON.stringify(mergedPlaces),
-      JSON.stringify(mergedBuckets),
+      placesJson,
+      bucketsJson,
       nowIso,
       nowIso,
     ],
   );
+
+  if (hasNewChanges) {
+    const partner = await findPartnerUser(c.env.DB, auth.coupleId, auth.id);
+    if (partner) {
+      await emitRealtimeEvent(c.env, partner.id, {
+        type: 'journey.updated',
+        journeyUpdated: true,
+        journey: {
+          places: mergedPlaces,
+          bucketItems: mergedBuckets,
+        },
+        title: '',
+        body: '',
+        targetUrl: '/app/journey',
+        url: '/app/journey',
+      });
+    }
+  }
 
   return c.json({
     places: mergedPlaces,
