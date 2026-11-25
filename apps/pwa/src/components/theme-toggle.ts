@@ -1,14 +1,16 @@
-import { store } from '../store/index';
+import { triggerHaptic } from '../ui/haptics';
+import { icon } from '../ui/icons/icons';
+import { setUiTheme } from '../ui/theme/index';
 
-/** A small light/dark switch for unauthenticated entry screens. */
+/** A small light/dark switch for unauthenticated entry screens (Bespoke SVG, zero emojis). */
 export function createThemeToggleButton(): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'btn-icon auth-theme-toggle';
+  button.className = 'btn-icon c-icon-btn auth-theme-toggle';
 
   const sync = (): void => {
     const isDark = document.documentElement.dataset.theme === 'dark';
-    button.textContent = isDark ? '☀️' : '🌙';
+    button.replaceChildren(icon(isDark ? 'sun' : 'moon', { size: 20, variant: 'filled' }));
     button.setAttribute('aria-pressed', String(isDark));
     const nextLabel = isDark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối';
     button.setAttribute('aria-label', nextLabel);
@@ -16,8 +18,9 @@ export function createThemeToggleButton(): HTMLButtonElement {
   };
 
   button.addEventListener('click', () => {
+    triggerHaptic('tap');
     const isDark = document.documentElement.dataset.theme === 'dark';
-    store.set({ theme: isDark ? 'light' : 'dark' });
+    setUiTheme(isDark ? 'light' : 'dark');
     sync();
   });
 

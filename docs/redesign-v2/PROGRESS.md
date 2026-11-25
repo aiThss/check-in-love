@@ -81,3 +81,43 @@ Mẫu mỗi mục:
   ?? design/redesign-v2/decisions.md
   ?? design/redesign-v2/icon-spec.md
 - Diff apps/api + packages (phải rỗng): rỗng (OK)
+
+## 2026-11-26 00:38 — P2 App Shell & Bottom Nav v2 (Gemini)
+- Làm:
+  - Bọc toàn bộ CSS cũ vào `@layer legacy` trong `styles/index.css` để `@layer components` v2 tự thắng độ ưu tiên mà không dùng `!important`.
+  - Viết `src/ui/haptics.ts`, `src/ui/view-transitions.ts` (tích hợp vào `router.ts` với suy luận hướng `tab/forward/back` và fallback đồng bộ an toàn cho WebView cũ/JSDOM), `src/ui/swr-bar.ts` + hook sự kiện nền trong `api/query-cache.ts` (không đổi chữ ký hàm).
+  - Thiết kế lại `components/nav.ts` + `10-components/shell.css`: 5 tab dùng icon SVG "Nét Yêu" (outline -> filled + pop), nút Check-in ống kính tim (`checkin-lens`) có vòng glow + shutter micro-animation + haptic, thanh trượt indicator `transform`, huy hiệu tin chưa đọc + đồng bộ `navigator.setAppBadge`, preload chunk khi `pointerdown`/`pointerenter`, tự ẩn khi bàn phím ảo mở.
+  - Đồng bộ `components/modal.ts` (thêm focus trap bàn phím), `components/toast.ts`, `components/theme-toggle.ts` (icon SVG `sun`/`moon`), `refresh-icon.ts`, `smile-plus-icon.ts`.
+  - Tách lazy `dev-helper` & `anniversary-cards` khỏi `main.ts` giúp chunk `index` giảm từ `46,40 kB` xuống **`34,46 kB` gzip (-25,7%)**.
+  - Thêm unit test `src/ui/shell.test.ts` và mở rộng `components/nav.test.ts`.
+- Kiểm: lint ✅ · test ✅ (28 file / 139 test) · build ✅ (`index` gzip 34,46 kB) · `git diff apps/api packages apps/admin` rỗng ✅.
+- Dở: không có.
+- Bước tiếp: P3 (Chat `messages` làm lại toàn diện theo hướng MIX).
+
+### Snapshot tự động 2026-11-26 00:38
+- Nhánh: main
+- Commit cuối: 81bf01e feat(pwa): P1 design system v2 tokens, self-hosted fonts, 78 custom icons and UI library
+- File thay đổi chưa commit:
+   M HANDOFF.md
+   M apps/pwa/src/api/query-cache.ts
+   M apps/pwa/src/components/modal.ts
+   M apps/pwa/src/components/nav.test.ts
+   M apps/pwa/src/components/nav.ts
+   M apps/pwa/src/components/refresh-icon.ts
+   M apps/pwa/src/components/smile-plus-icon.ts
+   M apps/pwa/src/components/theme-toggle.ts
+   M apps/pwa/src/components/toast.ts
+   M apps/pwa/src/main.ts
+   M apps/pwa/src/router.ts
+   M apps/pwa/src/styles/index.css
+   M apps/pwa/src/ui/icons/icons.ts
+   M apps/pwa/src/ui/index.ts
+   M design/redesign-v2/decisions.md
+   M docs/redesign-v2/DECISIONS.md
+   M docs/redesign-v2/PROGRESS.md
+  ?? apps/pwa/src/styles/10-components/shell.css
+  ?? apps/pwa/src/ui/haptics.ts
+  ?? apps/pwa/src/ui/shell.test.ts
+  ?? apps/pwa/src/ui/swr-bar.ts
+  ?? apps/pwa/src/ui/view-transitions.ts
+- Diff apps/api + packages (phải rỗng): rỗng (OK)

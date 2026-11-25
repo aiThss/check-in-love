@@ -12,6 +12,16 @@ interface QueryEntry<T> {
 
 const queries = new Map<string, QueryEntry<unknown>>();
 const mutations = new Map<string, Promise<unknown>>();
+let activeRevalidations = 0;
+
+function notifySwrState(delta: number): void {
+  activeRevalidations = Math.max(0, activeRevalidations + delta);
+  if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+    window.dispatchEvent(
+      new CustomEvent('lovecheck:swr', { detail: { active: activeRevalidations > 0 } }),
+    );
+  }
+}
 
 export function getCachedQuery<T>(key: string): T | undefined {
   return queries.get(key)?.data as T | undefined;
@@ -28,6 +38,9 @@ export async function fetchQuery<T>(
   if (existing?.request) return existing.request;
 
   const entry: QueryEntry<T> = existing ?? { updatedAt: 0, version: 0 };
+  const isBackgroundRevalidation = entry.data !== undefined;
+  if (isBackgroundRevalidation) notifySwrState(1);
+
   const requestVersion = entry.version;
   const request = loader()
     .then((data) => {
@@ -45,6 +58,7 @@ export async function fetchQuery<T>(
       throw error;
     })
     .finally(() => {
+      if (isBackgroundRevalidation) notifySwrState(-1);
       if (entry.request === request) entry.request = undefined;
     });
 

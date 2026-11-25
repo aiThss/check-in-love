@@ -1,0 +1,287 @@
+/* ============================================================
+   10-components/shell.css — Bottom Nav v2, SWR Bar, View Transitions & Global Modal/Toast
+   ============================================================ */
+
+@layer components {
+  /* ── Thin Non-Blocking SWR Top Progress Bar (Zero CLS) ─────── */
+  .c-swr-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2.5px;
+    z-index: var(--z-toast);
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .c-swr-bar.is-active {
+    opacity: 1;
+  }
+
+  .c-swr-bar__runner {
+    width: 45%;
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(90deg, transparent, var(--accent-500), var(--accent-600), transparent);
+    transform: translateX(-120%);
+  }
+
+  .c-swr-bar.is-active .c-swr-bar__runner {
+    animation: cil-swr-slide 1.1s var(--ease-standard) infinite;
+  }
+
+  @keyframes cil-swr-slide {
+    0% { transform: translateX(-110%); }
+    100% { transform: translateX(310%); }
+  }
+
+  /* ── Bottom Navigation v2 (MIX: Selective Glass + Lens-Heart CTA) ── */
+  .c-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-nav);
+    display: flex;
+    justify-content: center;
+    padding: 8px 14px calc(10px + var(--safe-bottom));
+    pointer-events: none;
+    view-transition-name: cil-bottom-nav;
+    transition:
+      transform var(--duration-base) var(--ease-standard),
+      opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  :root.keyboard-open .c-nav,
+  :root[data-fullscreen-route='true'] .c-nav {
+    transform: translateY(120%);
+    opacity: 0;
+  }
+
+  .c-nav__bar {
+    position: relative;
+    pointer-events: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr 68px 1fr 1fr;
+    align-items: center;
+    width: min(100%, 456px);
+    height: 70px;
+    padding: 0 6px;
+    border-radius: 26px;
+    background: var(--glass-nav-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-nav-border);
+    box-shadow: var(--elev-3);
+  }
+
+  .c-nav__indicator {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    height: 54px;
+    border-radius: 18px;
+    background-color: var(--accent-100);
+    pointer-events: none;
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+    transition:
+      transform var(--duration-base) var(--ease-spring),
+      width var(--duration-base) var(--ease-spring),
+      opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .c-nav__indicator.is-visible {
+    opacity: 1;
+  }
+
+  .c-nav__item {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 52px;
+    min-width: 44px;
+    padding: 4px 2px;
+    border: 0;
+    border-radius: 18px;
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    transition:
+      color var(--duration-fast) var(--ease-standard),
+      transform var(--duration-instant) var(--ease-standard);
+  }
+
+  .c-nav__item:active {
+    transform: scale(0.92);
+  }
+
+  .c-nav__item.active {
+    color: var(--accent-700);
+  }
+
+  .c-nav__label {
+    font-size: 11px;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+
+  .c-nav__badge {
+    position: absolute;
+    top: 3px;
+    right: calc(50% - 20px);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-pill);
+    background-color: var(--accent-600);
+    color: var(--accent-on-solid);
+    border: 2px solid var(--surface-paper);
+    font-size: 10px;
+    font-weight: var(--font-weight-bold);
+    font-variant-numeric: tabular-nums;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .c-nav__badge[hidden] {
+    display: none;
+  }
+
+  /* ── Center Check-in Lens-Heart CTA ────────────────────────── */
+  .c-nav__checkin-slot {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 100%;
+  }
+
+  .c-nav__checkin-glow {
+    position: absolute;
+    top: -18px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--accent-500) 42%, transparent) 0%, transparent 72%);
+    pointer-events: none;
+    transition: transform var(--duration-base) var(--ease-spring);
+  }
+
+  .c-nav__checkin {
+    position: relative;
+    z-index: 2;
+    margin-top: -26px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 4px solid var(--surface-paper);
+    background: linear-gradient(155deg, var(--accent-500), var(--accent-600));
+    color: var(--accent-on-solid);
+    box-shadow: var(--elev-btn), var(--elev-2);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition:
+      transform var(--duration-fast) var(--ease-spring),
+      background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .c-nav__checkin:active {
+    transform: scale(0.9);
+  }
+
+  .c-nav__checkin.active {
+    background: var(--ink-1);
+    color: var(--ink-inverse);
+  }
+
+  @media (max-width: 359px) {
+    .c-nav__bar {
+      grid-template-columns: 1fr 1fr 58px 1fr 1fr;
+    }
+    .c-nav__checkin {
+      width: 54px;
+      height: 54px;
+      margin-top: -22px;
+    }
+    .c-nav__label {
+      font-size: 10px;
+    }
+  }
+
+  /* ── Global Modal v2 & Toast v2 Harmonization ──────────────── */
+  .modal-overlay.c-modal-overlay-v2 {
+    background-color: var(--overlay-scrim);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  .modal.c-modal-v2 {
+    background-color: var(--surface-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elev-4);
+    color: var(--ink-1);
+  }
+
+  .modal.c-modal-v2 .modal-title {
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-semibold);
+    color: var(--ink-1);
+  }
+
+  .toast.c-toast-v2 {
+    background-color: var(--surface-elevated);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elev-3);
+    color: var(--ink-1);
+  }
+
+  /* ── View Transitions API (Directional + Tab Cross-Fade) ───── */
+  ::view-transition-old(cil-bottom-nav),
+  ::view-transition-new(cil-bottom-nav) {
+    animation: none;
+  }
+
+  :root[data-vt-kind='tab']::view-transition-old(root) {
+    animation: cil-vt-fade-out 130ms var(--ease-standard) both;
+  }
+  :root[data-vt-kind='tab']::view-transition-new(root) {
+    animation: cil-vt-fade-in 170ms var(--ease-standard) both;
+  }
+
+  :root[data-vt-kind='forward']::view-transition-old(root) {
+    animation: cil-vt-forward-out 180ms var(--ease-standard) both;
+  }
+  :root[data-vt-kind='forward']::view-transition-new(root) {
+    animation: cil-vt-forward-in 220ms var(--ease-emphasized) both;
+  }
+
+  :root[data-vt-kind='back']::view-transition-old(root) {
+    animation: cil-vt-back-out 180ms var(--ease-standard) both;
+  }
+  :root[data-vt-kind='back']::view-transition-new(root) {
+    animation: cil-vt-back-in 220ms var(--ease-emphasized) both;
+  }
+
+  @keyframes cil-vt-fade-out { to { opacity: 0; } }
+  @keyframes cil-vt-fade-in { from { opacity: 0; } }
+  @keyframes cil-vt-forward-out { to { opacity: 0; transform: translateX(-16px); } }
+  @keyframes cil-vt-forward-in { from { opacity: 0; transform: translateX(22px); } }
+  @keyframes cil-vt-back-out { to { opacity: 0; transform: translateX(22px); } }
+  @keyframes cil-vt-back-in { from { opacity: 0; transform: translateX(-16px); } }
+}

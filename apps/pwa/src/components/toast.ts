@@ -293,7 +293,7 @@ export function showToast(message: string, type: ToastType = 'info'): void {
   const container = getContainer();
 
   const toast = document.createElement('div');
-  toast.className = `toast toast-${type} animate-slide-down`;
+  toast.className = `toast c-toast-v2 toast-${type} animate-slide-down`;
   toast.setAttribute('role', 'status');
   toast.innerHTML = `
     <span class="toast-icon" aria-hidden="true">${getIconMarkup(type)}</span>

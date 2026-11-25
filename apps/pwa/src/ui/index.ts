@@ -4,3 +4,6 @@ export * from './primitives';
 export * from './forms';
 export * from './feedback';
 export * from './overlays';
+export * from './haptics';
+export * from './view-transitions';
+export * from './swr-bar';

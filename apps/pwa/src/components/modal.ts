@@ -1,6 +1,6 @@
 import { closeHistoryLayer, openHistoryLayer } from '../router';
 
-// ── Modal ─────────────────────────────────────────────────────────────────────
+// ── Modal (v2 Harmonized with Focus Trap, ESC & History Layer) ────────────────
 
 export interface ModalOptions {
   title: string;
@@ -17,26 +17,35 @@ export interface ModalOptions {
   modalClass?: string;
 }
 
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 let activeOverlay: HTMLElement | null = null;
 let activeHistoryLayerId: string | null = null;
-let activeEscHandler: ((event: KeyboardEvent) => void) | null = null;
+let activeKeyHandler: ((event: KeyboardEvent) => void) | null = null;
+let previousFocusedEl: HTMLElement | null = null;
 
-function removeOverlay(overlay: HTMLElement, escHandler: (event: KeyboardEvent) => void): void {
-  document.removeEventListener('keydown', escHandler);
+function removeOverlay(overlay: HTMLElement, keyHandler: (event: KeyboardEvent) => void): void {
+  document.removeEventListener('keydown', keyHandler);
   overlay.remove();
 
   if (activeOverlay === overlay) {
     activeOverlay = null;
     activeHistoryLayerId = null;
-    activeEscHandler = null;
+    activeKeyHandler = null;
   }
-  if (!activeOverlay) document.body.style.overflow = '';
+  if (!activeOverlay) {
+    document.body.style.overflow = '';
+    previousFocusedEl?.focus?.();
+    previousFocusedEl = null;
+  }
 }
 
 export function showModal(options: ModalOptions): void {
+  previousFocusedEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   const overlay = document.createElement('div');
-  const overlayClasses = ['modal-overlay'];
+  const overlayClasses = ['modal-overlay', 'c-modal-overlay-v2'];
   if (options.center) overlayClasses.push('modal-center');
   if (options.overlayClass) overlayClasses.push(...options.overlayClass.split(' '));
   overlay.className = overlayClasses.join(' ');
@@ -45,7 +54,7 @@ export function showModal(options: ModalOptions): void {
   overlay.setAttribute('aria-label', options.title);
 
   const modal = document.createElement('div');
-  const modalClasses = ['modal', 'animate-scale-in'];
+  const modalClasses = ['modal', 'c-modal-v2', 'animate-scale-in'];
   if (options.modalClass) modalClasses.push(...options.modalClass.split(' '));
   modal.className = modalClasses.join(' ');
 
@@ -58,7 +67,7 @@ export function showModal(options: ModalOptions): void {
   // Content
   if (typeof options.content === 'string') {
     const p = document.createElement('p');
-    p.style.cssText = 'font-size:15px;color:var(--text-secondary);line-height:1.6;';
+    p.style.cssText = 'font-size:var(--text-base);color:var(--ink-2);line-height:var(--leading-normal);margin:0;';
     p.textContent = options.content;
     modal.appendChild(p);
   } else {
@@ -72,7 +81,8 @@ export function showModal(options: ModalOptions): void {
 
     if (options.cancelText !== undefined || options.onConfirm) {
       const cancelBtn = document.createElement('button');
-      cancelBtn.className = 'btn-ghost';
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn-ghost c-btn c-btn--ghost c-btn--sm';
       cancelBtn.textContent = options.cancelText ?? 'Hủy';
       cancelBtn.addEventListener('click', () => {
         options.onCancel?.();
@@ -83,14 +93,14 @@ export function showModal(options: ModalOptions): void {
 
     if (options.confirmText) {
       const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'btn-primary';
-      if (options.danger) {
-        confirmBtn.style.background = '#ef4444';
-      }
+      confirmBtn.type = 'button';
+      confirmBtn.className = options.danger
+        ? 'btn-primary c-btn c-btn--danger c-btn--sm'
+        : 'btn-primary c-btn c-btn--primary c-btn--sm';
       confirmBtn.textContent = options.confirmText;
       confirmBtn.addEventListener('click', async () => {
         confirmBtn.disabled = true;
-        confirmBtn.innerHTML = `<span class="spinner" style="width:18px;height:18px;border-width:2px"></span>`;
+        confirmBtn.innerHTML = `<span class="c-btn__spinner" aria-hidden="true"></span>`;
         try {
           await options.onConfirm?.();
           closeModal();
@@ -115,36 +125,51 @@ export function showModal(options: ModalOptions): void {
     }
   });
 
-  // Close on Escape
-  const escHandler = (e: KeyboardEvent) => {
+  // Close on Escape + Accessible Focus Trap
+  const keyHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       options.onCancel?.();
       closeModal();
-      document.removeEventListener('keydown', escHandler);
+      return;
+    }
+    if (e.key === 'Tab') {
+      const focusables = Array.from(modal.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
   };
-  document.addEventListener('keydown', escHandler);
+  document.addEventListener('keydown', keyHandler);
 
   const historyLayerId = openHistoryLayer((reason) => {
     if (reason === 'back') options.onCancel?.();
-    removeOverlay(overlay, escHandler);
+    removeOverlay(overlay, keyHandler);
   });
 
   (document.getElementById('modal-root') ?? document.body).appendChild(overlay);
   activeOverlay = overlay;
   activeHistoryLayerId = historyLayerId;
-  activeEscHandler = escHandler;
+  activeKeyHandler = keyHandler;
 
-  // Prevent body scroll
   document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => {
+    modal.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
+  });
 }
 
 export function closeModal(): void {
   const overlay = activeOverlay;
   const historyLayerId = activeHistoryLayerId;
-  const escHandler = activeEscHandler;
-  if (!overlay || !escHandler) return;
+  const keyHandler = activeKeyHandler;
+  if (!overlay || !keyHandler) return;
 
-  removeOverlay(overlay, escHandler);
+  removeOverlay(overlay, keyHandler);
   if (historyLayerId) closeHistoryLayer(historyLayerId);
 }

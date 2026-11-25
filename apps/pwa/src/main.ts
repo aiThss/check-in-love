@@ -1,11 +1,7 @@
 import './styles/index.css';
-import './styles/components.css';
-import './styles/animations.css';
-import './styles/message-image-viewer.css';
-import './styles/auth-interaction-vibe.css';
-import './styles/love-journey.css';
 import { store } from './store/index';
 import { initUiThemeEngine } from './ui/theme/index';
+import { initSwrBar } from './ui/swr-bar';
 import { initRouter, navigate } from './router';
 import { clearPrivateClientState } from './session';
 import { logger } from './utils/logger';
@@ -16,14 +12,13 @@ import { initMessageStickerInput } from './utils/message-sticker-input';
 import { initMessageThreadEnhancements } from './utils/message-thread-enhancements';
 import { initProfileCopyright } from './utils/profile-copyright';
 import { initProfileUiCleanup } from './utils/profile-ui-cleanup';
-import { initAnniversaryCards } from './utils/anniversary-cards';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 import { initRealtimeEvents } from './api/events';
 import { showModal } from './components/modal';
-import { initDevHelper } from './components/dev-helper';
 
 store.initTheme();
 initUiThemeEngine();
+initSwrBar();
 initKeyboardViewport();
 initAuthFocusScroll();
 initMessageReplyGesture();
@@ -31,8 +26,8 @@ initMessageStickerInput();
 initMessageThreadEnhancements();
 initProfileCopyright();
 initProfileUiCleanup();
-initAnniversaryCards();
 initRealtimeEvents();
+void import('./utils/anniversary-cards').then(({ initAnniversaryCards }) => initAnniversaryCards());
 
 const devHost = window.location.hostname;
 const isPrivateDevHost = devHost === 'localhost'
@@ -42,7 +37,7 @@ const isPrivateDevHost = devHost === 'localhost'
   || /^172\.(1[6-9]|2\d|3[01])\./.test(devHost);
 const isViteDev = Boolean((import.meta as any).env?.DEV);
 if (isViteDev || isPrivateDevHost) {
-  initDevHelper();
+  void import('./components/dev-helper').then(({ initDevHelper }) => initDevHelper());
 }
 
 void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());

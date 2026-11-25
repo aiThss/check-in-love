@@ -1,6 +1,7 @@
 import { createNav, setActiveNav } from './components/nav';
 import { consumeRouteInvalidation, clearRouteInvalidations } from './route-invalidation';
 import { store } from './store/index';
+import { inferTransitionKind, runViewTransition } from './ui/view-transitions';
 import { logger } from './utils/logger';
 
 export interface RoutePage {
@@ -477,31 +478,39 @@ async function renderRoute(path: string, locationPath = getCurrentPath()): Promi
 
     if (version !== navigationVersion) return;
 
-    if (isAppRoute && currentElement && !currentPath.startsWith('/app/')) {
-      currentElement.remove();
-      currentElement = null;
-    }
-    if (!isAppRoute) {
-      clearPageCache();
-      activeShell.pageHost.replaceChildren();
-    }
-    if (currentPage && currentPage !== nextPage) currentPage.deactivate?.();
+    const previousRoutePath = currentPath;
+    const commitDomSwap = () => {
+      if (isAppRoute && currentElement && !previousRoutePath.startsWith('/app/')) {
+        currentElement.remove();
+        currentElement = null;
+      }
+      if (!isAppRoute) {
+        clearPageCache();
+        activeShell.pageHost.replaceChildren();
+      }
+      if (currentPage && currentPage !== nextPage) currentPage.deactivate?.();
 
-    activeShell.navHost.hidden = !isAppRoute;
-    const devHelper = document.getElementById('dev-helper-root');
-    // Dev Helper is a global development overlay. It must remain available
-    // on standalone auth/setup pages as well as regular app routes.
-    if (devHelper) devHelper.style.display = '';
-    if (isAppRoute) setActiveNav(resolvedPath);
-    if (!nextContainer.isConnected) activeShell.pageHost.appendChild(nextContainer);
-    setOnlyActivePage(activeShell.pageHost, nextContainer);
-    if (!cachedPage) nextPage.element.classList.add('page-enter');
+      activeShell.navHost.hidden = !isAppRoute;
+      const devHelper = document.getElementById('dev-helper-root');
+      // Dev Helper is a global development overlay. It must remain available
+      // on standalone auth/setup pages as well as regular app routes.
+      if (devHelper) devHelper.style.display = '';
+      if (isAppRoute) setActiveNav(resolvedPath);
+      if (!nextContainer.isConnected) activeShell.pageHost.appendChild(nextContainer);
+      setOnlyActivePage(activeShell.pageHost, nextContainer);
+      if (!cachedPage) nextPage.element.classList.add('page-enter');
 
-    currentPath = pageKey;
-    currentElement = nextContainer;
-    currentPage = nextPage;
-    nextPage.activate?.();
-    clearChunkRecoveryMarker();
+      currentPath = pageKey;
+      currentElement = nextContainer;
+      currentPage = nextPage;
+      nextPage.activate?.();
+      clearChunkRecoveryMarker();
+    };
+
+    const vtKind = previousRoutePath
+      ? inferTransitionKind(previousRoutePath, pageKey)
+      : 'none';
+    runViewTransition(commitDomSwap, vtKind);
 
     requestAnimationFrame(() => {
       if (version !== navigationVersion) return;

@@ -193,9 +193,6 @@ export function iconMarkup(name: IconName, options: IconOptions = {}): string {
 }
 
 export function icon(name: IconName, options: IconOptions = {}): SVGSVGElement {
-  if (typeof document !== 'undefined') {
-    ensureIconSprite(document);
-  }
   const svg = document.createElementNS(SVG_NS, 'svg');
   const size = options.size ?? 24;
   svg.setAttribute('class', buildClassList(options));
