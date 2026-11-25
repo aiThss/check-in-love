@@ -177,3 +177,26 @@ Mẫu mỗi mục:
   ?? apps/pwa/src/styles/20-pages/memories.css
   ?? apps/pwa/src/ui/reactions.ts
 - Diff apps/api + packages (phải rỗng): rỗng (OK)
+
+## 2026-11-26 01:21 — P5 Love Journey & Secondary Screens (Gemini)
+- Làm:
+  - Nâng cấp `pages/love-journey.ts` + `styles/20-pages/journey.css`: thay toàn bộ emoji UI/marker/sparkle bằng bộ icon SVG "Nét Yêu", nâng cấp thẻ chi tiết địa điểm thành sheet kéo vuốt đóng trên bản đồ (`p-journey-sheet-handle`), giữ nguyên 100% engine MapLibre, cấu trúc ngoài `.journey-map-canvas-wrap`, CSS attribution và schema `lovecheck_journey_*` (23/23 test pass).
+  - Thiết kế lại `pages/random.ts`, `pages/replies.ts`, `pages/card-preview.ts`, `pages/test-mail.ts` + `styles/20-pages/secondary.css`: đồng bộ ngôn ngữ MIX (thẻ rút bài kiểu sticker editorial, bong bóng phản hồi viền mực, bộ sưu tập thiệp cào icon SVG riêng, trang chẩn đoán SMTP hỗ trợ sáng/tối).
+- Kiểm: lint ✅ · test ✅ (28 file / 141 test) · build ✅ (`index` gzip 34,82 kB; mọi file CSS `20-pages` <= 311 dòng, 0 `!important`) · `git diff apps/api packages apps/admin` rỗng ✅.
+- Dở: không có.
+- Bước tiếp: P6 (Auth + Onboarding + Install + Profile/Settings).
+
+### Snapshot tự động 2026-11-26 01:21
+- Nhánh: main
+- Commit cuối: 5d6495f feat(pwa): P4 editorial MIX redesign for Home, Check-in viewfinder, Memories SWR and Photo Viewer
+- File thay đổi chưa commit:
+   M HANDOFF.md
+   M apps/pwa/src/pages/card-preview.ts
+   M apps/pwa/src/pages/love-journey.ts
+   M apps/pwa/src/pages/random.ts
+   M apps/pwa/src/pages/replies.ts
+   M apps/pwa/src/pages/test-mail.ts
+   M docs/redesign-v2/PROGRESS.md
+  ?? apps/pwa/src/styles/20-pages/journey.css
+  ?? apps/pwa/src/styles/20-pages/secondary.css
+- Diff apps/api + packages (phải rỗng): rỗng (OK)

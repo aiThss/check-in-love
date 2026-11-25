@@ -1,0 +1,211 @@
+/* ============================================================
+   20-pages/journey.css — Editorial + Sticker Love Journey v2
+   Overrides legacy love-journey.css via @layer components
+   ============================================================ */
+
+@layer components {
+  .journey-page.p-journey {
+    max-width: 1120px;
+    padding: calc(var(--safe-top, 0px) + 18px) var(--space-4) calc(112px + var(--safe-bottom, 0px));
+    gap: var(--space-4);
+  }
+
+  .p-journey .journey-badge {
+    background: var(--gold-bg);
+    color: var(--gold-ink);
+    border: 2px solid var(--ink-border);
+    box-shadow: 2px 2px 0 var(--ink-border);
+    font-weight: 700;
+  }
+
+  .p-journey .journey-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+  }
+
+  .p-journey .journey-stat-card {
+    background: var(--surface-paper);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elev-1);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .p-journey .journey-stat-value {
+    font-family: var(--font-display);
+    color: var(--accent-600);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .p-journey .journey-tabs {
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-border);
+    border-radius: var(--radius-pill);
+    box-shadow: 2px 2px 0 var(--ink-border);
+    padding: 4px;
+  }
+
+  .p-journey .journey-tab-btn {
+    border-radius: var(--radius-pill);
+    min-height: 40px;
+    font-weight: 700;
+  }
+
+  .p-journey .journey-tab-btn.active {
+    background: var(--accent-500);
+    color: var(--text-on-accent);
+    box-shadow: none;
+  }
+
+  .p-journey .journey-map-panel {
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--sticker-shadow), var(--elev-2);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .p-journey .journey-panel-title {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 600;
+  }
+
+  .p-journey .journey-add-pin-btn {
+    min-height: 40px;
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-500);
+    color: var(--text-on-accent);
+    border: 1.5px solid var(--ink-border);
+  }
+
+  .p-journey .journey-map-ctrl-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .p-journey .journey-pin-dot.visited {
+    background: var(--accent-500);
+    color: #ffffff;
+    border: 2px solid var(--ink-border);
+    box-shadow: 2px 2px 0 var(--ink-border);
+  }
+
+  .p-journey .journey-pin-dot.wishlist {
+    background: var(--gold-bg);
+    color: var(--gold-ink);
+    border: 2px dashed var(--ink-border);
+  }
+
+  .p-journey .journey-pin-mini-badge {
+    width: 18px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    background: var(--accent-500);
+    color: #ffffff;
+    border: 1.5px solid #ffffff;
+  }
+
+  /* ── Draggable Selected Place Sheet inside Map ── */
+  .p-journey .journey-place-detail-card {
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--sticker-shadow), var(--elev-3);
+    padding: 10px 16px 16px;
+    touch-action: pan-x;
+  }
+
+  .p-journey-sheet-handle {
+    width: 38px;
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--neutral-300);
+    margin: 0 auto 4px;
+    cursor: grab;
+  }
+
+  .p-journey .journey-place-detail-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+  }
+
+  .p-journey .journey-place-card-close {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+  }
+
+  /* ── Bucket List Cards ── */
+  .p-journey .journey-progress-wrap {
+    background: var(--surface-paper);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .p-journey .journey-filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 38px;
+    background: var(--surface-paper);
+    border: 1.5px solid var(--border-subtle);
+  }
+
+  .p-journey .journey-filter-pill.active {
+    background: var(--accent-500);
+    border-color: var(--ink-border);
+    color: var(--text-on-accent);
+  }
+
+  .p-journey .journey-bucket-card {
+    background: var(--surface-paper);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--elev-1);
+  }
+
+  .p-journey .journey-bucket-card.completed {
+    background: var(--bg-canvas);
+    border-color: var(--accent-200);
+  }
+
+  .p-journey .journey-checkbox-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--ink-border);
+    background: var(--bg-canvas);
+    color: transparent;
+  }
+
+  .p-journey .journey-bucket-card.completed .journey-checkbox-btn {
+    background: var(--accent-500);
+    border-color: var(--ink-border);
+    color: var(--text-on-accent);
+  }
+
+  .p-journey .journey-modal-card {
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--sticker-shadow), var(--elev-4);
+  }
+
+  .p-journey-sparkle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    color: var(--accent-500);
+    animation: heartSparkleFly 0.78s cubic-bezier(0.12, 0.8, 0.32, 1) forwards;
+  }
+}

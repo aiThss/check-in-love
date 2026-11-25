@@ -1,9 +1,14 @@
+import '../styles/20-pages/secondary.css';
 import { navigate } from '../router';
 import { getCheckins } from '../api/checkins';
 import { createMessage } from '../api/messages';
-import type { CheckIn, CheckInReply } from '../api/types';
 import { showToast } from '../components/toast';
 import { store } from '../store/index';
+import { iconMarkup } from '../ui/icons/icons';
+import { createIconButton } from '../ui/primitives';
+import { createEmptyState, createSkeleton } from '../ui/feedback';
+import { triggerHaptic } from '../ui/haptics';
+import type { CheckIn, CheckInReply } from '../api/types';
 
 function escapeHtml(value: string | undefined): string {
   return (value ?? '')
@@ -28,70 +33,71 @@ function renderReplyList(container: HTMLElement, replies: CheckInReply[]): void 
 
   if (replies.length === 0) {
     const empty = document.createElement('p');
-    empty.className = 'reply-page-empty';
-    empty.textContent = 'Chưa có phản hồi. Viết điều đầu tiên nhé 💕';
+    empty.className = 'reply-page-empty u-text-secondary';
+    empty.style.cssText = 'text-align:center;padding:24px 0;font-size:13px;';
+    empty.textContent = 'Chưa có phản hồi nào. Hãy viết dòng đầu tiên cho khoảnh khắc này nhé.';
     container.appendChild(empty);
     return;
   }
 
   replies.forEach((reply) => {
     const item = document.createElement('article');
-    item.className = `reply-page-item${reply.isOwn ? ' own' : ''}`;
+    item.className = `reply-page-item p-reply-bubble${reply.isOwn ? ' own' : ''}`;
     item.innerHTML = `
-      <div class="reply-page-item-head">
+      <div class="reply-page-item-head" style="display:flex;justify-content:space-between;gap:12px;font-size:11px;opacity:0.82;margin-bottom:2px;">
         <strong>${escapeHtml(reply.userName)}</strong>
         <time>${formatTime(reply.createdAt)}</time>
       </div>
-      <p>${escapeHtml(reply.message)}</p>
+      <p style="margin:0;font-size:14px;line-height:1.45;">${escapeHtml(reply.message)}</p>
     `;
     container.appendChild(item);
   });
 }
 
 function renderMissingState(content: HTMLElement, message: string): void {
-  content.innerHTML = `
-    <div class="reply-page-empty-state">
-      <div class="reply-page-empty-icon">💬</div>
-      <h2>Không tìm thấy khoảnh khắc</h2>
-      <p>${escapeHtml(message)}</p>
-      <button type="button" class="btn-primary" data-back-to-memories>Về Kỷ niệm</button>
-    </div>
-  `;
-  content.querySelector<HTMLButtonElement>('[data-back-to-memories]')?.addEventListener('click', () => {
-    navigate('/app/memories');
-  });
+  content.replaceChildren(
+    createEmptyState({
+      illustration: 'messages',
+      title: 'Không tìm thấy khoảnh khắc',
+      description: message,
+      action: {
+        label: 'Về Kỷ niệm',
+        variant: 'primary',
+        pill: true,
+        leadingIcon: 'memories',
+        onClick: () => navigate('/app/memories'),
+      },
+    }),
+  );
 }
 
 function renderReplyThread(content: HTMLElement, checkin: CheckIn): void {
   const photo = checkin.photoUrl
-    ? `<img class="reply-page-photo" src="${escapeHtml(checkin.photoUrl)}" alt="Ảnh check-in" loading="eager" />`
+    ? `<img class="reply-page-photo p-reply-source__photo" src="${escapeHtml(checkin.photoUrl)}" alt="Ảnh check-in" loading="eager" />`
     : '';
 
   content.innerHTML = `
-    <article class="reply-page-card">
+    <article class="reply-page-card p-reply-source u-grain-surface">
       ${photo}
-      <div class="reply-page-card-copy">
-        <span class="reply-page-owner">${escapeHtml(checkin.ownerName)}</span>
-        <h2>${escapeHtml(checkin.caption || 'Một khoảnh khắc đáng yêu')}</h2>
-        <time>${formatTime(checkin.createdAt)}</time>
+      <div class="reply-page-card-copy p-reply-source__copy">
+        <span class="p-sec-header__eyebrow">${escapeHtml(checkin.ownerName)}</span>
+        <h2>${escapeHtml(checkin.caption || 'Khoảnh khắc đã lưu')}</h2>
+        <time class="u-text-secondary" style="font-size:11px;">${formatTime(checkin.createdAt)}</time>
       </div>
     </article>
-    <section class="reply-page-thread" aria-labelledby="reply-page-title">
-      <div class="reply-page-thread-heading">
-        <div>
-          <span class="reply-page-eyebrow">Phản hồi</span>
-          <h1 id="reply-page-title">Xem phản hồi <span class="reply-page-count">${checkin.replies.length}</span></h1>
-        </div>
-        <span class="reply-page-thread-hint">Nhắn như Messenger</span>
+    <section class="reply-page-thread" aria-labelledby="reply-page-title" style="display:flex;flex-direction:column;gap:12px;margin-top:16px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;">
+        <h2 id="reply-page-title" style="font-family:var(--font-display);font-size:18px;">Trò chuyện (<span class="reply-page-count">${checkin.replies.length}</span>)</h2>
+        <span class="u-text-secondary" style="font-size:11px;">Đồng bộ sang Tin nhắn</span>
       </div>
-      <div class="reply-page-list"></div>
-      <form class="reply-page-form" autocomplete="off">
+      <div class="reply-page-list p-reply-list"></div>
+      <form class="reply-page-form p-reply-composer" autocomplete="off">
         <input
           type="text"
           name="reply_text_input"
           maxlength="500"
           aria-label="Viết phản hồi"
-          placeholder="Viết phản hồi..."
+          placeholder="Nhắn đôi lời về khoảnh khắc này..."
           autocomplete="off"
           autocorrect="off"
           autocapitalize="sentences"
@@ -100,7 +106,9 @@ function renderReplyThread(content: HTMLElement, checkin: CheckIn): void {
           data-form-type="other"
           data-1p-ignore="true"
         />
-        <button type="submit" aria-label="Gửi phản hồi">↑</button>
+        <button type="submit" class="c-icon-btn c-icon-btn--accent" aria-label="Gửi phản hồi">
+          ${iconMarkup('send', { size: 16 })}
+        </button>
       </form>
     </section>
   `;
@@ -125,6 +133,7 @@ function renderReplyThread(content: HTMLElement, checkin: CheckIn): void {
         referencedCheckinId: checkin.id,
         clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
       });
+      triggerHaptic('tap');
       const user = store.get().user;
       checkin.replies = [
         ...checkin.replies,
@@ -150,28 +159,32 @@ function renderReplyThread(content: HTMLElement, checkin: CheckIn): void {
 
 export function renderRepliesPage(): HTMLElement {
   const root = document.createElement('div');
-  root.className = 'page replies-page animate-fade-in';
-  root.innerHTML = `
-    <header class="reply-page-header">
-      <button type="button" class="reply-page-back" aria-label="Quay lại">←</button>
-      <div>
-        <span class="reply-page-eyebrow">Kỷ niệm</span>
-        <h1>Phản hồi</h1>
-      </div>
-    </header>
-    <main class="reply-page-content">
-      <div class="reply-page-loading">Đang tải phản hồi...</div>
-    </main>
-  `;
+  root.className = 'page replies-page p-secondary animate-fade-in';
 
-  root.querySelector<HTMLButtonElement>('.reply-page-back')?.addEventListener('click', () => {
-    navigate('/app/memories');
+  const header = document.createElement('header');
+  header.className = 'reply-page-header p-sec-header';
+  const backBtn = createIconButton({
+    icon: 'back',
+    ariaLabel: 'Quay lại',
+    className: 'reply-page-back',
+    onClick: () => navigate('/app/memories'),
   });
+  const headCopy = document.createElement('div');
+  headCopy.innerHTML = `
+    <span class="p-sec-header__eyebrow">Kỷ niệm</span>
+    <h1 class="p-sec-header__title">Phản hồi khoảnh khắc</h1>
+  `;
+  header.append(backBtn, headCopy);
+  root.appendChild(header);
 
-  const content = root.querySelector<HTMLElement>('.reply-page-content');
+  const content = document.createElement('main');
+  content.className = 'reply-page-content';
+  content.appendChild(createSkeleton({ height: '96px' }));
+  root.appendChild(content);
+
   const checkinId = new URLSearchParams(window.location.search).get('checkinId');
-  if (!content || !checkinId) {
-    if (content) renderMissingState(content, 'Liên kết phản hồi không hợp lệ.');
+  if (!checkinId) {
+    renderMissingState(content, 'Liên kết phản hồi không hợp lệ.');
     return root;
   }
 

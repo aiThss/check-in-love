@@ -1,0 +1,294 @@
+/* ============================================================
+   20-pages/secondary.css — Random, Replies, Card Preview, Mail
+   ============================================================ */
+
+@layer components {
+  .p-secondary {
+    max-width: 500px;
+    margin: 0 auto;
+    width: 100%;
+    min-height: 100dvh;
+    padding: calc(var(--safe-top, 0px) + 20px) var(--space-4) calc(112px + var(--safe-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    box-sizing: border-box;
+  }
+
+  .p-secondary--wide {
+    max-width: 680px;
+    padding-bottom: calc(44px + var(--safe-bottom, 0px));
+  }
+
+  .p-sec-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .p-sec-header__eyebrow {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-600);
+  }
+
+  .p-sec-header__title {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    line-height: 1.15;
+  }
+
+  .p-sec-header__sub {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  /* ── Random Category Grid & Drawn Tarot Card ── */
+  .p-random-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .p-random-cat {
+    aspect-ratio: 1 / 1;
+    padding: 10px 8px;
+    border-radius: var(--radius-lg);
+    background: var(--surface-paper);
+    border: 1.5px solid var(--border-subtle);
+    box-shadow: var(--elev-1);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform var(--dur-instant) var(--ease-spring), border-color var(--dur-fast) var(--ease-standard);
+  }
+
+  .p-random-cat:active {
+    transform: scale(0.96);
+  }
+
+  .p-random-cat.is-selected {
+    background: var(--accent-50);
+    border: 2px solid var(--ink-border);
+    box-shadow: var(--sticker-shadow);
+    color: var(--accent-600);
+  }
+
+  .p-random-cat__icon {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    background: var(--neutral-100);
+    color: var(--accent-500);
+    display: grid;
+    place-items: center;
+  }
+
+  .p-random-cat.is-selected .p-random-cat__icon {
+    background: var(--accent-500);
+    color: var(--text-on-accent);
+  }
+
+  .p-random-cat__label {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .p-random-cat__meta {
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+
+  .p-random-draw-card {
+    padding: var(--space-5);
+    border-radius: var(--radius-xl);
+    background:
+      radial-gradient(circle at top right, var(--accent-100), transparent 60%),
+      var(--surface-paper);
+    border: 2.5px solid var(--ink-border);
+    box-shadow: var(--sticker-shadow), var(--elev-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--space-3);
+  }
+
+  .p-random-draw-card__prompt {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text-primary);
+  }
+
+  .p-random-draw-card__detail {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .p-random-draw-card__actions {
+    display: flex;
+    gap: var(--space-2);
+    width: 100%;
+    margin-top: var(--space-2);
+  }
+
+  .p-random-draw-card__actions .c-btn {
+    flex: 1;
+  }
+
+  /* ── Replies Thread Page ── */
+  .p-reply-source {
+    padding: 12px;
+    border-radius: var(--radius-xl);
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-border);
+    box-shadow: var(--sticker-shadow);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .p-reply-source__photo {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .p-reply-source__copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .p-reply-source__copy h2 {
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    color: var(--text-primary);
+  }
+
+  .p-reply-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .p-reply-bubble {
+    max-width: 84%;
+    align-self: flex-start;
+    padding: 10px 14px;
+    border-radius: 18px 18px 18px 6px;
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-border);
+    box-shadow: 2px 2px 0 var(--ink-border);
+  }
+
+  .p-reply-bubble.own {
+    align-self: flex-end;
+    border-radius: 18px 18px 6px 18px;
+    background: var(--bubble-self-bg);
+    color: var(--bubble-self-ink);
+  }
+
+  .p-reply-composer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px 6px 6px 14px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-border);
+    box-shadow: var(--sticker-shadow);
+  }
+
+  .p-reply-composer input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    outline: none;
+  }
+
+  /* ── Card Preview & Mail Diagnostic ── */
+  .p-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  @media (max-width: 440px) {
+    .p-preview-grid { grid-template-columns: 1fr; }
+  }
+
+  .p-preview-card-btn {
+    padding: 14px;
+    border-radius: var(--radius-lg);
+    background: var(--surface-paper);
+    border: 1.5px solid var(--border-subtle);
+    box-shadow: var(--elev-1);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    text-align: left;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: transform var(--dur-instant) var(--ease-standard);
+  }
+
+  .p-preview-card-btn:active { transform: scale(0.98); }
+
+  .p-preview-card-btn__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: var(--accent-100);
+    color: var(--accent-600);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+
+  .p-mail-status {
+    display: none;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+  }
+
+  .p-mail-status.is-visible { display: flex; }
+
+  .p-mail-status.is-success {
+    background: var(--accent-50);
+    border: 1.5px solid var(--accent-300);
+    color: var(--text-primary);
+  }
+
+  .p-mail-status.is-error {
+    background: rgba(225, 29, 72, 0.08);
+    border: 1.5px solid rgba(225, 29, 72, 0.35);
+    color: var(--text-primary);
+  }
+}

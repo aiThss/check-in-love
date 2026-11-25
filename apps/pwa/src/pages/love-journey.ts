@@ -1,9 +1,12 @@
 import { Map as MapLibreMap, Marker, LngLatBounds, setWorkerUrl } from 'maplibre-gl';
 import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import '../styles/20-pages/journey.css';
 import { navigate } from '../router';
 import { showToast } from '../components/toast';
 import { store } from '../store/index';
+import { iconMarkup, type IconName } from '../ui/icons/icons';
+import { triggerHaptic } from '../ui/haptics';
 import {
   saveCoupleJourney,
   syncCoupleJourneyWithServer,
@@ -168,12 +171,12 @@ const LEGACY_SEED_BUCKET = [
   { id: 'b15', title: 'Viết một bức thư tay và mở ra đọc sau 5 năm', category: 'future', completed: false, note: 'Giữ kín bí mật đến đúng ngày kỷ niệm' },
 ];
 
-const CATEGORY_MAP: Record<BucketCategory, { label: string; icon: string }> = {
-  dating: { label: 'Hẹn hò', icon: '🍷' },
-  travel: { label: 'Du lịch', icon: '✈️' },
-  cozy: { label: 'Đời thường', icon: '🏡' },
-  adventure: { label: 'Trải nghiệm', icon: '🎨' },
-  future: { label: 'Tương lai', icon: '💍' },
+const CATEGORY_MAP: Record<BucketCategory, { label: string; icon: IconName }> = {
+  dating: { label: 'Hẹn hò', icon: 'heart' },
+  travel: { label: 'Du lịch', icon: 'route' },
+  cozy: { label: 'Đời thường', icon: 'home' },
+  adventure: { label: 'Trải nghiệm', icon: 'palette' },
+  future: { label: 'Tương lai', icon: 'anniversary' },
 };
 
 function normalizeText(str: string): string {
@@ -395,11 +398,12 @@ export function saveStoredBucket(items: BucketItem[]): void {
 }
 
 function triggerHeartSparkles(originX: number, originY: number): void {
-  const emojis = ['💖', '✨', '❤️', '🌸', '💫'];
+  if (document.documentElement.getAttribute('data-reduced-motion') === 'on') return;
+  const icons: IconName[] = ['heart', 'sparkle', 'star'];
   for (let i = 0; i < 7; i++) {
     const particle = document.createElement('span');
-    particle.className = 'heart-sparkle-particle';
-    particle.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    particle.className = 'p-journey-sparkle';
+    particle.innerHTML = iconMarkup(icons[i % icons.length], { size: 16, variant: 'filled' });
     particle.style.left = `${originX}px`;
     particle.style.top = `${originY}px`;
     const angle = (Math.PI * 2 * i) / 7 + (Math.random() - 0.5) * 0.4;
@@ -441,7 +445,7 @@ export function renderLoveJourneyPage(): HTMLElement {
   const root = document.createElement('div') as HTMLElement & {
     destroy?: () => void;
   };
-  root.className = 'page journey-page animate-fade-in';
+  root.className = 'page journey-page p-journey animate-fade-in';
 
   let places = loadStoredPlaces();
   let bucketItems = loadStoredBucket();
@@ -459,9 +463,9 @@ export function renderLoveJourneyPage(): HTMLElement {
   hero.className = 'journey-hero';
   hero.innerHTML = `
     <div class="journey-tag-row">
-      <span class="journey-badge">🗺️ HÀNH TRÌNH ĐÔI</span>
-      <button type="button" class="btn-ghost" id="journey-back-btn" style="padding:6px 12px;border-radius:12px;font-size:13px;">
-        ← Về Home
+      <span class="journey-badge">${iconMarkup('map', { size: 16, variant: 'filled' })} HÀNH TRÌNH ĐÔI</span>
+      <button type="button" class="c-btn c-btn--ghost c-btn--sm c-btn--pill" id="journey-back-btn">
+        ${iconMarkup('back', { size: 16 })}<span>Về Home</span>
       </button>
     </div>
     <h1 class="journey-title">Bản đồ hẹn hò & Điều ước</h1>
@@ -500,10 +504,10 @@ export function renderLoveJourneyPage(): HTMLElement {
   tabContainer.className = 'journey-tabs';
   tabContainer.innerHTML = `
     <button type="button" class="journey-tab-btn${activeTab === 'map' ? ' active' : ''}" data-tab="map">
-      <span>🗺️</span> Bản đồ toạ độ
+      ${iconMarkup('map', { size: 16 })}<span>Bản đồ toạ độ</span>
     </button>
     <button type="button" class="journey-tab-btn${activeTab === 'bucket' ? ' active' : ''}" data-tab="bucket">
-      <span>✨</span> Điều ước
+      ${iconMarkup('bucket-list', { size: 16 })}<span>Điều ước</span>
     </button>
   `;
   root.appendChild(tabContainer);
@@ -583,10 +587,10 @@ export function renderLoveJourneyPage(): HTMLElement {
   mapPanel.innerHTML = `
     <div class="journey-panel-header">
       <h2 class="journey-panel-title">
-        <span>📍</span> Toạ độ kỷ niệm
+        ${iconMarkup('location-pin', { size: 20, variant: 'filled' })}<span>Toạ độ kỷ niệm</span>
       </h2>
       <button type="button" class="journey-add-pin-btn" id="btn-add-place">
-        <span>+</span> Thêm điểm đến
+        <span>+ Thêm điểm đến</span>
       </button>
     </div>
 
@@ -598,13 +602,13 @@ export function renderLoveJourneyPage(): HTMLElement {
       <div class="journey-map-floating-bar" aria-label="Bộ điều khiển bản đồ">
         <div class="journey-map-filter-group">
           <button type="button" class="journey-map-filter-btn${(activeMapFilter as string) === 'all' ? ' active' : ''}" data-map-filter="all">Tất cả</button>
-          <button type="button" class="journey-map-filter-btn${(activeMapFilter as string) === 'visited' ? ' active' : ''}" data-map-filter="visited">💖 Đã đi</button>
-          <button type="button" class="journey-map-filter-btn${(activeMapFilter as string) === 'wishlist' ? ' active' : ''}" data-map-filter="wishlist">✨ Ấp ủ</button>
+          <button type="button" class="journey-map-filter-btn${(activeMapFilter as string) === 'visited' ? ' active' : ''}" data-map-filter="visited">Đã đi</button>
+          <button type="button" class="journey-map-filter-btn${(activeMapFilter as string) === 'wishlist' ? ' active' : ''}" data-map-filter="wishlist">Ấp ủ</button>
         </div>
         <div class="journey-map-actions-group">
-          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-reset" title="Toàn cảnh Việt Nam & Biển Đông">🎯</button>
-          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-in" title="Phóng to">+</button>
-          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-out" title="Thu nhỏ">−</button>
+          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-reset" aria-label="Toàn cảnh Việt Nam và Biển Đông" title="Toàn cảnh Việt Nam & Biển Đông">${iconMarkup('route', { size: 16 })}</button>
+          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-in" aria-label="Phóng to" title="Phóng to">+</button>
+          <button type="button" class="journey-map-ctrl-btn" id="journey-btn-zoom-out" aria-label="Thu nhỏ" title="Thu nhỏ">−</button>
         </div>
       </div>
 
@@ -861,7 +865,7 @@ export function renderLoveJourneyPage(): HTMLElement {
         pinBtn.innerHTML = `
           <div class="journey-pin-avatar">
             <img src="${escapeHtml(place.photoUrl)}" alt="${escapeHtml(place.name)}" />
-            <span class="journey-pin-mini-badge">💖</span>
+            <span class="journey-pin-mini-badge">${iconMarkup('heart', { size: 16, variant: 'filled' })}</span>
             ${isSelected ? '<div class="journey-pin-pulse"></div>' : ''}
           </div>
           <span class="journey-pin-label">${escapeHtml(place.name)}</span>
@@ -869,9 +873,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       } else if (isVisited) {
         pinBtn.innerHTML = `
           <div class="journey-pin-dot visited">
-            <svg class="journey-pin-heart-svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
+            ${iconMarkup('heart', { size: 16, variant: 'filled' })}
             ${isSelected ? '<div class="journey-pin-pulse"></div>' : ''}
           </div>
           <span class="journey-pin-label">${escapeHtml(place.name)}</span>
@@ -879,9 +881,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       } else {
         pinBtn.innerHTML = `
           <div class="journey-pin-dot wishlist">
-            <svg class="journey-pin-star-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
+            ${iconMarkup('star', { size: 16 })}
             ${isSelected ? '<div class="journey-pin-pulse"></div>' : ''}
           </div>
           <span class="journey-pin-label">${escapeHtml(place.name)}</span>
@@ -929,10 +929,10 @@ export function renderLoveJourneyPage(): HTMLElement {
     if (places.length === 0) {
       emptySlot.innerHTML = `
         <div class="journey-map-empty-state">
-          <span class="journey-empty-icon" aria-hidden="true">🗺️</span>
+          <span class="journey-empty-icon" aria-hidden="true">${iconMarkup('map', { size: 28, variant: 'filled' })}</span>
           <h3 class="journey-empty-title">Chưa có điểm đến nào</h3>
           <p class="journey-empty-text">Lưu nơi đầu tiên hai bạn đã cùng nhau ghé qua.</p>
-          <button type="button" class="btn-primary" id="btn-empty-add-place" style="margin-top:6px;padding:8px 16px;font-size:13px;">
+          <button type="button" class="c-btn c-btn--primary c-btn--sm c-btn--pill" id="btn-empty-add-place" style="margin-top:6px;">
             + Thêm điểm đến
           </button>
         </div>
@@ -945,7 +945,7 @@ export function renderLoveJourneyPage(): HTMLElement {
     }
   }
 
-  // ── Render Selected Place Floating Card INSIDE Map ───────────
+  // ── Render Selected Place Draggable Sheet INSIDE Map ───────────
   function renderSelectedPlaceCard(): void {
     const selectedSlot = mapPanel.querySelector<HTMLElement>('#journey-selected-place-slot');
     if (!selectedSlot) return;
@@ -966,15 +966,50 @@ export function renderLoveJourneyPage(): HTMLElement {
     const card = document.createElement('div');
     card.className = 'journey-place-detail-card';
 
+    const handle = document.createElement('div');
+    handle.className = 'p-journey-sheet-handle';
+    handle.setAttribute('aria-hidden', 'true');
+    card.appendChild(handle);
+
+    // Drag-to-dismiss gesture on the floating place detail sheet
+    let dragStartY = 0;
+    let dragDelta = 0;
+    let dragging = false;
+    handle.addEventListener('pointerdown', (ev) => {
+      dragging = true;
+      dragStartY = ev.clientY;
+      dragDelta = 0;
+      try { handle.setPointerCapture(ev.pointerId); } catch {}
+    });
+    handle.addEventListener('pointermove', (ev) => {
+      if (!dragging) return;
+      dragDelta = Math.max(0, ev.clientY - dragStartY);
+      card.style.transform = `translateY(${dragDelta}px)`;
+    });
+    const finishDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      if (dragDelta > 64) {
+        triggerHaptic('tap');
+        selectedPlaceId = '';
+        syncMarkers();
+        renderSelectedPlaceCard();
+      } else {
+        card.style.transform = '';
+      }
+    };
+    handle.addEventListener('pointerup', finishDrag);
+    handle.addEventListener('pointercancel', finishDrag);
+
     const headerDiv = document.createElement('div');
     headerDiv.className = 'journey-place-detail-header';
 
     const leftHeader = document.createElement('div');
     const titleEl = document.createElement('h3');
     titleEl.className = 'journey-place-detail-title';
-    titleEl.textContent = `📍 ${selectedPlace.name}`;
+    titleEl.innerHTML = `${iconMarkup('location-pin', { size: 16, variant: 'filled' })}<span>${escapeHtml(selectedPlace.name)}</span>`;
     const regionEl = document.createElement('small');
-    regionEl.style.cssText = 'color:var(--text-secondary);font-size:11px;';
+    regionEl.style.cssText = 'color:var(--text-secondary);font-size:11px;display:block;';
     regionEl.textContent = `Khu vực: ${formatRegion(selectedPlace.region)}`;
     leftHeader.appendChild(titleEl);
     leftHeader.appendChild(regionEl);
@@ -984,14 +1019,14 @@ export function renderLoveJourneyPage(): HTMLElement {
 
     const statusBadge = document.createElement('span');
     statusBadge.className = `journey-place-detail-status ${selectedPlace.status}`;
-    statusBadge.textContent = isVisited ? '💖 Đã cùng nhau ghé' : '✨ Điểm đến ấp ủ';
+    statusBadge.textContent = isVisited ? 'Đã cùng ghé' : 'Điểm ấp ủ';
     rightHeader.appendChild(statusBadge);
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
     closeBtn.className = 'journey-place-card-close';
     closeBtn.setAttribute('aria-label', 'Đóng thẻ');
-    closeBtn.innerHTML = '&times;';
+    closeBtn.innerHTML = iconMarkup('close', { size: 16 });
     closeBtn.addEventListener('click', () => {
       selectedPlaceId = '';
       syncMarkers();
@@ -1020,11 +1055,9 @@ export function renderLoveJourneyPage(): HTMLElement {
     if (selectedPlace.visitedDate) {
       const dateRow = document.createElement('div');
       dateRow.style.cssText = 'font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;';
-      const labelSpan = document.createElement('span');
-      labelSpan.textContent = '📅 Ngày ghé thăm:';
+      dateRow.innerHTML = `${iconMarkup('calendar', { size: 16 })}<span>Ngày ghé thăm:</span>`;
       const valStrong = document.createElement('strong');
       valStrong.textContent = selectedPlace.visitedDate;
-      dateRow.appendChild(labelSpan);
       dateRow.appendChild(valStrong);
       card.appendChild(dateRow);
     }
@@ -1034,10 +1067,10 @@ export function renderLoveJourneyPage(): HTMLElement {
 
     const toggleBtn = document.createElement('button');
     toggleBtn.type = 'button';
-    toggleBtn.className = 'btn-primary';
+    toggleBtn.className = 'c-btn c-btn--primary c-btn--sm c-btn--pill';
     toggleBtn.id = 'btn-toggle-place-status';
-    toggleBtn.style.cssText = 'flex:1;padding:9px;font-size:12px;';
-    toggleBtn.textContent = isVisited ? 'Đánh dấu thành ấp ủ 🚩' : 'Đánh dấu đã ghé thăm 💖';
+    toggleBtn.style.flex = '1';
+    toggleBtn.textContent = isVisited ? 'Chuyển thành ấp ủ' : 'Đánh dấu đã ghé thăm';
     toggleBtn.addEventListener('click', (e) => {
       const nextStatus = isVisited ? 'wishlist' : 'visited';
       selectedPlace.status = nextStatus;
@@ -1053,10 +1086,11 @@ export function renderLoveJourneyPage(): HTMLElement {
         itemTitle: selectedPlace.name,
       }).catch(() => {});
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      triggerHaptic('confirm');
       triggerHeartSparkles(rect.left + rect.width / 2, rect.top);
       showToast(
         nextStatus === 'visited'
-          ? `Tuyệt vời! Đã ghi dấu toạ độ ${selectedPlace.name} 💖`
+          ? `Tuyệt vời! Đã ghi dấu toạ độ ${selectedPlace.name}`
           : `Đã chuyển ${selectedPlace.name} về danh sách ấp ủ`,
         'success',
       );
@@ -1068,10 +1102,9 @@ export function renderLoveJourneyPage(): HTMLElement {
 
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
-    editBtn.className = 'btn-ghost';
+    editBtn.className = 'c-btn c-btn--secondary c-btn--sm c-btn--pill';
     editBtn.id = 'btn-edit-place-note';
-    editBtn.style.cssText = 'padding:9px 12px;font-size:12px;';
-    editBtn.textContent = '✏️ Sửa';
+    editBtn.innerHTML = `${iconMarkup('edit', { size: 16 })}<span>Sửa</span>`;
     editBtn.addEventListener('click', () => {
       openEditPlaceModal(selectedPlace);
     });
@@ -1086,15 +1119,15 @@ export function renderLoveJourneyPage(): HTMLElement {
 
   // ── Render Bucket List Panel ─────────────────────────────────
   function renderBucketPanel(): void {
-    const categories: Array<{ id: 'all' | 'incomplete' | 'completed' | BucketCategory; label: string }> = [
+    const categories: Array<{ id: 'all' | 'incomplete' | 'completed' | BucketCategory; label: string; icon?: IconName }> = [
       { id: 'all', label: 'Tất cả' },
-      { id: 'incomplete', label: 'Chưa làm ⏳' },
-      { id: 'completed', label: 'Đã hoàn thành 🎉' },
-      { id: 'dating', label: '🍷 Hẹn hò' },
-      { id: 'travel', label: '✈️ Du lịch' },
-      { id: 'cozy', label: '🏡 Đời thường' },
-      { id: 'adventure', label: '🎨 Trải nghiệm' },
-      { id: 'future', label: '💍 Tương lai' },
+      { id: 'incomplete', label: 'Chưa làm', icon: 'clock' },
+      { id: 'completed', label: 'Đã đạt được', icon: 'check' },
+      { id: 'dating', label: 'Hẹn hò', icon: 'heart' },
+      { id: 'travel', label: 'Du lịch', icon: 'route' },
+      { id: 'cozy', label: 'Đời thường', icon: 'home' },
+      { id: 'adventure', label: 'Trải nghiệm', icon: 'palette' },
+      { id: 'future', label: 'Tương lai', icon: 'anniversary' },
     ];
 
     const completedCount = bucketItems.filter((b) => b.completed).length;
@@ -1103,10 +1136,10 @@ export function renderLoveJourneyPage(): HTMLElement {
     bucketPanel.innerHTML = `
       <div class="journey-panel-header">
         <h2 class="journey-panel-title">
-          <span>📋</span> Điều ước cùng nhau
+          ${iconMarkup('bucket-list', { size: 20, variant: 'filled' })}<span>Điều ước cùng nhau</span>
         </h2>
         <button type="button" class="journey-add-pin-btn" id="btn-add-bucket">
-          <span>+</span> Thêm điều ước
+          <span>+ Thêm điều ước</span>
         </button>
       </div>
 
@@ -1125,7 +1158,7 @@ export function renderLoveJourneyPage(): HTMLElement {
           .map(
             (c) => `
           <button type="button" class="journey-filter-pill${activeFilter === c.id ? ' active' : ''}" data-filter="${c.id}">
-            ${c.label}
+            ${c.icon ? iconMarkup(c.icon, { size: 16 }) : ''}<span>${c.label}</span>
           </button>
         `,
           )
@@ -1157,10 +1190,10 @@ export function renderLoveJourneyPage(): HTMLElement {
     if (bucketItems.length === 0) {
       listSlot.innerHTML = `
         <div class="journey-empty-state">
-          <span class="journey-empty-icon" aria-hidden="true">✨</span>
+          <span class="journey-empty-icon" aria-hidden="true">${iconMarkup('sparkle', { size: 28, variant: 'filled' })}</span>
           <h3 class="journey-empty-title">Chưa có điều ước nào</h3>
           <p class="journey-empty-text">Tạo điều đầu tiên hai bạn muốn cùng nhau thực hiện.</p>
-          <button type="button" class="btn-primary" id="btn-empty-add-bucket" style="margin-top:6px;padding:8px 16px;font-size:13px;">
+          <button type="button" class="c-btn c-btn--primary c-btn--sm c-btn--pill" id="btn-empty-add-bucket" style="margin-top:6px;">
             + Thêm điều ước
           </button>
         </div>
@@ -1179,7 +1212,7 @@ export function renderLoveJourneyPage(): HTMLElement {
     if (filtered.length === 0) {
       listSlot.innerHTML = `
         <div class="journey-empty-state">
-          <span class="journey-empty-icon" aria-hidden="true">🍃</span>
+          <span class="journey-empty-icon" aria-hidden="true">${iconMarkup('bucket-list', { size: 28 })}</span>
           <p class="journey-empty-text">Chưa có điều ước nào trong mục này.</p>
         </div>
       `;
@@ -1191,7 +1224,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       const card = document.createElement('div');
       card.className = `journey-bucket-card${item.completed ? ' completed' : ''}`;
 
-      const catMeta = CATEGORY_MAP[item.category] || { label: 'Khác', icon: '✨' };
+      const catMeta = CATEGORY_MAP[item.category] || { label: 'Khác', icon: 'sparkle' as IconName };
 
       const topRow = document.createElement('div');
       topRow.className = 'journey-bucket-card-top';
@@ -1200,14 +1233,14 @@ export function renderLoveJourneyPage(): HTMLElement {
       checkBtn.type = 'button';
       checkBtn.className = 'journey-checkbox-btn';
       checkBtn.setAttribute('aria-label', item.completed ? 'Bỏ hoàn thành' : 'Đánh dấu hoàn thành');
-      checkBtn.textContent = item.completed ? '✓' : '';
+      checkBtn.innerHTML = item.completed ? iconMarkup('check', { size: 20, motion: 'draw' }) : '';
 
       const infoDiv = document.createElement('div');
       infoDiv.className = 'journey-bucket-info';
 
       const catSpan = document.createElement('span');
       catSpan.className = 'journey-bucket-category';
-      catSpan.innerHTML = `<span>${catMeta.icon}</span> ${catMeta.label}`;
+      catSpan.innerHTML = `${iconMarkup(catMeta.icon, { size: 16 })}<span>${catMeta.label}</span>`;
 
       const titleH3 = document.createElement('h3');
       titleH3.className = 'journey-bucket-title';
@@ -1233,7 +1266,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       if (item.completed && item.completedDate) {
         const badge = document.createElement('span');
         badge.className = 'journey-bucket-date-badge';
-        badge.textContent = `🎉 Đạt được: ${item.completedDate}`;
+        badge.innerHTML = `${iconMarkup('check', { size: 16 })}<span>Đạt được: ${escapeHtml(item.completedDate)}</span>`;
         bottomRow.appendChild(badge);
       } else {
         const hint = document.createElement('span');
@@ -1244,9 +1277,8 @@ export function renderLoveJourneyPage(): HTMLElement {
 
       const editBtn = document.createElement('button');
       editBtn.type = 'button';
-      editBtn.className = 'btn-ghost';
-      editBtn.style.cssText = 'padding:4px 8px;font-size:11px;';
-      editBtn.textContent = '✏️';
+      editBtn.className = 'c-icon-btn c-icon-btn--ghost';
+      editBtn.innerHTML = iconMarkup('edit', { size: 16 });
       editBtn.setAttribute('aria-label', `Sửa điều ước ${item.title}`);
       editBtn.addEventListener('click', () => {
         openEditBucketModal(item);
@@ -1274,11 +1306,12 @@ export function renderLoveJourneyPage(): HTMLElement {
         }).catch(() => {});
 
         const rect = checkBtn.getBoundingClientRect();
+        triggerHaptic(nextState ? 'confirm' : 'tap');
         triggerHeartSparkles(rect.left + rect.width / 2, rect.top);
 
         showToast(
           nextState
-            ? `Chúc mừng hai bạn đã hoàn thành: "${item.title}"! 🎉`
+            ? `Chúc mừng hai bạn đã hoàn thành: "${item.title}"!`
             : `Đã chuyển về danh sách chưa hoàn thành`,
           'success',
         );
@@ -1328,8 +1361,8 @@ export function renderLoveJourneyPage(): HTMLElement {
           <div class="journey-form-group">
             <label class="journey-form-label" for="add-place-status">Trạng thái</label>
             <select id="add-place-status" class="journey-form-select" name="status">
-              <option value="wishlist">✨ Điểm đến ấp ủ muốn đi</option>
-              <option value="visited">💖 Đã cùng nhau ghé thăm</option>
+              <option value="wishlist">Điểm đến ấp ủ muốn đi</option>
+              <option value="visited">Đã cùng nhau ghé thăm</option>
             </select>
           </div>
           <div class="journey-form-group" id="group-visited-date" style="display:none;">
@@ -1483,7 +1516,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       }).catch(() => {});
       selectedPlaceId = newPlace.id;
       closeModal();
-      showToast(`Đã thêm toạ độ "${name}" vào bản đồ! 📍`, 'success');
+      showToast(`Đã thêm toạ độ "${name}" vào bản đồ!`, 'success');
       syncMarkers();
       setupJourneyRouteLayer();
       renderSelectedPlaceCard();
@@ -1604,11 +1637,11 @@ export function renderLoveJourneyPage(): HTMLElement {
           <div class="journey-form-group">
             <label class="journey-form-label" for="add-bucket-category">Danh mục</label>
             <select id="add-bucket-category" class="journey-form-select" name="category">
-              <option value="dating">🍷 Hẹn hò & Ẩm thực</option>
-              <option value="travel">✈️ Du lịch & Khám phá</option>
-              <option value="cozy">🏡 Đời thường ấm áp</option>
-              <option value="adventure">🎨 Trải nghiệm mới</option>
-              <option value="future">💍 Cột mốc tương lai</option>
+              <option value="dating">Hẹn hò & Ẩm thực</option>
+              <option value="travel">Du lịch & Khám phá</option>
+              <option value="cozy">Đời thường ấm áp</option>
+              <option value="adventure">Trải nghiệm mới</option>
+              <option value="future">Cột mốc tương lai</option>
             </select>
           </div>
           <div class="journey-form-group">
@@ -1656,7 +1689,7 @@ export function renderLoveJourneyPage(): HTMLElement {
         itemTitle: newItem.title,
       }).catch(() => {});
       closeModal();
-      showToast('Đã thêm điều ước mới vào danh sách! ✨', 'success');
+      showToast('Đã thêm điều ước mới vào danh sách!', 'success');
       renderBucketPanel();
       updateStats();
     });
@@ -1679,11 +1712,11 @@ export function renderLoveJourneyPage(): HTMLElement {
           <div class="journey-form-group">
             <label class="journey-form-label" for="edit-bucket-category">Danh mục</label>
             <select id="edit-bucket-category" class="journey-form-select" name="category">
-              <option value="dating"${item.category === 'dating' ? ' selected' : ''}>🍷 Hẹn hò & Ẩm thực</option>
-              <option value="travel"${item.category === 'travel' ? ' selected' : ''}>✈️ Du lịch & Khám phá</option>
-              <option value="cozy"${item.category === 'cozy' ? ' selected' : ''}>🏡 Đời thường ấm áp</option>
-              <option value="adventure"${item.category === 'adventure' ? ' selected' : ''}>🎨 Trải nghiệm mới</option>
-              <option value="future"${item.category === 'future' ? ' selected' : ''}>💍 Cột mốc tương lai</option>
+              <option value="dating"${item.category === 'dating' ? ' selected' : ''}>Hẹn hò & Ẩm thực</option>
+              <option value="travel"${item.category === 'travel' ? ' selected' : ''}>Du lịch & Khám phá</option>
+              <option value="cozy"${item.category === 'cozy' ? ' selected' : ''}>Đời thường ấm áp</option>
+              <option value="adventure"${item.category === 'adventure' ? ' selected' : ''}>Trải nghiệm mới</option>
+              <option value="future"${item.category === 'future' ? ' selected' : ''}>Cột mốc tương lai</option>
             </select>
           </div>
           <div class="journey-form-group">

@@ -1,14 +1,19 @@
+import '../styles/20-pages/secondary.css';
 import { navigate } from '../router';
 import { getCategories, drawRandom, getHistory } from '../api/random';
 import { showToast } from '../components/toast';
+import { iconMarkup, type IconName } from '../ui/icons/icons';
+import { createBadge, createButton, createIconButton } from '../ui/primitives';
+import { createListGroup, createListRow } from '../ui/feedback';
+import { triggerHaptic } from '../ui/haptics';
 import type { RandomCategory, RandomHistoryItem, RandomItem } from '../api/types';
 
-const CATEGORY_ICONS: Record<string, string> = {
-  questions: '❓',
-  snap: '📸',
-  today: '📅',
-  food: '🍲',
-  universe: '🌌',
+const CATEGORY_ICONS: Record<string, IconName> = {
+  questions: 'help',
+  snap: 'camera',
+  today: 'calendar',
+  food: 'gift',
+  universe: 'sparkle',
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -21,335 +26,231 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export function renderRandomPage(): HTMLElement {
   const root = document.createElement('div');
-  root.className = 'page random-page animate-fade-in';
-  root.style.cssText = `
-    padding: calc(var(--safe-top) + 20px) 16px calc(var(--safe-bottom) + 118px) 16px;
-    margin: 0 auto;
-    width: 100%;
-    max-width: min(480px, 100%);
-    box-sizing: border-box;
-    min-height: 100dvh;
-    overflow-x: hidden;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(12px, 2.4vh, 20px);
-  `;
+  root.className = 'page random-page p-secondary animate-fade-in';
 
   // Header
-  const header = document.createElement('div');
-  header.style.cssText = 'margin-bottom:4px;';
-  header.innerHTML = `
-    <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.03em;">Thử chút gì đó khác</h1>
-    <p style="font-size:13px;color:var(--text-secondary);">Để vũ trụ quyết định hoạt động của hai đứa nhé 🎲</p>
+  const header = document.createElement('header');
+  header.className = 'p-sec-header';
+  header.appendChild(
+    createIconButton({
+      icon: 'back',
+      ariaLabel: 'Quay lại',
+      onClick: () => navigate('/app/checkin'),
+    }),
+  );
+  const headCopy = document.createElement('div');
+  headCopy.innerHTML = `
+    <span class="p-sec-header__eyebrow">Hộp bất ngờ</span>
+    <h1 class="p-sec-header__title">Thử chút điều mới</h1>
+    <p class="p-sec-header__sub">Để vũ trụ chọn giúp hoạt động cho hai đứa hôm nay</p>
   `;
+  header.appendChild(headCopy);
   root.appendChild(header);
 
-  // Selected state
   let selectedCategory: string | undefined = undefined;
   let categories: RandomCategory[] = [];
 
-  // Category Selector grid
-  const selectorTitle = document.createElement('label');
-  selectorTitle.className = 'input-label';
-  selectorTitle.textContent = 'Chọn một chủ đề hoặc để ngẫu nhiên';
-  root.appendChild(selectorTitle);
-
   const grid = document.createElement('div');
-  grid.className = 'random-category-grid';
-  grid.style.cssText = `
-    width:100%;
-    max-width:100%;
-    display:grid;
-    grid-template-columns:repeat(3, minmax(0, 1fr));
-    gap:clamp(10px, 3vw, 12px);
-    overflow:hidden;
-  `;
+  grid.className = 'random-category-grid p-random-grid';
   root.appendChild(grid);
 
-  // Big Action Button
-  const actionBtn = document.createElement('button');
-  actionBtn.className = 'btn-primary btn-primary-full animate-slide-up';
-  actionBtn.style.cssText = 'padding:16px;font-size:17px;font-weight:700;margin-top:4px;';
-  actionBtn.innerHTML = `Bốc ngay! 🎲`;
-  root.appendChild(actionBtn);
+  const drawBtnCtrl = createButton({
+    label: 'Rút thẻ ngẫu nhiên',
+    variant: 'sticker',
+    size: 'lg',
+    pill: true,
+    block: true,
+    leadingIcon: 'dice',
+  });
+  root.appendChild(drawBtnCtrl.element);
 
-  // Result Card Container
   const resultContainer = document.createElement('div');
-  resultContainer.style.cssText = 'margin-top:4px;display:none;';
+  resultContainer.hidden = true;
   root.appendChild(resultContainer);
 
-  // History Container
-  const historyWrapper = document.createElement('div');
-  historyWrapper.style.cssText = 'margin-top:12px;display:flex;flex-direction:column;gap:12px;';
+  const historyWrapper = document.createElement('section');
+  historyWrapper.style.cssText = 'display:flex;flex-direction:column;gap:10px;margin-top:4px;';
   historyWrapper.innerHTML = `
-    <h3 style="font-size:15px;font-weight:700;color:var(--text-secondary);">Lịch sử rút bài</h3>
-    <div id="history-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <span class="p-sec-header__eyebrow">Những thẻ vừa rút</span>
+    <div id="history-list"></div>
   `;
   root.appendChild(historyWrapper);
 
-  // Fetch Categories and render
-  async function loadCategories() {
+  async function loadCategories(): Promise<void> {
     try {
-      const res = await getCategories();
-      categories = res;
-      renderCategories();
+      categories = await getCategories();
     } catch {
-      // Fallback
       categories = [
-        { category: 'questions', label: 'Câu hỏi', description: 'Hỏi đáp thấu hiểu', icon: '❓', usageCount: 0 },
-        { category: 'snap', label: 'Chụp hình', description: 'Thử thách chụp ảnh', icon: '📸', usageCount: 0 },
-        { category: 'today', label: 'Hôm nay', description: 'Hoạt động trong ngày', icon: '📅', usageCount: 0 },
-        { category: 'food', label: 'Món ăn', description: 'Hôm nay ăn gì', icon: '🍲', usageCount: 0 },
-        { category: 'universe', label: 'Vũ trụ', description: 'Lời nhắn ngẫu nhiên', icon: '🌌', usageCount: 0 },
+        { category: 'questions', label: 'Câu hỏi', description: 'Hỏi đáp thấu hiểu', icon: 'help', usageCount: 0 },
+        { category: 'snap', label: 'Chụp hình', description: 'Thử thách chụp ảnh', icon: 'camera', usageCount: 0 },
+        { category: 'today', label: 'Hôm nay', description: 'Hoạt động trong ngày', icon: 'calendar', usageCount: 0 },
+        { category: 'food', label: 'Món ăn', description: 'Hôm nay ăn gì', icon: 'gift', usageCount: 0 },
+        { category: 'universe', label: 'Vũ trụ', description: 'Lời nhắn ngẫu nhiên', icon: 'sparkle', usageCount: 0 },
       ];
+    }
+    renderCategories();
+  }
+
+  function buildCategoryTile(
+    catKey: string | undefined,
+    label: string,
+    iconName: IconName,
+    usageCount = 0,
+  ): HTMLButtonElement {
+    const isSelected = selectedCategory === catKey;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `p-random-cat${isSelected ? ' is-selected' : ''}`;
+    btn.setAttribute('aria-pressed', String(isSelected));
+    btn.innerHTML = `
+      <span class="p-random-cat__icon">${iconMarkup(iconName, { size: 20, variant: isSelected ? 'filled' : 'outline' })}</span>
+      <span class="p-random-cat__label">${label}</span>
+      ${usageCount > 0 ? `<span class="p-random-cat__meta">Rút ${usageCount} lần</span>` : ''}
+    `;
+    btn.addEventListener('click', () => {
+      selectedCategory = catKey;
+      triggerHaptic('select');
       renderCategories();
-    }
+    });
+    return btn;
   }
 
-  function renderCategories() {
-    grid.innerHTML = '';
-    
-    // Add "Ngẫu nhiên" card
-    const randomCard = document.createElement('button');
-    randomCard.style.cssText = getCardStyle(selectedCategory === undefined);
-    randomCard.innerHTML = `
-      <div style="font-size:28px;line-height:1;">🎲</div>
-      <div style="font-size:12px;font-weight:600;margin-top:4px;">Bất kỳ</div>
-    `;
-    randomCard.addEventListener('click', () => {
-      selectedCategory = undefined;
-      updateSelections();
-    });
-    styleCategoryCardContent(randomCard);
-    grid.appendChild(randomCard);
-
-    categories.forEach(cat => {
-      const card = document.createElement('button');
-      const isSelected = selectedCategory === cat.category;
-      card.style.cssText = getCardStyle(isSelected);
-      const icon = CATEGORY_ICONS[cat.category] || '✨';
-      card.innerHTML = `
-        <div style="font-size:28px;line-height:1;">${icon}</div>
-        <div style="font-size:12px;font-weight:600;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;">${cat.label}</div>
-        ${cat.usageCount > 0 ? `<div style="font-size:9px;color:var(--text-secondary);margin-top:2px;">Rút ${cat.usageCount} lần</div>` : ''}
-      `;
-      card.addEventListener('click', () => {
-        selectedCategory = cat.category;
-        updateSelections();
-      });
-      styleCategoryCardContent(card);
-      grid.appendChild(card);
+  function renderCategories(): void {
+    grid.replaceChildren();
+    grid.appendChild(buildCategoryTile(undefined, 'Bất kỳ', 'dice'));
+    categories.forEach((cat) => {
+      const iconName = CATEGORY_ICONS[cat.category] ?? 'sparkle';
+      grid.appendChild(buildCategoryTile(cat.category, cat.label, iconName, cat.usageCount));
     });
   }
 
-  function styleCategoryCardContent(card: HTMLButtonElement): void {
-    const icon = card.children[0] as HTMLElement | undefined;
-    const title = card.children[1] as HTMLElement | undefined;
-    const meta = card.children[2] as HTMLElement | undefined;
+  drawBtnCtrl.element.addEventListener('click', async () => {
+    drawBtnCtrl.setLoading(true, 'Đang xào thẻ...');
+    triggerHaptic('tap');
 
-    if (icon) {
-      icon.style.fontSize = 'clamp(24px, 7vw, 34px)';
-      icon.style.lineHeight = '1';
-      icon.style.flexShrink = '0';
-    }
-
-    if (title) {
-      title.style.fontSize = 'clamp(11px, 3.2vw, 14px)';
-      title.style.fontWeight = '600';
-      title.style.marginTop = '6px';
-      title.style.lineHeight = '1.15';
-      title.style.textAlign = 'center';
-      title.style.whiteSpace = 'normal';
-      title.style.overflow = 'visible';
-      title.style.textOverflow = 'clip';
-      title.style.overflowWrap = 'anywhere';
-      title.style.width = '100%';
-      title.style.minWidth = '0';
-    }
-
-    if (meta) {
-      meta.style.fontSize = '9px';
-      meta.style.lineHeight = '1.1';
-      meta.style.textAlign = 'center';
-      meta.style.marginTop = '2px';
-    }
-  }
-
-  function getCardStyle(selected: boolean): string {
-    return `
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      width:100%;
-      min-width:0;
-      max-width:100%;
-      padding:clamp(8px, 2.5vw, 12px) 6px;
-      border-radius:clamp(20px, 6vw, 24px);
-      background: ${selected ? 'var(--accent-soft)' : 'var(--surface)'};
-      border: 1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'};
-      color: ${selected ? 'var(--accent)' : 'var(--text-primary)'};
-      transition: all var(--duration-fast) var(--ease);
-      cursor:pointer;
-      aspect-ratio: 1 / 1;
-      overflow:hidden;
-      box-sizing:border-box;
-    `;
-  }
-
-  function updateSelections() {
-    const cards = grid.querySelectorAll('button');
-    // Re-render styles
-    cards.forEach((card, idx) => {
-      const isSelected = idx === 0 ? selectedCategory === undefined : categories[idx - 1].category === selectedCategory;
-      card.style.cssText = getCardStyle(isSelected);
-      styleCategoryCardContent(card);
-    });
-  }
-
-  // Draw Action
-  actionBtn.addEventListener('click', async () => {
-    actionBtn.disabled = true;
-    actionBtn.innerHTML = `<span class="spinner" style="width:20px;height:20px;border-width:2px;border-color:#fff transparent transparent transparent;"></span> Đang bốc...`;
-    
     try {
       const res = await drawRandom(selectedCategory);
+      triggerHaptic('confirm');
       renderResultCard(res);
-      showToast('Đã rút thành công một thẻ bài! 🎉', 'success');
-      
-      // Reload history and categories
-      loadHistory();
-      loadCategories();
-
+      showToast('Đã rút được một gợi ý mới!', 'success');
+      void loadHistory();
+      void loadCategories();
     } catch (err) {
-      const error = err as Error;
-      showToast('Không rút được bài: ' + error.message, 'error');
+      showToast('Không rút được thẻ: ' + (err as Error).message, 'error');
     } finally {
-      actionBtn.disabled = false;
-      actionBtn.innerHTML = `Bốc ngay! 🎲`;
+      drawBtnCtrl.setLoading(false);
     }
   });
 
-  function renderResultCard(res: RandomItem) {
-    resultContainer.style.display = 'block';
-    resultContainer.innerHTML = '';
+  function renderResultCard(res: RandomItem): void {
+    resultContainer.hidden = false;
+    resultContainer.replaceChildren();
 
-    const card = document.createElement('div');
-    card.className = 'card animate-scale-in';
-    card.style.cssText = 'padding:24px;border:2px solid var(--accent);display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;position:relative;background:var(--surface);';
-    
+    const card = document.createElement('article');
+    card.className = 'p-random-draw-card u-grain-surface';
+
     const catLabel = CATEGORY_LABELS[res.category] || res.category;
-    const catIcon = CATEGORY_ICONS[res.category] || '✨';
+    card.appendChild(createBadge(`Chủ đề · ${catLabel}`, 'gold'));
 
-    card.innerHTML = `
-      <div class="badge" style="font-size:12px;padding:6px 12px;">
-        ${catIcon} Thẻ bài: ${catLabel}
-      </div>
-      
-      <div style="margin:8px 0;display:flex;flex-direction:column;gap:8px;">
-        <h2 style="font-size:20px;font-weight:700;line-height:1.4;color:var(--text-primary);">${res.prompt}</h2>
-        ${res.detail ? `<p style="font-size:14px;color:var(--text-secondary);line-height:1.5;">${res.detail}</p>` : ''}
-      </div>
+    const promptEl = document.createElement('h2');
+    promptEl.className = 'p-random-draw-card__prompt';
+    promptEl.textContent = res.prompt;
+    card.appendChild(promptEl);
 
-      <div style="display:flex;gap:10px;width:100%;margin-top:4px;">
-        <button id="btn-draw-again" class="btn-ghost" style="flex:1;padding:12px;">Rút lại 🔄</button>
-        <button id="btn-checkin-draw" class="btn-primary" style="flex:1.2;padding:12px;">Check-in ngay 📸</button>
-      </div>
-    `;
+    if (res.detail) {
+      const detailEl = document.createElement('p');
+      detailEl.className = 'p-random-draw-card__detail';
+      detailEl.textContent = res.detail;
+      card.appendChild(detailEl);
+    }
 
-    card.querySelector('#btn-draw-again')?.addEventListener('click', () => {
-      actionBtn.click();
+    const actions = document.createElement('div');
+    actions.className = 'p-random-draw-card__actions';
+    const againBtn = createButton({
+      label: 'Rút lại',
+      variant: 'secondary',
+      size: 'sm',
+      pill: true,
+      leadingIcon: 'refresh',
+      onClick: () => drawBtnCtrl.element.click(),
     });
+    againBtn.element.id = 'btn-draw-again';
 
-    card.querySelector('#btn-checkin-draw')?.addEventListener('click', () => {
-      // Navigate to checkin page
-      navigate('/app/checkin');
-      // Wait a moment for rendering, then inject prompt into text area
-      setTimeout(() => {
-        const textInput = document.querySelector('#text-input') as HTMLTextAreaElement;
-        if (textInput) {
-          textInput.value = `[Thử thách ${catLabel}] ${res.prompt}\n`;
-          textInput.focus();
-        }
-        const captionInput = document.querySelector('#caption-input') as HTMLInputElement;
-        if (captionInput) {
-          captionInput.value = `[Thử thách ${catLabel}] ${res.prompt}`;
-        }
-      }, 300);
+    const checkinBtn = createButton({
+      label: 'Check-in ngay',
+      variant: 'primary',
+      size: 'sm',
+      pill: true,
+      leadingIcon: 'camera',
+      onClick: () => {
+        navigate('/app/checkin');
+        setTimeout(() => {
+          const textInput = document.querySelector<HTMLTextAreaElement>('#text-input');
+          if (textInput) {
+            textInput.value = `[Thử thách ${catLabel}] ${res.prompt}\n`;
+            textInput.focus();
+          }
+          const captionInput = document.querySelector<HTMLInputElement>('#caption-input');
+          if (captionInput) {
+            captionInput.value = `[Thử thách ${catLabel}] ${res.prompt}`;
+          }
+        }, 280);
+      },
     });
+    checkinBtn.element.id = 'btn-checkin-draw';
 
+    actions.append(againBtn.element, checkinBtn.element);
+    card.appendChild(actions);
     resultContainer.appendChild(card);
-    
-    // Scroll to result
-    resultContainer.scrollIntoView({ behavior: 'smooth' });
+    resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  // Load History
-  async function loadHistory() {
-    const list = historyWrapper.querySelector('#history-list') as HTMLElement;
+  async function loadHistory(): Promise<void> {
+    const list = historyWrapper.querySelector<HTMLElement>('#history-list');
     if (!list) return;
 
     try {
       const items = await getHistory();
       renderHistory(items, list);
     } catch {
-      list.innerHTML = `<div style="font-size:13px;color:var(--text-secondary);text-align:center;padding:12px;">Không thể tải lịch sử</div>`;
+      list.innerHTML = '<p class="u-text-secondary" style="font-size:12px;">Chưa tải được lịch sử rút thẻ.</p>';
     }
   }
 
-  function renderHistory(items: RandomHistoryItem[], container: HTMLElement) {
-    container.innerHTML = '';
-    
+  function renderHistory(items: RandomHistoryItem[], container: HTMLElement): void {
+    container.replaceChildren();
     if (items.length === 0) {
-      container.innerHTML = `<div style="font-size:13px;color:var(--text-secondary);text-align:center;padding:12px;">Chưa rút thẻ bài nào</div>`;
+      container.innerHTML = '<p class="u-text-secondary" style="font-size:12px;">Chưa rút thẻ bài nào.</p>';
       return;
     }
 
-    // Show last 5
-    items.slice(0, 5).forEach(item => {
-      const row = document.createElement('div');
-      row.style.cssText = `
-        display:flex;
-        align-items:center;
-        gap:10px;
-        padding:12px;
-        background:var(--surface-solid);
-        border:1px solid var(--border);
-        border-radius:14px;
-      `;
-      
-      const icon = CATEGORY_ICONS[item.category] || '✨';
-      const timeStr = new Date(item.createdAt).toLocaleDateString('vi-VN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-      row.innerHTML = `
-        <span style="font-size:22px;line-height:1;">${icon}</span>
-        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
-          <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            ${item.prompt}
-          </span>
-          <span style="font-size:10px;color:var(--text-secondary);">${timeStr}</span>
-        </div>
-      `;
-
-      row.addEventListener('click', () => {
-        // Draw result from history item
-        const histResult: RandomItem = {
-          category: item.category,
-          prompt: item.prompt,
-          detail: item.detail ?? null,
-        };
-        renderResultCard(histResult);
+    const rows = items.slice(0, 5).map((item) => {
+      const timeStr = new Date(item.createdAt).toLocaleDateString('vi-VN', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
       });
-
-      container.appendChild(row);
+      return createListRow({
+        title: item.prompt,
+        subtitle: timeStr,
+        leadingIcon: CATEGORY_ICONS[item.category] ?? 'sparkle',
+        chevron: true,
+        onClick: () => {
+          renderResultCard({
+            category: item.category,
+            prompt: item.prompt,
+            detail: item.detail ?? null,
+          });
+        },
+      });
     });
+
+    container.appendChild(createListGroup(rows));
   }
 
-  // Init
-  loadCategories();
-  loadHistory();
+  void loadCategories();
+  void loadHistory();
 
-  // Inject Nav
   return root;
 }
