@@ -1,3 +1,4 @@
+/* global console */
 // Sinh 3 mock HTML tĩnh (A/B/C) từ cùng một markup + CSS riêng từng hướng.
 // Chạy: node design/redesign-v2/build-mocks.mjs
 import { writeFileSync } from 'node:fs';
