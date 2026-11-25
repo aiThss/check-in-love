@@ -77,3 +77,11 @@ Khi cần build bản cập nhật APK mới:
 - **Avatar người gửi (Large Icon)**: Tự động tải từ `senderAvatar` / `avatarUrl`, sau đó hàm `getCircleBitmap()` cắt thành hình tròn sắc nét.
 - **Ảnh đính kèm (Big Picture)**: Tự động tải từ `photoUrl` và hiển thị dạng mở rộng `NotificationCompat.BigPictureStyle`.
 - **Kênh thông báo (Channel)**: `realtime_interactions` với `NotificationManager.IMPORTANCE_HIGH` và `PRIORITY_MAX` để hiển thị banner nổi (heads-up pop-up).
+
+---
+
+## 5. Handoff / Tiếp Tục Công Việc (Bắt Buộc)
+
+- Đầu mỗi phiên: đọc `HANDOFF.md` (gốc repo), `git status`, `git log -5` trước khi sửa mã.
+- Sau mỗi mốc/phase: cập nhật `HANDOFF.md` + thêm mục vào `docs/redesign-v2/PROGRESS.md` (có thể chạy `powershell -File scripts\handoff-snapshot.ps1`).
+- Sắp hết token/quota: đưa cây mã về trạng thái nhất quán, cập nhật `HANDOFF.md`, commit + push, rồi báo user câu dán cho AI kế nhiệm (nằm ở mục 0 của `HANDOFF.md`).
