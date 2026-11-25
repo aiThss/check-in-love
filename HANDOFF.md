@@ -1,5 +1,5 @@
 # HANDOFF — Check IN Love (Redesign v2)
-Updated: 2026-11-26 00:05 bởi Claude Sonnet 5.5 (Antigravity)
+Updated: 2026-11-26 00:10 bởi Claude Sonnet 5.5 (Antigravity)
 
 ## 0. Câu dán cho AI mới
 "Đọc HANDOFF.md ở gốc repo + docs/redesign-v2/PROMPT.md + docs/redesign-v2/PROGRESS.md, chạy `git status` và `git log -5`, rồi làm tiếp từ mục 'Bước kế tiếp'. Build + test để xác nhận trạng thái thật trước khi sửa."
@@ -9,7 +9,7 @@ Yêu cầu gốc: "dựa trên các logic/feature/color hiện tại, đập đi
 Yêu cầu phụ: "tôi cần thêm 1 cái log hay gì đó để nếu bạn hết token thì tôi đổi AI khác đọc và hoàn thiện được tiếp"
 
 - [x] Hệ thống log bàn giao (file này + docs/redesign-v2/ + scripts/handoff-snapshot.ps1)
-- [x] P0 Khảo sát + 3 mock HTML + baseline (design/redesign-v2/: audit.md, metrics.md, DIRECTIONS.md, 3 mock + shots) -> **ĐANG Ở CỔNG DỪNG: chờ user chọn hướng A/B/C (hoặc trộn)**. Còn thiếu: screenshot baseline app thật + Lighthouse baseline (làm đầu P1)
+- [x] P0 Khảo sát + 3 mock HTML + baseline (design/redesign-v2/: audit.md, metrics.md, DIRECTIONS.md, 3 mock + shots) -> CỔNG DỪNG ĐÃ QUA: user chốt hướng **MIX** (xem DECISIONS.md, mock-mix.html). Còn thiếu: screenshot baseline app thật + Lighthouse baseline (làm đầu P1)
 - [ ] P1 Nền tảng: tokens, font tự host, theme/accent, icon system, component lib
 - [ ] P2 Shell: bottom nav, modal/toast/sheet, view transitions, skeleton/SWR
 - [ ] P3 Chat (messages) làm lại + cập nhật test
@@ -23,13 +23,13 @@ Yêu cầu phụ: "tôi cần thêm 1 cái log hay gì đó để nếu bạn h�
 Quyết định đã chốt với user: phạm vi = PWA + lớp native Android (admin, backend ngoài phạm vi); giữ TypeScript thuần + Vite; tự vẽ ~70 icon SVG; làm đủ 8 nhóm độ mượt; push thẳng `main` sau mỗi phase.
 
 ## 2. Trạng thái hiện tại
-- Phase: P0 xong, đang chờ user chọn hướng thẩm mỹ. KHÔNG code vào apps/pwa trước khi user trả lời.
+- Phase: P0 xong; hướng thẩm mỹ đã chốt = MIX (A nền + kính B ở nav/sheet/composer + chat/nhãn vàng/micro-animation của C). Sẵn sàng bắt đầu P1.
 - Baseline (xem design/redesign-v2/metrics.md): npm test 26 file / 128 test pass; lint sạch; build pwa pass; chunk index gzip 46,40 kB (trần P1+ ~51 kB).
 - Chưa có mã ứng dụng nào bị sửa cho Redesign v2. Chỉ thêm file trong design/redesign-v2/.
 - Mock sinh bằng: node design/redesign-v2/build-mocks.mjs (ảnh chụp: Chrome headless, xem PROGRESS.md).
 
 ## 3. Bước kế tiếp
-1. Hỏi/nhận quyết định hướng thẩm mỹ từ user (A Editorial / B Liquid Glass / C Sticker / trộn). Ghi vào DECISIONS.md. Gợi ý của agent: A làm nền (xem DIRECTIONS.md).
+1. (XONG) Hướng thẩm mỹ = MIX, đã ghi DECISIONS.md. Nguồn tham chiếu thị giác: design/redesign-v2/mock-mix.html (+ shots/mix-light.png, mix-dark.png).
 2. Đầu P1: chụp screenshot baseline app thật (dùng lovecheck_dev_preview_data trong src/dev/mock-data.ts) + đo Lighthouse mobile, ghi vào metrics.md.
 3. P1: tokens (+alias tương thích ngược), font tự host, theme/accent engine, icon system + icon-spec.md, component lib + trang /preview/ui (chỉ DEV). Trang cũ phải chạy nguyên.
 4. Sau mỗi phase: lint + test + build, kiểm `git diff --stat -- apps/api packages` rỗng, cập nhật file này + PROGRESS.md, commit, push.

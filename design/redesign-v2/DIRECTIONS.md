@@ -10,6 +10,10 @@ Mở bằng trình duyệt (thêm `?theme=dark` để mở sẵn chế độ t�
 
 > Font trong mock dùng font hệ thống để mở được offline. Khi triển khai: tự host Be Vietnam Pro (body) + font display theo hướng được chọn.
 
+## ✅ Hướng đã chốt: MIX
+
+[mock-mix.html](mock-mix.html) · ảnh: shots/mix-light.png, shots/mix-dark.png. Công thức: **A làm nền** + **kính kiểu B chỉ ở nav, bottom sheet, composer** + từ **C**: chat (bong bóng viền mực + bóng offset cứng, thanh reaction), nhãn vàng cho streak/chip ngày, micro-animation nhấn. Quyết định ghi trong docs/redesign-v2/DECISIONS.md.
+
 ## So sánh
 
 | | **A · Editorial Romance** | **B · Liquid Glass 2.0** | **C · Playful Sticker** |

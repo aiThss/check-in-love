@@ -289,6 +289,24 @@ const DIRS = {
   },
 };
 
+// ── Hướng chốt: MIX = A (nền) + B (kính chỉ ở nav/sheet/composer, đã có sẵn trong A) + C (chat, nhãn vàng, micro-animation)
+const MIX_CSS = `
+:root{--ink:#1f0f15;--gold:#ffeaa7;--gold-ink:#1f0f15}
+[data-theme=dark]{--ink:#ffb3d1;--gold:#5a3b00;--gold-ink:#ffd36b}
+.msg,.imgmsg{border:2.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.me{border:2.5px solid var(--ink)}
+.typing{border:2.5px solid var(--ink);box-shadow:2px 2px 0 var(--ink)}
+.react{border:2.5px solid var(--ink)}
+.reactbar{border:2.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.daychip{background:var(--gold);color:var(--gold-ink);border:2px solid var(--ink);font-weight:800}
+.chip{background:var(--gold);color:var(--gold-ink);border:2px solid var(--ink);font-weight:800}
+.chip.ghost{background:transparent;color:var(--text-2);border:1px solid var(--border);font-weight:600}
+.composer{border:2.5px solid var(--ink)}
+.send{border:2.5px solid var(--ink);box-shadow:2px 3px 0 var(--ink)}.send:active{transform:translate(2px,3px);box-shadow:none}
+.btn.primary:active{transform:translate(2px,3px)}
+@keyframes pop{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}`;
+DIRS.mix = { file: 'mock-mix.html', title: 'MIX — A nền + B kính (nav/sheet/composer) + C (chat, nhãn vàng, micro-animation)', css: DIRS.a.css + MIX_CSS };
+
 // ── Ráp trang ────────────────────────────────────────────────────────────────
 const links = (cur) =>
   Object.entries(DIRS)

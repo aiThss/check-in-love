@@ -41,3 +41,7 @@ Mẫu mỗi mục:
    M docs/redesign-v2/PROGRESS.md
   ?? design/redesign-v2/
 - Diff apps/api + packages (phải rỗng): rỗng (OK)
+
+## 2026-11-26 00:10 — Chốt hướng (Claude Sonnet 5.5)
+- Làm: user chọn MIX (A + kính B ở nav/sheet + nhãn vàng/micro-animation C + chat C). Thêm mock-mix.html + shots/mix-*.png vào build-mocks.mjs; bỏ animation vào khung tĩnh để ảnh chụp không bị mờ giữa chừng.
+- Bước tiếp: P1 (tokens + alias, font tự host, theme/accent engine, icon system, component lib, /preview/ui).
