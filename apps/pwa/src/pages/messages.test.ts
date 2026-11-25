@@ -687,4 +687,30 @@ describe('Messages scroll and reply behavior', () => {
     expect(payload.get('caption')).toBe('Đi chơi nhé');
     expect(routePage.element.querySelector('[data-message-id="photo-topic"] img')?.getAttribute('src')).toBe('/uploads/photo.jpg');
   });
+
+  it('groups consecutive sender messages, marks emoji-only messages, renders bespoke SVG reaction picker, and toggles typing bubble', async () => {
+    const m1 = { ...message('g1', false, 'Chào em'), createdAt: '2026-08-08T10:00:00.000Z', updatedAt: '2026-08-08T10:00:00.000Z' };
+    const m2 = { ...message('g2', false, 'Ăn tối chưa?'), createdAt: '2026-08-08T10:01:00.000Z', updatedAt: '2026-08-08T10:01:00.000Z' };
+    const m3 = { ...message('g3', true, '❤️❤️'), createdAt: '2026-08-08T10:02:00.000Z', updatedAt: '2026-08-08T10:02:00.000Z' };
+    const routePage = await mount([m1, m2, m3]);
+
+    expect(routePage.element.querySelector('[data-message-id="g1"]')?.classList.contains('is-group-first')).toBe(true);
+    expect(routePage.element.querySelector('[data-message-id="g2"]')?.classList.contains('is-group-last')).toBe(true);
+    expect(routePage.element.querySelector('[data-message-id="g3"]')?.classList.contains('is-emoji-only')).toBe(true);
+
+    const bubble = routePage.element.querySelector<HTMLElement>('[data-message-id="g1"] .chat-text-bubble')!;
+    bubble.dispatchEvent(pointer('pointerdown', 80, 100));
+    await vi.advanceTimersByTimeAsync(600);
+    const reactionButtons = routePage.element.querySelectorAll('.message-reaction-options button svg[data-cil-icon]');
+    expect(reactionButtons.length).toBeGreaterThanOrEqual(6);
+
+    const typingBubble = routePage.element.querySelector<HTMLElement>('.messages-typing-bubble')!;
+    expect(typingBubble.hidden).toBe(true);
+    window.dispatchEvent(new CustomEvent('lovecheck:realtime-event', {
+      detail: { type: 'message.typing', isTyping: true, senderName: 'Partner' },
+    }));
+    expect(typingBubble.hidden).toBe(false);
+    await vi.advanceTimersByTimeAsync(5_100);
+    expect(typingBubble.hidden).toBe(true);
+  });
 });

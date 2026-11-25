@@ -121,3 +121,27 @@ Mẫu mỗi mục:
   ?? apps/pwa/src/ui/swr-bar.ts
   ?? apps/pwa/src/ui/view-transitions.ts
 - Diff apps/api + packages (phải rỗng): rỗng (OK)
+
+## 2026-11-26 00:59 — P3 Chat MIX & Hợp nhất Module (Gemini)
+- Làm:
+  - Tách `pages/messages.ts` (79 KB) thành bộ module sạch `pages/messages/{index,bubble,format,typing,wallpaper}.ts` (vẫn re-export `renderMessagesPage`, `formatMessageTime` từ `pages/messages.ts`).
+  - Thiết kế lại toàn diện giao diện Chat theo hướng **MIX** trong `styles/20-pages/{chat-layout,chat-bubbles,chat-menus}.css` (mỗi file <= 315 dòng, 0 `!important`): bong bóng viền mực `--ink-border` (`2.5px`) + bóng cứng `--sticker-shadow`, gộp chuỗi tin liên tiếp đầu/giữa/cuối nhóm, tin chỉ-emoji cỡ lớn không khung, sticker trong suốt, chip ngày nhãn vàng `--gold-bg` sticky, nút nổi "Tin mới ↓".
+  - Nâng cấp trạng thái gửi bằng icon SVG (`clock` đang gửi, `check` đã gửi, `double-check` đã đọc ở tin cuối, `alert` lỗi + thử lại) gắn với IndexedDB outbox; typing indicator 3 chấm sóng lắng nghe SSE `message.typing`; thanh reaction nổi dùng icon SVG riêng + swipe-to-reply có rung haptic ở ngưỡng; `content-visibility: auto` cho hiệu năng cuộn dài, giữ nguyên scroll-anchoring và DOM identity khi reconcile SSE.
+  - Mở rộng `pages/messages.test.ts` (32 test) + `message-thread-enhancements.test.ts` (3 test) = **35 test hành vi chat**.
+- Kiểm: lint ✅ · test ✅ (28 file / 140 test) · build ✅ (`index` gzip 34,59 kB, `messages` CSS gzip 3,91 kB) · `git diff apps/api packages apps/admin` rỗng ✅.
+- Dở: không có.
+- Bước tiếp: P4 (Home + Check-in camera + Memories + Photo Viewer).
+
+### Snapshot tự động 2026-11-26 00:59
+- Nhánh: main
+- Commit cuối: ed112f6 feat(pwa): P2 app shell, bottom nav v2, view transitions, haptics, SWR bar and bundle optimization
+- File thay đổi chưa commit:
+   M HANDOFF.md
+   M apps/pwa/src/pages/messages.test.ts
+   M apps/pwa/src/pages/messages.ts
+   M docs/redesign-v2/PROGRESS.md
+  ?? apps/pwa/src/pages/messages/
+  ?? apps/pwa/src/styles/20-pages/chat-bubbles.css
+  ?? apps/pwa/src/styles/20-pages/chat-layout.css
+  ?? apps/pwa/src/styles/20-pages/chat-menus.css
+- Diff apps/api + packages (phải rỗng): rỗng (OK)
