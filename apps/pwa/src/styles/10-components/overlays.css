@@ -1,0 +1,217 @@
+/* ============================================================
+   10-components/overlays.css — Liquid Glass Bottom Sheet, Dialog, Toast, Popover
+   ============================================================ */
+
+@layer components {
+  .c-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-overlay);
+    background-color: var(--overlay-scrim);
+    opacity: 0;
+    transition: opacity var(--duration-base) var(--ease-standard);
+  }
+
+  .c-scrim.is-open {
+    opacity: 1;
+  }
+
+  /* ── Draggable Bottom Sheet (MIX: B Selective Glass) ───────── */
+  .c-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0 auto;
+    max-width: var(--app-max-width);
+    max-height: 88dvh;
+    z-index: var(--z-sheet);
+    display: flex;
+    flex-direction: column;
+    background: var(--glass-sheet-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-top: 1px solid var(--glass-nav-border);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: var(--elev-4);
+    padding: var(--space-2) var(--space-5) calc(var(--space-6) + var(--safe-bottom));
+    transform: translateY(102%);
+    transition: transform var(--duration-base) var(--ease-emphasized);
+    touch-action: none;
+  }
+
+  .c-sheet.is-open {
+    transform: translateY(0);
+  }
+
+  .c-sheet.is-dragging {
+    transition: none;
+  }
+
+  .c-sheet__handle-zone {
+    display: grid;
+    place-items: center;
+    padding: 8px 0 12px;
+    cursor: grab;
+  }
+
+  .c-sheet__handle {
+    width: 42px;
+    height: 5px;
+    border-radius: var(--radius-pill);
+    background-color: var(--border-strong);
+  }
+
+  .c-sheet__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-bottom: var(--space-3);
+  }
+
+  .c-sheet__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .c-sheet__body {
+    overflow-y: auto;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+  }
+
+  /* ── Accessible Dialog ─────────────────────────────────────── */
+  .c-dialog-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    display: grid;
+    place-items: center;
+    padding: var(--space-5);
+  }
+
+  .c-dialog {
+    width: 100%;
+    max-width: 380px;
+    background-color: var(--surface-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    box-shadow: var(--elev-4);
+    transform: scale(0.94);
+    opacity: 0;
+    transition:
+      transform var(--duration-base) var(--ease-spring),
+      opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .c-dialog.is-open {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .c-dialog__title {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .c-dialog__desc {
+    margin: 0 0 var(--space-5);
+    font-size: var(--text-base);
+    color: var(--ink-2);
+    line-height: var(--leading-normal);
+  }
+
+  .c-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
+  /* ── Popover Contextual Menu ───────────────────────────────── */
+  .c-popover {
+    position: fixed;
+    z-index: var(--z-modal);
+    min-width: 196px;
+    padding: 6px;
+    border-radius: var(--radius-md);
+    background-color: var(--surface-elevated);
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--elev-3);
+    transform-origin: top right;
+    animation: cil-icon-pop var(--duration-fast) var(--ease-spring);
+  }
+
+  .c-popover__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--ink-1);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .c-popover__item:hover,
+  .c-popover__item:focus-visible {
+    background-color: var(--surface-subtle);
+    outline: none;
+  }
+
+  .c-popover__item--danger {
+    color: var(--color-danger);
+  }
+
+  /* ── v2 Toast Stack ────────────────────────────────────────── */
+  .c-toast-stack {
+    position: fixed;
+    top: calc(var(--safe-top) + 12px);
+    left: 16px;
+    right: 16px;
+    max-width: 420px;
+    margin: 0 auto;
+    z-index: var(--z-toast);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    pointer-events: none;
+  }
+
+  .c-toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 50px;
+    padding: 10px 16px;
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-elevated);
+    border: 1.5px solid var(--border-strong);
+    box-shadow: var(--elev-3);
+    color: var(--ink-1);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    transform: translateY(-12px);
+    opacity: 0;
+    transition:
+      transform var(--duration-base) var(--ease-spring),
+      opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .c-toast.is-visible {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

@@ -1,0 +1,106 @@
+/* ============================================================
+   01-base.css — Reset, Typography, Focus Ring, Reduced Motion
+   ============================================================ */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: var(--leading-normal);
+    color: var(--ink-1);
+    background-color: var(--bg-canvas);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    color: var(--ink-1);
+    background: var(--bg-canvas-gradient);
+    overscroll-behavior-y: none;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Accessible keyboard focus ring across all v2 elements */
+  :is(.c-btn, .c-icon-btn, .c-input, .c-textarea, .c-switch, .c-seg-btn, .c-tab-btn, .c-chip, .c-list-row--interactive):focus-visible {
+    outline: 3px solid var(--accent-600);
+    outline-offset: 2px;
+  }
+
+  /* Editorial Display Typography */
+  .t-display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-tight);
+  }
+
+  .t-display-hero {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 600;
+    font-size: clamp(2.75rem, 11vw, 4.5rem);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-600);
+  }
+
+  .t-eyebrow {
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .t-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Reduced Motion (System or Explicit App Preference) — Sole Legal !important */
+  @media (prefers-reduced-motion: reduce) {
+    :root:not([data-reduced-motion='off']) *,
+    :root:not([data-reduced-motion='off']) *::before,
+    :root:not([data-reduced-motion='off']) *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 90ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  :root[data-reduced-motion='on'] *,
+  :root[data-reduced-motion='on'] *::before,
+  :root[data-reduced-motion='on'] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 90ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -3,47 +3,61 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
 
     <!-- PWA / Mobile web app -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Check IN Love" />
-    <meta name="theme-color" content="#FF3B7F" />
+    <meta name="theme-color" content="#f8e2e7" id="meta-theme-color" />
     <meta name="application-name" content="Check IN Love" />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Check IN Love 💕" />
-    <meta property="og:description" content="App check-in riêng tư cho hai đứa" />
+    <meta property="og:title" content="Check IN Love" />
+    <meta property="og:description" content="Không gian check-in riêng tư cho hai đứa" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/icons/icon-512.png" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Check IN Love 💕" />
-    <meta name="twitter:description" content="App check-in riêng tư cho hai đứa" />
+    <meta name="twitter:title" content="Check IN Love" />
+    <meta name="twitter:description" content="Không gian check-in riêng tư cho hai đứa" />
 
-    <!-- Manifest -->
+    <!-- Manifest & Icons -->
     <link rel="manifest" href="/manifest.webmanifest" />
-
-    <!-- Apple touch icons -->
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png" />
     <link rel="apple-touch-icon" sizes="152x152" href="/icons/apple-touch-icon-152.png" />
     <link rel="apple-touch-icon" sizes="120x120" href="/icons/apple-touch-icon-120.png" />
-
-    <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192.png" />
 
-    <!-- Google Fonts: Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <!-- Self-hosted Primary Font Preload (Vietnamese + Latin Body) -->
+    <link rel="preload" href="/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
 
-    <title>Check IN Love 💕</title>
+    <!-- Zero-FOUC Theme & Accent Bootstrap before First Paint -->
+    <script>
+      (function () {
+        try {
+          var doc = document.documentElement;
+          var v2Theme = localStorage.getItem('lovecheck_ui_v2_theme');
+          var rawState = localStorage.getItem('lovecheck_state');
+          var legacyTheme = rawState ? JSON.parse(rawState).theme : null;
+          var pref = v2Theme || legacyTheme || 'light';
+          var sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var resolved = pref === 'dark' || (pref === 'system' && sysDark) ? 'dark' : 'light';
+          doc.setAttribute('data-theme', resolved);
+          var accent = localStorage.getItem('lovecheck_ui_v2_accent');
+          if (accent) doc.setAttribute('data-accent', accent);
+          var motion = localStorage.getItem('lovecheck_ui_v2_reduced_motion');
+          if (motion === 'on' || motion === 'off') doc.setAttribute('data-reduced-motion', motion);
+          var meta = document.getElementById('meta-theme-color');
+          if (meta) meta.setAttribute('content', resolved === 'dark' ? '#261824' : '#f8e2e7');
+        } catch (_) {}
+      })();
+    </script>
+
+    <title>Check IN Love</title>
   </head>
   <body>
     <div id="app"></div>

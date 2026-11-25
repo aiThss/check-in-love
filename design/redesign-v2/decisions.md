@@ -1,0 +1,7 @@
+# Quyết định Thiết kế Kỹ thuật — Redesign v2
+
+- **2026-11-26 (P0)**: Chốt hướng **MIX** = nền *Soft Editorial Romance* (A) + kính mờ kiểu B chỉ ở `bottom-nav`, `bottom-sheet`, `composer` + phong cách *Playful Sticker* (C) cho bong bóng chat/thanh reaction viền mực 2.5px + nhãn vàng `#ffeaa7` cho streak/chip ngày + nhấn nút tactile.
+- **2026-11-26 (P1 — Font tự host)**: Dùng `Be Vietnam Pro` (400/500/600/700, subset `vietnamese` + `latin-ext` + `latin`) cho nội dung và `Fraunces Variable` (normal + italic, subset `vietnamese` + `latin-ext` + `latin`) cho tiêu đề/số ngày kỷ niệm; bỏ hoàn toàn Google Fonts và `unpkg lottie-player@latest` (không còn nơi nào trong code gọi `<lottie-player>`).
+- **2026-11-26 (P1 — Tương phản WCAG AA)**: Giữ màu thương hiệu `#ff3b7f` cho điểm nhấn đồ hoạ (`--accent-500`), nhưng mọi nút chữ trắng và chữ màu nhấn bắt buộc dùng `--accent-600` (`#d9205f` ở preset Rose, tỷ lệ ≥ 4.7:1 với `#ffffff`) và `--accent-ink` (`#a81146` sáng / `#ff94ba` tối, ≥ 5.5:1 trên nền thẻ).
+- **2026-11-26 (P1 — Chuyển tiếp không vỡ UI)**: Dùng `@layer tokens, base, components, utilities;` cho hệ thống mới với tiền tố `.c-*` / `.p-*` và giữ toàn bộ biến CSS cũ (`--bg`, `--surface`, `--accent`...) làm alias trỏ sang token mới để các màn chưa chuyển ở P1–P6 hiển thị bình thường trên `main`.
+- **2026-11-26 (P1 — Giữ ngân sách JS lõi)**: Trang `/preview/ui` chỉ nạp qua dynamic `import()` khi ở chế độ dev/local host nên cộng **0 byte** vào chunk `index` production; gỡ khối style dev `localDarkGlassVariants` dư thừa trong `main.ts`.

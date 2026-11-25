@@ -1,0 +1,98 @@
+/* ============================================================
+   20-pages/preview-ui.css — Dev Design System & Icon Gallery (/preview/ui)
+   ============================================================ */
+
+@layer components {
+  .p-ui-preview {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + 96px);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .p-ui-preview__section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .p-ui-preview__swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .p-ui-preview__swatch {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid var(--surface-elevated);
+    box-shadow: var(--elev-1);
+    cursor: pointer;
+    transition: transform var(--duration-fast) var(--ease-spring);
+  }
+
+  .p-ui-preview__swatch[aria-pressed='true'] {
+    outline: 3px solid var(--ink-1);
+    outline-offset: 2px;
+    transform: scale(1.08);
+  }
+
+  .p-ui-preview__icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 10px;
+  }
+
+  .p-ui-preview__icon-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 78px;
+    padding: 10px 6px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    background-color: var(--surface-paper);
+    color: var(--ink-1);
+    font-size: 11px;
+    cursor: pointer;
+    transition: transform var(--duration-instant) var(--ease-standard);
+  }
+
+  .p-ui-preview__icon-cell:active {
+    transform: scale(0.95);
+  }
+
+  .p-ui-preview__chat-demo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .p-ui-preview__bubble {
+    max-width: 78%;
+    padding: 10px 14px;
+    border-radius: 20px;
+    border: var(--ink-border);
+    box-shadow: var(--sticker-shadow);
+    font-size: var(--text-base);
+  }
+
+  .p-ui-preview__bubble--them {
+    align-self: flex-start;
+    background-color: var(--bubble-them-bg);
+    color: var(--bubble-them-ink);
+    border-bottom-left-radius: 6px;
+  }
+
+  .p-ui-preview__bubble--me {
+    align-self: flex-end;
+    background-color: var(--bubble-me-bg);
+    color: var(--bubble-me-ink);
+    border-bottom-right-radius: 6px;
+  }
+}

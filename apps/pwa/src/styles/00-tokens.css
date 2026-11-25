@@ -1,0 +1,350 @@
+/* ============================================================
+   00-tokens.css — Check IN Love Design System v2 (MIX Direction)
+   A: Soft Editorial Romance · B: Selective Glass · C: Sticker Chat & Gold
+   Includes 100% backwards-compatible aliases for legacy screens.
+   ============================================================ */
+
+@layer tokens {
+  :root {
+    color-scheme: light;
+
+    /* ── Neutral 12-step Scale (Warm Editorial Paper & Plum Ink) ── */
+    --neutral-1: #fffdf9;
+    --neutral-2: #fff8f4;
+    --neutral-3: #f8e2e7;
+    --neutral-4: #f2d4dc;
+    --neutral-5: #e6bfc9;
+    --neutral-6: #d5a3b1;
+    --neutral-7: #b68493;
+    --neutral-8: #946674;
+    --neutral-9: #734d5a;
+    --neutral-10: #593944;
+    --neutral-11: #3b212a;
+    --neutral-12: #1f0f15;
+
+    /* ── Dynamic Accent HSL Base (Default: Rose #ff3b7f) ───────── */
+    --accent-h: 339;
+    --accent-s: 100%;
+    --accent-l: 62%;
+
+    /* ── 10-step Accent Scale + WCAG AA Validated Action Pairs ─── */
+    --accent-50: hsl(var(--accent-h) 100% 97%);
+    --accent-100: hsl(var(--accent-h) 100% 92%);
+    --accent-200: hsl(var(--accent-h) 96% 85%);
+    --accent-300: hsl(var(--accent-h) 95% 76%);
+    --accent-400: hsl(var(--accent-h) 98% 68%);
+    --accent-500: #ff3b7f;
+    --accent-600: #d9205f; /* >= 4.74:1 with #ffffff (WCAG AA button fill) */
+    --accent-700: #b4124b; /* >= 6.80:1 on #fff8f4 (WCAG AA text ink) */
+    --accent-800: #8f0d3b;
+    --accent-900: #660829;
+    --accent-on-solid: #ffffff;
+
+    /* ── Surfaces & Page Canvas ────────────────────────────────── */
+    --bg-canvas: var(--neutral-3);
+    --bg-canvas-gradient:
+      radial-gradient(circle at 86% 6%, rgba(255, 166, 198, 0.35), transparent 36%),
+      radial-gradient(circle at 12% 84%, rgba(255, 224, 194, 0.38), transparent 40%),
+      linear-gradient(180deg, #fae8ec 0%, #f8e2e7 100%);
+    --surface-paper: var(--neutral-2);
+    --surface-elevated: #ffffff;
+    --surface-subtle: #fceef1;
+    --surface-sunken: #f3dce2;
+    --overlay-scrim: rgba(31, 15, 21, 0.42);
+
+    /* ── Text Hierarchy (All >= 4.5:1 AA on canvas & paper) ────── */
+    --ink-1: #1f0f15; /* 15.8:1 on paper */
+    --ink-2: #593944; /* 7.9:1 on paper */
+    --ink-3: #6e4b57; /* 5.6:1 on paper, 4.7:1 on #f8e2e7 */
+    --ink-inverse: #ffffff;
+
+    /* ── Borders & Sticker Ink (MIX: C) ────────────────────────── */
+    --border-subtle: rgba(120, 45, 72, 0.14);
+    --border-strong: rgba(120, 45, 72, 0.26);
+    --ink-stroke-color: #1f0f15;
+    --ink-border: 2.5px solid var(--ink-stroke-color);
+    --ink-border-thin: 2px solid var(--ink-stroke-color);
+    --sticker-shadow: 3px 3px 0 var(--ink-stroke-color);
+    --sticker-shadow-sm: 2px 2px 0 var(--ink-stroke-color);
+
+    /* ── Gold Highlight Chips (MIX: C — Streak & Day Chips) ────── */
+    --gold-bg: #ffeaa7;
+    --gold-ink: #1f0f15; /* 13.7:1 contrast */
+    --gold-border: #1f0f15;
+
+    /* ── Chat Bubbles (MIX: C Sticker Ink + Accent) ────────────── */
+    --bubble-me-bg: var(--accent-600);
+    --bubble-me-ink: var(--accent-on-solid);
+    --bubble-them-bg: var(--surface-paper);
+    --bubble-them-ink: var(--ink-1);
+    --bubble-seen: #ffeaa7;
+
+    /* ── Semantic Status (AA Validated) ────────────────────────── */
+    --color-success: #16794b;
+    --color-success-soft: #dcfce7;
+    --color-warning: #9a5b00;
+    --color-warning-soft: #fef3c7;
+    --color-danger: #c01e2e;
+    --color-danger-soft: #fee2e2;
+    --color-info: #1d5bbf;
+    --color-info-soft: #dbeafe;
+
+    /* ── Selective Glass (MIX: B — ONLY nav, sheet, composer) ──── */
+    --glass-blur: blur(18px) saturate(165%);
+    --glass-nav-bg: rgba(255, 248, 244, 0.84);
+    --glass-nav-border: rgba(120, 45, 72, 0.15);
+    --glass-sheet-bg: rgba(255, 248, 244, 0.94);
+    --glass-composer-bg: rgba(255, 248, 244, 0.88);
+
+    /* ── Editorial Paper Grain SVG ─────────────────────────────── */
+    --editorial-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.15 0 0 0 0 0.22 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+    /* ── Elevations (5 levels) ─────────────────────────────────── */
+    --elev-0: none;
+    --elev-1: 0 2px 6px rgba(130, 32, 66, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    --elev-2: 0 10px 24px -4px rgba(130, 32, 66, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    --elev-3: 0 16px 36px -6px rgba(130, 32, 66, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    --elev-4: 0 24px 48px -8px rgba(80, 16, 40, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    --elev-btn: 0 6px 16px rgba(217, 32, 95, 0.28);
+
+    /* ── Typography Scale ──────────────────────────────────────── */
+    --font-sans: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --font-display: 'Fraunces Variable', 'Iowan Old Style', Georgia, serif;
+    --text-xs: 0.75rem;    /* 12px */
+    --text-sm: 0.8125rem;  /* 13px */
+    --text-base: 0.9375rem;/* 15px */
+    --text-md: 1.0625rem;  /* 17px */
+    --text-lg: 1.25rem;    /* 20px */
+    --text-xl: 1.5rem;     /* 24px */
+    --text-2xl: 1.875rem;  /* 30px */
+    --text-3xl: 2.375rem;  /* 38px */
+    --leading-tight: 1.18;
+    --leading-snug: 1.34;
+    --leading-normal: 1.52;
+    --tracking-tight: -0.02em;
+    --tracking-wide: 0.08em;
+
+    --font-weight-light: 300;
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    /* ── Spacing (4px Grid) ────────────────────────────────────── */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+
+    /* ── Radii ─────────────────────────────────────────────────── */
+    --radius-xs: 8px;
+    --radius-sm: 12px;
+    --radius-md: 16px;
+    --radius-card: 22px;
+    --radius-lg: 24px;
+    --radius-xl: 32px;
+    --radius-pill: 999px;
+
+    /* ── Z-Index Named Scale ───────────────────────────────────── */
+    --z-base: 1;
+    --z-sticky: 20;
+    --z-composer: 40;
+    --z-nav: 50;
+    --z-overlay: 80;
+    --z-sheet: 90;
+    --z-modal: 100;
+    --z-toast: 120;
+
+    /* ── Motion (Compositor-Only) ──────────────────────────────── */
+    --duration-instant: 90ms;
+    --duration-fast: 160ms;
+    --duration-base: 240ms;
+    --duration-slow: 420ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-emphasized: cubic-bezier(0.3, 0, 0.1, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* ── Layout & Safe Area ────────────────────────────────────── */
+    --nav-height: 82px;
+    --app-max-width: 500px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* ── Legacy Backwards-Compatible Aliases ───────────────────── */
+    --bg: var(--bg-canvas);
+    --page-background: var(--bg-canvas-gradient);
+    --surface: var(--surface-paper);
+    --surface-solid: var(--surface-elevated);
+    --text-primary: var(--ink-1);
+    --text-secondary: var(--ink-2);
+    --text-tertiary: var(--ink-3);
+    --border: var(--border-subtle);
+    --accent: var(--accent-500);
+    --accent-soft: var(--accent-100);
+    --accent-glow: color-mix(in srgb, var(--accent-500) 20%, transparent);
+    --shadow: var(--elev-2);
+    --shadow-elevated: var(--elev-3);
+    --liquid-glass-blur: var(--glass-blur);
+    --liquid-glass-bg: var(--glass-nav-bg);
+    --liquid-glass-border: var(--glass-nav-border);
+    --liquid-glass-shadow: var(--elev-3);
+    --space-xs: var(--space-1);
+    --space-sm: var(--space-2);
+    --space-md: var(--space-4);
+    --space-lg: var(--space-6);
+    --space-xl: var(--space-8);
+    --space-2xl: var(--space-12);
+    --duration-normal: var(--duration-base);
+    --ease: var(--ease-standard);
+  }
+
+  /* ── Dark Theme (Deep Plum Romance) ──────────────────────────── */
+  [data-theme='dark'] {
+    color-scheme: dark;
+
+    --neutral-1: #1d111b;
+    --neutral-2: #261824;
+    --neutral-3: #321e2e;
+    --neutral-4: #3d2437;
+    --neutral-5: #4c2d44;
+    --neutral-6: #633c59;
+    --neutral-7: #825676;
+    --neutral-8: #a47a99;
+    --neutral-9: #c4a3bb;
+    --neutral-10: #dec6d7;
+    --neutral-11: #f3e6ef;
+    --neutral-12: #ffffff;
+
+    --accent-100: color-mix(in srgb, var(--accent-500) 22%, #2a1826);
+    --accent-600: #e0246a; /* >= 4.54:1 with #ffffff */
+    --accent-700: #ff8fb6; /* >= 6.40:1 on #3a2230 */
+    --accent-on-solid: #ffffff;
+
+    --bg-canvas: #261824;
+    --bg-canvas-gradient:
+      radial-gradient(circle at 86% 8%, rgba(255, 83, 145, 0.2), transparent 32%),
+      radial-gradient(circle at 8% 78%, rgba(142, 87, 218, 0.18), transparent 34%),
+      linear-gradient(180deg, #261824 0%, #342039 54%, #592946 100%);
+    --surface-paper: #3a2230;
+    --surface-elevated: #45293a;
+    --surface-subtle: #311c29;
+    --surface-sunken: #21121d;
+    --overlay-scrim: rgba(10, 4, 9, 0.64);
+
+    --ink-1: #ffffff;
+    --ink-2: #e2ced8;
+    --ink-3: #c7aeb9; /* >= 5.4:1 on #3a2230 */
+    --ink-inverse: #1f0f15;
+
+    --border-subtle: rgba(255, 174, 206, 0.18);
+    --border-strong: rgba(255, 174, 206, 0.32);
+    --ink-stroke-color: #ffb3d1;
+
+    --gold-bg: #543700;
+    --gold-ink: #ffd875; /* >= 7.8:1 on #543700 */
+    --gold-border: #ffd875;
+
+    --bubble-them-bg: #3f2635;
+    --bubble-them-ink: #ffffff;
+    --bubble-seen: #ffd875;
+
+    --color-success: #4ade80;
+    --color-success-soft: rgba(34, 197, 94, 0.18);
+    --color-warning: #fbbf24;
+    --color-warning-soft: rgba(245, 158, 11, 0.2);
+    --color-danger: #ff8a93;
+    --color-danger-soft: rgba(244, 63, 94, 0.22);
+    --color-info: #93c5fd;
+    --color-info-soft: rgba(59, 130, 246, 0.22);
+
+    --glass-nav-bg: rgba(54, 30, 45, 0.84);
+    --glass-nav-border: rgba(255, 174, 206, 0.2);
+    --glass-sheet-bg: rgba(54, 30, 45, 0.95);
+    --glass-composer-bg: rgba(48, 27, 41, 0.88);
+
+    --elev-1: 0 4px 12px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --elev-2: 0 12px 28px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --elev-3: 0 18px 42px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    --elev-4: 0 26px 56px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* ── 6 Curated Accent Presets (All WCAG AA Compliant) ────────── */
+  [data-accent='coral'] {
+    --accent-h: 16;
+    --accent-500: #ff6242;
+    --accent-600: #c83717;
+    --accent-700: #9f270c;
+    --elev-btn: 0 6px 16px rgba(200, 55, 23, 0.28);
+  }
+  [data-theme='dark'][data-accent='coral'] {
+    --accent-600: #d43d1c;
+    --accent-700: #ffab96;
+  }
+
+  [data-accent='violet'] {
+    --accent-h: 262;
+    --accent-500: #8b5cf6;
+    --accent-600: #6d35de;
+    --accent-700: #5521b5;
+    --elev-btn: 0 6px 16px rgba(109, 53, 222, 0.28);
+  }
+  [data-theme='dark'][data-accent='violet'] {
+    --accent-600: #7640e6;
+    --accent-700: #cbb2ff;
+  }
+
+  [data-accent='teal'] {
+    --accent-h: 172;
+    --accent-500: #14b8a6;
+    --accent-600: #0c776b;
+    --accent-700: #085c53;
+    --elev-btn: 0 6px 16px rgba(12, 119, 107, 0.28);
+  }
+  [data-theme='dark'][data-accent='teal'] {
+    --accent-600: #0d7f72;
+    --accent-700: #7cead9;
+  }
+
+  [data-accent='sky'] {
+    --accent-h: 214;
+    --accent-500: #3b82f6;
+    --accent-600: #1d5ed8;
+    --accent-700: #1849a9;
+    --elev-btn: 0 6px 16px rgba(29, 94, 216, 0.28);
+  }
+  [data-theme='dark'][data-accent='sky'] {
+    --accent-600: #2563eb;
+    --accent-700: #9ec5ff;
+  }
+
+  [data-accent='amber'] {
+    --accent-h: 33;
+    --accent-500: #f59e0b;
+    --accent-600: #a85503;
+    --accent-700: #854000;
+    --elev-btn: 0 6px 16px rgba(168, 85, 3, 0.28);
+  }
+  [data-theme='dark'][data-accent='amber'] {
+    --accent-600: #b45a04;
+    --accent-700: #fcd37d;
+  }
+
+  /* ── Opaque Fallback When backdrop-filter Unsupported ────────── */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root {
+      --glass-nav-bg: #fff8f4;
+      --glass-sheet-bg: #fff8f4;
+      --glass-composer-bg: #fff8f4;
+    }
+    [data-theme='dark'] {
+      --glass-nav-bg: #361e2d;
+      --glass-sheet-bg: #361e2d;
+      --glass-composer-bg: #361e2d;
+    }
+  }
+}

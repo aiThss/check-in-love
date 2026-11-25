@@ -1,0 +1,17 @@
+/* ============================================================
+   styles/index.css — Layered CSS Architecture Manifest (v2)
+   Order: tokens -> base -> components -> utilities
+   ============================================================ */
+
+@layer tokens, base, components, utilities;
+
+@import './00-fonts.css';
+@import './00-tokens.css';
+@import './01-base.css';
+@import './10-components/icons.css';
+@import './10-components/button.css';
+@import './10-components/card-avatar-badge.css';
+@import './10-components/forms.css';
+@import './10-components/list-skeleton-empty.css';
+@import './10-components/overlays.css';
+@import './02-utilities.css';
