@@ -1,3 +1,4 @@
+import '../styles/20-pages/checkin.css';
 import { navigate } from '../router';
 import { invalidateRoutes } from '../route-invalidation';
 import { createCheckin } from '../api/checkins';
@@ -5,6 +6,9 @@ import { ApiError } from '../api/client';
 import { store } from '../store/index';
 import { logger } from '../utils/logger';
 import { showToast } from '../components/toast';
+import { iconMarkup, type IconName } from '../ui/icons/icons';
+import { createButton, createChip } from '../ui/primitives';
+import { triggerHaptic } from '../ui/haptics';
 import {
   openCamera,
   openGallery,
@@ -14,166 +18,63 @@ import {
 } from '../components/camera';
 
 const PHOTO_ASPECT_RATIO = 1;
-const PHOTO_CSS_RATIO = '1 / 1';
-
-const _MOODS = [
-  { value: 'happy', emoji: '😊', label: 'Vui vẻ' },
-  { value: 'love', emoji: '🥰', label: 'Đang yêu' },
-  { value: 'sad', emoji: '😢', label: 'Buồn' },
-  { value: 'excited', emoji: '🤩', label: 'Hào hứng' },
-  { value: 'tired', emoji: '😴', label: 'Mệt mỏi' },
-  { value: 'calm', emoji: '😌', label: 'Bình yên' },
-  { value: 'miss', emoji: '🥺', label: 'Nhớ nhung' }
-];
 
 const QUICK_MESSAGES = [
-  'Đang nhớ người ấy ghê 💕',
-  'Đang ăn nè, thèm quá 🍲',
-  'Đang học/làm việc chăm chỉ ✍️',
-  'Hôm nay mệt xỉu luôn 😴',
-  'Cần ôm một cái thật chặt 🫂',
-  'Đang đi chơi nè 🌸',
-  'Có tin vui muốn khoe 🎉'
+  'Đang nhớ người ấy ghê',
+  'Đang ăn ngon nè, ước có anh/em',
+  'Đang làm việc chăm chỉ lắm',
+  'Hôm nay hơi mệt, cần một cái ôm',
+  'Đang dạo phố chiều nay',
+  'Có chuyện vui muốn kể ngay',
 ];
 
 export function renderCheckinPage(): HTMLElement {
   const root = document.createElement('div');
-  root.className = 'page checkin-page animate-fade-in';
-  root.style.cssText = `
-    padding: calc(var(--safe-top) + 16px) 16px calc(170px + var(--safe-bottom)) 16px;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(10px, 2vh, 16px);
-    margin: 0 auto;
-    width: 100%;
-    max-width: min(480px, 100%);
-    box-sizing: border-box;
-    min-height: 100dvh;
-    overflow-x: hidden;
-    overflow-y: auto;
-  `;
+  root.className = 'page checkin-page p-checkin animate-fade-in';
 
-  // Header with close (X) button
-  const header = document.createElement('div');
-  header.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:0;min-width:0;';
+  // Header with accessible SVG close button inside form fallback
+  const header = document.createElement('header');
+  header.className = 'p-checkin-header';
   header.innerHTML = `
     <form action="/app/home" method="get" style="display:flex;margin:0;">
-      <button type="submit" id="back-btn" class="btn-icon" aria-label="Đóng" style="position:relative;z-index:2;touch-action:manipulation;pointer-events:auto;border-radius:50%;width:44px;height:44px;font-size:18px;font-weight:700;">✕</button>
+      <button type="submit" id="back-btn" class="c-icon-btn" aria-label="Đóng">${iconMarkup('close', { size: 20 })}</button>
     </form>
-    <div>
-      <h1 style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">Gửi khoảnh khắc</h1>
-      <p style="font-size:13px;color:var(--text-secondary);">Chia sẻ hiện tại của bạn với người ấy</p>
+    <div class="p-checkin-header__copy">
+      <h1>Gửi khoảnh khắc</h1>
+      <p>Lưu lại hiện tại của bạn cho người ấy</p>
     </div>
   `;
   root.appendChild(header);
 
-  const backButton = header.querySelector<HTMLButtonElement>('#back-btn');
-  if (backButton) {
-    backButton.style.width = '40px';
-    backButton.style.height = '40px';
-    backButton.style.flexShrink = '0';
-  }
-
-  const headerText = header.querySelector<HTMLElement>('div');
-  if (headerText) {
-    headerText.style.minWidth = '0';
-    const subtitle = headerText.querySelector<HTMLElement>('p');
-    if (subtitle) {
-      subtitle.style.fontSize = '12px';
-      subtitle.style.lineHeight = '1.35';
-    }
-  }
-
-  function navigateHomeFromCheckin(): void {
-    const target = '/app/home';
-
-    try {
-      clearSelectedPhoto();
-    } catch (error) {
-      logger.warn('Failed to clear the selected check-in photo before closing', error);
-    }
-
-    try {
-      navigate(target);
-    } catch (error) {
-      logger.error('Failed to navigate away from check-in', error);
-      window.location.replace(target);
-      return;
-    }
-
-    // The client router updates the URL synchronously. Keep a hard-navigation
-    // fallback for stale WebViews or runtimes that swallow the router update.
-    window.setTimeout(() => {
-      if (window.location.pathname === '/app/checkin') window.location.replace(target);
-    }, 0);
-  }
-
-  const closeCheckin = header.querySelector<HTMLButtonElement>('#back-btn');
-  if (closeCheckin) {
-    let closeRequested = false;
-    const handleClose = (event: Event): void => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (closeRequested) return;
-      closeRequested = true;
-      navigateHomeFromCheckin();
-    };
-
-    closeCheckin.addEventListener('pointerup', handleClose);
-    closeCheckin.addEventListener('click', handleClose);
-  }
-
-  // Type Selector Tab
+  // Mode Selector Tabs (Zero system emojis — bespoke SVG icons)
   const tabsWrapper = document.createElement('div');
-  tabsWrapper.style.cssText = `
-    display: flex;
-    background: var(--surface-solid);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    padding: 4px;
-    gap: 4px;
-    width:100%;
-    max-width:100%;
-    overflow:hidden;
-  `;
-  
-  const modes = [
-    { id: 'photo', label: '📸 Ảnh' },
-    { id: 'text', label: '✍️ Tin nhắn' },
-    { id: 'random', label: '🎲 Random' }
+  tabsWrapper.className = 'p-checkin-tabs';
+  tabsWrapper.setAttribute('role', 'tablist');
+  tabsWrapper.setAttribute('aria-label', 'Chế độ gửi khoảnh khắc');
+
+  const modes: Array<{ id: 'photo' | 'text' | 'random'; icon: IconName; label: string }> = [
+    { id: 'photo', icon: 'camera', label: 'Ảnh' },
+    { id: 'text', icon: 'edit', label: 'Lời nhắn' },
+    { id: 'random', icon: 'dice', label: 'Bất ngờ' },
   ];
 
-  let activeMode = 'photo';
+  let activeMode: 'photo' | 'text' | 'random' = 'photo';
 
-  modes.forEach(mode => {
+  modes.forEach((mode) => {
     const tab = document.createElement('button');
-    tab.className = `tab-btn ${mode.id === activeMode ? 'active' : ''}`;
-    tab.style.cssText = `
-      flex: 1;
-      min-width:0;
-      padding: 8px 6px;
-      font-size: clamp(12px, 3.4vw, 14px);
-      font-weight: 600;
-      border-radius: var(--radius-pill);
-      text-align: center;
-      transition: all var(--duration-fast) var(--ease);
-      color: ${mode.id === activeMode ? 'var(--accent)' : 'var(--text-secondary)'};
-      background: ${mode.id === activeMode ? 'var(--bg)' : 'transparent'};
-      box-shadow: ${mode.id === activeMode ? 'var(--shadow)' : 'none'};
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    `;
-    tab.textContent = mode.label;
+    tab.type = 'button';
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(mode.id === activeMode));
+    tab.className = `tab-btn p-checkin-tab${mode.id === activeMode ? ' active' : ''}`;
     tab.dataset.mode = mode.id;
+    tab.innerHTML = `${iconMarkup(mode.icon, { size: 16, variant: mode.id === activeMode ? 'filled' : 'outline' })}<span>${mode.label}</span>`;
     tabsWrapper.appendChild(tab);
   });
   root.appendChild(tabsWrapper);
 
-  // Content Area
+  // Content Stage Card
   const contentArea = document.createElement('div');
-  contentArea.className = 'card';
-  contentArea.style.cssText = 'padding: clamp(14px, 3.5vw, 18px); display: flex; flex-direction: column; gap: 12px; min-height: 0; width:100%; max-width:100%; overflow:hidden;';
+  contentArea.className = 'card p-checkin-card u-grain-surface';
   root.appendChild(contentArea);
 
   // Form State
@@ -193,6 +94,41 @@ export function renderCheckinPage(): HTMLElement {
     selectedPreviewUrl = null;
   }
 
+  function navigateHomeFromCheckin(): void {
+    const target = '/app/home';
+    try {
+      clearSelectedPhoto();
+    } catch (error) {
+      logger.warn('Failed to clear the selected check-in photo before closing', error);
+    }
+
+    try {
+      navigate(target);
+    } catch (error) {
+      logger.error('Failed to navigate away from check-in', error);
+      window.location.replace(target);
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (window.location.pathname === '/app/checkin') window.location.replace(target);
+    }, 0);
+  }
+
+  const closeCheckin = header.querySelector<HTMLButtonElement>('#back-btn');
+  if (closeCheckin) {
+    let closeRequested = false;
+    const handleClose = (event: Event): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (closeRequested) return;
+      closeRequested = true;
+      navigateHomeFromCheckin();
+    };
+    closeCheckin.addEventListener('pointerup', handleClose);
+    closeCheckin.addEventListener('click', handleClose);
+  }
+
   async function applyPhotoTransform(sourceFile: File): Promise<void> {
     isProcessingPhoto = true;
     renderContentForm();
@@ -200,9 +136,8 @@ export function renderCheckinPage(): HTMLElement {
     try {
       const result = await processImage(sourceFile, {
         aspectRatio: PHOTO_ASPECT_RATIO,
-        // 2K resolution — crisp, sharp on all mobile and desktop screens
         maxSize: 2048,
-        quality: 0.90,
+        quality: 0.9,
       });
 
       revokePreviewUrl(selectedPreviewUrl);
@@ -221,7 +156,6 @@ export function renderCheckinPage(): HTMLElement {
     selectedSourceFile = res.file;
     const rawPreview = res.preview;
     void applyPhotoTransform(res.file).then(() => {
-      // Revoke the temporary raw-file blob URL produced by camera capture
       revokePreviewUrl(rawPreview);
     });
   }
@@ -249,15 +183,11 @@ export function renderCheckinPage(): HTMLElement {
     try {
       return await createCheckin(buildPhotoPayload(selectedFile, caption, clientMutationId));
     } catch (err) {
-      if (
-        !(err instanceof ApiError) ||
-        err.code !== 'NETWORK_ERROR' ||
-        !selectedSourceFile
-      ) {
+      if (!(err instanceof ApiError) || err.code !== 'NETWORK_ERROR' || !selectedSourceFile) {
         throw err;
       }
 
-      showToast('Upload ảnh chưa ổn, đang thử bản nhẹ hơn...', 'info');
+      showToast('Mạng hơi yếu, đang thử bản ảnh gọn hơn...', 'info');
       const fallback = await processImage(selectedSourceFile, {
         aspectRatio: PHOTO_ASPECT_RATIO,
         maxSize: 1080,
@@ -273,40 +203,26 @@ export function renderCheckinPage(): HTMLElement {
     }
   }
 
-  function compactCaptionGroup(group: HTMLElement): void {
-    group.querySelector('label')?.remove();
-    group.style.gap = '0';
-
-    const input = group.querySelector<HTMLInputElement>('#caption-input');
-    if (input) {
-      input.style.minHeight = '46px';
-      input.style.padding = '12px 14px';
-      input.style.fontSize = '14px';
-      input.style.borderRadius = '16px';
-    }
-  }
-
   function renderPhotoForm(): void {
     const picker = document.createElement('div');
-    picker.className = `photo-composer${selectedPreviewUrl ? ' has-photo' : ''}`;
-    picker.style.aspectRatio = PHOTO_CSS_RATIO;
+    picker.className = `photo-composer p-checkin-polaroid${selectedPreviewUrl ? ' has-photo' : ''}`;
 
     if (selectedPreviewUrl) {
       picker.innerHTML = `
-        <img class="photo-composer-image" src="${selectedPreviewUrl}" alt="Ảnh check-in đã chọn" />
-        <div class="photo-composer-vignette"></div>
-        <div class="photo-composer-topbar">
-          <button type="button" id="remove-photo" class="photo-icon-button" aria-label="Xóa ảnh">×</button>
+        <img class="photo-composer-image p-checkin-polaroid__img" src="${selectedPreviewUrl}" alt="Ảnh check-in đã chọn" />
+        <div class="p-checkin-polaroid__topbar">
+          <button type="button" id="remove-photo" class="c-icon-btn" aria-label="Bỏ chọn ảnh">${iconMarkup('close', { size: 20 })}</button>
         </div>
-        <div class="photo-composer-actions">
-          <button id="retake-photo" class="photo-action-button" type="button">Chụp lại</button>
-          <button id="change-photo" class="photo-action-button" type="button">Đổi ảnh</button>
+        <div class="p-checkin-polaroid__actions">
+          <button id="retake-photo" class="c-btn c-btn--secondary c-btn--sm c-btn--pill" type="button">${iconMarkup('camera', { size: 16 })}<span>Chụp lại</span></button>
+          <button id="change-photo" class="c-btn c-btn--secondary c-btn--sm c-btn--pill" type="button">${iconMarkup('gallery', { size: 16 })}<span>Đổi ảnh</span></button>
         </div>
       `;
 
       picker.querySelector('#remove-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        navigateHomeFromCheckin();
+        clearSelectedPhoto();
+        renderContentForm();
       });
       picker.querySelector('#retake-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -318,69 +234,51 @@ export function renderCheckinPage(): HTMLElement {
       });
     } else if (isProcessingPhoto) {
       picker.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;">
-          <svg viewBox="0 0 64 76" width="136" height="162" class="l-polaroid" aria-hidden="true">
-            <defs>
-              <linearGradient id="ciPolGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#ffb3cc"/>
-                <stop offset="55%" stop-color="#ff85a1"/>
-                <stop offset="100%" stop-color="#c0456c"/>
-              </linearGradient>
-            </defs>
-            <rect width="64" height="76" rx="4" fill="#fff4f7"/>
-            <rect class="l-polaroid__photo" x="6" y="6" width="52" height="52" rx="2" fill="url(#ciPolGrad)"/>
-            <rect x="10" y="66" width="26" height="3" rx="1.5" fill="#c0456c" opacity=".4"/>
-          </svg>
-          <span style="font-size:13px;color:var(--text-secondary);">Đang chuẩn bị ảnh...</span>
+        <div class="p-checkin-empty">
+          <div class="p-checkin-empty__lens">${iconMarkup('polaroid', { size: 32, motion: 'pop' })}</div>
+          <div class="p-checkin-empty__copy">
+            <strong>Đang tráng ảnh Polaroid...</strong>
+            <span>Đợi một nhịp cho ảnh sắc nét nhé</span>
+          </div>
         </div>
       `;
     } else {
       picker.innerHTML = `
-        <div class="photo-composer-empty">
-          <img class="photo-composer-lens" src="/icons8-photo-gallery-96.apng.png" alt="Gallery Icon" width="96" height="96" />
-          <div class="photo-composer-copy">
+        <div class="photo-composer-empty p-checkin-empty">
+          <div class="p-checkin-empty__lens">${iconMarkup('checkin-lens', { size: 32, variant: 'filled' })}</div>
+          <div class="photo-composer-copy p-checkin-empty__copy">
             <strong>Gửi ảnh cho người ấy</strong>
-            <span>Chụp mới hoặc chọn ảnh từ album</span>
+            <span>Mở ống kính chụp mới hoặc chọn từ album</span>
           </div>
-          <div class="photo-composer-actions photo-composer-actions-empty">
-            <button id="camera-photo" class="photo-action-button primary" type="button">Chụp</button>
-            <button id="gallery-photo" class="photo-action-button" type="button">Album</button>
+          <div class="photo-composer-actions" style="display:flex;gap:10px;margin-top:4px;">
+            <button id="camera-photo" class="c-btn c-btn--primary c-btn--pill" type="button">${iconMarkup('camera', { size: 20 })}<span>Chụp ảnh</span></button>
+            <button id="gallery-photo" class="c-btn c-btn--secondary c-btn--pill" type="button">${iconMarkup('gallery', { size: 20 })}<span>Album</span></button>
           </div>
         </div>
       `;
 
-      const lensImg = picker.querySelector<HTMLImageElement>('.photo-composer-lens');
-      const resetAnimation = () => {
-        if (lensImg) {
-          lensImg.src = '/icons8-photo-gallery-96.apng.png?t=' + Date.now();
-        }
-      };
-
-      picker.addEventListener('pointerenter', resetAnimation);
-      picker.addEventListener('click', resetAnimation);
-
       picker.querySelector('#camera-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
+        triggerHaptic('tap');
         openCamera((res) => selectPhoto(res));
       });
       picker.querySelector('#gallery-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
+        triggerHaptic('tap');
         openGallery((res) => selectPhoto(res));
       });
     }
 
-
-
     contentArea.appendChild(picker);
 
     const capGroup = document.createElement('div');
-    capGroup.className = 'input-group';
+    capGroup.className = 'c-field';
     capGroup.innerHTML = `
-      <label class="input-label">Mô tả (Không bắt buộc)</label>
       <input
         type="text"
         id="caption-input"
-        class="input"
+        class="c-input"
+        aria-label="Mô tả khoảnh khắc"
         placeholder="Viết vài dòng ngọt ngào..."
         maxlength="280"
         autocomplete="off"
@@ -392,7 +290,6 @@ export function renderCheckinPage(): HTMLElement {
         data-1p-ignore="true"
       />
     `;
-    compactCaptionGroup(capGroup);
     const captionInput = capGroup.querySelector<HTMLInputElement>('#caption-input');
     if (captionInput) {
       captionInput.value = photoCaption;
@@ -402,53 +299,38 @@ export function renderCheckinPage(): HTMLElement {
     }
     contentArea.appendChild(capGroup);
 
+    // Love Foil Scratch Toggle
     const scratchToggle = document.createElement('button');
     scratchToggle.type = 'button';
-    scratchToggle.className = `checkin-scratch-toggle${includeScratch ? ' is-on' : ''}`;
+    scratchToggle.className = `checkin-scratch-toggle p-checkin-scratch${includeScratch ? ' is-on' : ''}`;
     scratchToggle.setAttribute('aria-pressed', String(includeScratch));
     scratchToggle.setAttribute('aria-expanded', String(includeScratch));
     scratchToggle.setAttribute('aria-controls', 'surprise-text-group');
-    scratchToggle.style.cssText = `
-      width:100%;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      min-height:44px;
-      padding:8px 11px;
-      border:1px solid ${includeScratch ? 'rgba(255, 59, 127, 0.34)' : 'var(--border)'};
-      border-radius:14px;
-      background:${includeScratch ? 'linear-gradient(135deg, rgba(255, 47, 125, 0.12), rgba(111, 92, 255, 0.1))' : 'var(--surface-solid)'};
-      color:var(--text-primary);
-      text-align:left;
-      cursor:pointer;
-    `;
     scratchToggle.innerHTML = `
-      <span style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:750;">
-        <span aria-hidden="true" style="color:${includeScratch ? 'var(--accent)' : 'var(--text-secondary)'};font-size:16px;">✦</span>
-        Lớp cào
+      <span class="p-checkin-scratch__lead">
+        ${iconMarkup('scratch-card', { size: 20, variant: includeScratch ? 'filled' : 'outline' })}
+        <span>Lớp cào bất ngờ (Love Foil)</span>
       </span>
-      <span style="padding:3px 7px;border-radius:999px;background:${includeScratch ? 'rgba(255, 59, 127, 0.16)' : 'rgba(255,255,255,0.07)'};color:${includeScratch ? 'var(--accent)' : 'var(--text-secondary)'};font-size:10px;font-weight:800;">
-        ${includeScratch ? 'Bật' : 'Tắt'}
-      </span>
+      <span class="p-checkin-scratch__pill">${includeScratch ? 'Đang bật' : 'Đang tắt'}</span>
     `;
     scratchToggle.addEventListener('click', () => {
       includeScratch = !includeScratch;
+      triggerHaptic('select');
       renderContentForm();
     });
     contentArea.appendChild(scratchToggle);
 
     if (includeScratch) {
       const surpriseTextGroup = document.createElement('div');
-      surpriseTextGroup.className = 'input-group checkin-scratch-message';
+      surpriseTextGroup.className = 'c-field checkin-scratch-message';
       surpriseTextGroup.id = 'surprise-text-group';
       surpriseTextGroup.innerHTML = `
-        <label class="input-label">Lời nhắn (tuỳ chọn)</label>
         <input
           type="text"
           id="surprise-text-input"
-          class="input"
-          placeholder="Một lời nhắn nhỏ..."
+          class="c-input"
+          aria-label="Lời nhắn trên lớp cào"
+          placeholder="Lời nhắn hiện trên lớp nhũ trước khi cào..."
           maxlength="120"
           autocomplete="off"
           autocorrect="off"
@@ -459,7 +341,6 @@ export function renderCheckinPage(): HTMLElement {
           data-1p-ignore="true"
         />
       `;
-      compactCaptionGroup(surpriseTextGroup);
       const surpriseTextInput = surpriseTextGroup.querySelector<HTMLInputElement>('#surprise-text-input');
       if (surpriseTextInput) {
         surpriseTextInput.value = photoSurpriseText;
@@ -470,40 +351,30 @@ export function renderCheckinPage(): HTMLElement {
       contentArea.appendChild(surpriseTextGroup);
     }
 
-    const quickHeader = document.createElement('label');
-    quickHeader.className = 'input-label';
-    quickHeader.textContent = 'Chọn nhanh tin nhắn';
-    quickHeader.style.marginBottom = '0';
-    contentArea.appendChild(quickHeader);
-
     const chipsWrapper = document.createElement('div');
-    chipsWrapper.className = 'chip-scroll photo-chip-scroll';
+    chipsWrapper.className = 'p-checkin-chips';
     QUICK_MESSAGES.forEach((msg) => {
-      const chip = document.createElement('button');
-      chip.className = `chip ${selectedQuickMsg === msg ? 'active' : ''}`;
-      chip.type = 'button';
-      chip.textContent = msg;
-      chip.addEventListener('click', () => {
-        if (selectedQuickMsg === msg) {
-          selectedQuickMsg = null;
-        } else {
-          selectedQuickMsg = msg;
-          photoCaption = msg;
-          const input = contentArea.querySelector<HTMLInputElement>('#caption-input');
-          if (input) input.value = msg;
-        }
-        chipsWrapper.querySelectorAll<HTMLButtonElement>('button').forEach((btn, idx) => {
-          btn.classList.toggle('active', QUICK_MESSAGES[idx] === selectedQuickMsg);
-        });
+      const chip = createChip({
+        label: msg,
+        selected: selectedQuickMsg === msg,
+        interactive: true,
+        onClick: () => {
+          if (selectedQuickMsg === msg) {
+            selectedQuickMsg = null;
+          } else {
+            selectedQuickMsg = msg;
+            photoCaption = msg;
+          }
+          renderContentForm();
+        },
       });
       chipsWrapper.appendChild(chip);
     });
     contentArea.appendChild(chipsWrapper);
   }
 
-  // Render content depending on activeMode
-  function renderContentForm() {
-    contentArea.innerHTML = '';
+  function renderContentForm(): void {
+    contentArea.replaceChildren();
 
     if (activeMode === 'photo') {
       renderPhotoForm();
@@ -511,82 +382,72 @@ export function renderCheckinPage(): HTMLElement {
     }
 
     if (activeMode === 'text') {
-      // Text Checkin
       const textGroup = document.createElement('div');
-      textGroup.className = 'input-group';
-      textGroup.style.flex = '1';
+      textGroup.className = 'c-field';
       textGroup.innerHTML = `
-        <label class="input-label">Viết gì đó gửi người ấy</label>
-        <textarea id="text-input" class="input" placeholder="Hôm nay của bạn thế nào? Kể cho người ấy nghe nhé..." maxlength="280" style="flex:1;min-height:140px;"></textarea>
+        <label class="c-field__label" for="text-input">Viết đôi lời gửi người ấy</label>
+        <textarea id="text-input" class="c-textarea" rows="5" placeholder="Hôm nay của bạn thế nào? Kể cho người ấy nghe nhé..." maxlength="280"></textarea>
       `;
-      const textInput = textGroup.querySelector<HTMLTextAreaElement>('#text-input');
-      if (textInput) {
-        textInput.style.minHeight = '112px';
-        textInput.style.lineHeight = '1.45';
-      }
       contentArea.appendChild(textGroup);
 
-      // Quick message selection
-      const quickHeader = document.createElement('label');
-      quickHeader.className = 'input-label';
-      quickHeader.textContent = 'Gợi ý tin nhắn';
-      quickHeader.style.marginBottom = '0';
-      contentArea.appendChild(quickHeader);
-
       const chipsWrapper = document.createElement('div');
-      chipsWrapper.style.cssText = 'display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding-bottom:4px;margin-top:-8px;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch;';
-      QUICK_MESSAGES.forEach(msg => {
-        const chip = document.createElement('button');
-        chip.style.cssText = `
-          white-space:nowrap;
-          flex-shrink:0;
-          font-size:12px;
-          padding:5px 10px;
-          border-radius:12px;
-          background: var(--surface-solid);
-          border: 1px solid var(--border);
-          color: var(--text-primary);
-        `;
-        chip.textContent = msg;
-        chip.addEventListener('click', () => {
-          const textarea = contentArea.querySelector('#text-input') as HTMLTextAreaElement;
-          if (textarea) {
-            textarea.value = msg;
-            textarea.focus();
-          }
+      chipsWrapper.className = 'p-checkin-chips';
+      QUICK_MESSAGES.forEach((msg) => {
+        const chip = createChip({
+          label: msg,
+          interactive: true,
+          onClick: () => {
+            const textarea = contentArea.querySelector<HTMLTextAreaElement>('#text-input');
+            if (textarea) {
+              textarea.value = msg;
+              textarea.focus();
+            }
+          },
         });
         chipsWrapper.appendChild(chip);
       });
       contentArea.appendChild(chipsWrapper);
-
-    } else if (activeMode === 'random') {
-      const randomCard = document.createElement('div');
-      randomCard.className = 'card-solid';
-      randomCard.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px 16px;text-align:center;';
-      randomCard.innerHTML = `
-        <div style="font-size:48px;line-height:1">🎲</div>
-        <strong>Random cho hai bạn</strong>
-        <span style="font-size:13px;color:var(--text-secondary)">Bốc câu hỏi, thử thách hoặc một gợi ý bất ngờ.</span>
-        <button type="button" class="btn-primary">Mở Random</button>
-      `;
-      randomCard.querySelector('button')?.addEventListener('click', () => navigate('/app/random'));
-      contentArea.appendChild(randomCard);
+      return;
     }
+
+    const randomCard = document.createElement('div');
+    randomCard.className = 'p-checkin-empty';
+    randomCard.innerHTML = `
+      <div class="p-checkin-empty__lens">${iconMarkup('dice', { size: 32, variant: 'filled' })}</div>
+      <div class="p-checkin-empty__copy">
+        <strong>Trò chơi & Gợi ý ngẫu nhiên</strong>
+        <span>Bốc câu hỏi sâu sắc, thử thách dễ thương hoặc ý tưởng hẹn hò cho hai bạn.</span>
+      </div>
+    `;
+    randomCard.appendChild(
+      createButton({
+        label: 'Mở hộp Bất ngờ',
+        variant: 'primary',
+        pill: true,
+        leadingIcon: 'sparkle',
+        onClick: () => navigate('/app/random'),
+      }).element,
+    );
+    contentArea.appendChild(randomCard);
   }
 
-  // Switch tab event handlers
   tabsWrapper.addEventListener('click', (e) => {
-    const btn = (e.target as HTMLElement).closest('.tab-btn') as HTMLButtonElement | null;
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.tab-btn');
     if (!btn) return;
-    const mode = btn.dataset.mode;
+    const mode = btn.dataset.mode as 'photo' | 'text' | 'random' | undefined;
     if (!mode || mode === activeMode) return;
 
     activeMode = mode;
-    tabsWrapper.querySelectorAll<HTMLButtonElement>('.tab-btn').forEach(b => {
-      const isAct = b.getAttribute('data-mode') === activeMode;
-      b.style.color = isAct ? 'var(--accent)' : 'var(--text-secondary)';
-      b.style.background = isAct ? 'var(--bg)' : 'transparent';
-      b.style.boxShadow = isAct ? 'var(--shadow)' : 'none';
+    triggerHaptic('select');
+    tabsWrapper.querySelectorAll<HTMLButtonElement>('.tab-btn').forEach((b) => {
+      const m = b.dataset.mode as 'photo' | 'text' | 'random';
+      const isAct = m === activeMode;
+      b.classList.toggle('active', isAct);
+      b.setAttribute('aria-selected', String(isAct));
+      const modeDef = modes.find((item) => item.id === m);
+      if (modeDef) {
+        b.innerHTML = `${iconMarkup(modeDef.icon, { size: 16, variant: isAct ? 'filled' : 'outline' })}<span>${modeDef.label}</span>`;
+      }
     });
 
     renderContentForm();
@@ -594,50 +455,49 @@ export function renderCheckinPage(): HTMLElement {
 
   renderContentForm();
 
-  // Send Button
+  // Sticky Primary Send Button
   const sendBtn = document.createElement('button');
-  sendBtn.className = 'btn-primary btn-primary-full';
-  sendBtn.style.cssText = `
-    position:fixed;
-    left:50%;
-    bottom:calc(92px + var(--safe-bottom));
-    transform:translateX(-50%);
-    z-index:90;
-    width:min(448px, calc(100% - 32px));
-    padding:16px;
-    font-size:17px;
-    font-weight:700;
-    box-shadow:0 12px 32px var(--accent-glow);
-  `;
-  sendBtn.innerHTML = `Gửi ngay 💕`;
-  root.appendChild(sendBtn);
+  sendBtn.type = 'button';
+  sendBtn.className = 'c-btn c-btn--primary c-btn--lg p-checkin-submit';
 
   function resetSendButton(): void {
     sendBtn.disabled = false;
-    sendBtn.innerHTML = `Gửi ngay 💕`;
+    sendBtn.innerHTML = `${iconMarkup('send', { size: 20 })}<span>Gửi ngay cho người ấy</span>`;
+  }
+  resetSendButton();
+  root.appendChild(sendBtn);
+
+  function setSendProgressState(label: string): void {
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = `
+      <svg class="p-checkin-ring" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" stroke-opacity="0.25"></circle>
+        <path d="M12 3a9 9 0 0 1 9 9" stroke-linecap="round"></path>
+      </svg>
+      <span>${label}</span>
+    `;
   }
 
-  // Send Action handler
   sendBtn.addEventListener('click', async () => {
-    let payload: FormData | Record<string, any>;
+    let payload: FormData | Record<string, unknown>;
     const clientMutationId = `checkin:${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
-    
+
     if (activeMode === 'photo') {
       if (isProcessingPhoto) {
-        showToast('Ảnh đang được xử lý, chờ một chút nhé.', 'info');
+        showToast('Ảnh đang được chuẩn bị, chờ một nhịp nhé.', 'info');
         return;
       }
       if (!selectedFile) {
-        showToast('Vui lòng chọn hoặc chụp ảnh!', 'error');
+        showToast('Hãy chụp hoặc chọn một tấm ảnh trước nhé!', 'error');
         return;
       }
-      const caption = (root.querySelector('#caption-input') as HTMLInputElement)?.value.trim();
+      const caption = root.querySelector<HTMLInputElement>('#caption-input')?.value.trim();
       photoCaption = caption ?? '';
       payload = buildPhotoPayload(selectedFile, photoCaption, clientMutationId);
     } else if (activeMode === 'text') {
-      const text = (root.querySelector('#text-input') as HTMLTextAreaElement)?.value.trim();
+      const text = root.querySelector<HTMLTextAreaElement>('#text-input')?.value.trim();
       if (!text) {
-        showToast('Nội dung tin nhắn không được để trống!', 'error');
+        showToast('Nội dung lời nhắn chưa được nhập!', 'error');
         return;
       }
       payload = {
@@ -650,8 +510,7 @@ export function renderCheckinPage(): HTMLElement {
       return;
     }
 
-    sendBtn.disabled = true;
-    sendBtn.innerHTML = `<span class="spinner" style="width:20px;height:20px;border-width:2px;border-color:#fff transparent transparent transparent;"></span> Đang gửi...`;
+    setSendProgressState('Đang gửi khoảnh khắc...');
 
     try {
       const result = activeMode === 'photo'
@@ -663,10 +522,10 @@ export function renderCheckinPage(): HTMLElement {
           store.set({ couple: { ...current.couple, streak: result.streak } });
         }
       }
-      
-      // Success Heart Burst animation
+
+      triggerHaptic('confirm');
       showHeartBurstEffect();
-      showToast('Gửi check-in thành công!', 'success');
+      showToast('Đã gửi khoảnh khắc thành công!', 'success');
 
       if (activeMode === 'photo') {
         clearSelectedPhoto();
@@ -677,14 +536,11 @@ export function renderCheckinPage(): HTMLElement {
         renderContentForm();
       }
       resetSendButton();
-      // Check-in pages are cached by the router. Never restore the previous
-      // in-flight button state after a completed submission.
       invalidateRoutes('/app/checkin');
-      
+
       setTimeout(() => {
         navigate('/app/home');
-      }, 700);
-
+      }, 650);
     } catch (err) {
       logger.error('Failed to submit check-in', err);
       showToast((err as Error).message || 'Gửi check-in thất bại!', 'error');
@@ -692,60 +548,51 @@ export function renderCheckinPage(): HTMLElement {
     }
   });
 
-  // Helper for Heart Burst Effect
-  function showHeartBurstEffect() {
+  // Bespoke SVG Heart-Burst Celebration (<= 2KB, respects reduced-motion)
+  function showHeartBurstEffect(): void {
+    if (document.documentElement.getAttribute('data-reduced-motion') === 'true') return;
+
     let burstContainer = document.getElementById('heart-burst-container');
     if (!burstContainer) {
       burstContainer = document.createElement('div');
       burstContainer.id = 'heart-burst-container';
-      burstContainer.className = 'heart-burst-container';
+      burstContainer.className = 'p-heart-burst-layer';
       document.body.appendChild(burstContainer);
     }
 
     const rect = sendBtn.getBoundingClientRect();
     let x = rect.left + rect.width / 2;
     let y = rect.top + rect.height / 2;
-
-    // Fallback to center of viewport if coordinates are invalid (0 or NaN)
-    if (!x || !y || isNaN(x) || isNaN(y)) {
+    if (!x || !y || Number.isNaN(x) || Number.isNaN(y)) {
       x = window.innerWidth / 2;
       y = window.innerHeight / 2;
-      logger.warn('[HeartBurst] Invalid button coordinates, falling back to viewport center:', { x, y, rect });
-    } else {
-      logger.info('[HeartBurst] Triggered at button coordinates:', { x, y, rect });
     }
 
-    const particleCount = 18;
-    const hearts = ["❤️", "💖", "💕", "🌸", "🥰"];
-
-    for (let i = 0; i < particleCount; i++) {
+    const svgIcons: IconName[] = ['heart', 'heart-burst', 'sparkle'];
+    for (let i = 0; i < 14; i++) {
       const particle = document.createElement('div');
-      particle.className = 'particle-heart';
-      particle.textContent = hearts[Math.floor(Math.random() * hearts.length)];
+      particle.className = 'p-burst-svg';
+      const chosen = svgIcons[i % svgIcons.length];
+      particle.innerHTML = iconMarkup(chosen, { size: 20, variant: 'filled' });
 
-      const angle = Math.random() * Math.PI * 2;
-      const distance = 60 + Math.random() * 120;
-      const tx = Math.cos(angle) * distance;
-      const ty = Math.sin(angle) * distance - 40; // bias upwards
-      const scale = 0.5 + Math.random() * 0.8;
-      const rot = -45 + Math.random() * 90;
-
-      particle.style.setProperty('--tx', `${tx}px`);
-      particle.style.setProperty('--ty', `${ty}px`);
-      particle.style.setProperty('--scale', `${scale}`);
-      particle.style.setProperty('--rot', `${rot}deg`);
+      const angle = (Math.PI * 2 * i) / 14 + (Math.random() - 0.5) * 0.35;
+      const distance = 64 + Math.random() * 110;
+      const tx = Math.round(Math.cos(angle) * distance);
+      const ty = Math.round(Math.sin(angle) * distance - 44);
+      const scale = (0.65 + Math.random() * 0.65).toFixed(2);
+      const rot = Math.round(-36 + Math.random() * 72);
 
       particle.style.left = `${x}px`;
       particle.style.top = `${y}px`;
+      particle.style.setProperty('--tx', `${tx}px`);
+      particle.style.setProperty('--ty', `${ty}px`);
+      particle.style.setProperty('--scale', scale);
+      particle.style.setProperty('--rot', `${rot}deg`);
 
       burstContainer.appendChild(particle);
-
-      particle.addEventListener('animationend', () => {
-        particle.remove();
-      });
+      particle.addEventListener('animationend', () => particle.remove(), { once: true });
     }
   }
 
-  // Inject Nav
   return root;
 }

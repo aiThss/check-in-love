@@ -1,8 +1,12 @@
+import '../styles/20-pages/camera.css';
+import { logger } from '../utils/logger';
+import { iconMarkup } from '../ui/icons/icons';
+import { triggerHaptic } from '../ui/haptics';
+
 export interface CameraResult {
   file: File;
   preview: string;
 }
-import { logger } from '../utils/logger';
 
 export interface ImageProcessOptions {
   aspectRatio?: number;
@@ -166,7 +170,6 @@ async function handleFileSelection(
 ): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
-    // Track whether Android already popped the dummy state so cleanup doesn't double-back.
     let dummyStatePopped = false;
     let cancelFallbackTimer: ReturnType<typeof setTimeout> | null = null;
     const androidCamera = isCamera && isAndroidApp();
@@ -185,11 +188,10 @@ async function handleFileSelection(
         document.body.removeChild(input);
       }
 
-      // Only pop the Android dummy entry if the native side has not already done it.
       if (
-        androidCamera &&
-        !dummyStatePopped &&
-        (history.state as Record<string, unknown>)?.cameraOpen
+        androidCamera
+        && !dummyStatePopped
+        && (history.state as Record<string, unknown>)?.cameraOpen
       ) {
         dummyStatePopped = true;
         history.back();
@@ -204,13 +206,9 @@ async function handleFileSelection(
       }
     };
 
-    // Keep the dummy entry Android-only. The native back guard prevents a chooser
-    // result from being followed by a second real SPA back navigation.
     if (androidCamera) {
       history.pushState({ cameraOpen: true }, '');
 
-      // A camera app may deliver the result after the WebView has already emitted
-      // popstate. Give onchange time to receive the file before removing the input.
       const onPop = () => {
         window.removeEventListener('popstate', onPop);
         dummyStatePopped = true;
@@ -239,9 +237,6 @@ async function handleFileSelection(
       }
 
       settled = true;
-
-      // Return raw file directly — let the caller handle any necessary single transform
-      // pass to prevent double compression and keep images sharp and crisp.
       onResult({ file, preview: URL.createObjectURL(file) });
       resolve();
     };
@@ -260,111 +255,89 @@ function openCameraCapture(onResult: (result: CameraResult) => void): void {
 }
 
 /**
- * Fallback Web Camera using getUserMedia streaming into an overlay video player.
+ * Full-bleed Editorial Viewfinder with 1:1 square grid, camera flip, flash, 3s timer,
+ * tactile shutter, and friendly Vietnamese permission-denied guidance.
  */
 async function openCameraStream(onResult: (result: CameraResult) => void): Promise<void> {
   const overlay = document.createElement('div');
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: #000;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+  overlay.className = 'p-cam-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Máy ảnh chụp khoảnh khắc');
+
+  overlay.innerHTML = `
+    <div class="p-cam-topbar">
+      <button type="button" class="p-cam-icon-btn" id="cam-close-btn" aria-label="Đóng máy ảnh">
+        ${iconMarkup('close', { size: 20 })}
+      </button>
+      <div class="p-cam-tools">
+        <button type="button" class="p-cam-pill-btn" id="cam-grid-btn" aria-pressed="true" aria-label="Bật tắt lưới căn khung">
+          <span>3×3</span>
+        </button>
+        <button type="button" class="p-cam-icon-btn" id="cam-timer-btn" aria-pressed="false" aria-label="Hẹn giờ 3 giây">
+          ${iconMarkup('clock', { size: 20 })}
+        </button>
+        <button type="button" class="p-cam-icon-btn" id="cam-flash-btn" aria-pressed="false" aria-label="Bật tắt đèn flash">
+          ${iconMarkup('flash-off', { size: 20 })}
+        </button>
+      </div>
+    </div>
+    <div class="p-cam-stage">
+      <video class="p-cam-video" autoplay playsinline webkit-playsinline></video>
+      <div class="p-cam-frame is-grid" id="cam-frame">
+        <span class="p-cam-grid-line p-cam-grid-line--v1"></span>
+        <span class="p-cam-grid-line p-cam-grid-line--v2"></span>
+        <span class="p-cam-grid-line p-cam-grid-line--h1"></span>
+        <span class="p-cam-grid-line p-cam-grid-line--h2"></span>
+      </div>
+      <div class="p-cam-countdown" id="cam-countdown" hidden></div>
+      <div class="p-cam-screen-flash" id="cam-screen-flash" hidden></div>
+      <div class="p-cam-denied" id="cam-denied" hidden>
+        <div class="p-cam-denied__icon">${iconMarkup('lock', { size: 32, variant: 'filled' })}</div>
+        <h3>Chưa cấp quyền máy ảnh</h3>
+        <p>Cho phép quyền truy cập Camera trong phần cài đặt trình duyệt, hoặc chọn ảnh có sẵn từ thư viện nhé.</p>
+        <div class="p-cam-denied__actions">
+          <button type="button" class="c-btn c-btn--primary c-btn--pill" id="cam-fallback-native">Mở máy ảnh thiết bị</button>
+          <button type="button" class="c-btn c-btn--secondary c-btn--pill" id="cam-fallback-gallery">Chọn từ Album</button>
+        </div>
+      </div>
+    </div>
+    <div class="p-cam-bottombar">
+      <button type="button" class="p-cam-icon-btn" id="cam-gallery-btn" aria-label="Chọn từ thư viện ảnh">
+        ${iconMarkup('gallery', { size: 24 })}
+      </button>
+      <button type="button" class="p-cam-shutter" id="cam-shutter-btn" aria-label="Chụp ảnh">
+        <span class="p-cam-shutter__ring">
+          ${iconMarkup('heart', { size: 24, variant: 'filled' })}
+        </span>
+      </button>
+      <button type="button" class="p-cam-icon-btn" id="cam-flip-btn" aria-label="Đổi camera trước sau">
+        ${iconMarkup('flip-camera', { size: 24 })}
+      </button>
+    </div>
   `;
 
-  const video = document.createElement('video');
-  video.autoplay = true;
-  video.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
-  // Required attribute flags for iOS Safari
-  video.setAttribute('playsinline', 'true');
-  video.setAttribute('webkit-playsinline', 'true');
-  overlay.appendChild(video);
-
-  const controls = document.createElement('div');
-  controls.style.cssText = `
-    position: absolute;
-    bottom: max(40px, calc(40px + var(--safe-bottom)));
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 80%;
-    max-width: 400px;
-    z-index: 10000;
-  `;
-
-  const closeBtn = document.createElement('button');
-  closeBtn.innerHTML = '✕';
-  closeBtn.type = 'button';
-  closeBtn.style.cssText = `
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(255,255,255,0.25);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    color: #fff;
-    font-size: 20px;
-    font-weight: bold;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  `;
-  controls.appendChild(closeBtn);
-
-  const captureBtn = document.createElement('button');
-  captureBtn.type = 'button';
-  captureBtn.style.cssText = `
-    width: 76px;
-    height: 76px;
-    border-radius: 50%;
-    border: 5px solid #fff;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  `;
-  const innerCircle = document.createElement('div');
-  innerCircle.style.cssText = 'width: 56px; height: 56px; border-radius: 50%; background: #fff;';
-  captureBtn.appendChild(innerCircle);
-  controls.appendChild(captureBtn);
-
-  // Balance layout placeholder
-  const placeholder = document.createElement('div');
-  placeholder.style.width = '50px';
-  controls.appendChild(placeholder);
-
-  overlay.appendChild(controls);
   document.body.appendChild(overlay);
 
-  let localStream: MediaStream | null = null;
+  const video = overlay.querySelector<HTMLVideoElement>('.p-cam-video')!;
+  const frameEl = overlay.querySelector<HTMLElement>('#cam-frame')!;
+  const countdownEl = overlay.querySelector<HTMLElement>('#cam-countdown')!;
+  const flashScreenEl = overlay.querySelector<HTMLElement>('#cam-screen-flash')!;
+  const deniedEl = overlay.querySelector<HTMLElement>('#cam-denied')!;
+  const closeBtn = overlay.querySelector<HTMLButtonElement>('#cam-close-btn')!;
+  const gridBtn = overlay.querySelector<HTMLButtonElement>('#cam-grid-btn')!;
+  const timerBtn = overlay.querySelector<HTMLButtonElement>('#cam-timer-btn')!;
+  const flashBtn = overlay.querySelector<HTMLButtonElement>('#cam-flash-btn')!;
+  const shutterBtn = overlay.querySelector<HTMLButtonElement>('#cam-shutter-btn')!;
+  const flipBtn = overlay.querySelector<HTMLButtonElement>('#cam-flip-btn')!;
+  const galleryBtn = overlay.querySelector<HTMLButtonElement>('#cam-gallery-btn')!;
 
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'environment',
-        width: { ideal: 1080 },
-        height: { ideal: 1080 }
-      },
-      audio: false
-    });
-    video.srcObject = localStream;
-  } catch (err) {
-    logger.warn('[camera] getUserMedia failed, falling back to file capture', err);
-    if (document.body.contains(overlay)) {
-      document.body.removeChild(overlay);
-    }
-    openCameraCapture(onResult);
-    return;
-  }
+  let localStream: MediaStream | null = null;
+  let facingMode: 'environment' | 'user' = 'environment';
+  let flashEnabled = false;
+  let timerEnabled = false;
+  let gridEnabled = true;
+  let capturing = false;
 
   const stopStream = () => {
     if (localStream) {
@@ -376,45 +349,155 @@ async function openCameraStream(onResult: (result: CameraResult) => void): Promi
     }
   };
 
+  const applyTorch = async (on: boolean) => {
+    const track = localStream?.getVideoTracks()?.[0];
+    if (!track) return;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
+    } catch {
+      // Hardware torch unsupported; screen flash is used during capture
+    }
+  };
+
+  const startStream = async (mode: 'environment' | 'user') => {
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
+      localStream = null;
+    }
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: mode,
+          width: { ideal: 1440 },
+          height: { ideal: 1440 },
+        },
+        audio: false,
+      });
+      video.srcObject = localStream;
+      video.classList.toggle('is-mirrored', mode === 'user');
+      deniedEl.hidden = true;
+      if (flashEnabled) void applyTorch(true);
+    } catch (err) {
+      logger.warn('[camera] getUserMedia failed', err);
+      const name = (err as DOMException)?.name || '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        deniedEl.hidden = false;
+      } else {
+        stopStream();
+        openCameraCapture(onResult);
+      }
+    }
+  };
+
+  await startStream(facingMode);
+
   closeBtn.addEventListener('click', stopStream);
 
-  captureBtn.addEventListener('click', async () => {
-    if (!video.videoWidth) return;
+  gridBtn.addEventListener('click', () => {
+    gridEnabled = !gridEnabled;
+    gridBtn.setAttribute('aria-pressed', String(gridEnabled));
+    frameEl.classList.toggle('is-grid', gridEnabled);
+    triggerHaptic('select');
+  });
+
+  timerBtn.addEventListener('click', () => {
+    timerEnabled = !timerEnabled;
+    timerBtn.setAttribute('aria-pressed', String(timerEnabled));
+    timerBtn.classList.toggle('is-active', timerEnabled);
+    triggerHaptic('select');
+  });
+
+  flashBtn.addEventListener('click', () => {
+    flashEnabled = !flashEnabled;
+    flashBtn.setAttribute('aria-pressed', String(flashEnabled));
+    flashBtn.classList.toggle('is-active', flashEnabled);
+    flashBtn.innerHTML = iconMarkup(flashEnabled ? 'flash' : 'flash-off', {
+      size: 20,
+      variant: flashEnabled ? 'filled' : 'outline',
+    });
+    void applyTorch(flashEnabled);
+    triggerHaptic('select');
+  });
+
+  flipBtn.addEventListener('click', () => {
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    triggerHaptic('tap');
+    void startStream(facingMode);
+  });
+
+  galleryBtn.addEventListener('click', () => {
+    stopStream();
+    openGallery(onResult);
+  });
+
+  overlay.querySelector('#cam-fallback-native')?.addEventListener('click', () => {
+    stopStream();
+    openCameraCapture(onResult);
+  });
+
+  overlay.querySelector('#cam-fallback-gallery')?.addEventListener('click', () => {
+    stopStream();
+    openGallery(onResult);
+  });
+
+  shutterBtn.addEventListener('click', async () => {
+    if (capturing || !video.videoWidth) return;
+    capturing = true;
+
+    if (timerEnabled) {
+      countdownEl.hidden = false;
+      for (let sec = 3; sec >= 1; sec--) {
+        countdownEl.textContent = String(sec);
+        triggerHaptic('select');
+        await new Promise((r) => setTimeout(r, 900));
+      }
+      countdownEl.hidden = true;
+    }
+
+    if (flashEnabled && facingMode === 'user') {
+      flashScreenEl.hidden = false;
+      await new Promise((r) => setTimeout(r, 120));
+    }
+
+    triggerHaptic('threshold');
 
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (ctx) {
+      if (facingMode === 'user') {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      flashScreenEl.hidden = true;
       canvas.toBlob(
         async (blob) => {
           if (blob) {
             const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
-            try {
-              onResult(await processImage(file));
-            } catch {
-              onResult({
-                file,
-                preview: URL.createObjectURL(file),
-              });
-            }
+            onResult({
+              file,
+              preview: URL.createObjectURL(file),
+            });
           }
           stopStream();
         },
         'image/jpeg',
-        0.88,
+        0.92,
       );
     } else {
+      flashScreenEl.hidden = true;
       stopStream();
     }
   });
 }
 
 /**
- * Open device camera. If forceStream is true (not on Android app), falls back to getUserMedia web stream.
+ * Open device camera. On web browsers with getUserMedia support, opens the rich
+ * viewfinder stream unless running inside the Android wrapper WebView.
  */
-export function openCamera(onResult: (result: CameraResult) => void, forceStream = false): void {
+export function openCamera(onResult: (result: CameraResult) => void, forceStream = true): void {
   if (forceStream && !isAndroidApp() && typeof navigator.mediaDevices?.getUserMedia === 'function') {
     void openCameraStream(onResult);
   } else {

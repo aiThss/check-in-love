@@ -9,7 +9,7 @@
     calc(10px + env(safe-area-inset-right, 0px))
     calc(18px + env(safe-area-inset-bottom, 0px))
     calc(10px + env(safe-area-inset-left, 0px));
-  background: rgba(0, 0, 0, .94);
+  background: rgba(12, 8, 11, 0.94);
   animation: messageImageViewerIn 160ms ease-out both;
   overflow: hidden;
   touch-action: none;
@@ -31,6 +31,7 @@
   height: auto;
   max-width: 100%;
   max-height: calc(100dvh - 36px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  border-radius: 12px;
   object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
@@ -45,29 +46,26 @@
 
 .message-image-viewer-close {
   position: absolute;
-  top: calc(10px + env(safe-area-inset-top, 0px));
-  right: calc(10px + env(safe-area-inset-right, 0px));
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
   z-index: 10;
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, .3);
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
   border-radius: 50%;
-  background: rgba(30, 30, 30, .72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #fff;
+  background: rgba(28, 18, 25, 0.76);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #ffffff;
   cursor: pointer;
-  font-size: 30px;
-  font-weight: 300;
-  line-height: 1;
 }
 
 .message-image-viewer-close:hover,
 .message-image-viewer-close:focus-visible {
-  background: rgba(255, 255, 255, .2);
-  outline: 2px solid rgba(255, 255, 255, .8);
+  background: rgba(255, 255, 255, 0.22);
+  outline: 2px solid rgba(255, 255, 255, 0.85);
   outline-offset: 2px;
 }
 

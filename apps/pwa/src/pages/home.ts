@@ -1,15 +1,28 @@
+import '../styles/20-pages/home.css';
 import { navigate } from '../router';
 import { store, applyTheme } from '../store/index';
-import { getLatestPartnerCheckin, getCachedLatestPartnerCheckin, getCheckins, addReaction, addReply } from '../api/checkins';
+import {
+  getLatestPartnerCheckin,
+  getCachedLatestPartnerCheckin,
+  getCheckins,
+  addReaction,
+  addReply,
+} from '../api/checkins';
 import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
 import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
+import { BESPOKE_REACTIONS, MOOD_ICON_LOOKUP, renderReactionSymbolHtml } from '../ui/reactions';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import { smilePlusIconMarkup } from '../components/smile-plus-icon';
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
 import { createReplyToggle, getReplyPagePath } from '../components/reply-toggle';
 import { createMessage } from '../api/messages';
+import { icon, iconMarkup, type IconName } from '../ui/icons/icons';
+import { createAvatarPair, createButton } from '../ui/primitives';
+import { attachPullToRefresh, createEmptyState, createSkeleton } from '../ui/feedback';
+import { triggerHaptic } from '../ui/haptics';
+import { setUiTheme, type UiThemePreference } from '../ui/theme/index';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -40,9 +53,9 @@ function formatTime(isoString: string): string {
   const year = date.getFullYear();
 
   if (year === now.getFullYear()) {
-    return `Lúc ${hours}:${minutes} ${day} tháng ${month}`;
+    return `Lúc ${hours}:${minutes} · ${day} thg ${month}`;
   }
-  return `Lúc ${hours}:${minutes} ${day} tháng ${month}, ${year}`;
+  return `Lúc ${hours}:${minutes} · ${day}/${month}/${year}`;
 }
 
 function calcStreak(couple: { streak?: number } | null): number {
@@ -56,27 +69,11 @@ function calcDaysTogether(loveStartDate?: string): number {
   return Math.max(0, Math.floor(diff / 86400000));
 }
 
-const MOOD_EMOJIS: Record<string, string> = {
-  happy: '\u{1F60A}',
-  love: '\u{1F970}',
-  sad: '\u{1F622}',
-  excited: '\u{1F929}',
-  tired: '\u{1F634}',
-  calm: '\u{1F60C}',
-  miss: '\u{1F97A}',
-};
-
-const REACTIONS: Array<{ type: ReactionType; emoji: string; label: string }> = [
-  { type: '❤️', emoji: '❤️', label: 'Yêu' },
-  { type: '🥰', emoji: '🥰', label: 'Thương' },
-  { type: '😘', emoji: '😘', label: 'Hôn' },
-  { type: '😂', emoji: '😂', label: 'Cười' },
-  { type: '🥺', emoji: '🥺', label: 'Nhớ' },
-  { type: '🤗', emoji: '🤗', label: 'Ôm' },
-  { type: '🔥', emoji: '🔥', label: 'Xinh' },
-  { type: '✨', emoji: '✨', label: 'Lấp lánh' },
-  { type: '😭', emoji: '😭', label: 'Thương quá' },
-];
+function getThemeIconName(theme: UiThemePreference): IconName {
+  if (theme === 'dark') return 'sun';
+  if (theme === 'light') return 'moon';
+  return 'palette';
+}
 
 function getReaction(checkin: CheckIn, type: ReactionType): Reaction | undefined {
   return checkin.reactions.find((reaction) => reaction.type === type);
@@ -84,26 +81,16 @@ function getReaction(checkin: CheckIn, type: ReactionType): Reaction | undefined
 
 function renderSkeleton(): HTMLElement {
   const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'padding:0 16px;display:flex;flex-direction:column;gap:16px;';
-  wrapper.innerHTML = `
-    <div class="skeleton" style="height:48px;border-radius:12px;"></div>
-    <div style="height:300px;border-radius:28px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;box-shadow:var(--shadow);">
-      <svg viewBox="0 0 64 76" width="158" height="188" class="l-polaroid" aria-hidden="true">
-        <defs>
-          <linearGradient id="skelPolGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#ffb3cc"/>
-            <stop offset="55%" stop-color="#ff85a1"/>
-            <stop offset="100%" stop-color="#c0456c"/>
-          </linearGradient>
-        </defs>
-        <rect width="64" height="76" rx="4" fill="#fff4f7"/>
-        <rect class="l-polaroid__photo" x="6" y="6" width="52" height="52" rx="2" fill="url(#skelPolGrad)"/>
-        <rect x="10" y="66" width="26" height="3" rx="1.5" fill="#c0456c" opacity=".4"/>
-      </svg>
-      <span style="font-size:13px;color:var(--text-secondary);letter-spacing:.01em;">Đang tải check-in của người ấy...</span>
-    </div>
-    <div class="skeleton" style="height:56px;border-radius:20px;"></div>
-  `;
+  wrapper.className = 'p-home-polaroid-wrap skeleton';
+  const frame = document.createElement('div');
+  frame.className = 'p-home-polaroid';
+  frame.appendChild(createSkeleton({ height: '310px', className: 'p-home-skel-media' }));
+  const lineWrap = document.createElement('div');
+  lineWrap.className = 'p-home-polaroid__caption-bar';
+  lineWrap.appendChild(createSkeleton({ width: '68%', height: '18px' }));
+  lineWrap.appendChild(createSkeleton({ width: '42%', height: '13px' }));
+  frame.appendChild(lineWrap);
+  wrapper.appendChild(frame);
   return wrapper;
 }
 
@@ -124,6 +111,7 @@ function attachLongPress(target: HTMLElement, onLongPress: () => void): void {
     clear();
     timer = window.setTimeout(() => {
       longPressed = true;
+      triggerHaptic('threshold');
       onLongPress();
     }, 420);
   });
@@ -142,23 +130,31 @@ function buildReactionPicker(
   onReact: (type: ReactionType) => void,
 ): HTMLElement {
   const picker = document.createElement('div');
-  picker.className = 'reaction-picker';
+  picker.className = 'reaction-picker p-reaction-drawer';
 
-  REACTIONS.forEach(({ type, emoji, label }) => {
+  BESPOKE_REACTIONS.forEach(({ type, icon: iconName, label }) => {
     const existing = getReaction(checkin, type);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `reaction-option${existing?.reactedByMe ? ' selected' : ''}`;
     btn.dataset.type = type;
-    btn.innerHTML = `<span class="reaction-option-emoji">${emoji}</span><span>${label}</span>`;
-    btn.addEventListener('click', () => onReact(type));
+    btn.setAttribute('aria-label', `Thả cảm xúc ${label}`);
+    btn.innerHTML = `${iconMarkup(iconName, {
+      size: 16,
+      variant: existing?.reactedByMe ? 'filled' : 'outline',
+      motion: existing?.reactedByMe ? 'heartbeat' : undefined,
+    })}<span>${label}</span>`;
+    btn.addEventListener('click', () => {
+      triggerHaptic('tap');
+      onReact(type);
+    });
     picker.appendChild(btn);
   });
 
   const custom = document.createElement('form');
   custom.className = 'reaction-custom-form';
   custom.innerHTML = `
-    <input aria-label="Emoji tùy chọn" maxlength="16" placeholder="Emoji" />
+    <input aria-label="Cảm xúc tùy chọn" maxlength="16" placeholder="Ký hiệu riêng..." />
     <button type="submit">Gửi</button>
   `;
   custom.addEventListener('submit', (event) => {
@@ -166,6 +162,7 @@ function buildReactionPicker(
     const input = custom.querySelector<HTMLInputElement>('input');
     const value = input?.value.trim();
     if (!value) return;
+    triggerHaptic('tap');
     onReact(value);
     if (input) input.value = '';
   });
@@ -178,29 +175,26 @@ function buildReactionSummary(
   checkin: CheckIn,
   onShowPicker: () => void,
 ): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'checkin-actions-row';
-
   const summary = document.createElement('button');
   summary.type = 'button';
-  summary.className = 'reaction-summary';
+  summary.className = 'reaction-summary p-home-react-summary';
+  summary.setAttribute('aria-label', 'Mở bảng thả cảm xúc');
   summary.addEventListener('click', onShowPicker);
 
   const activeReactions = checkin.reactions.filter((reaction) => reaction.count > 0);
 
   if (activeReactions.length === 0) {
-    summary.innerHTML = `<span class="reaction-hint">Giữ để react.</span>`;
+    summary.innerHTML = `${iconMarkup('heart', { size: 16 })}<span class="reaction-hint">Thả cảm xúc</span>`;
   } else {
     summary.innerHTML = activeReactions
       .map(
         (reaction) =>
-          `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${escapeHtml(reaction.type)}<strong>${reaction.count}</strong></span>`,
+          `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${renderReactionSymbolHtml(reaction.type, Boolean(reaction.reactedByMe))}<strong>${reaction.count}</strong></span>`,
       )
       .join('');
   }
 
-  row.appendChild(summary);
-  return row;
+  return summary;
 }
 
 function showReplyComposer(
@@ -210,19 +204,19 @@ function showReplyComposer(
   const form = document.createElement('div');
   form.className = 'reply-composer';
   form.innerHTML = `
-    <textarea id="reply-message" class="reply-textarea" rows="4" maxlength="500" placeholder="Viết reply cho check-in này"></textarea>
+    <textarea id="reply-message" class="reply-textarea c-textarea" rows="4" maxlength="500" placeholder="Viết đôi lời nhắn gửi cho khoảnh khắc này..."></textarea>
   `;
 
   showModal({
-    title: 'Reply check-in',
+    title: 'Phản hồi khoảnh khắc',
     content: form,
-    confirmText: 'Gửi reply',
-    cancelText: 'Hủy',
+    confirmText: 'Gửi phản hồi',
+    cancelText: 'Huỷ',
     onConfirm: async () => {
       const textarea = form.querySelector<HTMLTextAreaElement>('#reply-message');
       const message = textarea?.value.trim() ?? '';
       if (!message) {
-        showToast('Nhập nội dung reply trước nhé', 'error');
+        showToast('Nhập nội dung phản hồi trước nhé', 'error');
         throw new Error('Reply message required');
       }
 
@@ -246,11 +240,10 @@ function showReplyComposer(
           },
         ];
       } catch {
-        // Keep the older reply endpoint as a compatibility fallback for legacy deployments.
         replies = await addReply(checkin.id, message);
       }
       onSaved(replies);
-      showToast('Đã gửi reply', 'success');
+      showToast('Đã gửi phản hồi', 'success');
     },
   });
 
@@ -259,40 +252,64 @@ function showReplyComposer(
   }, 50);
 }
 
+interface CheckinCardView {
+  element: HTMLElement;
+  patchInteractions: () => void;
+}
+
 function buildCheckinCard(
   checkin: CheckIn,
   onReact: (type: ReactionType) => void,
   onReply: () => void,
 ): CheckinCardView {
   const wrapper = document.createElement('div');
-  wrapper.className = 'checkin-wrapper';
+  wrapper.className = 'checkin-wrapper p-home-polaroid-wrap';
 
-  const card = document.createElement('div');
-  card.className = 'checkin-card animate-slide-up';
+  const card = document.createElement('article');
+  card.className = 'checkin-card p-home-polaroid u-grain-surface';
+
+  const moodMeta = checkin.mood ? MOOD_ICON_LOOKUP[checkin.mood] : undefined;
+  const moodBadgeHtml = moodMeta
+    ? `<span class="p-home-mood-tag">${iconMarkup(moodMeta.icon, { size: 16, variant: 'filled' })}</span>`
+    : '';
 
   if (checkin.type === 'photo' && checkin.photoUrl) {
     card.innerHTML = `
-      <img
-        class="checkin-card-image"
-        src="${escapeHtml(checkin.photoUrl)}"
-        alt="Ảnh check-in"
-        data-surprise-text="${escapeHtml(checkin.surpriseText || '')}"
-        data-scratch-enabled="${checkin.includeScratch !== false ? 'true' : 'false'}"
-        loading="lazy"
-      />
-      <div class="checkin-card-overlay">
-        ${checkin.caption ? `<p class="checkin-card-overlay-text">${escapeHtml(checkin.caption)}</p>` : ''}
-        <p class="checkin-card-overlay-meta">
-          ${checkin.mood ? MOOD_EMOJIS[checkin.mood] + ' ' : ''}${escapeHtml(checkin.ownerName)} · ${formatTime(checkin.createdAt)}
+      <div class="p-home-polaroid__media">
+        <img
+          class="checkin-card-image"
+          src="${escapeHtml(checkin.photoUrl)}"
+          alt="Ảnh check-in của ${escapeHtml(checkin.ownerName)}"
+          data-surprise-text="${escapeHtml(checkin.surpriseText || '')}"
+          data-scratch-enabled="${checkin.includeScratch !== false ? 'true' : 'false'}"
+          decoding="async"
+        />
+      </div>
+      <div class="checkin-card-overlay p-home-polaroid__caption-bar">
+        ${checkin.caption ? `<p class="checkin-card-overlay-text p-home-polaroid__caption">${escapeHtml(checkin.caption)}</p>` : ''}
+        <p class="checkin-card-overlay-meta p-home-polaroid__meta">
+          ${moodBadgeHtml}<span>${escapeHtml(checkin.ownerName)} · ${formatTime(checkin.createdAt)}</span>
         </p>
       </div>
     `;
+    const mediaEl = card.querySelector<HTMLElement>('.p-home-polaroid__media');
+    mediaEl?.addEventListener('click', () => {
+      if (!checkin.photoUrl) return;
+      openPolaroidCoverModal({
+        imageUrl: checkin.photoUrl,
+        title: checkin.caption || `Khoảnh khắc của ${checkin.ownerName}`,
+        dateText: formatTime(checkin.createdAt),
+        coverText: checkin.surpriseText,
+        forceScratch: false,
+      });
+    });
   } else {
+    card.classList.add('p-home-polaroid--text');
     card.innerHTML = `
       <div class="checkin-card-text">
-        ${checkin.mood ? `<div class="checkin-mood-emoji">${MOOD_EMOJIS[checkin.mood]}</div>` : ''}
-        ${checkin.caption ? `<p style="font-size:17px;line-height:1.6;font-weight:500;color:var(--text-primary)">${escapeHtml(checkin.caption)}</p>` : ''}
-        <p style="font-size:13px;color:var(--text-secondary);margin-top:4px">
+        ${moodMeta ? `<div class="checkin-mood-icon">${iconMarkup(moodMeta.icon, { size: 28, variant: 'filled' })}</div>` : ''}
+        ${checkin.caption ? `<p class="p-home-polaroid__caption">${escapeHtml(checkin.caption)}</p>` : ''}
+        <p class="p-home-polaroid__meta">
           ${escapeHtml(checkin.ownerName)} · ${formatTime(checkin.createdAt)}
         </p>
       </div>
@@ -307,8 +324,11 @@ function buildCheckinCard(
   attachLongPress(card, showPicker);
   wrapper.appendChild(card);
   wrapper.appendChild(picker);
-  let actions = buildReactionSummary(checkin, showPicker);
-  wrapper.appendChild(actions);
+
+  const actionRow = document.createElement('div');
+  actionRow.className = 'checkin-actions-row p-home-react-bar';
+  let summaryBtn = buildReactionSummary(checkin, showPicker);
+  actionRow.appendChild(summaryBtn);
 
   const replyToggle = createReplyToggle(
     () => checkin.replies,
@@ -316,39 +336,36 @@ function buildCheckinCard(
     'Trả lời',
     onReply,
   );
-  wrapper.appendChild(replyToggle.toggle);
+  actionRow.appendChild(replyToggle.toggle);
+  wrapper.appendChild(actionRow);
   wrapper.appendChild(replyToggle.panel);
 
   return {
     element: wrapper,
     patchInteractions: () => {
-      const nextActions = buildReactionSummary(checkin, showPicker);
-      actions.replaceWith(nextActions);
-      actions = nextActions;
+      const nextSummary = buildReactionSummary(checkin, showPicker);
+      summaryBtn.replaceWith(nextSummary);
+      summaryBtn = nextSummary;
 
       picker.querySelectorAll<HTMLButtonElement>('[data-type]').forEach((button) => {
-        const reaction = getReaction(checkin, button.dataset.type ?? '');
-        button.classList.toggle('selected', Boolean(reaction?.reactedByMe));
+        const type = button.dataset.type ?? '';
+        const reaction = getReaction(checkin, type);
+        const isSelected = Boolean(reaction?.reactedByMe);
+        button.classList.toggle('selected', isSelected);
+        const def = BESPOKE_REACTIONS.find((r) => r.type === type);
+        if (def) {
+          button.innerHTML = `${iconMarkup(def.icon, {
+            size: 16,
+            variant: isSelected ? 'filled' : 'outline',
+            motion: isSelected ? 'heartbeat' : undefined,
+          })}<span>${def.label}</span>`;
+        }
       });
 
       replyToggle.sync();
     },
   };
 }
-
-interface CheckinCardView {
-  element: HTMLElement;
-  patchInteractions: () => void;
-}
-
-const ART_CLASSES = [
-  'rm-photo-art-gradient-1',
-  'rm-photo-art-gradient-2',
-  'rm-photo-art-gradient-3',
-  'rm-photo-art-gradient-4',
-];
-
-const ART_EMOJIS = ['🌸', '💌', '✨', '🌷', '💕', '🥰', '🌙', '🍀'];
 
 type CheckInWithLegacyMedia = CheckIn & {
   cardUrl?: string;
@@ -363,56 +380,33 @@ function getCheckinPhotoUrl(item: CheckIn): string | undefined {
 function isToday(isoDate: string): boolean {
   const date = new Date(isoDate);
   const today = new Date();
-
   return (
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth() &&
-    date.getDate() === today.getDate()
+    date.getFullYear() === today.getFullYear()
+    && date.getMonth() === today.getMonth()
+    && date.getDate() === today.getDate()
   );
 }
 
 function buildRecentMemoriesSection(): HTMLElement {
-  const section = document.createElement('div');
-  section.className = 'recent-memories-section';
+  const section = document.createElement('section');
+  section.className = 'recent-memories-section p-home-recent';
 
-  // Header
   const header = document.createElement('div');
   header.className = 'recent-memories-header';
   header.innerHTML = `
     <div class="recent-memories-heading">
-      <span class="recent-memories-eyebrow">Hôm nay</span>
-      <span class="recent-memories-title">Ảnh đã gửi</span>
+      <span class="recent-memories-eyebrow">Nhật ký hôm nay</span>
+      <span class="recent-memories-title">Ảnh hai đứa đã gửi</span>
     </div>
   `;
   section.appendChild(header);
 
-  // List placeholder skeleton
   const list = document.createElement('div');
-  list.className = 'recent-memories-list';
-  list.innerHTML = `
-    <div class="recent-memory-item">
-      <div class="recent-memory-card">
-        <div class="skeleton" style="height:80px;border-radius:0;"></div>
-        <div class="rm-body" style="gap:8px;">
-          <div class="skeleton" style="height:12px;border-radius:6px;width:60%;"></div>
-          <div class="skeleton" style="height:12px;border-radius:6px;width:80%;"></div>
-        </div>
-      </div>
-    </div>
-    <div class="recent-memory-item">
-      <div class="recent-memory-card">
-        <div class="skeleton" style="height:80px;border-radius:0;"></div>
-        <div class="rm-body" style="gap:8px;">
-          <div class="skeleton" style="height:12px;border-radius:6px;width:50%;"></div>
-          <div class="skeleton" style="height:12px;border-radius:6px;width:70%;"></div>
-        </div>
-      </div>
-    </div>
-  `;
+  list.className = 'recent-memories-list p-home-recent__list';
+  list.appendChild(createSkeleton({ height: '140px' }));
   section.appendChild(list);
 
-  // Load today's photos, newest first.
-  (async () => {
+  void (async () => {
     try {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
@@ -421,14 +415,14 @@ function buildRecentMemoriesSection(): HTMLElement {
         .filter((item) => isToday(item.createdAt) && Boolean(getCheckinPhotoUrl(item)))
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      list.innerHTML = '';
+      list.replaceChildren();
 
       if (items.length === 0) {
-        list.innerHTML = `
-          <div style="text-align:center;padding:20px 0;color:var(--text-secondary);font-size:14px;">
-            Hôm nay chưa có ảnh check-in nào. 💕
-          </div>
-        `;
+        const note = document.createElement('p');
+        note.className = 'u-text-secondary';
+        note.style.cssText = 'text-align:center;padding:16px 0;font-size:13px;';
+        note.textContent = 'Hôm nay chưa có tấm ảnh nào được lưu vào cuốn album chung.';
+        list.appendChild(note);
         return;
       }
 
@@ -436,52 +430,34 @@ function buildRecentMemoriesSection(): HTMLElement {
         const wrapper = document.createElement('div');
         wrapper.className = 'recent-memory-item';
 
-        const card = document.createElement('div');
-        card.className = 'recent-memory-card';
+        const card = document.createElement('article');
+        card.className = 'recent-memory-card p-home-recent-card';
 
-        // ── Media section ──
         const photoUrl = getCheckinPhotoUrl(item);
-        const hasPhoto = Boolean(photoUrl);
-
-        if (hasPhoto && photoUrl) {
+        if (photoUrl) {
           const photoWrap = document.createElement('div');
           photoWrap.className = 'rm-photo-wrap';
           photoWrap.style.cursor = 'pointer';
           photoWrap.innerHTML = `
-            <img src="${escapeHtml(photoUrl)}" alt="Ảnh kỷ niệm" loading="lazy" />
+            <img src="${escapeHtml(photoUrl)}" alt="Ảnh kỷ niệm của ${escapeHtml(item.ownerName)}" loading="lazy" decoding="async" />
             <div class="rm-photo-overlay"></div>
           `;
           photoWrap.addEventListener('click', (event) => {
             event.stopPropagation();
             openPolaroidCoverModal({
               imageUrl: photoUrl,
-              title: item.caption || `Kỷ niệm của ${item.ownerName} 💖`,
+              title: item.caption || `Khoảnh khắc của ${item.ownerName}`,
               dateText: formatTime(item.createdAt),
               coverText: item.surpriseText,
               forceScratch: false,
-              timerSeconds: 5,
             });
           });
           card.appendChild(photoWrap);
-        } else if (item.type === 'mood') {
-          // Mood art placeholder
-          const artDiv = document.createElement('div');
-          artDiv.className = `rm-photo-art ${ART_CLASSES[idx % ART_CLASSES.length]}`;
-          artDiv.innerHTML = `${MOOD_EMOJIS[item.mood || ''] || '😊'}`;
-          card.appendChild(artDiv);
-        } else {
-          // Text art placeholder
-          const artDiv = document.createElement('div');
-          artDiv.className = `rm-photo-art ${ART_CLASSES[idx % ART_CLASSES.length]}`;
-          artDiv.innerHTML = `${ART_EMOJIS[idx % ART_EMOJIS.length]}`;
-          card.appendChild(artDiv);
         }
 
-        // ── Body ──
         const body = document.createElement('div');
         body.className = 'rm-body';
 
-        // Top row: meta + mood stamp
         const topRow = document.createElement('div');
         topRow.className = 'rm-top-row';
 
@@ -491,7 +467,6 @@ function buildRecentMemoriesSection(): HTMLElement {
           <span class="rm-owner">${escapeHtml(item.ownerName)}</span>
           <span class="rm-time">${formatTime(item.createdAt)}</span>
         `;
-
         topRow.appendChild(meta);
 
         const reactionBadges = document.createElement('div');
@@ -502,17 +477,17 @@ function buildRecentMemoriesSection(): HTMLElement {
         updateReactionBadges();
         topRow.appendChild(reactionBadges);
 
-        if (item.mood) {
+        const moodInfo = item.mood ? MOOD_ICON_LOOKUP[item.mood] : undefined;
+        if (moodInfo) {
           const moodStamp = document.createElement('div');
           moodStamp.className = 'rm-mood-stamp';
-          moodStamp.setAttribute('aria-label', item.mood);
-          moodStamp.textContent = MOOD_EMOJIS[item.mood] || '😊';
+          moodStamp.setAttribute('aria-label', moodInfo.label);
+          moodStamp.innerHTML = iconMarkup(moodInfo.icon, { size: 16, variant: 'filled' });
           topRow.appendChild(moodStamp);
         }
 
         body.appendChild(topRow);
 
-        // Caption
         if (item.caption) {
           const caption = document.createElement('p');
           caption.className = 'rm-caption';
@@ -520,23 +495,8 @@ function buildRecentMemoriesSection(): HTMLElement {
           body.appendChild(caption);
         }
 
-        // Reaction row — heart button with optimistic update
         const reactionRow = document.createElement('div');
         reactionRow.className = 'rm-reaction-row';
-
-        const heartBtn = document.createElement('button');
-        heartBtn.type = 'button';
-        heartBtn.className = 'rm-heart-btn react-button';
-        heartBtn.dataset.icon = 'smile+';
-        heartBtn.setAttribute('aria-label', 'Chọn cảm xúc');
-
-        heartBtn.innerHTML = smilePlusIconMarkup;
-
-        heartBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          openReactionPicker(item, updateReactionBadges);
-        });
-
 
         const replyForm = document.createElement('form');
         replyForm.className = 'rm-inline-composer';
@@ -547,7 +507,7 @@ function buildRecentMemoriesSection(): HTMLElement {
             name="home_chat_msg"
             aria-label="Gửi tin nhắn cho ảnh này"
             maxlength="500"
-            placeholder="Gửi tin nhắn..."
+            placeholder="Nhắn gì đó cho tấm ảnh này..."
             autocomplete="off"
             autocorrect="off"
             autocapitalize="sentences"
@@ -557,7 +517,7 @@ function buildRecentMemoriesSection(): HTMLElement {
             data-1p-ignore="true"
           />
           <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
-          <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">↑</button>
+          <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">${iconMarkup('send', { size: 16 })}</button>
         `;
 
         const replyInput = replyForm.querySelector<HTMLInputElement>('input');
@@ -567,7 +527,7 @@ function buildRecentMemoriesSection(): HTMLElement {
             updateReactionBadges();
             inlineReactionPicker.classList.remove('open');
           } catch {
-            showToast('Không react được, thử lại nhé', 'error');
+            showToast('Không thả cảm xúc được, thử lại nhé', 'error');
           }
         });
         const replyToggle = createReplyToggle(
@@ -576,6 +536,7 @@ function buildRecentMemoriesSection(): HTMLElement {
           'Trả lời',
           () => replyInput?.focus(),
         );
+
         replyForm.addEventListener('submit', async (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -601,10 +562,7 @@ function buildRecentMemoriesSection(): HTMLElement {
               },
             ];
             replyToggle.sync();
-            if (replyInput) {
-              replyInput.value = '';
-              replyInput.placeholder = 'Gửi tin nhắn...';
-            }
+            if (replyInput) replyInput.value = '';
             showToast('Đã gửi tin nhắn', 'success');
           } catch {
             showToast('Không gửi được tin nhắn, thử lại nhé', 'error');
@@ -613,7 +571,7 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         replyForm.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
           event.stopPropagation();
-          inlineReactionPicker.classList.toggle('open');
+          openReactionPicker(item, updateReactionBadges);
         });
 
         reactionRow.appendChild(replyForm);
@@ -622,49 +580,31 @@ function buildRecentMemoriesSection(): HTMLElement {
         body.appendChild(replyToggle.toggle);
         body.appendChild(replyToggle.panel);
 
-        // Only the oldest photo is the exit point to the full memory archive.
         if (idx === items.length - 1) {
-          const viewAllButton = document.createElement('button');
-          viewAllButton.type = 'button';
-          viewAllButton.className = 'recent-memories-open-all';
-          viewAllButton.textContent = 'Xem tất cả kỷ niệm →';
-          viewAllButton.setAttribute('aria-label', 'Mở tất cả kỷ niệm');
-          viewAllButton.addEventListener('click', (event) => {
-            event.stopPropagation();
-            navigate('/app/memories');
+          const viewAllButton = createButton({
+            label: 'Mở trọn bộ Kỷ niệm',
+            variant: 'ghost',
+            size: 'sm',
+            trailingIcon: 'chevron-right',
+            className: 'recent-memories-open-all',
+            onClick: (event) => {
+              event.stopPropagation();
+              navigate('/app/memories');
+            },
           });
-          body.appendChild(viewAllButton);
+          body.appendChild(viewAllButton.element);
         }
 
         card.appendChild(body);
-
-        // Stagger animation delay
-        card.style.animationDelay = `${idx * 60}ms`;
-
         wrapper.appendChild(card);
         list.appendChild(wrapper);
       });
     } catch {
-      list.innerHTML = '';
-      // Fail silently — main content still shows
+      list.replaceChildren();
     }
   })();
 
   return section;
-}
-
-function buildEmptyState(partnerName: string): HTMLElement {
-  const el = document.createElement('div');
-  el.className = 'empty-state animate-fade-in';
-  el.innerHTML = `
-    <div class="empty-state-emoji">\u{1F4ED}</div>
-    <div class="empty-state-title">Chưa có gì mới hôm nay</div>
-    <p class="empty-state-text">${escapeHtml(partnerName)} chưa gửi check-in nào hôm nay.<br>Bạn có thể gửi trước để bắt đầu nhé!</p>
-    <button class="btn-primary" id="home-checkin-btn" style="margin-top:8px">
-      Gửi check-in
-    </button>
-  `;
-  return el;
 }
 
 export function renderHomePage(): HTMLElement {
@@ -672,133 +612,200 @@ export function renderHomePage(): HTMLElement {
   const user = state.user;
   const couple = state.couple;
   const partnerName = user?.partnerName ?? 'Người ấy';
+  const myName = user?.displayName ?? 'Bạn';
 
   const page = document.createElement('div');
-  page.className = 'page animate-fade-in';
+  page.className = 'page p-home animate-fade-in';
 
-  const topBar = document.createElement('div');
-  topBar.className = 'top-bar';
-  topBar.style.cssText =
-    'padding-top:calc(20px + env(safe-area-inset-top, 0px));padding-bottom:12px;';
+  // ── 1. Top Editorial Bar ──
+  const topBar = document.createElement('header');
+  topBar.className = 'p-home-topbar';
 
-  const streakBadge = document.createElement('div');
+  const brandWrap = document.createElement('div');
+  brandWrap.className = 'p-home-brand';
   const streak = calcStreak(couple);
   const days = calcDaysTogether(couple?.loveStartDate);
-  streakBadge.innerHTML = `
-    <div class="streak-banner">\u{1F525} ${streak} ngày</div>
-    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;padding-left:2px">
-      ${days} ngày bên nhau
-    </div>
-  `;
+
+  const streakChip = document.createElement('div');
+  streakChip.className = 'p-home-streak';
+  streakChip.appendChild(icon('streak', { size: 16, variant: 'filled' }));
+  const streakVal = document.createElement('span');
+  streakVal.className = 'p-home-streak__val';
+  streakVal.textContent = `${streak} ngày`;
+  streakChip.appendChild(streakVal);
+
+  // Hidden legacy hook in case external callers inspect .streak-banner
+  const legacyStreakHook = document.createElement('span');
+  legacyStreakHook.className = 'streak-banner';
+  legacyStreakHook.hidden = true;
+  brandWrap.append(streakChip, legacyStreakHook);
+
+  const daysSub = document.createElement('div');
+  daysSub.className = 'p-home-days-sub';
+  daysSub.textContent = days > 0 ? `${days} ngày bên nhau` : 'Mỗi ngày một khoảnh khắc';
+  brandWrap.appendChild(daysSub);
 
   const rightActions = document.createElement('div');
-  rightActions.style.cssText = 'display:flex;gap:8px;';
+  rightActions.className = 'p-home-actions';
 
   const themeBtn = document.createElement('button');
-  themeBtn.className = 'btn-icon';
+  themeBtn.type = 'button';
+  themeBtn.className = 'c-icon-btn';
   themeBtn.setAttribute('aria-label', 'Đổi giao diện');
-  const currentTheme = state.theme;
-  themeBtn.textContent =
-    currentTheme === 'dark' ? '\u2600\uFE0F' : currentTheme === 'light' ? '\u{1F319}' : '\u{1F317}';
+  themeBtn.innerHTML = iconMarkup(getThemeIconName(state.theme), { size: 20 });
   themeBtn.addEventListener('click', () => {
-    const s = store.get();
-    const next = s.theme === 'dark' ? 'light' : s.theme === 'light' ? 'system' : 'dark';
+    const current = store.get().theme;
+    const next: UiThemePreference = current === 'dark' ? 'light' : current === 'light' ? 'system' : 'dark';
+    triggerHaptic('select');
     store.set({ theme: next });
     applyTheme(next);
-    themeBtn.textContent = next === 'dark' ? '\u2600\uFE0F' : next === 'light' ? '\u{1F319}' : '\u{1F317}';
+    setUiTheme(next);
+    themeBtn.innerHTML = iconMarkup(getThemeIconName(next), { size: 20 });
   });
 
   const refreshBtn = document.createElement('button');
-  refreshBtn.className = 'btn-icon';
+  refreshBtn.type = 'button';
+  refreshBtn.className = 'c-icon-btn';
   refreshBtn.setAttribute('aria-label', 'Làm mới');
   refreshBtn.innerHTML = refreshIconMarkup;
   refreshBtn.addEventListener('click', () => {
+    triggerHaptic('tap');
     showToast('Đang tải lại check-in...', 'loading-spark');
-    loadCheckin();
+    void loadCheckin(true);
   });
 
-  rightActions.appendChild(themeBtn);
-  rightActions.appendChild(refreshBtn);
-  topBar.appendChild(streakBadge);
-  topBar.appendChild(rightActions);
+  rightActions.append(themeBtn, refreshBtn);
+  topBar.append(brandWrap, rightActions);
   page.appendChild(topBar);
 
+  // Live sync streak from store
+  const unsubStore = store.subscribe?.((nextState) => {
+    if (!page.isConnected) {
+      unsubStore?.();
+      return;
+    }
+    const nextStreak = calcStreak(nextState.couple);
+    streakVal.textContent = `${nextStreak} ngày`;
+  });
+
+  // ── 2. Couple Hero Card ──
+  const hero = document.createElement('section');
+  hero.className = 'p-home-hero u-grain-surface';
+  const heroRow = document.createElement('div');
+  heroRow.className = 'p-home-hero__row';
+  const heroCopy = document.createElement('div');
+  heroCopy.className = 'p-home-hero__copy';
+  heroCopy.innerHTML = `
+    <span class="p-home-hero__eyebrow">Không gian hai đứa</span>
+    <h1 class="p-home-hero__title">${days > 0 ? `Ngày thứ <em>${days}</em>` : `Thương chào <em>${escapeHtml(myName)}</em>`}</h1>
+  `;
+  const userMedia = user as { avatarUrl?: string; partnerAvatar?: string } | null;
+  const avatars = createAvatarPair(
+    { name: myName, src: userMedia?.avatarUrl, size: 'md' },
+    { name: partnerName, src: userMedia?.partnerAvatar, size: 'md', presence: 'online' },
+    true,
+  );
+  heroRow.append(heroCopy, avatars);
+  hero.appendChild(heroRow);
+
+  const heroCtas = document.createElement('div');
+  heroCtas.className = 'p-home-hero__cta-row';
+  heroCtas.appendChild(
+    createButton({
+      label: 'Gửi khoảnh khắc',
+      variant: 'primary',
+      size: 'sm',
+      pill: true,
+      leadingIcon: 'checkin-lens',
+      onClick: () => navigate('/app/checkin'),
+    }).element,
+  );
+  heroCtas.appendChild(
+    createButton({
+      label: 'Nhắn tin',
+      variant: 'secondary',
+      size: 'sm',
+      pill: true,
+      leadingIcon: 'chat',
+      onClick: () => navigate('/app/messages'),
+    }).element,
+  );
+  hero.appendChild(heroCtas);
+  page.appendChild(hero);
+
+  // ── 3. Push Permission Slot ──
   const pushSlot = document.createElement('div');
-  pushSlot.style.cssText = 'padding:0 16px 10px;';
+  pushSlot.className = 'p-home-push-slot';
   page.appendChild(pushSlot);
 
-  const partnerLabel = document.createElement('div');
-  partnerLabel.style.cssText =
-    'padding:0 20px 8px;font-size:16px;font-weight:600;color:var(--text-primary);';
-  partnerLabel.innerHTML = `
-    <span style="color:var(--accent)">${escapeHtml(partnerName)}</span>
-    <span style="color:var(--text-secondary);font-weight:400"> đã gửi cho bạn:</span>
+  // ── 4. Partner Latest Check-in Section ──
+  const sectionHead = document.createElement('div');
+  sectionHead.className = 'p-home-section-head';
+  sectionHead.innerHTML = `
+    <h2 class="p-home-section-head__title">Từ <span class="p-home-section-head__accent">${escapeHtml(partnerName)}</span></h2>
   `;
-  page.appendChild(partnerLabel);
+  page.appendChild(sectionHead);
 
   const contentArea = document.createElement('div');
-  contentArea.style.cssText = 'padding:0 16px;';
-  contentArea.appendChild(renderSkeleton());
+  contentArea.className = 'p-home-stage';
   page.appendChild(contentArea);
 
-  // Journey Banner — "Bản đồ hẹn hò & Điều ước đôi"
+  // ── 5. Love Journey Card ──
   const journeyBanner = document.createElement('button');
   journeyBanner.type = 'button';
   journeyBanner.setAttribute('aria-label', 'Mở bản đồ hẹn hò và điều ước');
-  journeyBanner.className = 'home-journey-banner card-solid';
-  journeyBanner.style.cssText =
-    'margin: 20px 16px 0; padding: 14px 16px; border-radius: 20px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; background: linear-gradient(135deg, rgba(255, 59, 127, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%), var(--surface); border: 1px solid var(--border); transition: transform 0.2s ease, border-color 0.2s ease;';
+  journeyBanner.className = 'home-journey-banner p-home-journey';
   journeyBanner.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div style="width:42px;height:42px;border-radius:14px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">
-        🗺️
-      </div>
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        <span style="font-size:14px;font-weight:700;color:var(--text-primary);letter-spacing:-0.01em;">Bản đồ hẹn hò & Điều ước</span>
-        <span style="font-size:12px;color:var(--text-secondary);">Ghi dấu từng toạ độ và ước mơ của hai đứa ✨</span>
+    <div class="p-home-journey__lead">
+      <div class="p-home-journey__icon">${iconMarkup('map', { size: 24, variant: 'filled' })}</div>
+      <div>
+        <span class="p-home-journey__title">Bản đồ hẹn hò & Điều ước</span>
+        <span class="p-home-journey__sub">Ghi dấu từng toạ độ và ước hẹn của hai đứa</span>
       </div>
     </div>
-    <span style="font-size:16px;color:var(--text-secondary);margin-left:8px;">›</span>
+    ${iconMarkup('chevron-right', { size: 20 })}
   `;
-  journeyBanner.addEventListener('click', () => {
-    navigate('/app/journey');
-  });
+  journeyBanner.addEventListener('click', () => navigate('/app/journey'));
   page.appendChild(journeyBanner);
 
-  // Recent memories section — "Những điều rất nhỏ"
-  const recentMemoriesSection = buildRecentMemoriesSection();
-  recentMemoriesSection.style.cssText = 'margin-top:20px;padding-bottom:16px;';
-  page.appendChild(recentMemoriesSection);
+  // ── 6. Today's Sent Photos ──
+  page.appendChild(buildRecentMemoriesSection());
 
-  async function renderPushPrompt() {
+  async function renderPushPrompt(): Promise<void> {
     if (!store.isAuthenticated()) return;
-
     const result = await getPushSetupState().catch(() => null);
-    pushSlot.innerHTML = '';
+    pushSlot.replaceChildren();
     if (!result || result.status !== 'prompt') return;
 
     const card = document.createElement('div');
-    card.className = 'push-permission-card';
+    card.className = 'push-permission-card p-home-push-card';
     card.innerHTML = `
-      <div>
-        <strong>Bật thông báo check-in</strong>
-        <span>Nhận noti khi người ấy gửi check-in, reply hoặc react.</span>
+      <div class="p-home-push-card__lead">
+        <div class="p-home-push-card__icon">${iconMarkup('bell', { size: 20, variant: 'filled' })}</div>
+        <div class="p-home-push-card__copy">
+          <strong>Bật thông báo tức thì</strong>
+          <span>Báo ngay khi ${escapeHtml(partnerName)} gửi ảnh hoặc nhắn tin.</span>
+        </div>
       </div>
-      <button type="button" class="btn-primary">Bật</button>
     `;
-
-    card.querySelector('button')?.addEventListener('click', async () => {
-      const setup = await ensurePushSubscription(true).catch(
-        (): PushSetupResult => ({ status: 'error', message: 'Chưa bật được thông báo' }),
-      );
-      if (setup.status === 'subscribed') {
-        card.remove();
-        showToast('Đã bật thông báo', 'success');
-      } else {
-        showToast(setup.message ?? 'Chưa bật được thông báo', 'error');
-      }
+    const enableBtn = createButton({
+      label: 'Bật',
+      variant: 'primary',
+      size: 'sm',
+      pill: true,
+      onClick: async () => {
+        const setup = await ensurePushSubscription(true).catch(
+          (): PushSetupResult => ({ status: 'error', message: 'Chưa bật được thông báo' }),
+        );
+        if (setup.status === 'subscribed') {
+          card.remove();
+          showToast('Đã bật thông báo', 'success');
+        } else {
+          showToast(setup.message ?? 'Chưa bật được thông báo', 'error');
+        }
+      },
     });
-
+    card.appendChild(enableBtn.element);
     pushSlot.appendChild(card);
   }
 
@@ -827,7 +834,7 @@ export function renderHomePage(): HTMLElement {
           checkin.reactions = await addReaction(checkin.id, type);
         } catch {
           checkin.reactions = previousReactions;
-          showToast('Không thể react, thử lại nhé', 'error');
+          showToast('Không thể thả cảm xúc, thử lại nhé', 'error');
         } finally {
           reactionPending = false;
           cardView.patchInteractions();
@@ -845,18 +852,18 @@ export function renderHomePage(): HTMLElement {
     contentArea.replaceChildren(cardView.element);
   }
 
-  async function loadCheckin(useCache = true) {
+  async function loadCheckin(useCache = true): Promise<void> {
     if (useCache) {
       const cached = getCachedLatestPartnerCheckin();
       if (cached) {
         renderLoadedCheckin(cached);
-      } else {
-        contentArea.innerHTML = '';
-        contentArea.appendChild(renderSkeleton());
+      } else if (!activeCard) {
+        contentArea.replaceChildren(renderSkeleton());
       }
     } else {
-      contentArea.innerHTML = '';
-      contentArea.appendChild(renderSkeleton());
+      activeCheckin = null;
+      activeCard = null;
+      contentArea.replaceChildren(renderSkeleton());
     }
 
     setRefreshButtonLoading(refreshBtn, true);
@@ -868,58 +875,77 @@ export function renderHomePage(): HTMLElement {
       if (!checkin) {
         activeCheckin = null;
         activeCard = null;
-        contentArea.replaceChildren();
-        const empty = buildEmptyState(partnerName);
-        contentArea.appendChild(empty);
-        contentArea.querySelector('#home-checkin-btn')?.addEventListener('click', () => {
-          navigate('/app/checkin');
+        const empty = createEmptyState({
+          illustration: 'memories',
+          title: 'Chưa có khoảnh khắc mới hôm nay',
+          description: `${partnerName} chưa gửi check-in nào hôm nay. Bạn gửi mở hàng trước nhé!`,
+          action: {
+            label: 'Gửi check-in ngay',
+            variant: 'primary',
+            pill: true,
+            leadingIcon: 'checkin-lens',
+            onClick: () => navigate('/app/checkin'),
+          },
         });
+        empty.querySelector('button')?.setAttribute('id', 'home-checkin-btn');
+        contentArea.replaceChildren(empty);
         return;
       }
 
       renderLoadedCheckin(checkin);
 
-      // Sync with Android widget
       try {
-        const bridge = (window as any).LoveCheckAndroid;
+        const bridge = (window as unknown as {
+          LoveCheckAndroid?: { updatePartnerCheckin?: (...args: string[]) => void };
+        }).LoveCheckAndroid;
         if (bridge && typeof bridge.updatePartnerCheckin === 'function') {
           bridge.updatePartnerCheckin(
             partnerName,
             checkin.type,
             checkin.caption || '',
             checkin.photoUrl || '',
-            checkin.createdAt
+            checkin.createdAt,
           );
         }
       } catch {
-        // ignore
+        // Android bridge is optional
       }
     } catch {
       setRefreshButtonLoading(refreshBtn, false);
-      if (getCachedLatestPartnerCheckin()) {
+      if (getCachedLatestPartnerCheckin() || activeCard) {
         showToast('Không thể làm mới dữ liệu', 'error');
         return;
       }
       activeCheckin = null;
       activeCard = null;
-      contentArea.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-emoji">\u{1F622}</div>
-          <div class="empty-state-title">Không tải được dữ liệu</div>
-          <p class="empty-state-text">Kiểm tra kết nối mạng và thử lại</p>
-          <button class="btn-ghost" id="retry-btn" style="margin-top:8px">Thử lại</button>
-        </div>
-      `;
-      contentArea.querySelector('#retry-btn')?.addEventListener('click', () => loadCheckin(false));
+      const errState = createEmptyState({
+        illustration: 'offline',
+        title: 'Chưa tải được khoảnh khắc',
+        description: 'Kiểm tra kết nối mạng rồi thử lại giúp mình nhé.',
+        action: {
+          label: 'Thử lại',
+          variant: 'secondary',
+          pill: true,
+          leadingIcon: 'refresh',
+          onClick: () => void loadCheckin(false),
+        },
+      });
+      errState.querySelector('button')?.setAttribute('id', 'retry-btn');
+      contentArea.replaceChildren(errState);
     }
   }
 
-  renderPushPrompt();
-  if (getCachedLatestPartnerCheckin()) {
-    loadCheckin(true);
-  } else {
-    setTimeout(() => loadCheckin(), 3000);
-  }
+  attachPullToRefresh({
+    scrollContainer: page,
+    onRefresh: async () => {
+      triggerHaptic('tap');
+      await loadCheckin(true);
+    },
+  });
+
+  void renderPushPrompt();
+  void loadCheckin(true);
+
   return page;
 }
 
@@ -930,9 +956,11 @@ function toggleReactionOptimistically(reactions: Reaction[], type: ReactionType)
   if (current.reactedByMe) {
     const nextCount = Math.max(0, current.count - 1);
     return reactions
-      .map((reaction) => reaction.type === type ? { ...reaction, count: nextCount, reactedByMe: false } : reaction)
+      .map((reaction) => (reaction.type === type ? { ...reaction, count: nextCount, reactedByMe: false } : reaction))
       .filter((reaction) => reaction.count > 0);
   }
 
-  return reactions.map((reaction) => reaction.type === type ? { ...reaction, count: reaction.count + 1, reactedByMe: true } : reaction);
+  return reactions.map((reaction) =>
+    reaction.type === type ? { ...reaction, count: reaction.count + 1, reactedByMe: true } : reaction,
+  );
 }

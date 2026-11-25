@@ -1,4 +1,5 @@
 import type { CheckInReply } from '../api/types';
+import { iconMarkup } from '../ui/icons/icons';
 
 export interface ReplyToggleView {
   toggle: HTMLButtonElement;
@@ -19,20 +20,20 @@ export function createReplyToggle(
 ): ReplyToggleView {
   const toggle = document.createElement('button');
   toggle.type = 'button';
-  toggle.className = 'reply-toggle-button reply-button';
+  toggle.className = 'reply-toggle-button reply-button c-reply-toggle';
   toggle.setAttribute('aria-expanded', 'false');
 
-  // Kept as a hidden compatibility node for existing card layouts. Replies now
-  // render on the dedicated reply page instead of under the source card.
+  // Kept as a hidden compatibility node for existing card layouts and tests.
   const panel = document.createElement('div');
   panel.className = 'reply-preview-list reply-toggle-panel';
   panel.hidden = true;
 
   const sync = () => {
     const replies = getReplies();
-    toggle.textContent = replies.length
-      ? `💬 Xem phản hồi (${replies.length})`
-      : `💬 ${emptyLabel}`;
+    const label = replies.length
+      ? `Xem phản hồi (${replies.length})`
+      : emptyLabel;
+    toggle.innerHTML = `${iconMarkup('chat', { size: 16 })}<span>${label}</span>`;
     toggle.setAttribute('aria-expanded', 'false');
     panel.hidden = true;
     panel.replaceChildren();

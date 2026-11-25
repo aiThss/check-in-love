@@ -1,0 +1,164 @@
+/* ============================================================
+   20-pages/camera.css — Full-bleed Editorial Camera Viewfinder
+   ============================================================ */
+
+@layer components {
+  .p-cam-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #0d080c;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: calc(12px + var(--safe-top, 0px)) 16px calc(24px + var(--safe-bottom, 0px));
+  }
+
+  .p-cam-topbar,
+  .p-cam-bottombar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 3;
+  }
+
+  .p-cam-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .p-cam-icon-btn,
+  .p-cam-pill-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(25, 16, 22, 0.65);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .p-cam-icon-btn.is-active,
+  .p-cam-pill-btn[aria-pressed="true"] {
+    background: var(--accent-500);
+    border-color: #ffffff;
+  }
+
+  .p-cam-stage {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    margin: auto;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    background: #1a1117;
+    border: 2px solid rgba(255, 255, 255, 0.24);
+  }
+
+  .p-cam-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .p-cam-video.is-mirrored {
+    transform: scaleX(-1);
+  }
+
+  .p-cam-frame {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-standard);
+  }
+
+  .p-cam-frame.is-grid {
+    opacity: 1;
+  }
+
+  .p-cam-grid-line {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.28);
+  }
+
+  .p-cam-grid-line--v1 { top: 0; bottom: 0; left: 33.333%; width: 1px; }
+  .p-cam-grid-line--v2 { top: 0; bottom: 0; left: 66.666%; width: 1px; }
+  .p-cam-grid-line--h1 { left: 0; right: 0; top: 33.333%; height: 1px; }
+  .p-cam-grid-line--h2 { left: 0; right: 0; top: 66.666%; height: 1px; }
+
+  .p-cam-countdown {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-size: 84px;
+    font-weight: 700;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.28);
+  }
+
+  .p-cam-screen-flash {
+    position: fixed;
+    inset: 0;
+    background: #ffffff;
+    z-index: 10;
+  }
+
+  .p-cam-shutter {
+    width: 78px;
+    height: 78px;
+    border-radius: 50%;
+    border: 4px solid #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: transform var(--dur-instant) var(--ease-spring);
+  }
+
+  .p-cam-shutter:active {
+    transform: scale(0.92);
+  }
+
+  .p-cam-shutter__ring {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--accent-500);
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+  }
+
+  .p-cam-denied {
+    position: absolute;
+    inset: 0;
+    padding: var(--space-5);
+    background: rgba(22, 13, 20, 0.96);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: var(--space-3);
+  }
+
+  .p-cam-denied__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: 100%;
+  }
+}

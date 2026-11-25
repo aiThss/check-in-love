@@ -1,0 +1,259 @@
+/* ============================================================
+   20-pages/checkin.css — Editorial + Sticker Check-in Composer
+   ============================================================ */
+
+@layer components {
+  .p-checkin {
+    max-width: 480px;
+    margin: 0 auto;
+    width: 100%;
+    min-height: 100dvh;
+    padding: calc(var(--safe-top, 0px) + 16px) var(--space-4) calc(168px + var(--safe-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .p-checkin-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .p-checkin-header__copy h1 {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+  }
+
+  .p-checkin-header__copy p {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .p-checkin-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-border);
+    box-shadow: 2px 2px 0 var(--ink-border);
+  }
+
+  .p-checkin-tab {
+    flex: 1;
+    min-height: 40px;
+    padding: 6px 10px;
+    border-radius: var(--radius-pill);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: transform var(--dur-instant) var(--ease-standard), background-color var(--dur-fast) var(--ease-standard);
+  }
+
+  .p-checkin-tab.active {
+    background: var(--accent-500);
+    color: var(--text-on-accent);
+  }
+
+  .p-checkin-card {
+    padding: var(--space-4);
+    border-radius: var(--radius-xl);
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-border);
+    box-shadow: var(--sticker-shadow), var(--elev-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .p-checkin-polaroid {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: calc(var(--radius-xl) - 8px);
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 35%, var(--accent-100), transparent 70%),
+      var(--bg-canvas);
+    border: 1.5px dashed var(--border-strong);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .p-checkin-polaroid.has-photo {
+    border-style: solid;
+    border-color: var(--ink-border);
+  }
+
+  .p-checkin-polaroid__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .p-checkin-polaroid__topbar {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+  }
+
+  .p-checkin-polaroid__actions {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    justify-content: center;
+    gap: var(--space-2);
+    z-index: 2;
+  }
+
+  .p-checkin-empty {
+    padding: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--space-3);
+  }
+
+  .p-checkin-empty__lens {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: var(--surface-paper);
+    color: var(--accent-500);
+    border: 2px solid var(--ink-border);
+    box-shadow: var(--sticker-shadow);
+    display: grid;
+    place-items: center;
+  }
+
+  .p-checkin-empty__copy strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    color: var(--text-primary);
+  }
+
+  .p-checkin-empty__copy span {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .p-checkin-scratch {
+    width: 100%;
+    min-height: 46px;
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-subtle);
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    cursor: pointer;
+  }
+
+  .p-checkin-scratch.is-on {
+    border-color: var(--accent-400);
+    background: var(--accent-50);
+  }
+
+  .p-checkin-scratch__lead {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-sm);
+    font-weight: 700;
+  }
+
+  .p-checkin-scratch__pill {
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--neutral-200);
+    color: var(--text-secondary);
+  }
+
+  .p-checkin-scratch.is-on .p-checkin-scratch__pill {
+    background: var(--accent-500);
+    color: var(--text-on-accent);
+  }
+
+  .p-checkin-chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .p-checkin-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .p-checkin-submit {
+    position: fixed;
+    left: 50%;
+    bottom: calc(90px + var(--safe-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: var(--z-sticky);
+    width: min(448px, calc(100% - 32px));
+    min-height: 54px;
+    border-radius: var(--radius-pill);
+    border: 2.5px solid var(--ink-border);
+    box-shadow: var(--sticker-shadow), 0 12px 28px var(--accent-glow);
+  }
+
+  .p-checkin-ring {
+    width: 20px;
+    height: 20px;
+    animation: cilSpin 0.9s linear infinite;
+  }
+
+  .p-heart-burst-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: var(--z-toast);
+    overflow: hidden;
+  }
+
+  .p-burst-svg {
+    position: absolute;
+    color: var(--accent-500);
+    transform: translate(-50%, -50%);
+    animation: pCheckinBurst 760ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes pCheckinBurst {
+    0% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, -80px))) scale(var(--scale, 1)) rotate(var(--rot, 15deg));
+    }
+  }
+}

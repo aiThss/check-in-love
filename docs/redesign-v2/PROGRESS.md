@@ -145,3 +145,35 @@ Mẫu mỗi mục:
   ?? apps/pwa/src/styles/20-pages/chat-layout.css
   ?? apps/pwa/src/styles/20-pages/chat-menus.css
 - Diff apps/api + packages (phải rỗng): rỗng (OK)
+
+## 2026-11-26 01:14 — P4 Home, Check-in Camera, Memories & Photo Viewer (Gemini)
+- Làm:
+  - Tạo `src/ui/reactions.ts` + nâng cấp `components/reaction-picker.ts` và `components/reply-toggle.ts`: thay toàn bộ emoji cảm xúc/reply bằng bộ icon SVG "Nét Yêu" riêng, giữ nguyên mã `ReactionType` gửi lên API.
+  - Thiết kế lại `pages/home.ts` + `styles/20-pages/home.css`: Editorial Hero (số ngày yêu bằng `Fraunces` italic, chip streak vàng `--gold-bg` đồng bộ realtime với `store`, cặp avatar đôi + CTA nhanh), bỏ hoàn toàn delay `3000ms` khi cold load, hiển thị tức thì từ `getCachedLatestPartnerCheckin()`, thẻ Polaroid viền mực giữ nguyên DOM identity khi patch reaction/reply/refresh, tích hợp `attachPullToRefresh`, thẻ Bản đồ hẹn hò SVG `map` và danh sách kỷ niệm hôm nay.
+  - Thiết kế lại `pages/checkin.ts` + `components/camera.ts` + `styles/20-pages/{checkin,camera}.css`: xoá `icons8-photo-gallery-96.apng.png` và emoji tab/particle, thay bằng SVG "Nét Yêu" + hiệu ứng Heart-Burst SVG tôn trọng `reduced-motion`; nâng cấp camera stream viewfinder (khung vuông 1:1 + lưới 3×3, lật cam trước/sau có soi gương, đèn flash/screen-flash, đếm ngược 3 giây, màn hình hướng dẫn khi thiếu quyền camera); mở rộng `checkin.test.ts`.
+  - Thiết kế lại `pages/memories.ts` + `components/message-image-viewer.ts` + `styles/20-pages/memories.css`: xoá delay `2000ms` nhân tạo & `icons8-search-48.apng.png`, hiển thị SWR tức thì trên frame đầu, thêm thanh lọc `Tất cả / Người ấy / Của mình` + nhãn tháng vàng sticky, giữ tương thích `Love Foil` và `installAndroidLongPressDownload`, nâng cấp viewer nút đóng SVG 44×44 + vuốt ngang chuyển ảnh.
+- Kiểm: lint ✅ · test ✅ (28 file / 141 test) · build ✅ (`index` gzip 34,73 kB; mọi file CSS `20-pages` <= 311 dòng, 0 `!important`) · `git diff apps/api packages apps/admin` rỗng ✅.
+- Dở: không có.
+- Bước tiếp: P5 (Love Journey + Random + Replies + Card-preview + Test-mail).
+
+### Snapshot tự động 2026-11-26 01:19
+- Nhánh: main
+- Commit cuối: 2466caa feat(pwa): P3 modular chat redesign with MIX sticker bubbles, grouping, SVG reactions and typing
+- File thay đổi chưa commit:
+   M HANDOFF.md
+   M apps/pwa/src/components/camera.ts
+   M apps/pwa/src/components/message-image-viewer.ts
+   M apps/pwa/src/components/reaction-picker.ts
+   M apps/pwa/src/components/reply-toggle.ts
+   M apps/pwa/src/pages/checkin.test.ts
+   M apps/pwa/src/pages/checkin.ts
+   M apps/pwa/src/pages/home.ts
+   M apps/pwa/src/pages/memories.ts
+   M apps/pwa/src/styles/message-image-viewer.css
+   M docs/redesign-v2/PROGRESS.md
+  ?? apps/pwa/src/styles/20-pages/camera.css
+  ?? apps/pwa/src/styles/20-pages/checkin.css
+  ?? apps/pwa/src/styles/20-pages/home.css
+  ?? apps/pwa/src/styles/20-pages/memories.css
+  ?? apps/pwa/src/ui/reactions.ts
+- Diff apps/api + packages (phải rỗng): rỗng (OK)
