@@ -26,3 +26,18 @@ Mẫu mỗi mục:
   ?? docs/redesign-v2/
   ?? scripts/
 - Diff apps/api + packages (phải rỗng): rỗng (OK)
+
+## 2026-11-26 00:05 — P0 (Claude Sonnet 5.5)
+- Làm: baseline test/lint/build; audit (audit.md); metrics (metrics.md); 3 mock HTML A/B/C + trang so sánh (DIRECTIONS.md, build-mocks.mjs, shots/ light+dark bằng Chrome headless). Đã sửa các lỗi layout phát hiện khi chụp (seg/dots xếp dọc, tile trống ở A, emoji trong UI thay bằng icon SVG).
+- Kiểm: test 26 file/128 pass; build pass; git diff apps/api packages rỗng.
+- Dở: chưa chụp screenshot baseline app thật, chưa chạy Lighthouse (làm đầu P1).
+- Bước tiếp: CHỜ user chọn hướng thẩm mỹ rồi mới bắt đầu P1.
+
+### Snapshot tự động 2026-11-26 00:03
+- Nhánh: main
+- Commit cuối: 8bf5388 docs: add AI handoff log system for Redesign v2
+- File thay đổi chưa commit:
+   M HANDOFF.md
+   M docs/redesign-v2/PROGRESS.md
+  ?? design/redesign-v2/
+- Diff apps/api + packages (phải rỗng): rỗng (OK)
