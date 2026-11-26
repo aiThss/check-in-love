@@ -200,3 +200,11 @@ Mẫu mỗi mục:
   ?? apps/pwa/src/styles/20-pages/journey.css
   ?? apps/pwa/src/styles/20-pages/secondary.css
 - Diff apps/api + packages (phải rỗng): rỗng (OK)
+
+## 2026-11-26 01:30 — P6 Auth, Onboarding, Install & Profile/Settings (Gemini)
+- Làm:
+  - Thiết kế lại `pages/login.ts`, `pages/onboarding.ts`, `pages/google-onboarding.ts`, `pages/install.ts` + `styles/20-pages/auth.css`: bố cục cảm xúc MIX với biểu tượng SVG "Nét Yêu", thanh tiến trình stepper mượt (`transform: scaleX`), ô nhập Couple Code & OTP từng ký tự hỗ trợ dán/xoá lùi/mở rộng 6–8 ký tự, giữ nguyên luật gọi trực tiếp `window.LoveCheckAndroid.signInWithGoogle()`, trang `/install` hướng dẫn từng bước trên Safari + tự động phát hiện trình duyệt trong ứng dụng (Zalo, Messenger, Instagram, TikTok).
+  - Thiết kế lại `pages/profile.ts` + `styles/20-pages/profile.css`: Couple Editorial Card (avatar đôi mở `openSheet`, số ngày yêu `Fraunces`, streak vàng, sao chép Couple Code), nhóm cài đặt phân mục rõ ràng gồm **Bộ chọn 6 màu nhấn Accent Picker (WCAG AA)** + công tắc **Giảm hiệu ứng chuyển động**, thẻ Sinh nhật native render ngay từ frame đầu, nhắc giờ & thử thông báo đẩy đa tầng, kiểm tra phiên bản APK, bảo mật và đăng xuất.
+- Kiểm: lint ✅ · test ✅ (28 file / 141 test) · build ✅ · `git diff apps/api packages apps/admin` rỗng ✅.
+- Dở: không có.
+- Bước tiếp: P7 (PWA manifest/shortcuts, `offline.html`, SW cache v10, update toast, icon app v2, dọn file patch & test tương thích ngược storage).

@@ -1,6 +1,7 @@
 import { renderOnboardingPage } from './onboarding';
 import { navigate } from '../router';
 import { clearPrivateClientState } from '../session';
+import { iconMarkup } from '../ui/icons/icons';
 
 /**
  * Google accounts finish setup on a standalone page. Keeping this route
@@ -16,20 +17,10 @@ export function renderGoogleOnboardingPage(): HTMLElement {
   if (isDevHost) {
     const testAgainButton = document.createElement('button');
     testAgainButton.type = 'button';
-    testAgainButton.className = 'btn-ghost';
-    testAgainButton.textContent = '🧪 Test lại Google Dev';
-    testAgainButton.setAttribute('aria-label', 'Quay lại để test Google Dev');
-    testAgainButton.style.cssText = [
-      'position:fixed',
-      'top:calc(var(--safe-top) + 12px)',
-      'left:16px',
-      'z-index:5',
-      'padding:8px 12px',
-      'font-size:11px',
-      'border:1px dashed var(--accent)',
-      'color:var(--accent)',
-      'background:var(--surface)',
-    ].join(';');
+    testAgainButton.className = 'c-btn c-btn--secondary c-btn--sm c-btn--pill';
+    testAgainButton.innerHTML = `${iconMarkup('refresh', { size: 16 })}<span>Thử lại Google Dev</span>`;
+    testAgainButton.setAttribute('aria-label', 'Quay lại để thử Google Dev');
+    testAgainButton.style.cssText = 'position:fixed;bottom:calc(var(--safe-bottom, 0px) + 12px);right:16px;z-index:5;';
     testAgainButton.addEventListener('click', () => {
       clearPrivateClientState();
       [

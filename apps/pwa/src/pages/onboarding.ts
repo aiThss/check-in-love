@@ -1,11 +1,14 @@
+import '../styles/20-pages/auth.css';
 import { navigate } from '../router';
 import { createThemeToggleButton } from '../components/theme-toggle';
 import { store } from '../store/index';
 import { startOnboarding, sendOtp, verifyOtp } from '../api/auth';
 import { showToast } from '../components/toast';
 import { MOCK_PREVIEW_TOKEN, seedMockPreviewData } from '../dev/mock-data';
-
-// ── UUID v4 ───────────────────────────────────────────────────────────────────
+import { iconMarkup, type IconName } from '../ui/icons/icons';
+import { createBadge, createButton, createChip, createIconButton } from '../ui/primitives';
+import { createSwitch } from '../ui/forms';
+import { triggerHaptic } from '../ui/haptics';
 
 function generateDeviceId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -27,8 +30,6 @@ function getOrCreateDeviceId(): string {
   return id;
 }
 
-// ── Calculate days together ───────────────────────────────────────────────────
-
 function calcDaysTogether(dateStr: string): number {
   if (!dateStr) return 0;
   const start = new Date(dateStr);
@@ -37,17 +38,14 @@ function calcDaysTogether(dateStr: string): number {
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
-// ── Onboarding Page ───────────────────────────────────────────────────────────
-
 export type OnboardingMode = 'email' | 'google';
 
 export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): HTMLElement {
   const deviceId = getOrCreateDeviceId();
 
-  // State
   const savedStep = sessionStorage.getItem('dev_onboarding_step');
   let currentStep = savedStep !== null ? Math.max(0, Math.min(4, parseInt(savedStep, 10))) : 0;
-  const TOTAL_STEPS = 5; // Added OTP step
+  const TOTAL_STEPS = 5;
 
   const isGoogleUser = options.mode === 'google'
     || sessionStorage.getItem('google_authenticated_user') === 'true'
@@ -65,407 +63,418 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     emailVerified: isGoogleUser,
   };
 
-  // Root container
   const root = document.createElement('div');
-  root.className = 'page-no-nav';
-  root.style.cssText = 'min-height:100dvh;background:var(--bg);position:relative;overflow-x:hidden;overflow-y:auto;';
+  root.className = 'page-no-nav p-auth animate-fade-in';
 
-  // ── Render helpers ────────────────────────────────────────────────────────
+  function renderStepShell(
+    emblemIcon: IconName,
+    title: string,
+    subtitle: string,
+    cardBody: HTMLElement,
+    footerNode?: HTMLElement,
+  ): void {
+    root.replaceChildren();
 
-  function renderProgressDots(): HTMLElement {
-    // Only show dots for steps relevant to user flow
-    const visibleSteps = formData.useAccount ? TOTAL_STEPS : TOTAL_STEPS - 1;
-    const visibleCurrent = currentStep;
-    const dots = document.createElement('div');
-    dots.className = 'progress-dots';
-    for (let i = 0; i < visibleSteps; i++) {
-      const dot = document.createElement('div');
-      dot.className = `progress-dot${i === visibleCurrent ? ' active' : ''}`;
-      dots.appendChild(dot);
-    }
-    return dots;
-  }
+    const visibleSteps = formData.useAccount && !isGoogleUser ? TOTAL_STEPS : TOTAL_STEPS - 1;
+    const stepDisplay = Math.min(visibleSteps, currentStep + 1);
+    const ratio = Math.max(0.2, Math.min(1, stepDisplay / visibleSteps));
 
-  function renderStep(content: HTMLElement): void {
-    root.innerHTML = '';
-
-    const step = document.createElement('div');
-    step.className = 'onboarding-step animate-slide-up';
-
-    // Top: dots + back button (Symmetrical 3-column grid layout)
-    const topRow = document.createElement('div');
-    topRow.style.cssText =
-      'display:grid;grid-template-columns:40px 1fr 40px;align-items:center;width:100%;max-width:380px;margin-bottom:20px;';
+    const topBar = document.createElement('header');
+    topBar.className = 'p-auth-topbar';
 
     const leftSlot = document.createElement('div');
-    leftSlot.style.cssText = 'display:flex;align-items:center;justify-content:flex-start;';
-
     if (currentStep > 0) {
-      const backBtn = document.createElement('button');
-      backBtn.className = 'btn-icon';
-      backBtn.setAttribute('aria-label', 'Quay lại');
-      backBtn.innerHTML = '←';
-      backBtn.style.cssText = 'width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;';
-      backBtn.addEventListener('click', () => {
-        currentStep--;
-        renderCurrentStep();
-      });
-      leftSlot.appendChild(backBtn);
+      leftSlot.appendChild(
+        createIconButton({
+          icon: 'back',
+          ariaLabel: 'Quay lại bước trước',
+          onClick: () => {
+            currentStep--;
+            triggerHaptic('tap');
+            renderCurrentStep();
+          },
+        }),
+      );
     }
 
-    const centerSlot = document.createElement('div');
-    centerSlot.style.cssText = 'display:flex;align-items:center;justify-content:center;';
-    centerSlot.appendChild(renderProgressDots());
-
-    const rightSlot = document.createElement('div');
-    rightSlot.style.cssText = 'width:40px;height:40px;display:flex;align-items:center;justify-content:flex-end;';
-    rightSlot.appendChild(createThemeToggleButton());
-
-    topRow.appendChild(leftSlot);
-    topRow.appendChild(centerSlot);
-    topRow.appendChild(rightSlot);
-
-    step.appendChild(topRow);
-    step.appendChild(content);
-    root.appendChild(step);
-  }
-
-  // ── Step 1: Your name ─────────────────────────────────────────────────────
-
-  function renderStep1(): void {
-    const content = document.createElement('div');
-    content.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:360px;';
-
-    content.innerHTML = `
-      <div style="font-size:72px;line-height:1" class="animate-pulse">👋</div>
-      <div style="text-align:center">
-        <h1 class="onboarding-title">Tên của bạn là gì?</h1>
-        <p class="onboarding-subtitle" style="margin-top:8px">Chúng tớ sẽ dùng tên này <br> để hiển thị trong app</p>
-      </div>
+    const progress = document.createElement('div');
+    progress.className = 'p-auth-progress';
+    progress.innerHTML = `
+      <div class="p-auth-progress__track"><div class="p-auth-progress__bar" style="transform:scaleX(${ratio})"></div></div>
+      <span class="p-auth-progress__label">Bước ${stepDisplay} / ${visibleSteps}</span>
     `;
 
-    const inputWrapper = document.createElement('div');
-    inputWrapper.style.cssText = 'width:100%;';
+    const rightSlot = document.createElement('div');
+    rightSlot.style.justifySelf = 'end';
+    rightSlot.appendChild(createThemeToggleButton());
+
+    topBar.append(leftSlot, progress, rightSlot);
+    root.appendChild(topBar);
+
+    const centerWrap = document.createElement('main');
+    centerWrap.style.cssText = 'display:flex;flex-direction:column;gap:18px;margin:auto 0;';
+
+    const hero = document.createElement('div');
+    hero.className = 'p-auth-hero';
+    hero.innerHTML = `
+      <div class="p-auth-emblem">${iconMarkup(emblemIcon, { size: 32, variant: 'filled' })}</div>
+      <h1 class="p-auth-title">${title}</h1>
+      <p class="p-auth-sub">${subtitle}</p>
+    `;
+
+    const card = document.createElement('div');
+    card.className = 'p-auth-card u-grain-surface';
+    card.appendChild(cardBody);
+
+    centerWrap.append(hero, card);
+    root.appendChild(centerWrap);
+
+    if (footerNode) {
+      root.appendChild(footerNode);
+    } else {
+      const spacer = document.createElement('div');
+      root.appendChild(spacer);
+    }
+  }
+
+  // ── Step 1: Display Name ──
+  function renderStep1(): void {
+    const body = document.createElement('div');
+    body.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.className = 'input';
+    input.className = 'c-input';
     input.placeholder = 'Ví dụ: Minh, Linh, Bảo...';
+    input.setAttribute('aria-label', 'Tên hiển thị của bạn');
     input.value = formData.displayName;
     input.maxLength = 30;
-    input.style.cssText = 'text-align:center;font-size:20px;font-weight:600;padding:18px 20px;';
+    input.style.cssText = 'text-align:center;font-size:18px;font-weight:600;min-height:52px;';
     input.addEventListener('input', () => {
       formData.displayName = input.value.trim();
     });
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && formData.displayName) goNext();
-    });
-    inputWrapper.appendChild(input);
-    content.appendChild(inputWrapper);
 
-    const nextBtn = document.createElement('button');
-    nextBtn.className = 'btn-primary btn-primary-full';
-    nextBtn.style.cssText = 'width:100%;font-size:17px;padding:16px;';
-    nextBtn.textContent = 'Tiếp theo →';
-    nextBtn.addEventListener('click', goNext);
-    content.appendChild(nextBtn);
-
-    // This action belongs only to the email/OTP entry flow. The Google flow
-    // has already authenticated the account and uses its own standalone page.
-    if (!isGoogleUser) {
-      const loginBtn = document.createElement('button');
-      loginBtn.className = 'btn-ghost';
-      loginBtn.style.cssText = 'width:100%;font-size:14px;';
-      loginBtn.textContent = 'Đã có tài khoản? Đăng nhập bằng Google';
-      loginBtn.addEventListener('click', () => navigate('/login?tab=google', true));
-      content.appendChild(loginBtn);
-    }
-
-    renderStep(content);
-    requestAnimationFrame(() => input.focus());
-
-    function goNext() {
+    const goNext = () => {
       if (!formData.displayName) {
-        input.classList.add('animate-pulse');
+        showToast('Hãy nhập tên của bạn trước nhé', 'error');
         input.focus();
-        setTimeout(() => input.classList.remove('animate-pulse'), 600);
         return;
       }
+      triggerHaptic('tap');
       currentStep++;
       renderCurrentStep();
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') goNext();
+    });
+
+    const nextBtn = createButton({
+      label: 'Tiếp tục',
+      variant: 'primary',
+      pill: true,
+      block: true,
+      trailingIcon: 'chevron-right',
+      onClick: goNext,
+    });
+
+    body.append(input, nextBtn.element);
+
+    let footer: HTMLElement | undefined;
+    if (!isGoogleUser) {
+      footer = document.createElement('footer');
+      footer.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+      footer.appendChild(
+        createButton({
+          label: 'Đã có tài khoản? Đăng nhập',
+          variant: 'ghost',
+          pill: true,
+          block: true,
+          leadingIcon: 'user',
+          onClick: () => navigate('/login', true),
+        }).element,
+      );
     }
+
+    renderStepShell(
+      'user',
+      'Tên của bạn là gì?',
+      'Chúng mình sẽ dùng tên này trên mọi tấm ảnh Polaroid và tin nhắn.',
+      body,
+      footer,
+    );
+    requestAnimationFrame(() => input.focus());
   }
 
-  // ── Step 2: Partner name ──────────────────────────────────────────────────
-
+  // ── Step 2: Partner Name ──
   function renderStep2(): void {
-    const content = document.createElement('div');
-    content.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:360px;';
-
-    content.innerHTML = `
-      <div style="font-size:72px;line-height:1" class="animate-pulse">💕</div>
-      <div style="text-align:center">
-        <h1 class="onboarding-title">Tên người ấy là gì?</h1>
-        <p class="onboarding-subtitle" style="margin-top:8px">Tên người thương của bạn</p>
-      </div>
-    `;
+    const body = document.createElement('div');
+    body.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.className = 'input';
-    input.placeholder = 'Tên người đặc biệt của bạn';
+    input.className = 'c-input';
+    input.placeholder = 'Tên thương gọi của người ấy';
+    input.setAttribute('aria-label', 'Tên người ấy');
     input.value = formData.partnerName;
     input.maxLength = 30;
-    input.style.cssText = 'text-align:center;font-size:20px;font-weight:600;padding:18px 20px;width:100%;';
+    input.style.cssText = 'text-align:center;font-size:18px;font-weight:600;min-height:52px;';
     input.addEventListener('input', () => {
       formData.partnerName = input.value.trim();
     });
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && formData.partnerName) {
-        currentStep++;
-        renderCurrentStep();
-      }
-    });
-    content.appendChild(input);
 
-    const nextBtn = document.createElement('button');
-    nextBtn.className = 'btn-primary btn-primary-full';
-    nextBtn.style.cssText = 'width:100%;font-size:17px;padding:16px;';
-    nextBtn.textContent = 'Tiếp theo →';
-    nextBtn.addEventListener('click', () => {
+    const goNext = () => {
       if (!formData.partnerName) {
+        showToast('Hãy nhập tên người thương nhé', 'error');
         input.focus();
         return;
       }
+      triggerHaptic('tap');
       currentStep++;
       renderCurrentStep();
-    });
-    content.appendChild(nextBtn);
+    };
 
-    renderStep(content);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') goNext();
+    });
+
+    body.append(
+      input,
+      createButton({
+        label: 'Tiếp tục',
+        variant: 'primary',
+        pill: true,
+        block: true,
+        trailingIcon: 'chevron-right',
+        onClick: goNext,
+      }).element,
+    );
+
+    renderStepShell(
+      'couple',
+      'Người thương của bạn tên gì?',
+      'Gọi theo tên thân mật nhất mà hai đứa vẫn hay dành cho nhau.',
+      body,
+    );
     requestAnimationFrame(() => input.focus());
   }
 
-  // ── Step 3: Couple code ───────────────────────────────────────────────────
-
+  // ── Step 3: Couple Code (OTP-style Individual Boxes) + Optional Account ──
   function renderStep3(): void {
-    const content = document.createElement('div');
-    content.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;max-width:360px;';
+    const body = document.createElement('div');
+    body.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
 
-    content.innerHTML = `
-      <div style="font-size:72px;line-height:1" class="animate-pulse">🔑</div>
-      <div style="text-align:center">
-        <h1 class="onboarding-title">Couple Code của hai đứa</h1>
-        <p class="onboarding-subtitle" style="margin-top:8px">Hai đứa nhập cùng một code để kết nối.<br>Tạo code bất kỳ rồi chia sẻ với người ấy.</p>
-      </div>
-    `;
+    let boxCount = formData.coupleCode.length > 6 ? 8 : 6;
+    const boxesContainer = document.createElement('div');
+    boxesContainer.className = 'p-otp-grid';
+    let codeBoxes: HTMLInputElement[] = [];
 
-    const codeInput = document.createElement('input');
-    codeInput.type = 'text';
-    codeInput.className = 'input';
-    codeInput.placeholder = 'VD: 010203';
-    codeInput.value = formData.coupleCode;
-    codeInput.maxLength = 8;
-    codeInput.style.cssText =
-      'text-align:center;font-size:24px;font-weight:700;letter-spacing:0.12em;padding:18px 20px;width:100%;text-transform:uppercase;';
-    codeInput.addEventListener('input', () => {
-      const val = codeInput.value.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 8);
-      codeInput.value = val;
-      formData.coupleCode = val;
+    const syncCodeFromBoxes = () => {
+      formData.coupleCode = codeBoxes.map((b) => b.value).join('').toUpperCase();
+    };
+
+    const buildCodeBoxes = () => {
+      boxesContainer.replaceChildren();
+      codeBoxes = [];
+      for (let i = 0; i < boxCount; i++) {
+        const cell = document.createElement('input');
+        cell.type = 'text';
+        cell.maxLength = 1;
+        cell.className = 'p-otp-cell';
+        cell.setAttribute('aria-label', `Ký tự mã ghép đôi ${i + 1}`);
+        cell.value = formData.coupleCode[i] ?? '';
+
+        cell.addEventListener('input', () => {
+          const clean = cell.value.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(-1);
+          cell.value = clean;
+          syncCodeFromBoxes();
+          if (clean && i < codeBoxes.length - 1) {
+            codeBoxes[i + 1]?.focus();
+          }
+        });
+
+        cell.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && !cell.value && i > 0) {
+            codeBoxes[i - 1]?.focus();
+          }
+        });
+
+        cell.addEventListener('paste', (e) => {
+          e.preventDefault();
+          const raw = (e.clipboardData?.getData('text') || '')
+            .replace(/[^A-Z0-9]/gi, '')
+            .toUpperCase()
+            .slice(0, 8);
+          if (!raw) return;
+          if (raw.length > 6 && boxCount < 8) {
+            boxCount = 8;
+            formData.coupleCode = raw;
+            buildCodeBoxes();
+            codeBoxes[Math.min(raw.length - 1, 7)]?.focus();
+            return;
+          }
+          raw.split('').forEach((ch, idx) => {
+            if (codeBoxes[idx]) codeBoxes[idx].value = ch;
+          });
+          syncCodeFromBoxes();
+          codeBoxes[Math.min(raw.length, codeBoxes.length - 1)]?.focus();
+        });
+
+        codeBoxes.push(cell);
+        boxesContainer.appendChild(cell);
+      }
+    };
+
+    buildCodeBoxes();
+    body.appendChild(boxesContainer);
+
+    const lenToggle = document.createElement('button');
+    lenToggle.type = 'button';
+    lenToggle.className = 'p-auth-link';
+    lenToggle.style.alignSelf = 'center';
+    lenToggle.textContent = boxCount === 6 ? 'Dùng mã 8 ký tự' : 'Dùng mã 6 ký tự';
+    lenToggle.addEventListener('click', () => {
+      boxCount = boxCount === 6 ? 8 : 6;
+      formData.coupleCode = formData.coupleCode.slice(0, boxCount);
+      lenToggle.textContent = boxCount === 6 ? 'Dùng mã 8 ký tự' : 'Dùng mã 6 ký tự';
+      buildCodeBoxes();
+      codeBoxes[0]?.focus();
     });
-    content.appendChild(codeInput);
+    body.appendChild(lenToggle);
 
     let emailInput: HTMLInputElement | null = null;
     let passwordInput: HTMLInputElement | null = null;
+
     if (!isGoogleUser) {
-      // Email/OTP-only option. Google users already have an account identity,
-      // so this registration toggle must not appear in their flow.
-      const toggleWrapper = document.createElement('div');
-      toggleWrapper.style.cssText = 'width:100%;';
-      toggleWrapper.innerHTML = `
-        <div id="use-account-card" class="account-toggle-card ${formData.useAccount ? 'is-checked' : ''}" role="checkbox" aria-checked="${formData.useAccount}" tabindex="0">
-          <div class="custom-checkbox-box">
-            <svg class="custom-check-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </div>
-          <span class="account-toggle-label" style="font-size:10.8px;">Đăng ký tài khoản để sử dụng trên thiết bị khác</span>
-        </div>
-      `;
+      const toggleRow = document.createElement('div');
+      toggleRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;background:var(--bg-canvas);border:1px solid var(--border-subtle);';
+      const copy = document.createElement('span');
+      copy.style.cssText = 'font-size:12px;font-weight:600;color:var(--text-primary);';
+      copy.textContent = 'Đăng ký Email để đăng nhập trên máy khác';
 
       const accountFields = document.createElement('div');
-      accountFields.style.cssText = `
-        width:100%;
-        display:flex;
-        flex-direction:column;
-        gap:10px;
-        overflow:hidden;
-        transition:max-height 0.3s ease, opacity 0.3s ease;
-        max-height:${formData.useAccount ? '200px' : '0'};
-        opacity:${formData.useAccount ? '1' : '0'};
-      `;
+      accountFields.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+      accountFields.hidden = !formData.useAccount;
 
-      const emailField = document.createElement('input');
-      emailInput = emailField;
-      emailField.type = 'email';
-      emailField.className = 'input';
-      emailField.placeholder = 'Email của bạn';
-      emailField.value = formData.email;
-      emailField.addEventListener('input', () => {
-        formData.email = emailField.value.trim();
-        // Reset verification state if email changes
+      const sw = createSwitch({
+        ariaLabel: 'Đăng ký tài khoản Email',
+        checked: formData.useAccount,
+        onChange: (checked) => {
+          formData.useAccount = checked;
+          accountFields.hidden = !checked;
+        },
+      });
+      toggleRow.append(copy, sw.element);
+
+      emailInput = document.createElement('input');
+      emailInput.type = 'email';
+      emailInput.className = 'c-input';
+      emailInput.placeholder = 'Email của bạn';
+      emailInput.setAttribute('aria-label', 'Email của bạn');
+      emailInput.value = formData.email;
+      emailInput.addEventListener('input', () => {
+        formData.email = emailInput!.value.trim();
         formData.emailVerified = false;
         formData.otpCode = '';
       });
 
-      const passwordField = document.createElement('input');
-      passwordInput = passwordField;
-      passwordField.type = 'password';
-      passwordField.className = 'input';
-      passwordField.placeholder = 'Mật khẩu (tối thiểu 6 ký tự)';
-      passwordField.value = formData.password;
-      passwordField.addEventListener('input', () => {
-        formData.password = passwordField.value;
+      passwordInput = document.createElement('input');
+      passwordInput.type = 'password';
+      passwordInput.className = 'c-input';
+      passwordInput.placeholder = 'Mật khẩu (tối thiểu 6 ký tự)';
+      passwordInput.setAttribute('aria-label', 'Mật khẩu');
+      passwordInput.value = formData.password;
+      passwordInput.addEventListener('input', () => {
+        formData.password = passwordInput!.value;
       });
 
-      accountFields.appendChild(emailField);
-      accountFields.appendChild(passwordField);
-      content.appendChild(toggleWrapper);
-      content.appendChild(accountFields);
-
-      const toggleCard = toggleWrapper.querySelector<HTMLElement>('#use-account-card')!;
-      toggleCard.addEventListener('click', () => {
-        formData.useAccount = !formData.useAccount;
-        toggleCard.classList.toggle('is-checked', formData.useAccount);
-        toggleCard.setAttribute('aria-checked', String(formData.useAccount));
-        accountFields.style.maxHeight = formData.useAccount ? '200px' : '0';
-        accountFields.style.opacity = formData.useAccount ? '1' : '0';
-      });
+      accountFields.append(emailInput, passwordInput);
+      body.append(toggleRow, accountFields);
     }
 
-    const nextBtn = document.createElement('button');
-    nextBtn.className = 'btn-primary btn-primary-full';
-    nextBtn.style.cssText = 'width:100%;font-size:17px;padding:16px;';
-    nextBtn.textContent = 'Tiếp theo →';
-    nextBtn.addEventListener('click', () => {
-      if (!formData.coupleCode || formData.coupleCode.length < 4) {
-        showToast('Code cần ít nhất 4 ký tự', 'error');
-        codeInput.focus();
-        return;
-      }
-      if (formData.useAccount) {
-        if (!formData.email) {
-          showToast('Vui lòng nhập email', 'error');
-          emailInput?.focus();
-          return;
-        }
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(formData.email)) {
-          showToast('Email không hợp lệ', 'error');
-          emailInput?.focus();
-          return;
-        }
-        if (formData.password.length < 6) {
-          showToast('Mật khẩu cần ít nhất 6 ký tự', 'error');
-          passwordInput?.focus();
-          return;
-        }
-      }
-      currentStep++;
-      renderCurrentStep();
-    });
-    content.appendChild(nextBtn);
+    body.appendChild(
+      createButton({
+        label: 'Tiếp tục',
+        variant: 'primary',
+        pill: true,
+        block: true,
+        trailingIcon: 'chevron-right',
+        onClick: () => {
+          syncCodeFromBoxes();
+          if (!formData.coupleCode || formData.coupleCode.length < 4) {
+            showToast('Couple Code cần ít nhất 4 ký tự', 'error');
+            codeBoxes[0]?.focus();
+            return;
+          }
+          if (formData.useAccount) {
+            if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+              showToast('Vui lòng nhập Email hợp lệ', 'error');
+              emailInput?.focus();
+              return;
+            }
+            if (formData.password.length < 6) {
+              showToast('Mật khẩu cần ít nhất 6 ký tự', 'error');
+              passwordInput?.focus();
+              return;
+            }
+          }
+          triggerHaptic('tap');
+          currentStep++;
+          renderCurrentStep();
+        },
+      }).element,
+    );
 
-    renderStep(content);
-    requestAnimationFrame(() => codeInput.focus());
+    renderStepShell(
+      'key',
+      'Mã ghép đôi hai đứa',
+      'Hai người nhập chung một mã bí mật (4–8 ký tự) để nối hai thiết bị vào cùng một nhà.',
+      body,
+    );
+    requestAnimationFrame(() => codeBoxes[0]?.focus());
   }
 
-  // ── Step 4: Email OTP Verification (only if useAccount) ───────────────────
-
+  // ── Step 4: Email OTP Verification ──
   function renderStep4OTP(): void {
-    const content = document.createElement('div');
-    content.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;max-width:360px;';
+    const body = document.createElement('div');
+    body.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
 
     let cooldown = 0;
     let cooldownInterval: ReturnType<typeof setInterval> | null = null;
 
-    content.innerHTML = `
-      <div style="font-size:72px;line-height:1" class="animate-pulse">📬</div>
-      <div style="text-align:center">
-        <h1 class="onboarding-title">Xác thực Email</h1>
-        <p class="onboarding-subtitle" style="margin-top:8px">
-          Nhập mã <strong>6 chữ số</strong> được gửi tới<br>
-          <strong style="color:var(--accent)">${formData.email}</strong>
-        </p>
-      </div>
-    `;
-
-    // Offline notice banner (hidden by default)
     const offlineBanner = document.createElement('div');
-    offlineBanner.style.cssText = `
-      display:none;
-      width:100%;
-      background:rgba(248,113,113,0.12);
-      border:1px solid rgba(248,113,113,0.35);
-      border-radius:12px;
-      padding:12px 16px;
-      text-align:center;
-      font-size:13px;
-      color:#f87171;
-      line-height:1.5;
+    offlineBanner.className = 'p-install-alert';
+    offlineBanner.hidden = true;
+    offlineBanner.innerHTML = `
+      ${iconMarkup('wifi-off', { size: 20 })}
+      <div><strong>Chưa có kết nối mạng.</strong> Bạn có thể kết nối lại rồi thử, hoặc bấm bỏ qua xác thực bên dưới.</div>
     `;
-    offlineBanner.innerHTML = '📡 Không có kết nối mạng<br><span style="color:var(--text-secondary)">Kết nối mạng rồi thử lại, hoặc bỏ qua bước này.</span>';
-    content.appendChild(offlineBanner);
+    body.appendChild(offlineBanner);
 
-    // OTP input boxes (6 separate inputs)
     const otpWrapper = document.createElement('div');
-    otpWrapper.style.cssText = 'display:flex;gap:10px;justify-content:center;width:100%;';
+    otpWrapper.className = 'p-otp-grid';
     const otpInputs: HTMLInputElement[] = [];
+
+    const syncOtpValue = () => {
+      formData.otpCode = otpInputs.map((i) => i.value).join('');
+    };
 
     for (let i = 0; i < 6; i++) {
       const box = document.createElement('input');
       box.type = 'text';
       box.inputMode = 'numeric';
       box.maxLength = 1;
-      box.setAttribute('aria-label', `Chữ số ${i + 1}`);
-      box.style.cssText = `
-        width:44px;height:56px;
-        text-align:center;font-size:22px;font-weight:700;
-        border:2px solid var(--border);
-        border-radius:14px;
-        background:var(--surface-solid);
-        color:var(--text);
-        caret-color:var(--accent);
-        transition:border-color 0.2s ease;
-        outline:none;
-      `;
-
-      box.addEventListener('focus', () => {
-        box.style.borderColor = 'var(--accent)';
-        box.select();
-      });
-      box.addEventListener('blur', () => {
-        box.style.borderColor = 'var(--border)';
-      });
+      box.className = 'p-otp-cell';
+      box.setAttribute('aria-label', `Chữ số OTP ${i + 1}`);
       box.addEventListener('input', () => {
         const val = box.value.replace(/\D/g, '');
         box.value = val.slice(-1);
         syncOtpValue();
-        if (val && i < 5) {
-          otpInputs[i + 1]?.focus();
-        }
+        if (val && i < 5) otpInputs[i + 1]?.focus();
       });
       box.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !box.value && i > 0) {
-          otpInputs[i - 1]?.focus();
-        }
-        if (e.key === 'Enter') {
-          void handleVerify();
-        }
+        if (e.key === 'Backspace' && !box.value && i > 0) otpInputs[i - 1]?.focus();
+        if (e.key === 'Enter') void handleVerify();
       });
       box.addEventListener('paste', (e) => {
         e.preventDefault();
@@ -474,116 +483,95 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
           if (otpInputs[idx]) otpInputs[idx].value = ch;
         });
         syncOtpValue();
-        const focusIdx = Math.min(text.length, 5);
-        otpInputs[focusIdx]?.focus();
+        otpInputs[Math.min(text.length, 5)]?.focus();
       });
-
       otpInputs.push(box);
       otpWrapper.appendChild(box);
     }
-    content.appendChild(otpWrapper);
+    body.appendChild(otpWrapper);
 
-    function syncOtpValue() {
-      formData.otpCode = otpInputs.map((i) => i.value).join('');
-    }
-
-    // Status message
-    const statusMsg = document.createElement('p');
-    statusMsg.style.cssText = 'font-size:13px;color:var(--text-secondary);text-align:center;min-height:20px;margin:0;';
-    content.appendChild(statusMsg);
-
-    // Verify button
-    const verifyBtn = document.createElement('button');
-    verifyBtn.className = 'btn-primary btn-primary-full';
-    verifyBtn.style.cssText = 'width:100%;font-size:17px;padding:16px;';
-    verifyBtn.textContent = 'Xác thực →';
-    verifyBtn.addEventListener('click', () => void handleVerify());
-    content.appendChild(verifyBtn);
-
-    // Resend button
-    const resendBtn = document.createElement('button');
-    resendBtn.className = 'btn-ghost';
-    resendBtn.style.cssText = 'width:100%;font-size:14px;';
-    resendBtn.textContent = 'Gửi lại mã';
-    resendBtn.addEventListener('click', () => void handleSendOtp(true));
-    content.appendChild(resendBtn);
-
-    // Skip OTP button — always visible so user can bypass if offline
-    const skipOtpBtn = document.createElement('button');
-    skipOtpBtn.className = 'btn-ghost';
-    skipOtpBtn.style.cssText = 'width:100%;font-size:13px;opacity:0.6;margin-top:-8px;';
-    skipOtpBtn.textContent = 'Bỏ qua xác thực email';
-    skipOtpBtn.addEventListener('click', () => {
-      formData.emailVerified = false;
-      formData.otpCode = '';
-      currentStep++;
-      renderCurrentStep();
+    const verifyCtrl = createButton({
+      label: 'Xác thực Email',
+      variant: 'primary',
+      pill: true,
+      block: true,
+      leadingIcon: 'check',
+      onClick: () => void handleVerify(),
     });
-    content.appendChild(skipOtpBtn);
 
-    renderStep(content);
+    const resendCtrl = createButton({
+      label: 'Gửi lại mã',
+      variant: 'secondary',
+      size: 'sm',
+      pill: true,
+      block: true,
+      onClick: () => void handleSendOtp(true),
+    });
 
-    // Auto-send OTP on load if not already sent
-    void handleSendOtp(false);
+    const skipBtn = createButton({
+      label: 'Bỏ qua xác thực lúc này',
+      variant: 'ghost',
+      size: 'sm',
+      pill: true,
+      block: true,
+      onClick: () => {
+        if (cooldownInterval) clearInterval(cooldownInterval);
+        formData.emailVerified = false;
+        formData.otpCode = '';
+        currentStep++;
+        renderCurrentStep();
+      },
+    });
 
-    function isNetworkError(err: unknown): boolean {
+    body.append(verifyCtrl.element, resendCtrl.element, skipBtn.element);
+
+    renderStepShell(
+      'mail',
+      'Xác thực Email',
+      `Nhập mã 6 chữ số vừa được gửi tới ${formData.email}`,
+      body,
+    );
+
+    const isNetworkError = (err: unknown): boolean => {
       if (!navigator.onLine) return true;
       if (err instanceof TypeError && err.message.toLowerCase().includes('fetch')) return true;
       if (err instanceof Error) {
-        const msg = err.message.toLowerCase();
-        return msg.includes('network') || msg.includes('failed to fetch') ||
-               msg.includes('không có kết nối') || msg.includes('offline') ||
-               msg.includes('connection');
+        const m = err.message.toLowerCase();
+        return m.includes('network') || m.includes('failed to fetch') || m.includes('offline');
       }
       return false;
-    }
+    };
 
-    async function handleSendOtp(isResend: boolean) {
-      if (cooldown > 0) {
-        showToast(`Vui lòng chờ ${cooldown}s trước khi gửi lại`, 'error');
-        return;
-      }
-
-      resendBtn.disabled = true;
-      resendBtn.textContent = 'Đang gửi...';
+    async function handleSendOtp(isResend: boolean): Promise<void> {
+      if (cooldown > 0) return;
+      resendCtrl.setDisabled(true);
+      resendCtrl.setLabel('Đang gửi...');
 
       try {
         await sendOtp(formData.email);
-        offlineBanner.style.display = 'none';
-        showToast(
-          isResend ? '✉️ Đã gửi lại mã mới!' : `✉️ Mã đã gửi tới ${formData.email}`,
-          'success',
-        );
-        // Start 60s cooldown
+        offlineBanner.hidden = true;
+        showToast(isResend ? 'Đã gửi lại mã OTP mới!' : `Đã gửi mã OTP tới ${formData.email}`, 'success');
         cooldown = 60;
-        resendBtn.textContent = `Gửi lại sau ${cooldown}s`;
+        resendCtrl.setLabel(`Gửi lại sau ${cooldown}s`);
         cooldownInterval = setInterval(() => {
           cooldown--;
           if (cooldown <= 0) {
             clearInterval(cooldownInterval!);
-            resendBtn.textContent = 'Gửi lại mã';
-            resendBtn.disabled = false;
+            resendCtrl.setLabel('Gửi lại mã');
+            resendCtrl.setDisabled(false);
           } else {
-            resendBtn.textContent = `Gửi lại sau ${cooldown}s`;
+            resendCtrl.setLabel(`Gửi lại sau ${cooldown}s`);
           }
         }, 1000);
-      } catch (err: unknown) {
-        resendBtn.disabled = false;
-        resendBtn.textContent = 'Thử lại';
-        if (isNetworkError(err)) {
-          // Show offline banner with skip hint
-          offlineBanner.style.display = 'block';
-          if (isResend) {
-            showToast('Không có kết nối mạng', 'error');
-          }
-        } else {
-          const msg = err instanceof Error ? err.message : 'Gửi email thất bại';
-          showToast(msg, 'error');
-        }
+      } catch (err) {
+        resendCtrl.setDisabled(false);
+        resendCtrl.setLabel('Thử gửi lại');
+        if (isNetworkError(err)) offlineBanner.hidden = false;
+        else showToast(err instanceof Error ? err.message : 'Gửi email thất bại', 'error');
       }
     }
 
-    async function handleVerify() {
+    async function handleVerify(): Promise<void> {
       syncOtpValue();
       if (formData.otpCode.length !== 6) {
         showToast('Vui lòng nhập đủ 6 chữ số', 'error');
@@ -591,394 +579,129 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
         return;
       }
 
-      verifyBtn.disabled = true;
-      verifyBtn.innerHTML = `<span class="spinner" style="width:18px;height:18px;border-width:2px"></span> Đang xác thực...`;
-
+      verifyCtrl.setLoading(true, 'Đang xác thực...');
       try {
         await verifyOtp(formData.email, formData.otpCode);
         formData.emailVerified = true;
-
-        // Visual feedback
-        otpInputs.forEach((inp) => {
-          inp.style.borderColor = '#4ade80';
-          inp.style.background = 'rgba(74,222,128,0.08)';
-          inp.disabled = true;
-        });
-        statusMsg.style.color = '#4ade80';
-        statusMsg.textContent = '✓ Email đã được xác thực!';
-
-        showToast('Xác thực thành công!', 'success');
-        setTimeout(() => {
-          currentStep++;
-          renderCurrentStep();
-        }, 700);
-      } catch (err: unknown) {
-        verifyBtn.disabled = false;
-        verifyBtn.textContent = 'Xác thực →';
-        if (isNetworkError(err)) {
-          offlineBanner.style.display = 'block';
-          showToast('Không có kết nối mạng', 'error');
-        } else {
-          const msg = err instanceof Error ? err.message : 'Mã không đúng';
-          showToast(msg, 'error');
-          // Shake effect
-          otpInputs.forEach((inp) => {
-            inp.style.borderColor = '#f87171';
-            inp.style.animation = 'none';
-            setTimeout(() => { inp.style.borderColor = 'var(--border)'; }, 600);
-          });
-        }
+        if (cooldownInterval) clearInterval(cooldownInterval);
+        triggerHaptic('confirm');
+        showToast('Xác thực Email thành công!', 'success');
+        currentStep++;
+        renderCurrentStep();
+      } catch (err) {
+        verifyCtrl.setLoading(false);
+        if (isNetworkError(err)) offlineBanner.hidden = false;
+        else showToast(err instanceof Error ? err.message : 'Mã OTP chưa đúng', 'error');
       }
     }
 
-    // Focus first input
+    void handleSendOtp(false);
     requestAnimationFrame(() => otpInputs[0]?.focus());
   }
 
-  // ── Step 4/5: Love start date ─────────────────────────────────────────────
-
-  // ── Step 4/5: Love start date ─────────────────────────────────────────────
-
-  function formatDateVietnamese(dateStr: string): string {
-    if (!dateStr) return '';
-    const date = new Date(dateStr + 'T00:00:00');
-    if (isNaN(date.getTime())) return '';
-    const daysOfWeek = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-    const dayName = daysOfWeek[date.getDay()];
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${dayName}, ${day}/${month}/${year}`;
-  }
-
+  // ── Step 5: Love Start Date ──
   function renderStepDate(): void {
-    const content = document.createElement('div');
-    content.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;max-width:360px;';
+    const body = document.createElement('div');
+    body.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
 
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    // Default to 1 year ago if empty
     if (!formData.loveStartDate) {
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(today.getFullYear() - 1);
       formData.loveStartDate = oneYearAgo.toISOString().split('T')[0];
     }
 
-    content.innerHTML = `
-      <div class="love-date-avatar-wrapper animate-pulse">
-        <span class="love-date-avatar-icon">📅</span>
-        <span class="love-date-avatar-badge">LOVE</span>
-      </div>
-      <div style="text-align:center">
-        <h1 class="onboarding-title">Hai đứa bắt đầu<br>yêu nhau khi nào?</h1>
-        <p class="onboarding-subtitle" style="margin-top:6px">Chọn ngày kỷ niệm đặc biệt của hai bạn</p>
-      </div>
-    `;
-
-    // Modern Date Picker Card
-    const pickerCard = document.createElement('div');
-    pickerCard.className = 'love-date-picker-card';
-
-    // Hidden native date input (for showPicker / mobile native modal trigger)
-    const dateInput = document.createElement('input');
-    dateInput.type = 'date';
-    dateInput.value = formData.loveStartDate;
-    dateInput.max = todayStr;
-    dateInput.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:0;height:0;';
-    pickerCard.appendChild(dateInput);
-
-    // 1. Quick Presets Bar
-    const presetsSection = document.createElement('div');
-    presetsSection.innerHTML = `<div class="love-date-presets-title">⚡ Chọn nhanh mốc thời gian</div>`;
-    const presetsList = document.createElement('div');
-    presetsList.className = 'love-date-presets-list';
-
+    const presetsWrap = document.createElement('div');
+    presetsWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;justify-content:center;';
     const presets = [
-      { label: 'Hôm nay', getDays: () => 0 },
-      { label: '100 ngày', getDays: () => 100 },
-      { label: '6 tháng', getDays: () => 180 },
-      { label: '1 năm', getDays: () => 365 },
-      { label: '2 năm', getDays: () => 730 },
-      { label: '3 năm', getDays: () => 1095 }
+      { label: 'Hôm nay', days: 0 },
+      { label: '100 ngày', days: 100 },
+      { label: '6 tháng', days: 180 },
+      { label: '1 năm', days: 365 },
+      { label: '2 năm', days: 730 },
     ];
 
-    // 2. Custom Wheel Selector (Day, Month, Year)
-    const wheelContainer = document.createElement('div');
-    wheelContainer.className = 'love-date-wheel-container';
-    wheelContainer.innerHTML = `
-      <div class="love-date-wheel-highlight"></div>
-      <div class="love-date-wheel-col" id="wheel-day"></div>
-      <div class="love-date-wheel-col" id="wheel-month"></div>
-      <div class="love-date-wheel-col" id="wheel-year"></div>
-    `;
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.className = 'c-input';
+    dateInput.max = todayStr;
+    dateInput.value = formData.loveStartDate;
+    dateInput.setAttribute('aria-label', 'Ngày bắt đầu yêu nhau');
+    dateInput.style.cssText = 'text-align:center;font-size:16px;font-weight:700;min-height:50px;';
 
-    const wheelDay = wheelContainer.querySelector('#wheel-day') as HTMLElement;
-    const wheelMonth = wheelContainer.querySelector('#wheel-month') as HTMLElement;
-    const wheelYear = wheelContainer.querySelector('#wheel-year') as HTMLElement;
+    const previewBox = document.createElement('div');
+    previewBox.style.cssText = 'padding:14px;border-radius:16px;background:var(--accent-50);border:1.5px solid var(--accent-200);text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;';
 
-    // Populate Days (01 -> 31)
-    const daysList: string[] = [];
-    for (let d = 1; d <= 31; d++) {
-      const val = d.toString().padStart(2, '0');
-      daysList.push(val);
-      const item = document.createElement('div');
-      item.className = 'love-date-wheel-item';
-      item.dataset.value = val;
-      item.textContent = val;
-      const idx = d - 1;
-      item.addEventListener('click', () => {
-        wheelDay.scrollTo({ top: idx * 40, behavior: 'smooth' });
-      });
-      wheelDay.appendChild(item);
-    }
-
-    // Populate Months (Tháng 1 -> Tháng 12)
-    const monthsList: string[] = [];
-    for (let m = 1; m <= 12; m++) {
-      const val = m.toString().padStart(2, '0');
-      monthsList.push(val);
-      const item = document.createElement('div');
-      item.className = 'love-date-wheel-item';
-      item.dataset.value = val;
-      item.textContent = `Tháng ${m}`;
-      const idx = m - 1;
-      item.addEventListener('click', () => {
-        wheelMonth.scrollTo({ top: idx * 40, behavior: 'smooth' });
-      });
-      wheelMonth.appendChild(item);
-    }
-
-    // Populate Years (Current Year down to 1990)
-    const currentYear = today.getFullYear();
-    const yearsList: string[] = [];
-    for (let y = currentYear; y >= 1990; y--) {
-      const val = y.toString();
-      yearsList.push(val);
-      const item = document.createElement('div');
-      item.className = 'love-date-wheel-item';
-      item.dataset.value = val;
-      item.textContent = val;
-      const idx = yearsList.length - 1;
-      item.addEventListener('click', () => {
-        wheelYear.scrollTo({ top: idx * 40, behavior: 'smooth' });
-      });
-      wheelYear.appendChild(item);
-    }
-
-    pickerCard.appendChild(presetsSection);
-    presetsSection.appendChild(presetsList);
-    pickerCard.appendChild(wheelContainer);
-
-    // 4. Romantic Days Counter Preview Card
-    const dayPreview = document.createElement('div');
-    dayPreview.className = 'love-date-preview-card';
-
-    // State & Scroll Helpers
-    let isProgrammaticScroll = false;
-
-    function getSelectedValueFromCol(col: HTMLElement, list: string[]): { value: string; index: number } {
-      const scrollTop = col.scrollTop;
-      let index = Math.round(scrollTop / 40);
-      if (index < 0) index = 0;
-      if (index >= list.length) index = list.length - 1;
-
-      const items = col.querySelectorAll('.love-date-wheel-item');
-      items.forEach((it, i) => {
-        if (i === index) it.classList.add('selected');
-        else it.classList.remove('selected');
-      });
-
-      return { value: list[index] || list[0], index };
-    }
-
-    function syncFromWheel() {
-      if (isProgrammaticScroll) return;
-
-      const dayObj = getSelectedValueFromCol(wheelDay, daysList);
-      const monthObj = getSelectedValueFromCol(wheelMonth, monthsList);
-      const yearObj = getSelectedValueFromCol(wheelYear, yearsList);
-
-      const y = yearObj.value;
-      const m = monthObj.value;
-      let d = dayObj.value;
-
-      // Adjust max days in month
-      const maxDaysInMonth = new Date(parseInt(y), parseInt(m), 0).getDate();
-      if (parseInt(d) > maxDaysInMonth) {
-        d = maxDaysInMonth.toString().padStart(2, '0');
-        isProgrammaticScroll = true;
-        wheelDay.scrollTop = (maxDaysInMonth - 1) * 40;
-        setTimeout(() => { isProgrammaticScroll = false; }, 60);
-      }
-
-      const newDateStr = `${y}-${m}-${d}`;
-
-      // Prevent future dates
-      if (newDateStr > todayStr) {
-        syncFromDateString(todayStr);
-        showToast('Ngày bắt đầu yêu không thể trong tương lai 💕', 'info');
-        return;
-      }
-
-      dateInput.value = newDateStr;
-      formData.loveStartDate = newDateStr;
-      updatePreview();
-      updateActivePreset();
-    }
-
-    function highlightSelectedItems() {
-      getSelectedValueFromCol(wheelDay, daysList);
-      getSelectedValueFromCol(wheelMonth, monthsList);
-      getSelectedValueFromCol(wheelYear, yearsList);
-    }
-
-    let scrollTimer: ReturnType<typeof setTimeout> | null = null;
-    function onColScroll() {
-      highlightSelectedItems();
-      if (scrollTimer) clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(() => {
-        syncFromWheel();
-      }, 60);
-    }
-
-    wheelDay.addEventListener('scroll', onColScroll);
-    wheelMonth.addEventListener('scroll', onColScroll);
-    wheelYear.addEventListener('scroll', onColScroll);
-
-    function syncFromDateString(dateStr: string) {
-      if (!dateStr) return;
-      const parts = dateStr.split('-');
-      if (parts.length === 3) {
-        const y = parts[0];
-        const m = parts[1];
-        const d = parts[2];
-
-        const dayIdx = daysList.indexOf(d);
-        const monthIdx = monthsList.indexOf(m);
-        const yearIdx = yearsList.indexOf(y);
-
-        isProgrammaticScroll = true;
-        if (dayIdx >= 0) wheelDay.scrollTop = dayIdx * 40;
-        if (monthIdx >= 0) wheelMonth.scrollTop = monthIdx * 40;
-        if (yearIdx >= 0) wheelYear.scrollTop = yearIdx * 40;
-
-        highlightSelectedItems();
-
-        setTimeout(() => { isProgrammaticScroll = false; }, 60);
-      }
-
-      dateInput.value = dateStr;
-      formData.loveStartDate = dateStr;
-      updatePreview();
-      updateActivePreset();
-    }
-
-    function updatePreview() {
+    const updatePreview = () => {
       const days = calcDaysTogether(formData.loveStartDate);
-      const formattedDate = formatDateVietnamese(formData.loveStartDate);
+      previewBox.innerHTML = `
+        <span class="u-text-secondary" style="font-size:12px;">Hai đứa đã đồng hành</span>
+        <strong style="font-family:var(--font-display);font-size:30px;color:var(--accent-600);line-height:1.1;">${days.toLocaleString('vi-VN')} ngày</strong>
+      `;
+    };
 
-      if (days >= 0 && formData.loveStartDate) {
-        let milestoneText: string;
-        if (days === 0) milestoneText = 'Ngày đầu tiên bên nhau ✨';
-        else if (days < 30) milestoneText = 'Những ngày đầu rực rỡ 💓';
-        else if (days < 100) milestoneText = 'Sắp đạt mốc 100 ngày 🎉';
-        else if (days < 365) milestoneText = 'Hành trình đang đơm hoa! 🥰';
-        else {
-          const yrs = (days / 365).toFixed(1);
-          milestoneText = `🎉 Đã gắn bó hơn ${yrs} năm ngọt ngào`;
-        }
-
-        dayPreview.innerHTML = `
-          <div class="love-date-preview-days">
-            <span class="preview-text-phrase">💕 Hai đứa đã bên nhau</span>
-            <strong class="preview-days-count">${days.toLocaleString()}</strong>
-            <span class="preview-text-unit">ngày</span>
-          </div>
-          <div class="love-date-preview-sub">${formattedDate}</div>
-          <div class="love-date-milestone-pill">${milestoneText}</div>
-        `;
-      } else {
-        dayPreview.innerHTML = `
-          <div class="love-date-preview-sub" style="font-size:14px;color:var(--text-secondary)">
-            Vui lòng chọn ngày kỷ niệm 💕
-          </div>
-        `;
-      }
-    }
-
-    function updateActivePreset() {
-      const currentDays = calcDaysTogether(formData.loveStartDate);
-      const presetChips = presetsList.querySelectorAll('.love-date-preset-chip');
-      presetChips.forEach((chip) => {
-        const targetDays = parseInt(chip.getAttribute('data-days') || '-1');
-        if (Math.abs(currentDays - targetDays) <= 1 && targetDays >= 0) {
-          chip.classList.add('active');
-        } else {
-          chip.classList.remove('active');
-        }
-      });
-    }
-
-    // Build preset chips
     presets.forEach((p) => {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'love-date-preset-chip';
-      const targetDays = p.getDays();
-      chip.setAttribute('data-days', targetDays.toString());
-      chip.textContent = p.label;
-      chip.addEventListener('click', () => {
-        const d = new Date();
-        d.setDate(d.getDate() - targetDays);
-        const dateStr = d.toISOString().split('T')[0];
-        syncFromDateString(dateStr);
-      });
-      presetsList.appendChild(chip);
+      presetsWrap.appendChild(
+        createChip({
+          label: p.label,
+          interactive: true,
+          onClick: () => {
+            const d = new Date();
+            d.setDate(d.getDate() - p.days);
+            const nextStr = d.toISOString().split('T')[0];
+            formData.loveStartDate = nextStr;
+            dateInput.value = nextStr;
+            triggerHaptic('select');
+            updatePreview();
+          },
+        }),
+      );
     });
 
-    // Event listeners
-    dateInput.addEventListener('input', () => {
-      syncFromDateString(dateInput.value);
+    dateInput.addEventListener('change', () => {
+      if (dateInput.value > todayStr) {
+        dateInput.value = todayStr;
+        showToast('Ngày kỷ niệm không thể ở tương lai nhé', 'info');
+      }
+      formData.loveStartDate = dateInput.value;
+      updatePreview();
     });
 
-    // Initial sync with double frame delay to ensure DOM dimensions & layout are ready
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        syncFromDateString(formData.loveStartDate);
-      });
+    updatePreview();
+
+    const finishCtrl = createButton({
+      label: 'Mở không gian hai đứa',
+      variant: 'primary',
+      size: 'lg',
+      pill: true,
+      block: true,
+      leadingIcon: 'heart',
+      onClick: () => void handleSubmit(finishCtrl),
     });
 
-    content.appendChild(pickerCard);
-    content.appendChild(dayPreview);
+    const skipBtn = createButton({
+      label: 'Thiết lập sau',
+      variant: 'ghost',
+      size: 'sm',
+      pill: true,
+      block: true,
+      onClick: () => void handleSubmit(finishCtrl),
+    });
 
-    const finishBtn = document.createElement('button');
-    finishBtn.className = 'btn-primary btn-primary-full';
-    finishBtn.style.cssText =
-      'width:100%;font-size:17px;padding:16px;box-shadow: 0 8px 24px rgba(255, 75, 114, 0.3);';
-    finishBtn.textContent = 'Bắt đầu ngay 💕';
-    finishBtn.addEventListener('click', handleSubmit);
-    content.appendChild(finishBtn);
+    body.append(presetsWrap, dateInput, previewBox, finishCtrl.element, skipBtn.element);
 
-    const skipBtn = document.createElement('button');
-    skipBtn.className = 'btn-ghost';
-    skipBtn.style.cssText = 'width:100%;font-size:14px;color:var(--text-secondary);';
-    skipBtn.textContent = 'Bỏ qua bước này';
-    skipBtn.addEventListener('click', handleSubmit);
-    content.appendChild(skipBtn);
-
-    renderStep(content);
+    renderStepShell(
+      'calendar',
+      'Ngày bắt đầu yêu nhau',
+      'Chọn cột mốc đầu tiên để ứng dụng đếm từng ngày kỷ niệm và chuẩn bị thiệp bất ngờ.',
+      body,
+    );
   }
 
-  // ── Submit ────────────────────────────────────────────────────────────────
-
-  async function handleSubmit() {
-    const btn = root.querySelector<HTMLButtonElement>('.btn-primary');
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = `<span class="spinner" style="width:20px;height:20px;border-width:2px"></span> Đang tạo...`;
-    }
+  async function handleSubmit(btnCtrl: ReturnType<typeof createButton>): Promise<void> {
+    btnCtrl.setLoading(true, 'Đang khởi tạo...');
 
     try {
       const payload: Parameters<typeof startOnboarding>[0] = {
@@ -993,18 +716,15 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       };
 
       const result = await startOnboarding(payload);
-
       store.set({
         token: result.token,
         user: result.user,
         couple: result.couple,
       });
       localStorage.setItem('lovecheck_token', result.token);
-
       showSuccessAndNavigate();
     } catch {
-      // Fallback for local UI preview when backend API server is offline
-      showToast('Đã tạo dữ liệu xem thử Local! Đang vào trang chính...', 'info');
+      showToast('Chế độ xem thử Local: Đang mở trang chính...', 'info');
       const preview = seedMockPreviewData({
         displayName: formData.displayName,
         partnerName: formData.partnerName,
@@ -1019,42 +739,41 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
         couple: preview.couple,
       });
       localStorage.setItem('lovecheck_token', MOCK_PREVIEW_TOKEN);
-
       showSuccessAndNavigate();
     }
   }
 
+  function showSuccessAndNavigate(): void {
+    [
+      'google_authenticated_user',
+      'dev_onboarding_step',
+      'dev_onboarding_displayName',
+      'dev_onboarding_partnerName',
+      'dev_onboarding_coupleCode',
+      'dev_onboarding_loveStartDate',
+      'dev_onboarding_email',
+      'dev_onboarding_useAccount',
+    ].forEach((k) => sessionStorage.removeItem(k));
 
-  function showSuccessAndNavigate() {
-    sessionStorage.removeItem('google_authenticated_user');
-    sessionStorage.removeItem('dev_onboarding_step');
-    sessionStorage.removeItem('dev_onboarding_displayName');
-    sessionStorage.removeItem('dev_onboarding_partnerName');
-    sessionStorage.removeItem('dev_onboarding_coupleCode');
-    sessionStorage.removeItem('dev_onboarding_loveStartDate');
-    sessionStorage.removeItem('dev_onboarding_email');
-    sessionStorage.removeItem('dev_onboarding_useAccount');
-
-    root.innerHTML = '';
-    root.style.cssText +=
-      'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;';
-    root.innerHTML = `
-      <div style="font-size:80px;line-height:1" class="animate-scale-in animate-heartbeat">💕</div>
-      <div style="text-align:center" class="animate-slide-up stagger-1">
-        <h1 style="font-size:26px;font-weight:700;letter-spacing:-0.03em;margin-bottom:8px">
-          Chào mừng, ${formData.displayName}!
-        </h1>
-        <p style="font-size:16px;color:var(--text-secondary);line-height:1.6">
-          Bắt đầu hành trình cùng ${formData.partnerName} nhé 💕
-        </p>
-      </div>
-    `;
-    setTimeout(() => navigate('/app/home', true), 1800);
+    triggerHaptic('confirm');
+    root.replaceChildren();
+    const welcome = document.createElement('div');
+    welcome.className = 'p-auth-hero';
+    welcome.style.margin = 'auto';
+    welcome.appendChild(createBadge('Đã sẵn sàng', 'gold'));
+    welcome.insertAdjacentHTML(
+      'beforeend',
+      `
+      <div class="p-auth-emblem" style="margin-top:12px;">${iconMarkup('heart-burst', { size: 32, variant: 'filled' })}</div>
+      <h1 class="p-auth-title">Chào mừng, ${formData.displayName}!</h1>
+      <p class="p-auth-sub">Bắt đầu hành trình yêu thương cùng ${formData.partnerName} ngay thôi.</p>
+    `,
+    );
+    root.appendChild(welcome);
+    setTimeout(() => navigate('/app/home', true), 1200);
   }
 
-  // ── Step renderer ─────────────────────────────────────────────────────────
-
-  function renderCurrentStep() {
+  function renderCurrentStep(): void {
     sessionStorage.setItem('dev_onboarding_step', String(currentStep));
     sessionStorage.setItem('dev_onboarding_displayName', formData.displayName);
     sessionStorage.setItem('dev_onboarding_partnerName', formData.partnerName);
@@ -1067,15 +786,10 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       case 1: renderStep2(); break;
       case 2: renderStep3(); break;
       case 3:
-        // If using account and not Google user, show OTP step; otherwise show date step
-        if (formData.useAccount && !isGoogleUser) {
-          renderStep4OTP();
-        } else {
-          renderStepDate();
-        }
+        if (formData.useAccount && !isGoogleUser) renderStep4OTP();
+        else renderStepDate();
         break;
       case 4:
-        // Date step (only reached after OTP if useAccount)
         renderStepDate();
         break;
     }

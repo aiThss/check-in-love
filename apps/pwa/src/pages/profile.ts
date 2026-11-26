@@ -1,15 +1,32 @@
+import '../styles/20-pages/profile.css';
 import { navigate } from '../router';
 import { clearPrivateClientState } from '../session';
 import { store, applyTheme } from '../store/index';
 import { updateProfile, uploadAvatar, uploadPartnerAvatar } from '../api/profile';
-import { getMe, MeResponse } from '../api/auth';
+import { getMe, type MeResponse } from '../api/auth';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
-import { openCamera, openGallery, CameraResult } from '../components/camera';
+import { openCamera, openGallery, type CameraResult } from '../components/camera';
 import { apiFetch } from '../api/client';
 import { ensurePushSubscription, isAndroidApp, testPushNotification, syncAndroidFcmNow } from '../api/push';
-import type { User, Couple } from '../api/types';
 import { isMockPreviewMode } from '../dev/mock-data';
+import { iconMarkup } from '../ui/icons/icons';
+import { createButton, getInitials } from '../ui/primitives';
+import { createSegmentedControl, createSwitch } from '../ui/forms';
+import { createListGroup, createListRow, createSkeleton } from '../ui/feedback';
+import { openSheet } from '../ui/overlays';
+import { triggerHaptic } from '../ui/haptics';
+import {
+  ACCENT_PRESETS,
+  getUiAccent,
+  getUiReducedMotion,
+  setUiAccent,
+  setUiReducedMotion,
+  setUiTheme,
+  type UiAccentId,
+  type UiThemePreference,
+} from '../ui/theme/index';
+import type { User, Couple } from '../api/types';
 
 function calcDaysTogether(loveStartDate?: string): number {
   if (!loveStartDate) return 0;
@@ -20,22 +37,18 @@ function calcDaysTogether(loveStartDate?: string): number {
 
 function calcUserAge(birthdayStr?: string | null): number | undefined {
   if (!birthdayStr) return undefined;
-  const rawDate = birthdayStr.split('T')[0];
-  const parts = rawDate.split('-');
+  const parts = birthdayStr.split('T')[0].split('-');
   if (parts.length < 3) return undefined;
 
   const birthYear = parseInt(parts[0], 10);
   const birthMonth = parseInt(parts[1], 10) - 1;
   const birthDay = parseInt(parts[2], 10);
-  if (isNaN(birthYear) || isNaN(birthMonth) || isNaN(birthDay)) return undefined;
+  if (Number.isNaN(birthYear) || Number.isNaN(birthMonth) || Number.isNaN(birthDay)) return undefined;
 
   const now = new Date();
   let age = now.getFullYear() - birthYear;
   const m = now.getMonth() - birthMonth;
-  if (m < 0 || (m === 0 && now.getDate() < birthDay)) {
-    age--;
-  }
-
+  if (m < 0 || (m === 0 && now.getDate() < birthDay)) age--;
   return age >= 0 && age <= 130 ? age : undefined;
 }
 
@@ -68,103 +81,73 @@ function compareVersions(left: string, right: string): number {
     normalizeVersion(version)
       .split(/[._-]/)
       .map((part) => Number.parseInt(part, 10) || 0);
-
   const leftParts = toParts(left);
   const rightParts = toParts(right);
   const max = Math.max(leftParts.length, rightParts.length);
-
   for (let i = 0; i < max; i++) {
     const diff = (leftParts[i] || 0) - (rightParts[i] || 0);
     if (diff !== 0) return diff;
   }
-
   return 0;
-}
-
-function getApkAsset(release: GitHubRelease): GitHubReleaseAsset | undefined {
-  return release.assets?.find((asset) => asset.name.toLowerCase().endsWith('.apk'));
 }
 
 async function checkApkUpdate(
   statusEl: HTMLElement,
   checkButton: HTMLButtonElement,
-  downloadButton: HTMLButtonElement
-) {
+  downloadButton: HTMLButtonElement,
+): Promise<void> {
   const previousLabel = checkButton.textContent || 'Kiểm tra';
   checkButton.disabled = true;
-  checkButton.textContent = 'Đang kiểm tra...';
+  checkButton.textContent = 'Đang quét...';
   downloadButton.style.display = 'none';
-  statusEl.textContent = 'Đang quét phiên bản APK mới nhất...';
-  showToast('Đang quét tìm phiên bản mới...', 'info');
-
-  const startTime = Date.now();
+  statusEl.textContent = 'Đang kiểm tra bản phát hành Android mới nhất...';
 
   try {
     const res = await fetch(GITHUB_RELEASE_API, {
       cache: 'no-store',
-      headers: { Accept: 'application/vnd.github+json' }
+      headers: { Accept: 'application/vnd.github+json' },
     });
-
     if (!res.ok) throw new Error(`GitHub trả về ${res.status}`);
 
     const release = (await res.json()) as GitHubRelease;
     const latestVersion = normalizeVersion(release.tag_name || release.name);
-    const apkAsset = getApkAsset(release);
+    const apkAsset = release.assets?.find((a) => a.name.toLowerCase().endsWith('.apk'));
     const updateUrl = apkAsset?.browser_download_url || release.html_url || GITHUB_RELEASES_PAGE;
     const currentVersion = getCurrentAndroidVersion();
 
-    // Giữ trạng thái đang tải tối thiểu 800ms để tránh việc nháy nút quá nhanh
-    const elapsed = Date.now() - startTime;
-    if (elapsed < 800) {
-      await new Promise((resolve) => setTimeout(resolve, 800 - elapsed));
-    }
-
     downloadButton.dataset.updateUrl = updateUrl;
-    downloadButton.textContent = apkAsset ? 'Tải APK mới' : 'Mở trang release';
+    downloadButton.textContent = apkAsset ? 'Tải APK mới' : 'Mở trang phát hành';
     downloadButton.style.display = 'inline-flex';
 
     if (!latestVersion) {
-      statusEl.textContent = 'Đã tìm thấy release, nhưng chưa đọc được số phiên bản.';
-      showToast('Đã tìm thấy release mới nhưng chưa rõ phiên bản', 'info');
+      statusEl.textContent = 'Đã tìm thấy bản phát hành trên GitHub.';
       return;
     }
-
     if (!currentVersion) {
-      statusEl.textContent = `Không đọc được version APK hiện tại. Bạn có thể tải bản mới nhất v${latestVersion}.`;
-      showToast(`Đã quét xong: Có phiên bản v${latestVersion} trên GitHub`, 'info');
+      statusEl.textContent = `Phiên bản mới nhất trên GitHub: v${latestVersion}.`;
       return;
     }
-
     if (compareVersions(currentVersion, latestVersion) >= 0) {
-      statusEl.textContent = `Bạn đang ở bản mới nhất (v${currentVersion}).`;
+      statusEl.textContent = `Bạn đang ở phiên bản mới nhất (v${currentVersion}).`;
       downloadButton.style.display = 'none';
-      showToast(`Ứng dụng đang ở phiên bản mới nhất v${currentVersion}!`, 'success');
+      showToast(`Đang ở phiên bản mới nhất v${currentVersion}!`, 'success');
       return;
     }
 
-    statusEl.textContent = `Có bản mới v${latestVersion}. Bản đang cài là v${currentVersion}.`;
-    showToast(`Có phiên bản mới v${latestVersion}!`, 'success');
+    statusEl.textContent = `Có phiên bản mới v${latestVersion} (đang cài v${currentVersion}).`;
+    showToast(`Có bản cập nhật mới v${latestVersion}!`, 'success');
   } catch (err) {
-    const error = err as Error;
-    const elapsed = Date.now() - startTime;
-    if (elapsed < 800) {
-      await new Promise((resolve) => setTimeout(resolve, 800 - elapsed));
-    }
-    statusEl.textContent = `Không kiểm tra được cập nhật: ${error.message || 'lỗi mạng'}.`;
+    statusEl.textContent = `Chưa kiểm tra được: ${(err as Error).message || 'lỗi mạng'}.`;
     downloadButton.dataset.updateUrl = GITHUB_RELEASES_PAGE;
-    downloadButton.textContent = 'Mở trang release';
+    downloadButton.textContent = 'Mở trang phát hành';
     downloadButton.style.display = 'inline-flex';
-    showToast('Không kiểm tra được cập nhật APK', 'error');
   } finally {
     checkButton.disabled = false;
     checkButton.textContent = previousLabel;
   }
 }
 
-/* ============================================================
-   Check-in Reminder — persisted server-side and delivered by push.
-   ============================================================ */
-
+/* ── Check-in Reminder ── */
 const REMINDER_KEY = 'lovecheck_reminder';
 const REMINDER_MIGRATION_KEY = 'lovecheck_reminder_migrated_v2';
 
@@ -178,14 +161,14 @@ function getReminderSettings(): ReminderSettings {
   try {
     const raw = localStorage.getItem(REMINDER_KEY);
     if (raw) return JSON.parse(raw) as ReminderSettings;
-  } catch { /* ignore */ }
+  } catch {}
   return { enabled: false, time: '20:30', timezone: 'Asia/Ho_Chi_Minh' };
 }
 
 function saveReminderSettings(settings: ReminderSettings): void {
   try {
     localStorage.setItem(REMINDER_KEY, JSON.stringify(settings));
-  } catch { /* ignore */ }
+  } catch {}
 }
 
 async function loadReminderSettings(): Promise<ReminderSettings> {
@@ -206,293 +189,189 @@ async function saveRemoteReminderSettings(settings: ReminderSettings): Promise<R
   return response.reminder;
 }
 
-// Kept as a no-op for callers from older bundles. Scheduling now belongs to the API.
 export function restoreReminderOnLoad(): void {}
 
-function getPermissionStatus(): { label: string; cls: string } {
-  if (isAndroidApp()) {
-    return { label: 'Thông báo ứng dụng Android đã sẵn sàng', cls: 'granted' };
-  }
-  if (!('Notification' in window)) {
-    return { label: 'Nhắc server đã sẵn sàng', cls: 'granted' };
-  }
-  switch (Notification.permission) {
-    case 'granted': return { label: 'Đã cấp quyền thông báo', cls: 'granted' };
-    case 'denied':  return { label: 'Bị chặn — cần mở lại trong cài đặt trình duyệt', cls: 'denied' };
-    default:        return { label: 'Chưa cấp quyền', cls: 'default' };
-  }
+function getPermissionStatus(): { label: string; ok: boolean } {
+  if (isAndroidApp()) return { label: 'Thông báo Native Android FCM + SSE đang sẵn sàng', ok: true };
+  if (!('Notification' in window)) return { label: 'Đồng bộ nhắc qua máy chủ sẵn sàng', ok: true };
+  if (Notification.permission === 'granted') return { label: 'Đã cấp quyền thông báo trình duyệt (Web Push + SSE)', ok: true };
+  if (Notification.permission === 'denied') return { label: 'Quyền thông báo đang bị tắt trong cài đặt trình duyệt', ok: false };
+  return { label: 'Chưa bật quyền nhận thông báo đẩy', ok: false };
 }
 
 function buildReminderCard(): HTMLElement {
   const card = document.createElement('div');
-  card.className = 'card-solid reminder-card';
+  card.className = 'p-profile-card reminder-card';
 
-  const settings = getReminderSettings();
-  let permStatus = getPermissionStatus();
+  const localInitial = { ...getReminderSettings() };
 
   const render = () => {
-    const currentSettings = getReminderSettings();
-    permStatus = getPermissionStatus();
+    const current = getReminderSettings();
+    const perm = getPermissionStatus();
+    card.replaceChildren();
 
-    card.innerHTML = '';
-
-    // Header: icon + copy + toggle
-    const header = document.createElement('div');
-    header.className = 'reminder-card-header';
-    header.innerHTML = `
-      <div class="reminder-card-icon" aria-hidden="true">🔔</div>
-      <div class="reminder-card-copy">
-        <span class="reminder-card-title">Nhắc check-in</span>
-        <span class="reminder-card-subtitle">Nhắc đúng giờ, kể cả khi app đã đóng</span>
-      </div>
-      <div class="reminder-toggle-wrap">
-        <label class="reminder-toggle" aria-label="${currentSettings.enabled ? 'Tắt nhắc check-in' : 'Bật nhắc check-in'}">
-          <input
-            type="checkbox"
-            id="reminder-toggle-input"
-            ${currentSettings.enabled ? 'checked' : ''}
-            aria-checked="${currentSettings.enabled}"
-          />
-          <span class="reminder-toggle-track"></span>
-          <span class="reminder-toggle-thumb"></span>
-        </label>
+    const top = document.createElement('div');
+    top.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;';
+    top.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <span style="width:36px;height:36px;border-radius:12px;background:var(--accent-100);color:var(--accent-600);display:grid;place-items:center;flex-shrink:0;">
+          ${iconMarkup('bell', { size: 20, variant: current.enabled ? 'filled' : 'outline' })}
+        </span>
+        <div>
+          <strong style="display:block;font-size:14px;">Nhắc gửi khoảnh khắc mỗi ngày</strong>
+          <span class="u-text-secondary" style="font-size:12px;">Nhắc đúng giờ hẹn kể cả khi đã đóng ứng dụng</span>
+        </div>
       </div>
     `;
-    card.appendChild(header);
 
-    // Time row
+    const sw = createSwitch({
+      ariaLabel: current.enabled ? 'Tắt nhắc check-in' : 'Bật nhắc check-in',
+      checked: current.enabled,
+      onChange: async (nowEnabled) => {
+        const timeInput = card.querySelector<HTMLInputElement>('#reminder-time-input');
+        const savedTime = timeInput?.value || current.time;
+
+        if (nowEnabled && !isAndroidApp() && 'Notification' in window) {
+          if (Notification.permission === 'denied') {
+            showToast('Quyền thông báo đang bị chặn trong trình duyệt.', 'error');
+            sw.setChecked(false);
+            return;
+          }
+          let permission: NotificationPermission = Notification.permission;
+          if (permission === 'default') permission = await Notification.requestPermission();
+          if (permission !== 'granted') {
+            showToast('Chưa cấp quyền thông báo', 'error');
+            sw.setChecked(false);
+            return;
+          }
+          const pushSetup = await ensurePushSubscription(true);
+          if (pushSetup.status !== 'subscribed') {
+            showToast(pushSetup.message ?? 'Chưa đăng ký được nhận thông báo', 'error');
+            sw.setChecked(false);
+            return;
+          }
+        }
+
+        try {
+          const next: ReminderSettings = { enabled: nowEnabled, time: savedTime, timezone: 'Asia/Ho_Chi_Minh' };
+          saveReminderSettings(await saveRemoteReminderSettings(next));
+          showToast(nowEnabled ? `Đã bật nhắc lúc ${savedTime}` : 'Đã tắt nhắc check-in', 'success');
+          render();
+        } catch {
+          sw.setChecked(!nowEnabled);
+          showToast('Không lưu được cài đặt nhắc hẹn, thử lại nhé', 'error');
+        }
+      },
+    });
+    top.appendChild(sw.element);
+    card.appendChild(top);
+
     const timeRow = document.createElement('div');
-    timeRow.className = `reminder-time-row${currentSettings.enabled ? '' : ' disabled'}`;
+    timeRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border-subtle);';
     timeRow.innerHTML = `
-      <span class="reminder-time-label">Giờ nhắc</span>
-      <input
-        type="time"
-        id="reminder-time-input"
-        class="reminder-time-input"
-        value="${currentSettings.time}"
-        aria-label="Chọn giờ nhắc"
-      />
+      <span style="font-size:13px;font-weight:600;">Khung giờ nhắc</span>
+      <input type="time" id="reminder-time-input" class="c-input" style="width:auto;min-height:38px;padding:4px 10px;" value="${current.time}" aria-label="Chọn giờ nhắc" />
     `;
-    card.appendChild(timeRow);
-
-    // Permission status
-    const statusRow = document.createElement('div');
-    statusRow.className = 'reminder-status-row';
-    statusRow.innerHTML = `
-      <span class="reminder-status-dot ${permStatus.cls}" aria-hidden="true"></span>
-      <span>${permStatus.label}</span>
-    `;
-    card.appendChild(statusRow);
-
-    // The API scheduler owns delivery; the browser only stores the user's permission.
-    const disclaimer = document.createElement('p');
-    disclaimer.className = 'reminder-disclaimer';
-    disclaimer.textContent = isAndroidApp()
-      ? 'Nhắc nhở và tương tác sẽ được gửi thông báo trực tiếp qua ứng dụng Android.'
-      : 'Nhắc giờ được gửi từ server qua push. Cần cấp quyền thông báo và thiết bị có kết nối mạng.';
-    card.appendChild(disclaimer);
-
-    // Test Push Row
-    const testRow = document.createElement('div');
-    testRow.className = 'reminder-test-row';
-    testRow.style.cssText = 'margin-top: 14px; display: flex; justify-content: flex-end;';
-    testRow.innerHTML = `
-      <button type="button" id="btn-test-push" class="btn-ghost" style="font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);">
-        🔔 Thử gửi thông báo
-      </button>
-    `;
-    card.appendChild(testRow);
-
-    testRow.querySelector('#btn-test-push')?.addEventListener('click', async () => {
-      const btn = testRow.querySelector<HTMLButtonElement>('#btn-test-push');
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'Đang kiểm tra & gửi...';
-      }
-      try {
-        if (isAndroidApp()) {
-          const synced = await syncAndroidFcmNow().catch(() => false);
-          if (!synced) {
-            try {
-              const rawDebug = (window.LoveCheckAndroid as any)?.getFcmDebugInfo?.();
-              if (rawDebug) {
-                const debug = JSON.parse(rawDebug);
-                if (debug.error) {
-                  showToast(`Lỗi Firebase Native: ${debug.error}`, 'error');
-                  return;
-                }
-              }
-            } catch {}
-          }
-        }
-        const res = await testPushNotification();
-        showToast(res.message || 'Đã gửi thông báo thử nghiệm thành công! ✨', 'success');
-      } catch (err: any) {
-        showToast(err?.message || err?.error || 'Không gửi được thông báo, vui lòng thử lại', 'error');
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = '🔔 Thử gửi thông báo';
-        }
-      }
-    });
-
-    // ── Event handlers ──
-
-    const toggleInput = card.querySelector<HTMLInputElement>('#reminder-toggle-input');
-    const timeInput   = card.querySelector<HTMLInputElement>('#reminder-time-input');
-
-    toggleInput?.addEventListener('change', async () => {
-      const nowEnabled = toggleInput.checked;
-
-      if (nowEnabled) {
-        if (isAndroidApp() || !('Notification' in window)) {
-          const savedTime = timeInput?.value || settings.time;
-          try {
-            const newSettings: ReminderSettings = { enabled: true, time: savedTime, timezone: 'Asia/Ho_Chi_Minh' };
-            saveReminderSettings(await saveRemoteReminderSettings(newSettings));
-            showToast(`Đã bật nhắc lúc ${savedTime}`, 'success');
-            render();
-          } catch {
-            toggleInput.checked = false;
-            showToast('Không lưu được giờ nhắc, thử lại nhé', 'error');
-          }
-          return;
-        }
-
-        // Request permission first
-        if (Notification.permission === 'denied') {
-          showToast('Thông báo bị chặn. Vui lòng mở lại trong cài đặt trình duyệt.', 'error');
-          toggleInput.checked = false;
-          return;
-        }
-
-        let permission: NotificationPermission = Notification.permission;
-        if (permission === 'default') {
-          permission = await Notification.requestPermission();
-        }
-
-        if (permission !== 'granted') {
-          showToast('Chưa cấp quyền thông báo', 'error');
-          toggleInput.checked = false;
-          return;
-        }
-
-        const pushSetup = await ensurePushSubscription(true);
-        if (pushSetup.status !== 'subscribed') {
-          showToast(pushSetup.message ?? 'Chưa đăng ký được nhận thông báo', 'error');
-          toggleInput.checked = false;
-          return;
-        }
-
-        const savedTime = timeInput?.value || settings.time;
-        try {
-          const newSettings: ReminderSettings = {
-            enabled: true,
-            time: savedTime,
-            timezone: 'Asia/Ho_Chi_Minh',
-          };
-          saveReminderSettings(await saveRemoteReminderSettings(newSettings));
-          showToast(`Đã bật nhắc lúc ${savedTime}`, 'success');
-          render();
-        } catch {
-          toggleInput.checked = false;
-          showToast('Không lưu được giờ nhắc, thử lại nhé', 'error');
-        }
-      } else {
-        const savedTime = timeInput?.value || settings.time;
-        try {
-          const newSettings: ReminderSettings = {
-            enabled: false,
-            time: savedTime,
-            timezone: 'Asia/Ho_Chi_Minh',
-          };
-          saveReminderSettings(await saveRemoteReminderSettings(newSettings));
-          showToast('Đã tắt nhắc check-in', 'info');
-          render();
-        } catch {
-          toggleInput.checked = true;
-          showToast('Không cập nhật được nhắc check-in, thử lại nhé', 'error');
-        }
-      }
-    });
-
+    const timeInput = timeRow.querySelector<HTMLInputElement>('#reminder-time-input');
     timeInput?.addEventListener('change', async () => {
-      const current = getReminderSettings();
-      const newTime = timeInput.value || current.time;
-      const newSettings: ReminderSettings = { ...current, time: newTime };
-      saveReminderSettings(newSettings);
-      if (current.enabled) {
+      const latest = getReminderSettings();
+      const newTime = timeInput.value || latest.time;
+      const next: ReminderSettings = { ...latest, time: newTime };
+      saveReminderSettings(next);
+      if (latest.enabled) {
         try {
-          saveReminderSettings(await saveRemoteReminderSettings(newSettings));
+          saveReminderSettings(await saveRemoteReminderSettings(next));
           showToast(`Đã đổi giờ nhắc sang ${newTime}`, 'success');
         } catch {
-          showToast('Không lưu được giờ nhắc, thử lại nhé', 'error');
+          showToast('Không lưu được giờ nhắc', 'error');
         }
       }
     });
+    card.appendChild(timeRow);
+
+    const statusFoot = document.createElement('div');
+    statusFoot.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;';
+    statusFoot.innerHTML = `
+      <span class="u-text-secondary" style="font-size:11px;display:inline-flex;align-items:center;gap:6px;">
+        ${iconMarkup(perm.ok ? 'check' : 'info', { size: 16 })}<span>${perm.label}</span>
+      </span>
+    `;
+    const testBtn = createButton({
+      label: 'Thử gửi thông báo',
+      variant: 'secondary',
+      size: 'sm',
+      pill: true,
+      leadingIcon: 'bell',
+      onClick: async () => {
+        testBtn.setLoading(true, 'Đang gửi thử...');
+        try {
+          if (isAndroidApp()) {
+            const synced = await syncAndroidFcmNow().catch(() => false);
+            if (!synced) {
+              try {
+                const rawDebug = window.LoveCheckAndroid?.getFcmDebugInfo?.();
+                if (rawDebug) {
+                  const debug = JSON.parse(rawDebug) as { error?: string };
+                  if (debug.error) {
+                    showToast(`Lỗi Firebase Native: ${debug.error}`, 'error');
+                    return;
+                  }
+                }
+              } catch {}
+            }
+          }
+          const res = await testPushNotification();
+          showToast(res.message || 'Đã gửi thông báo thử nghiệm thành công!', 'success');
+        } catch (err) {
+          showToast((err as Error)?.message || 'Không gửi được thông báo thử', 'error');
+        } finally {
+          testBtn.setLoading(false);
+        }
+      },
+    });
+    testBtn.element.id = 'btn-test-push';
+    statusFoot.appendChild(testBtn.element);
+    card.appendChild(statusFoot);
   };
 
-  const localSettings = { ...settings };
   render();
   void loadReminderSettings()
     .then(async (remoteSettings) => {
       const hasMigrated = localStorage.getItem(REMINDER_MIGRATION_KEY) === 'true';
-
-      // Keep a schedule configured before reminders moved to the API.
-      // The one-time marker avoids re-enabling a reminder intentionally disabled later.
-      if (!hasMigrated && localSettings.enabled && !remoteSettings.enabled) {
-        saveReminderSettings(await saveRemoteReminderSettings(localSettings));
+      if (!hasMigrated && localInitial.enabled && !remoteSettings.enabled) {
+        saveReminderSettings(await saveRemoteReminderSettings(localInitial));
       } else {
         saveReminderSettings(remoteSettings);
       }
       localStorage.setItem(REMINDER_MIGRATION_KEY, 'true');
       render();
     })
-    .catch(() => {
-      // Keep the last local display value until the API becomes available.
-    });
+    .catch(() => {});
+
   return card;
 }
 
 export function renderProfilePage(): HTMLElement {
   const root = document.createElement('div');
-  root.className = 'page profile-page animate-fade-in';
-  root.style.cssText = `
-    padding: calc(var(--safe-top) + 24px) 16px calc(var(--safe-bottom) + var(--nav-height, 86px) + 60px) 16px;
-    max-width: 480px;
-    margin: 0 auto;
-    width: 100%;
-    box-sizing: border-box;
-    min-height: 100dvh;
-    overflow-x: hidden;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  `;
+  root.className = 'page profile-page p-profile animate-fade-in';
 
-  // Header
-  const header = document.createElement('div');
-  header.style.cssText = 'margin-bottom:4px;';
+  const header = document.createElement('header');
+  header.className = 'p-profile-header';
   header.innerHTML = `
-    <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.03em;">Tài khoản</h1>
-    <p style="font-size:13px;color:var(--text-secondary);">Cài đặt và cấu hình ứng dụng của hai đứa</p>
+    <h1>Hồ sơ hai đứa</h1>
+    <p>Cá nhân hoá giao diện, thông báo và kỷ niệm chung</p>
   `;
   root.appendChild(header);
 
-  // Profile info card (avatars, names, days together)
-  const profileCard = document.createElement('div');
-  profileCard.className = 'card';
-  profileCard.style.cssText = 'padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px;background:var(--surface);';
+  const profileCard = document.createElement('section');
+  profileCard.className = 'p-profile-hero u-grain-surface';
   root.appendChild(profileCard);
 
-  // Settings section container
   const settingsContainer = document.createElement('div');
-  settingsContainer.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+  settingsContainer.style.cssText = 'display:flex;flex-direction:column;gap:18px;';
   root.appendChild(settingsContainer);
 
-  async function loadProfile() {
+  async function loadProfile(): Promise<void> {
     const cachedUser = store.get().user;
     const cachedCouple = store.get().couple;
 
@@ -500,29 +379,57 @@ export function renderProfilePage(): HTMLElement {
       renderProfileCard({ user: cachedUser, couple: cachedCouple });
       renderSettings({ user: cachedUser, couple: cachedCouple });
     } else {
-      profileCard.innerHTML = `<div class="spinner" style="width:28px;height:28px;margin:16px 0;"></div>`;
+      profileCard.replaceChildren(createSkeleton({ height: '180px' }));
     }
 
     try {
       const res = await getMe();
-      // Update local store
-      store.set({
-        user: res.user,
-        couple: res.couple
-      });
-
+      store.set({ user: res.user, couple: res.couple });
       renderProfileCard(res);
       renderSettings(res);
-
     } catch (err) {
-      const error = err as Error;
       if (!cachedUser || !cachedCouple) {
-        showToast('Không thể tải thông tin profile: ' + error.message, 'error');
+        showToast('Không thể tải thông tin hồ sơ: ' + (err as Error).message, 'error');
       }
     }
   }
 
-  function renderProfileCard(data: MeResponse) {
+  function renderAvatarButton(
+    id: string,
+    name: string,
+    avatarUrl: string | undefined,
+    ariaLabel: string,
+    onClick: () => void,
+  ): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = id;
+    btn.className = 'p-profile-av-btn';
+    btn.setAttribute('aria-label', ariaLabel);
+    const clip = document.createElement('span');
+    clip.className = 'p-profile-av-btn__clip';
+    if (avatarUrl) {
+      const img = document.createElement('img');
+      img.src = avatarUrl;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.addEventListener('error', () => {
+        clip.textContent = getInitials(name);
+      });
+      clip.appendChild(img);
+    } else {
+      clip.textContent = getInitials(name);
+    }
+    const camBadge = document.createElement('span');
+    camBadge.className = 'p-profile-av-btn__cam';
+    camBadge.setAttribute('aria-hidden', 'true');
+    camBadge.innerHTML = iconMarkup('camera', { size: 16 });
+    btn.append(clip, camBadge);
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function renderProfileCard(data: MeResponse): void {
     const user = data.user;
     const couple = data.couple;
     const partner = data.partnerUser;
@@ -530,422 +437,424 @@ export function renderProfilePage(): HTMLElement {
     const days = couple?.loveStartDate ? calcDaysTogether(couple.loveStartDate) : 0;
     const myAge = calcUserAge(user.birthday);
     const partnerAge = calcUserAge(user.partnerBirthday || partner?.birthday);
+    const myName = user.displayName || 'Bạn';
+    const displayPartnerName =
+      user.partnerName && user.partnerName !== 'undefined'
+        ? user.partnerName
+        : partner?.displayName || 'Người ấy';
 
-    const myAvatar = user.avatarUrl
-      ? `<img src="${user.avatarUrl}" style="width:100%;height:100%;object-fit:cover;" />`
-      : `<img src="/profile.png" alt="avatar" style="width:70%;height:70%;object-fit:contain;" />`;
-    const partnerAvatar = user.partnerAvatarUrl ? `<img src="${user.partnerAvatarUrl}" style="width:100%;height:100%;object-fit:cover;" />` : '💖';
+    profileCard.replaceChildren();
 
-    const displayPartnerName = (user.partnerName && user.partnerName !== 'undefined')
-      ? user.partnerName
-      : (partner?.displayName || 'Người ấy');
+    const avRow = document.createElement('div');
+    avRow.className = 'p-profile-avatars';
+    avRow.appendChild(
+      renderAvatarButton('my-avatar-container', myName, user.avatarUrl, 'Đổi ảnh đại diện của bạn', () => promptAvatarUpload('my')),
+    );
+    const heartKnot = document.createElement('span');
+    heartKnot.style.color = 'var(--accent-500)';
+    heartKnot.innerHTML = iconMarkup('heart', { size: 24, variant: 'filled', motion: 'heartbeat' });
+    avRow.appendChild(heartKnot);
+    avRow.appendChild(
+      renderAvatarButton('partner-avatar-container', displayPartnerName, user.partnerAvatarUrl, 'Đổi ảnh đại diện người ấy', () => promptAvatarUpload('partner')),
+    );
+    profileCard.appendChild(avRow);
 
-    profileCard.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;position:relative;">
-        <div id="my-avatar-container" class="avatar avatar-lg" style="border:3px solid var(--accent);cursor:pointer;position:relative;">
-          ${myAvatar}
-          <div style="position:absolute;bottom:0;right:0;background:var(--accent);color:#fff;font-size:10px;padding:2px 4px;border-radius:4px;line-height:1;">Sửa</div>
-        </div>
-        <div style="font-size:24px;animation:pulse 2s ease-in-out infinite;">❤️</div>
-        <div id="partner-avatar-container" class="avatar avatar-lg" style="border:3px solid var(--border);cursor:pointer;position:relative;">
-          ${partnerAvatar}
-          <div style="position:absolute;bottom:0;right:0;background:var(--text-secondary);color:#fff;font-size:10px;padding:2px 4px;border-radius:4px;line-height:1;">Sửa</div>
-        </div>
-      </div>
-      
-      <div style="text-align:center;width:100%;">
-        <h2 style="font-size:18px;font-weight:700;margin-bottom:12px;">
-          ${user.displayName || 'Bạn'} & ${displayPartnerName}
-        </h2>
+    const namesH2 = document.createElement('h2');
+    namesH2.className = 'p-profile-names';
+    namesH2.textContent = `${myName} & ${displayPartnerName}`;
+    profileCard.appendChild(namesH2);
 
-        <div style="
-          display:grid;
-          grid-template-columns:1fr 1.15fr 1fr;
-          gap:6px;
-          width:100%;
-          align-items:stretch;
-        ">
-          <!-- Left: User Age -->
-          <div id="btn-my-bday-pill" style="
-            background:var(--surface-solid);
-            border:1px solid var(--border);
-            border-radius:14px;
-            padding:5px 8px;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:center;
-            gap:1px;
-            cursor:pointer;
-            min-width:0;
-            transition:transform 0.15s ease, border-color 0.15s ease;
-          ">
-            <span style="font-size:14px;line-height:1;">🎂</span>
-            <strong style="font-size:12px;font-weight:700;color:var(--text-primary);white-space:nowrap;">
-              ${myAge !== undefined ? `${myAge} tuổi` : 'Chưa đặt'}
-            </strong>
-          </div>
+    const pills = document.createElement('div');
+    pills.className = 'p-profile-pills';
 
-          <!-- Center: Streak Banner -->
-          <div style="
-            background:linear-gradient(135deg, #ff3b7f, #ff6b35);
-            border-radius:14px;
-            padding:5px 8px;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:center;
-            gap:1px;
-            color:#ffffff;
-            box-shadow:0 4px 14px rgba(255, 59, 127, 0.28);
-            min-width:0;
-          ">
-            <span style="font-size:10px;opacity:0.9;font-weight:600;white-space:nowrap;">Streak 🔥</span>
-            <strong style="font-size:12px;font-weight:800;white-space:nowrap;">
-              ${couple?.streak || 0} ngày
-            </strong>
-          </div>
+    const myBdayBtn = document.createElement('button');
+    myBdayBtn.type = 'button';
+    myBdayBtn.id = 'btn-my-bday-pill';
+    myBdayBtn.className = 'p-profile-stat-pill';
+    myBdayBtn.innerHTML = `${iconMarkup('anniversary', { size: 16 })}<strong>${myAge !== undefined ? `${myAge} tuổi` : 'Đặt tuổi'}</strong>`;
+    myBdayBtn.addEventListener('click', () => {
+      document.querySelector<HTMLInputElement>('#birthday-self')?.focus();
+      document.querySelector('.birthday-settings-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
 
-          <!-- Right: Partner Age -->
-          <div id="btn-partner-bday-pill" style="
-            background:var(--surface-solid);
-            border:1px solid var(--border);
-            border-radius:14px;
-            padding:5px 8px;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:center;
-            gap:1px;
-            cursor:pointer;
-            min-width:0;
-            transition:transform 0.15s ease, border-color 0.15s ease;
-          ">
-            <span style="font-size:14px;line-height:1;">🎂</span>
-            <strong style="font-size:12px;font-weight:700;color:var(--text-primary);white-space:nowrap;">
-              ${partnerAge !== undefined ? `${partnerAge} tuổi` : 'Chưa đặt'}
-            </strong>
-          </div>
-        </div>
-      </div>
-
-      <div class="profile-days-section">
-        <span style="font-size:32px;font-weight:800;color:var(--accent);">${days}</span>
-        <span style="font-size:13px;font-weight:600;color:var(--text-secondary);">ngày bên nhau 💕</span>
-        <span style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Bắt đầu từ: ${couple?.loveStartDate ? new Date(couple.loveStartDate).toLocaleDateString('vi-VN') : 'Chưa đặt'}</span>
-      </div>
-
-      <div style="
-        background:var(--surface-solid);
-        border:1px solid var(--border);
-        border-radius:16px;
-        padding:10px 14px;
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        width:100%;
-        font-size:13px;
-        cursor:pointer;
-        box-shadow:var(--shadow);
-      " id="copy-code-container">
-        <span style="color:var(--text-secondary);font-weight:500;">Couple Code:</span>
-        <strong style="color:var(--accent);font-family:monospace;font-size:16px;letter-spacing:1.5px;font-weight:700;">${couple?.code || (couple as any)?.coupleCode || 'LOVE123'}</strong>
-        <button type="button" aria-label="Sao chép" title="Sao chép couple code" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;background:rgba(255, 59, 127, 0.1);border:1px solid rgba(255, 59, 127, 0.2);color:var(--accent);cursor:pointer;transition:all 0.2s ease;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-        </button>
-      </div>
+    const streakPill = document.createElement('div');
+    streakPill.className = 'p-profile-stat-pill p-profile-stat-pill--gold';
+    streakPill.innerHTML = `
+      <span style="display:inline-flex;align-items:center;gap:4px;">${iconMarkup('streak', { size: 16, variant: 'filled' })}<span>Chuỗi ngày</span></span>
+      <strong>${couple?.streak || 0} ngày</strong>
+      <span class="streak-banner" hidden></span>
     `;
 
-    // Click to jump to birthday settings
-    profileCard.querySelector('#btn-my-bday-pill')?.addEventListener('click', () => {
-      const settingsCard = document.querySelector('.birthday-settings-card');
-      if (settingsCard) {
-        settingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        settingsCard.querySelector<HTMLInputElement>('#birthday-self')?.focus();
-      } else {
-        showToast('Hãy điền ngày sinh ở thẻ Sinh nhật bên dưới', 'info');
-      }
+    const partnerBdayBtn = document.createElement('button');
+    partnerBdayBtn.type = 'button';
+    partnerBdayBtn.id = 'btn-partner-bday-pill';
+    partnerBdayBtn.className = 'p-profile-stat-pill';
+    partnerBdayBtn.innerHTML = `${iconMarkup('anniversary', { size: 16 })}<strong>${partnerAge !== undefined ? `${partnerAge} tuổi` : 'Đặt tuổi'}</strong>`;
+    partnerBdayBtn.addEventListener('click', () => {
+      document.querySelector<HTMLInputElement>('#birthday-partner')?.focus();
+      document.querySelector('.birthday-settings-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
-    profileCard.querySelector('#btn-partner-bday-pill')?.addEventListener('click', () => {
-      const settingsCard = document.querySelector('.birthday-settings-card');
-      if (settingsCard) {
-        settingsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        settingsCard.querySelector<HTMLInputElement>('#birthday-partner')?.focus();
-      } else {
-        showToast('Hãy điền ngày sinh ở thẻ Sinh nhật bên dưới', 'info');
+    pills.append(myBdayBtn, streakPill, partnerBdayBtn);
+    profileCard.appendChild(pills);
+
+    const daysBox = document.createElement('div');
+    daysBox.className = 'p-profile-days';
+    const startLabel = couple?.loveStartDate
+      ? new Date(couple.loveStartDate).toLocaleDateString('vi-VN')
+      : 'Chưa đặt ngày kỷ niệm';
+    daysBox.innerHTML = `
+      <strong>${days.toLocaleString('vi-VN')}</strong>
+      <span style="font-size:13px;font-weight:600;color:var(--text-secondary);">ngày bên nhau</span>
+      <small class="u-text-secondary" style="font-size:11px;">Từ ${startLabel}</small>
+    `;
+    profileCard.appendChild(daysBox);
+
+    const coupleCode = couple?.code || (couple as Couple & { coupleCode?: string })?.coupleCode || 'LOVE123';
+    const codeBar = document.createElement('button');
+    codeBar.type = 'button';
+    codeBar.id = 'copy-code-container';
+    codeBar.className = 'p-profile-code-bar';
+    codeBar.setAttribute('aria-label', 'Sao chép mã ghép đôi Couple Code');
+    codeBar.innerHTML = `
+      <span class="u-text-secondary" style="font-size:12px;font-weight:600;">Couple Code</span>
+      <code>${coupleCode}</code>
+      ${iconMarkup('copy', { size: 16 })}
+    `;
+    codeBar.addEventListener('click', () => {
+      if (coupleCode) {
+        void navigator.clipboard?.writeText(coupleCode);
+        triggerHaptic('tap');
+        showToast('Đã sao chép Couple Code!', 'success');
       }
     });
-
-    // Click to copy code
-    profileCard.querySelector('#copy-code-container')?.addEventListener('click', () => {
-      if (couple?.code) {
-        navigator.clipboard.writeText(couple.code);
-        showToast('Đã sao chép couple code!', 'success');
-      }
-    });
-
-    // Avatar Upload Triggers
-    profileCard.querySelector('#my-avatar-container')?.addEventListener('click', () => {
-      promptAvatarUpload('my');
-    });
-    profileCard.querySelector('#partner-avatar-container')?.addEventListener('click', () => {
-      promptAvatarUpload('partner');
-    });
+    profileCard.appendChild(codeBar);
   }
 
-  function promptAvatarUpload(type: 'my' | 'partner') {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-end;justify-content:center;z-index:1000;';
-    
-    const sheet = document.createElement('div');
-    sheet.className = 'modal animate-slide-up';
-    sheet.style.cssText = 'background:var(--bg);border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:440px;box-shadow:var(--shadow-elevated);';
-    sheet.innerHTML = `
-      <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px auto;"></div>
-      <h3 style="font-size:16px;font-weight:700;text-align:center;margin-bottom:16px;">
-        Đổi ảnh đại diện ${type === 'my' ? 'của bạn' : 'người ấy'}
-      </h3>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <button id="btn-camera-av" class="btn-primary" style="width:100%;padding:12px;">📷 Chụp ảnh mới</button>
-        <button id="btn-gallery-av" class="btn-ghost" style="width:100%;padding:12px;">🖼️ Chọn ảnh từ album</button>
-        <button id="btn-cancel-av-sheet" class="btn-ghost" style="width:100%;padding:12px;border:none;margin-top:4px;">Hủy bỏ</button>
-      </div>
-    `;
-    overlay.appendChild(sheet);
-    document.body.appendChild(overlay);
+  function promptAvatarUpload(type: 'my' | 'partner'): void {
+    const content = document.createElement('div');
+    content.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
 
-    const closeSheet = () => document.body.removeChild(overlay);
-
-    sheet.querySelector('#btn-cancel-av-sheet')?.addEventListener('click', closeSheet);
-    
     const handleAvatarResult = async (res: CameraResult) => {
-      showToast('Đang tải ảnh lên...', 'info');
+      showToast('Đang tải ảnh đại diện lên...', 'info');
       try {
-        if (type === 'my') {
-          await uploadAvatar(res.file);
-        } else {
-          await uploadPartnerAvatar(res.file);
-        }
-        showToast('Cập nhật avatar thành công!', 'success');
-        loadProfile();
+        if (type === 'my') await uploadAvatar(res.file);
+        else await uploadPartnerAvatar(res.file);
+        showToast('Đã cập nhật ảnh đại diện!', 'success');
+        void loadProfile();
       } catch (err) {
-        const error = err as Error;
-        showToast('Lỗi tải ảnh lên: ' + error.message, 'error');
+        showToast('Lỗi tải ảnh lên: ' + (err as Error).message, 'error');
       }
     };
 
-    sheet.querySelector('#btn-camera-av')?.addEventListener('click', () => {
-      closeSheet();
-      openCamera(handleAvatarResult);
-    });
-    sheet.querySelector('#btn-gallery-av')?.addEventListener('click', () => {
-      closeSheet();
-      openGallery(handleAvatarResult);
-    });
+    let closeAvatarSheet = () => {};
+    content.appendChild(
+      createButton({
+        label: 'Chụp ảnh mới',
+        variant: 'primary',
+        pill: true,
+        block: true,
+        leadingIcon: 'camera',
+        onClick: () => {
+          closeAvatarSheet();
+          openCamera(handleAvatarResult);
+        },
+      }).element,
+    );
+    content.appendChild(
+      createButton({
+        label: 'Chọn ảnh từ Album',
+        variant: 'secondary',
+        pill: true,
+        block: true,
+        leadingIcon: 'gallery',
+        onClick: () => {
+          closeAvatarSheet();
+          openGallery(handleAvatarResult);
+        },
+      }).element,
+    );
+
+    closeAvatarSheet = openSheet({
+      title: `Đổi ảnh đại diện ${type === 'my' ? 'của bạn' : 'người ấy'}`,
+      content,
+    }).close;
   }
 
-  function renderSettings(data: MeResponse) {
-    settingsContainer.innerHTML = '';
+  function buildSection(label: string, ...nodes: HTMLElement[]): HTMLElement {
+    const sec = document.createElement('section');
+    sec.className = 'p-profile-section';
+    const lbl = document.createElement('span');
+    lbl.className = 'p-profile-section__label';
+    lbl.textContent = label;
+    sec.append(lbl, ...nodes);
+    return sec;
+  }
+
+  function renderSettings(data: MeResponse): void {
+    settingsContainer.replaceChildren();
     const user = data.user;
     const couple = data.couple;
+    const partner = data.partnerUser;
 
-    // 1. Edit Profile Row
-    const editRow = document.createElement('div');
-    editRow.className = 'card-solid';
-    editRow.style.cssText = 'padding:16px;cursor:pointer;display:flex;justify-content:between;align-items:center;transition:all 0.2s;';
-    editRow.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:20px;">📝</span>
-        <div style="display:flex;flex-direction:column;">
-          <span style="font-size:14px;font-weight:600;">Chỉnh sửa thông tin</span>
-          <span style="font-size:11px;color:var(--text-secondary);">Tên hiển thị, Ngày kỷ niệm yêu</span>
-        </div>
-      </div>
-      <span style="font-size:16px;color:var(--text-secondary);">→</span>
-    `;
-    editRow.addEventListener('click', () => {
-      if (couple) {
-        showEditProfileModal(user, couple);
-      } else {
-        showToast('Vui lòng hoàn tất ghép đôi cặp đôi trước.', 'info');
-      }
+    // ── Section 1: Hồ sơ & Kỷ niệm ──
+    const editRow = createListRow({
+      title: 'Chỉnh sửa thông tin',
+      subtitle: 'Tên hiển thị của hai đứa & Ngày bắt đầu yêu',
+      leadingIcon: 'edit',
+      chevron: true,
+      onClick: () => {
+        if (couple) showEditProfileModal(user, couple);
+        else showToast('Vui lòng hoàn tất ghép đôi trước.', 'info');
+      },
     });
-    settingsContainer.appendChild(editRow);
+    editRow.classList.add('card-solid');
 
-    // 1.5. Journey & Bucket List Row
-    const journeyRow = document.createElement('button');
-    journeyRow.type = 'button';
-    journeyRow.setAttribute('aria-label', 'Mở bản đồ hẹn hò và điều ước');
-    journeyRow.className = 'card-solid';
-    journeyRow.style.cssText = 'padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.2s;';
-    journeyRow.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:20px;">🗺️</span>
-        <div style="display:flex;flex-direction:column;">
-          <span style="font-size:14px;font-weight:600;">Bản đồ hẹn hò & Điều ước</span>
-          <span style="font-size:11px;color:var(--text-secondary);">Toạ độ đã đi qua & mục tiêu cùng nhau chạm tới</span>
-        </div>
-      </div>
-      <span style="font-size:16px;color:var(--text-secondary);">→</span>
-    `;
-    journeyRow.addEventListener('click', () => {
-      navigate('/app/journey');
+    const journeyRow = createListRow({
+      title: 'Bản đồ hẹn hò & Điều ước',
+      subtitle: 'Toạ độ đã ghé qua và mục tiêu thực hiện cùng nhau',
+      leadingIcon: 'map',
+      chevron: true,
+      onClick: () => navigate('/app/journey'),
     });
-    settingsContainer.appendChild(journeyRow);
 
-    // 2. Theme Toggle Row
-    const themeRow = document.createElement('div');
-    themeRow.className = 'card-solid theme-settings-card';
-    
-    const state = store.get();
-    const curTheme = state.theme || 'system';
+    const cardsRow = createListRow({
+      title: 'Bộ thiệp cào ngày đặc biệt',
+      subtitle: 'Xem trước các thiệp kỷ niệm 100 ngày, sinh nhật, lễ tình nhân',
+      leadingIcon: 'gift',
+      chevron: true,
+      onClick: () => navigate('/preview/cards'),
+    });
 
-    const themeOptions: Array<{ value: 'light' | 'dark' | 'system'; label: string; icon: string; hint: string }> = [
-      { value: 'light', label: 'Sáng', icon: '☀️', hint: 'Giao diện sáng' },
-      { value: 'dark', label: 'Tối', icon: '🌙', hint: 'Giao diện tối' },
-      { value: 'system', label: 'Hệ thống', icon: '⚙️', hint: 'Theo thiết bị' },
-    ];
-
-    themeRow.innerHTML = `
-      <div class="theme-settings-copy">
-        <span class="theme-settings-icon">🎨</span>
+    // Native Birthday Settings Card (rendered cleanly from frame 0)
+    const bdayCard = document.createElement('div');
+    bdayCard.className = 'p-profile-card birthday-settings-card';
+    const todayIso = new Date().toISOString().split('T')[0];
+    const selfBday = user.birthday ? user.birthday.split('T')[0] : '';
+    const partBday = (user.partnerBirthday || partner?.birthday || '').split('T')[0];
+    bdayCard.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="width:36px;height:36px;border-radius:12px;background:var(--gold-bg);color:var(--gold-ink);display:grid;place-items:center;flex-shrink:0;">
+          ${iconMarkup('anniversary', { size: 20, variant: 'filled' })}
+        </span>
         <div>
-          <span class="theme-settings-title">Giao diện</span>
-          <span class="theme-settings-subtitle">Chọn cách app hiển thị theo mắt bạn.</span>
+          <strong style="display:block;font-size:14px;">Ngày sinh nhật hai đứa</strong>
+          <span class="u-text-secondary" style="font-size:12px;">Tự động mở thiệp chúc mừng đúng 00:00 ngày sinh nhật</span>
         </div>
       </div>
-      <div class="theme-segmented" role="radiogroup" aria-label="Chọn giao diện">
-        ${themeOptions.map((option) => `
-          <button
-            type="button"
-            class="theme-choice${curTheme === option.value ? ' active' : ''}"
-            data-theme-choice="${option.value}"
-            role="radio"
-            aria-checked="${curTheme === option.value}"
-          >
-            <span>${option.icon}</span>
-            <strong>${option.label}</strong>
-            <small>${option.hint}</small>
-          </button>
-        `).join('')}
+      <div class="p-bday-grid">
+        <div>
+          <label class="c-field__label" for="birthday-self" style="font-size:11px;">Sinh nhật của bạn</label>
+          <input id="birthday-self" type="date" class="c-input" max="${todayIso}" value="${selfBday}" style="margin-top:4px;min-height:42px;" />
+        </div>
+        <div>
+          <label class="c-field__label" for="birthday-partner" style="font-size:11px;">Sinh nhật người ấy</label>
+          <input id="birthday-partner" type="date" class="c-input" max="${todayIso}" value="${partBday}" style="margin-top:4px;min-height:42px;" />
+        </div>
       </div>
     `;
-
-    themeRow.querySelectorAll<HTMLButtonElement>('[data-theme-choice]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const selected = btn.dataset.themeChoice as 'light' | 'dark' | 'system';
-        store.set({ theme: selected });
-
-        themeRow.querySelectorAll<HTMLButtonElement>('[data-theme-choice]').forEach((item) => {
-          const active = item.dataset.themeChoice === selected;
-          item.classList.toggle('active', active);
-          item.setAttribute('aria-checked', String(active));
-        });
-
-        applyTheme(selected);
-
-        showToast('Đã đổi giao diện thành công!', 'success');
-      });
+    const saveBdayCtrl = createButton({
+      label: 'Lưu ngày sinh nhật',
+      variant: 'secondary',
+      size: 'sm',
+      pill: true,
+      leadingIcon: 'check',
+      onClick: async () => {
+        const sVal = bdayCard.querySelector<HTMLInputElement>('#birthday-self')?.value || null;
+        const pVal = bdayCard.querySelector<HTMLInputElement>('#birthday-partner')?.value || null;
+        saveBdayCtrl.setLoading(true, 'Đang lưu...');
+        try {
+          await updateProfile({ birthday: sVal, partnerBirthday: pVal });
+          showToast('Đã lưu ngày sinh nhật!', 'success');
+          void loadProfile();
+        } catch (err) {
+          showToast('Không lưu được ngày sinh: ' + (err as Error).message, 'error');
+        } finally {
+          saveBdayCtrl.setLoading(false);
+        }
+      },
     });
-    settingsContainer.appendChild(themeRow);
+    bdayCard.appendChild(saveBdayCtrl.element);
 
-    // 3. Check-in Reminder Row & Notification Test
-    const reminderCard = buildReminderCard();
-    settingsContainer.appendChild(reminderCard);
+    settingsContainer.appendChild(
+      buildSection('Hồ sơ & Kỷ niệm', createListGroup([editRow, journeyRow, cardsRow]), bdayCard),
+    );
 
-    // 4. APK Update Row
-    const updateRow = document.createElement('div');
-    updateRow.className = 'card-solid';
-    updateRow.style.cssText = 'padding:16px;display:flex;flex-direction:column;gap:12px;';
-    updateRow.innerHTML = `
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-        <div style="display:flex;align-items:flex-start;gap:12px;min-width:0;">
-          <span style="font-size:20px;line-height:1;">⬆️</span>
-          <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
-            <span style="font-size:14px;font-weight:600;">Cập nhật APK</span>
-            <span id="apk-update-status" style="font-size:11px;color:var(--text-secondary);line-height:1.4;">
-              Kiểm tra bản Android mới nhất để tránh thiếu tính năng.
-            </span>
+    // ── Section 2: Giao diện & Màu nhấn (Theme + 6 Accent Presets + Reduced Motion) ──
+    const appearanceCard = document.createElement('div');
+    appearanceCard.className = 'p-profile-card theme-settings-card';
+
+    const curTheme = store.get().theme || 'system';
+    const themeHeader = document.createElement('div');
+    themeHeader.innerHTML = `
+      <strong style="display:block;font-size:14px;">Chế độ sáng tối</strong>
+      <span class="u-text-secondary" style="font-size:12px;">Đồng bộ tức thì trên toàn bộ ứng dụng</span>
+    `;
+    const themeSeg = createSegmentedControl<UiThemePreference>({
+      ariaLabel: 'Chọn chế độ giao diện',
+      value: curTheme,
+      fullWidth: true,
+      items: [
+        { value: 'light', label: 'Sáng' },
+        { value: 'dark', label: 'Tối' },
+        { value: 'system', label: 'Hệ thống' },
+      ],
+      onChange: (selected) => {
+        triggerHaptic('select');
+        store.set({ theme: selected });
+        applyTheme(selected);
+        setUiTheme(selected);
+        showToast('Đã cập nhật chế độ giao diện!', 'success');
+      },
+    });
+
+    const accentHeader = document.createElement('div');
+    accentHeader.style.paddingTop = '6px';
+    accentHeader.innerHTML = `
+      <strong style="display:block;font-size:14px;">Màu nhấn chủ đạo</strong>
+      <span class="u-text-secondary" style="font-size:12px;">6 sắc thái đạt chuẩn tương phản WCAG AA</span>
+    `;
+    const accentGrid = document.createElement('div');
+    accentGrid.className = 'p-accent-grid';
+    accentGrid.setAttribute('role', 'radiogroup');
+    accentGrid.setAttribute('aria-label', 'Chọn màu nhấn');
+
+    const renderSwatches = () => {
+      const currentAccent = getUiAccent();
+      accentGrid.replaceChildren();
+      ACCENT_PRESETS.forEach((preset) => {
+        const active = preset.id === currentAccent;
+        const sw = document.createElement('button');
+        sw.type = 'button';
+        sw.className = `p-accent-swatch${active ? ' is-active' : ''}`;
+        sw.style.background = preset.swatchHex;
+        sw.setAttribute('role', 'radio');
+        sw.setAttribute('aria-checked', String(active));
+        sw.setAttribute('aria-label', `Màu ${preset.label}`);
+        sw.title = preset.label;
+        if (active) sw.innerHTML = iconMarkup('check', { size: 20 });
+        sw.addEventListener('click', () => {
+          triggerHaptic('select');
+          setUiAccent(preset.id as UiAccentId);
+          renderSwatches();
+          showToast(`Đã chọn sắc màu "${preset.label}"`, 'success');
+        });
+        accentGrid.appendChild(sw);
+      });
+    };
+    renderSwatches();
+
+    const motionRow = document.createElement('div');
+    motionRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:8px;border-top:1px solid var(--border-subtle);';
+    motionRow.innerHTML = `
+      <div>
+        <strong style="display:block;font-size:13px;">Giảm hiệu ứng chuyển động</strong>
+        <span class="u-text-secondary" style="font-size:11px;">Tắt hiệu ứng nảy và pháo tim cho máy tiết kiệm pin</span>
+      </div>
+    `;
+    const motionSwitch = createSwitch({
+      ariaLabel: 'Giảm hiệu ứng chuyển động',
+      checked: getUiReducedMotion() === 'on',
+      onChange: (on) => {
+        setUiReducedMotion(on ? 'on' : 'off');
+        triggerHaptic('select');
+      },
+    });
+    motionRow.appendChild(motionSwitch.element);
+
+    appearanceCard.append(themeHeader, themeSeg.element, accentHeader, accentGrid, motionRow);
+    settingsContainer.appendChild(buildSection('Giao diện & Cá nhân hoá', appearanceCard));
+
+    // ── Section 3: Thông báo & Nhắc hẹn ──
+    settingsContainer.appendChild(buildSection('Thông báo & Nhắc hẹn', buildReminderCard()));
+
+    // ── Section 4: Ứng dụng, Bảo mật & Tài khoản ──
+    const apkCard = document.createElement('div');
+    apkCard.className = 'p-profile-card';
+    apkCard.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+          <span style="width:36px;height:36px;border-radius:12px;background:var(--neutral-100);color:var(--text-primary);display:grid;place-items:center;flex-shrink:0;">
+            ${iconMarkup('download', { size: 20 })}
+          </span>
+          <div style="min-width:0;">
+            <strong style="display:block;font-size:14px;">Phiên bản ứng dụng Android</strong>
+            <span id="apk-update-status" class="u-text-secondary" style="font-size:12px;display:block;">Kiểm tra bản cài đặt APK mới nhất trên GitHub.</span>
           </div>
         </div>
-        <button id="check-apk-update-btn" class="btn-ghost" style="padding:8px 10px;font-size:12px;white-space:nowrap;">
-          Kiểm tra
-        </button>
+        <button type="button" id="check-apk-update-btn" class="c-btn c-btn--secondary c-btn--sm c-btn--pill">Kiểm tra</button>
       </div>
-      <button id="download-apk-update-btn" class="btn-primary" style="display:none;width:100%;padding:10px;justify-content:center;">
-        Tải APK mới
-      </button>
+      <button type="button" id="download-apk-update-btn" class="c-btn c-btn--primary c-btn--sm c-btn--pill c-btn--block" style="display:none;">Tải APK mới</button>
     `;
-    const statusEl = updateRow.querySelector<HTMLElement>('#apk-update-status');
-    const checkButton = updateRow.querySelector<HTMLButtonElement>('#check-apk-update-btn');
-    const downloadButton = updateRow.querySelector<HTMLButtonElement>('#download-apk-update-btn');
-
-    if (statusEl && checkButton && downloadButton) {
-      checkButton.addEventListener('click', () => {
-        checkApkUpdate(statusEl, checkButton, downloadButton);
-      });
-      downloadButton.addEventListener('click', () => {
-        window.location.href = downloadButton.dataset.updateUrl || GITHUB_RELEASES_PAGE;
+    const statusEl = apkCard.querySelector<HTMLElement>('#apk-update-status');
+    const checkBtn = apkCard.querySelector<HTMLButtonElement>('#check-apk-update-btn');
+    const downloadBtn = apkCard.querySelector<HTMLButtonElement>('#download-apk-update-btn');
+    if (statusEl && checkBtn && downloadBtn) {
+      checkBtn.addEventListener('click', () => void checkApkUpdate(statusEl, checkBtn, downloadBtn));
+      downloadBtn.addEventListener('click', () => {
+        window.location.href = downloadBtn.dataset.updateUrl || GITHUB_RELEASES_PAGE;
       });
     }
-    settingsContainer.appendChild(updateRow);
 
-    // 4. Logout Row
-    const logoutRow = document.createElement('div');
-    logoutRow.className = 'card-solid';
-    logoutRow.style.cssText = 'padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-color:rgba(239, 68, 68, 0.2);';
-    logoutRow.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:20px;">🚪</span>
-        <div style="display:flex;flex-direction:column;">
-          <span style="font-size:14px;font-weight:600;color:#ef4444;">Đăng xuất</span>
-          <span style="font-size:11px;color:var(--text-secondary);">Thoát tài khoản khỏi thiết bị này</span>
-        </div>
-      </div>
-      <span style="font-size:16px;color:#ef4444;">→</span>
-    `;
-    logoutRow.addEventListener('click', () => {
-      showModal({
-        title: 'Đăng xuất tài khoản',
-        content: 'Bạn có chắc chắn muốn đăng xuất? Thiết bị này sẽ cần quét hoặc nhập lại couple code để đăng nhập.',
-        confirmText: 'Đăng xuất',
-        cancelText: 'Hủy',
-        danger: true,
-        center: true,
-        onConfirm: () => {
-          clearPrivateClientState();
-          navigate('/onboarding');
-        }
-      });
+    const authMethod = user.googleId ? 'Google Identity' : user.email ? `Email (${user.email})` : 'Thiết bị tin cậy';
+    const securityRow = createListRow({
+      title: 'Bảo mật & Thiết bị tin cậy',
+      subtitle: `Đang xác thực qua: ${authMethod}`,
+      leadingIcon: 'shield',
     });
-    settingsContainer.appendChild(logoutRow);
+
+    const installGuideRow = createListRow({
+      title: 'Hướng dẫn thêm vào Màn hình chính',
+      subtitle: 'Cài đặt biểu tượng PWA nhanh trên iPhone & Android',
+      leadingIcon: 'install',
+      chevron: true,
+      onClick: () => navigate('/install'),
+    });
+
+    const logoutRow = createListRow({
+      title: 'Đăng xuất khỏi thiết bị này',
+      subtitle: 'Xoá phiên đăng nhập cục bộ, giữ nguyên dữ liệu trên máy chủ',
+      leadingIcon: 'logout',
+      onClick: () => {
+        showModal({
+          title: 'Đăng xuất tài khoản',
+          content: 'Bạn muốn đăng xuất khỏi thiết bị này? Lần sau bạn có thể đăng nhập lại bằng Email, Google hoặc Couple Code.',
+          confirmText: 'Đăng xuất',
+          cancelText: 'Huỷ',
+          danger: true,
+          center: true,
+          onConfirm: () => {
+            clearPrivateClientState();
+            navigate('/onboarding');
+          },
+        });
+      },
+    });
+
+    settingsContainer.appendChild(
+      buildSection('Ứng dụng & Bảo mật', apkCard, createListGroup([securityRow, installGuideRow, logoutRow])),
+    );
   }
 
-  function showEditProfileModal(user: User, couple: Couple) {
+  function showEditProfileModal(user: User, couple: Couple): void {
     const form = document.createElement('div');
-    form.style.cssText = 'display:flex;flex-direction:column;gap:14px;width:100%;text-align:left;';
-    
-    // Format loveStartDate to YYYY-MM-DD for date input
+    form.style.cssText = 'display:flex;flex-direction:column;gap:12px;width:100%;text-align:left;';
+
     const originalDate = couple.loveStartDate ? new Date(couple.loveStartDate) : new Date();
     const dateString = originalDate.toISOString().substring(0, 10);
 
     form.innerHTML = `
-      <div class="input-group">
-        <label class="input-label">Tên của bạn</label>
-        <input type="text" id="edit-my-name" class="input" value="${user.displayName}" placeholder="Tên hiển thị của bạn" required />
+      <div>
+        <label class="c-field__label" for="edit-my-name">Tên hiển thị của bạn</label>
+        <input type="text" id="edit-my-name" class="c-input" value="${user.displayName || ''}" style="margin-top:4px;" required />
       </div>
-      <div class="input-group">
-        <label class="input-label">Tên người ấy</label>
-        <input type="text" id="edit-partner-name" class="input" value="${user.partnerName}" placeholder="Tên người đặc biệt" required />
+      <div>
+        <label class="c-field__label" for="edit-partner-name">Tên người thương</label>
+        <input type="text" id="edit-partner-name" class="c-input" value="${user.partnerName || ''}" style="margin-top:4px;" required />
       </div>
-      <div class="input-group">
-        <label class="input-label">Ngày bắt đầu yêu nhau</label>
-        <input type="date" id="edit-love-date" class="input" value="${dateString}" required />
+      <div>
+        <label class="c-field__label" for="edit-love-date">Ngày bắt đầu yêu</label>
+        <input type="date" id="edit-love-date" class="c-input" value="${dateString}" style="margin-top:4px;" required />
       </div>
     `;
 
@@ -953,37 +862,23 @@ export function renderProfilePage(): HTMLElement {
       title: 'Chỉnh sửa thông tin',
       content: form,
       confirmText: 'Lưu thay đổi',
-      cancelText: 'Hủy',
+      cancelText: 'Huỷ',
       center: true,
       onConfirm: async () => {
         const displayName = (form.querySelector('#edit-my-name') as HTMLInputElement).value.trim();
         const partnerName = (form.querySelector('#edit-partner-name') as HTMLInputElement).value.trim();
         const loveStartDate = (form.querySelector('#edit-love-date') as HTMLInputElement).value;
-
         if (!displayName || !partnerName || !loveStartDate) {
           showToast('Vui lòng điền đầy đủ thông tin!', 'error');
           throw new Error('Fields missing');
         }
-
-        try {
-          await updateProfile({
-            displayName,
-            partnerName,
-            loveStartDate
-          });
-          showToast('Cập nhật thông tin thành công!', 'success');
-          loadProfile();
-         } catch (err) {
-          const error = err as Error;
-          showToast('Lỗi cập nhật: ' + error.message, 'error');
-          throw error;
-        }
-      }
+        await updateProfile({ displayName, partnerName, loveStartDate });
+        showToast('Đã lưu thông tin cặp đôi!', 'success');
+        void loadProfile();
+      },
     });
   }
 
-  loadProfile();
-
-  // Inject Nav
+  void loadProfile();
   return root;
 }

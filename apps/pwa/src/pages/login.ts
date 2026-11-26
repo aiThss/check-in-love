@@ -1,3 +1,4 @@
+import '../styles/20-pages/auth.css';
 import {
   loginWithGoogle,
   sendLoginOtp,
@@ -9,6 +10,9 @@ import { showToast } from '../components/toast';
 import { createThemeToggleButton } from '../components/theme-toggle';
 import { navigate } from '../router';
 import { store } from '../store/index';
+import { iconMarkup } from '../ui/icons/icons';
+import { createIconButton } from '../ui/primitives';
+import { triggerHaptic } from '../ui/haptics';
 
 declare const __GOOGLE_CLIENT_ID__: string;
 
@@ -57,195 +61,181 @@ let googleSdkPromise: Promise<void> | null = null;
 
 export function renderLoginPage(): HTMLElement {
   const root = document.createElement('div');
-  root.className = 'page-no-nav login-page-pwa animate-fade-in';
+  root.className = 'page-no-nav login-page-pwa p-auth animate-fade-in';
 
-  // Floating ambient background elements
-  const bgGlow = document.createElement('div');
-  bgGlow.className = 'login-ambient-glow';
-  bgGlow.innerHTML = `
-    <div class="glow-orb orb-1"></div>
-    <div class="glow-orb orb-2"></div>
+  // Top Bar
+  const topBar = document.createElement('header');
+  topBar.className = 'p-auth-topbar';
+  const backBtn = createIconButton({
+    icon: 'back',
+    ariaLabel: 'Quay lại',
+    onClick: () => navigate('/onboarding', true),
+  });
+  backBtn.id = 'back-btn';
+  const spacer = document.createElement('div');
+  const rightWrap = document.createElement('div');
+  rightWrap.style.justifySelf = 'end';
+  rightWrap.appendChild(createThemeToggleButton());
+  topBar.append(backBtn, spacer, rightWrap);
+  root.appendChild(topBar);
+
+  // Main Body
+  const main = document.createElement('main');
+  main.style.cssText = 'display:flex;flex-direction:column;gap:16px;my:auto;';
+
+  const hero = document.createElement('div');
+  hero.className = 'p-auth-hero';
+  hero.innerHTML = `
+    <div class="p-auth-emblem">${iconMarkup('couple', { size: 32, variant: 'filled' })}</div>
+    <h1 class="p-auth-title">Mừng bạn trở về</h1>
+    <p class="p-auth-sub">Đăng nhập để tiếp tục lưu giữ từng khoảnh khắc bên người thương</p>
   `;
-  root.appendChild(bgGlow);
+  main.appendChild(hero);
 
-  const shell = document.createElement('div');
-  shell.className = 'auth-shell animate-slide-up';
-
-  const header = document.createElement('div');
-  header.className = 'auth-header';
-  header.innerHTML = `
-    <button class="btn-icon auth-back-btn" id="back-btn" aria-label="Quay lại">←</button>
-    <div class="auth-brand-center">
-      <div class="auth-emoji pulse-heart">💕</div>
-      <h1 class="onboarding-title">Đăng nhập</h1>
-      <p class="onboarding-subtitle">Mừng bạn trở về nhà</p>
-    </div>
-    <span class="auth-header-spacer"></span>
-  `;
-  header.querySelector('.auth-header-spacer')?.replaceWith(createThemeToggleButton());
-
-  // Auth Tabs Container
+  // Auth Tabs
   const tabsWrap = document.createElement('div');
-  tabsWrap.className = 'auth-tabs-wrap';
+  tabsWrap.className = 'p-auth-tabs';
+  tabsWrap.setAttribute('role', 'tablist');
   tabsWrap.innerHTML = `
-    <div class="auth-tab-pill active" id="tab-email-btn" role="tab" aria-selected="true">
-      <span class="tab-icon">✉️</span> Email & OTP
-    </div>
-    <div class="auth-tab-pill" id="tab-google-btn" role="tab" aria-selected="false">
-      <span class="tab-icon">🌐</span> Google
-    </div>
+    <button type="button" class="p-auth-tab active" id="tab-email-btn" role="tab" aria-selected="true">
+      ${iconMarkup('mail', { size: 16 })}<span>Email & OTP</span>
+    </button>
+    <button type="button" class="p-auth-tab" id="tab-google-btn" role="tab" aria-selected="false">
+      ${iconMarkup('google', { size: 16 })}<span>Google</span>
+    </button>
   `;
+  main.appendChild(tabsWrap);
 
-  // Form Shell Card
+  // Form Sticker Card
   const formCard = document.createElement('div');
-  formCard.className = 'auth-form-card glass-card';
+  formCard.className = 'p-auth-card u-grain-surface';
 
-  // --- TAB 1: Email Login Panel ---
   const emailPanel = document.createElement('div');
-  emailPanel.className = 'auth-tab-panel active';
+  emailPanel.className = 'p-auth-panel active';
   emailPanel.id = 'panel-email';
-
   emailPanel.innerHTML = `
-    <!-- Step 1: Input Credentials -->
-    <form id="email-login-form" class="auth-step-form">
-      <div class="form-group-v2">
-        <label class="form-label-v2" for="user-email">Địa chỉ Email</label>
-        <div class="input-icon-wrapper">
-          <span class="input-icon">📧</span>
-          <input type="email" id="user-email" class="input input-with-icon" placeholder="nhapemail@gmail.com" required autocomplete="email" />
+    <form id="email-login-form" class="p-auth-step" style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label class="c-field__label" for="user-email">Địa chỉ Email</label>
+        <div class="p-auth-input-wrap" style="margin-top:6px;">
+          <span class="p-auth-input-wrap__lead">${iconMarkup('mail', { size: 20 })}</span>
+          <input type="email" id="user-email" class="c-input" placeholder="ban@gmail.com" required autocomplete="email" />
         </div>
       </div>
 
-      <div class="form-group-v2">
-        <div class="form-label-row">
-          <label class="form-label-v2" for="user-password">Mật khẩu</label>
-          <button type="button" class="link-btn-sm" id="forgot-password-link">Quên mật khẩu?</button>
+      <div>
+        <div class="p-auth-label-row">
+          <label class="c-field__label" for="user-password">Mật khẩu</label>
+          <button type="button" class="p-auth-link" id="forgot-password-link">Quên mật khẩu?</button>
         </div>
-        <div class="input-icon-wrapper">
-          <span class="input-icon">🔒</span>
-          <input type="password" id="user-password" class="input input-with-icon" placeholder="••••••••" required autocomplete="current-password" />
-          <button type="button" class="password-toggle-btn" id="toggle-pwd-btn" aria-label="Hiện mật khẩu">👁️</button>
+        <div class="p-auth-input-wrap p-auth-input-wrap--trail">
+          <span class="p-auth-input-wrap__lead">${iconMarkup('lock', { size: 20 })}</span>
+          <input type="password" id="user-password" class="c-input" placeholder="Nhập mật khẩu" required autocomplete="current-password" />
+          <button type="button" class="p-auth-eye-btn" id="toggle-pwd-btn" aria-label="Hiện mật khẩu">
+            ${iconMarkup('eye', { size: 20 })}
+          </button>
         </div>
       </div>
 
-      <button type="submit" class="btn-primary btn-full btn-glow" id="send-otp-btn">
+      <button type="submit" class="c-btn c-btn--primary c-btn--pill c-btn--block" id="send-otp-btn">
         <span>Gửi mã OTP xác thực</span>
-        <span class="btn-arrow">→</span>
+        ${iconMarkup('chevron-right', { size: 16 })}
       </button>
     </form>
 
-    <!-- Step 2: Enter OTP (Hidden by default) -->
-    <form id="otp-verify-form" class="auth-step-form hidden-step">
-      <div class="otp-info-banner">
-        <div class="otp-banner-icon">📩</div>
-        <div class="otp-banner-text">
-          <span>Mã OTP 6 chữ số đã được gửi tới</span>
+    <form id="otp-verify-form" class="p-auth-step hidden-step" style="display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--accent-50);border:1px solid var(--accent-200);font-size:12px;">
+        ${iconMarkup('mail', { size: 20, variant: 'filled' })}
+        <div>
+          <span class="u-text-secondary">Mã 6 chữ số đã gửi tới </span>
           <strong id="otp-sent-target">email của bạn</strong>
         </div>
       </div>
 
-      <div class="form-group-v2">
-        <label class="form-label-v2">Mã xác thực OTP</label>
-        <div class="otp-pin-container" id="otp-pin-boxes">
-          <input type="text" maxlength="1" class="otp-box" data-index="0" inputmode="numeric" pattern="[0-9]*" />
-          <input type="text" maxlength="1" class="otp-box" data-index="1" inputmode="numeric" pattern="[0-9]*" />
-          <input type="text" maxlength="1" class="otp-box" data-index="2" inputmode="numeric" pattern="[0-9]*" />
-          <input type="text" maxlength="1" class="otp-box" data-index="3" inputmode="numeric" pattern="[0-9]*" />
-          <input type="text" maxlength="1" class="otp-box" data-index="4" inputmode="numeric" pattern="[0-9]*" />
-          <input type="text" maxlength="1" class="otp-box" data-index="5" inputmode="numeric" pattern="[0-9]*" />
+      <div>
+        <label class="c-field__label" style="display:block;text-align:center;margin-bottom:8px;">Mã xác thực OTP</label>
+        <div class="p-otp-grid" id="otp-pin-boxes">
+          <input type="text" maxlength="1" class="otp-box p-otp-cell" data-index="0" aria-label="Số OTP 1" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-box p-otp-cell" data-index="1" aria-label="Số OTP 2" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-box p-otp-cell" data-index="2" aria-label="Số OTP 3" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-box p-otp-cell" data-index="3" aria-label="Số OTP 4" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-box p-otp-cell" data-index="4" aria-label="Số OTP 5" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-box p-otp-cell" data-index="5" aria-label="Số OTP 6" inputmode="numeric" pattern="[0-9]*" />
         </div>
       </div>
 
-      <div class="otp-resend-row">
+      <div style="text-align:center;font-size:12px;color:var(--text-secondary);">
         <span id="otp-timer-text">Gửi lại mã sau <strong id="timer-sec">60</strong>s</span>
-        <button type="button" class="link-btn-sm hidden-resend" id="resend-otp-btn">Gửi lại mã ngay</button>
+        <button type="button" class="p-auth-link" id="resend-otp-btn" style="display:none;">Gửi lại mã ngay</button>
       </div>
 
-      <button type="submit" class="btn-primary btn-full btn-glow" id="final-login-btn">
-        <span>Đăng nhập ngay</span>
+      <button type="submit" class="c-btn c-btn--primary c-btn--pill c-btn--block" id="final-login-btn">
+        ${iconMarkup('check', { size: 20 })}<span>Đăng nhập ngay</span>
       </button>
 
-      <button type="button" class="btn-ghost-sm btn-full" id="back-to-step1-btn">
-        ← Nhập lại Email / Mật khẩu
+      <button type="button" class="c-btn c-btn--ghost c-btn--sm c-btn--pill c-btn--block" id="back-to-step1-btn">
+        ${iconMarkup('back', { size: 16 })}<span>Đổi Email / Mật khẩu</span>
       </button>
     </form>
   `;
 
-  // --- TAB 2: Google Login Panel ---
   const googlePanel = document.createElement('div');
-  googlePanel.className = 'auth-tab-panel';
+  googlePanel.className = 'p-auth-panel';
   googlePanel.id = 'panel-google';
-
   googlePanel.innerHTML = `
-    <div class="google-login-card-inner">
-      <div class="google-login-intro-v2">
-        <div class="google-g-badge">G</div>
-        <div class="google-intro-content">
-          <strong>Đăng nhập bằng Google</strong>
-          <span>Xác thực chuẩn Google.</span>
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:8px 0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${iconMarkup('google', { size: 24 })}
+        <div style="text-align:left;">
+          <strong style="display:block;font-size:14px;">Đăng nhập bằng Google</strong>
+          <span class="u-text-secondary" style="font-size:12px;">Một chạm an toàn, đồng bộ tức thì</span>
         </div>
       </div>
-
-      <div class="google-button-wrap-v2" id="google-button-wrap" aria-live="polite">
-        <div id="google-signin-button"></div>
-        <p class="google-login-status" id="google-login-status">Đang tải nút đăng nhập Google…</p>
+      <div id="google-button-wrap" aria-live="polite" style="display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;">
+        <div id="google-signin-button" style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;"></div>
+        <p class="u-text-secondary" id="google-login-status" style="font-size:12px;margin:0;">Đang tải nút đăng nhập Google…</p>
       </div>
     </div>
   `;
 
-  formCard.appendChild(emailPanel);
-  formCard.appendChild(googlePanel);
+  formCard.append(emailPanel, googlePanel);
+  main.appendChild(formCard);
 
-  // Footer Navigation & Register Action
-  const footerAction = document.createElement('div');
-  footerAction.className = 'auth-footer-action';
+  const footerAction = document.createElement('footer');
+  footerAction.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
   footerAction.innerHTML = `
-    <div class="auth-divider"><span>hoặc</span></div>
-    <button class="btn-ghost btn-full" id="go-onboarding-btn">✨ Tạo tài khoản Couple mới</button>
+    <div class="p-auth-divider"><span>hoặc</span></div>
+    <button type="button" class="c-btn c-btn--secondary c-btn--pill c-btn--block" id="go-onboarding-btn">
+      ${iconMarkup('sparkle', { size: 16 })}<span>Tạo không gian Couple mới</span>
+    </button>
   `;
 
-  shell.appendChild(header);
-  shell.appendChild(tabsWrap);
-  shell.appendChild(formCard);
-  shell.appendChild(footerAction);
-  root.appendChild(shell);
+  root.append(main, footerAction);
 
-  // --- Reset Password Modal ---
   const resetModal = createResetPasswordModal();
   root.appendChild(resetModal);
 
-  // Event Listeners
-  root.querySelector('#back-btn')?.addEventListener('click', () => navigate('/onboarding', true));
-  root.querySelector('#go-onboarding-btn')?.addEventListener('click', () => navigate('/onboarding', true));
-  root.querySelector('#forgot-password-link')?.addEventListener('click', () => openResetModal(resetModal));
+  footerAction.querySelector('#go-onboarding-btn')?.addEventListener('click', () => navigate('/onboarding', true));
+  emailPanel.querySelector('#forgot-password-link')?.addEventListener('click', () => openResetModal(resetModal));
 
-  // Tab Switching Logic
-  const tabEmail = tabsWrap.querySelector('#tab-email-btn')!;
-  const tabGoogle = tabsWrap.querySelector('#tab-google-btn')!;
+  const tabEmail = tabsWrap.querySelector<HTMLButtonElement>('#tab-email-btn')!;
+  const tabGoogle = tabsWrap.querySelector<HTMLButtonElement>('#tab-google-btn')!;
 
   const switchTab = (activeTab: 'email' | 'google') => {
     sessionStorage.setItem('dev_login_tab', activeTab);
-    if (activeTab === 'email') {
-      tabEmail.classList.add('active');
-      tabEmail.setAttribute('aria-selected', 'true');
-      tabGoogle.classList.remove('active');
-      tabGoogle.setAttribute('aria-selected', 'false');
-      emailPanel.classList.add('active');
-      googlePanel.classList.remove('active');
-    } else {
-      tabGoogle.classList.add('active');
-      tabGoogle.setAttribute('aria-selected', 'true');
-      tabEmail.classList.remove('active');
-      tabEmail.setAttribute('aria-selected', 'false');
-      googlePanel.classList.add('active');
-      emailPanel.classList.remove('active');
-    }
+    triggerHaptic('select');
+    const isEmail = activeTab === 'email';
+    tabEmail.classList.toggle('active', isEmail);
+    tabEmail.setAttribute('aria-selected', String(isEmail));
+    tabGoogle.classList.toggle('active', !isEmail);
+    tabGoogle.setAttribute('aria-selected', String(!isEmail));
+    emailPanel.classList.toggle('active', isEmail);
+    googlePanel.classList.toggle('active', !isEmail);
   };
 
   tabEmail.addEventListener('click', () => switchTab('email'));
   tabGoogle.addEventListener('click', () => switchTab('google'));
 
-  // Restore saved login tab on load
   const requestedLoginTab = new URLSearchParams(window.location.search).get('tab') as 'email' | 'google' | null;
   const savedLoginTab = sessionStorage.getItem('dev_login_tab') as 'email' | 'google' | null;
   if (requestedLoginTab === 'email' || requestedLoginTab === 'google') {
@@ -254,7 +244,6 @@ export function renderLoginPage(): HTMLElement {
     switchTab(savedLoginTab);
   }
 
-  // Email Step 1 Form Handler
   const emailForm = emailPanel.querySelector<HTMLFormElement>('#email-login-form')!;
   const otpForm = emailPanel.querySelector<HTMLFormElement>('#otp-verify-form')!;
   const emailInput = emailPanel.querySelector<HTMLInputElement>('#user-email')!;
@@ -271,21 +260,20 @@ export function renderLoginPage(): HTMLElement {
   togglePwdBtn.addEventListener('click', () => {
     passwordVisible = !passwordVisible;
     passwordInput.type = passwordVisible ? 'text' : 'password';
-    togglePwdBtn.textContent = passwordVisible ? '🙈' : '👁️';
+    togglePwdBtn.setAttribute('aria-label', passwordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+    togglePwdBtn.innerHTML = iconMarkup(passwordVisible ? 'eye-off' : 'eye', { size: 20 });
   });
 
   let resendTimer: number | null = null;
-
   const startCountdown = () => {
     let secondsLeft = 60;
     timerText.style.display = 'inline';
     resendOtpBtn.style.display = 'none';
-    if (timerSec) timerSec.textContent = '60';
-
+    timerSec.textContent = '60';
     if (resendTimer) clearInterval(resendTimer);
     resendTimer = window.setInterval(() => {
       secondsLeft -= 1;
-      if (timerSec) timerSec.textContent = String(secondsLeft);
+      timerSec.textContent = String(secondsLeft);
       if (secondsLeft <= 0) {
         if (resendTimer) clearInterval(resendTimer);
         timerText.style.display = 'none';
@@ -298,62 +286,52 @@ export function renderLoginPage(): HTMLElement {
     e.preventDefault();
     const email = emailInput.value.trim();
     const password = passwordInput.value;
-
     if (!email || !password) {
       showToast('Vui lòng nhập đầy đủ Email và Mật khẩu', 'error');
       return;
     }
 
     sendOtpBtn.disabled = true;
-    sendOtpBtn.innerHTML = '<span class="spinner"></span> Đang gửi mã OTP…';
+    sendOtpBtn.innerHTML = '<span class="c-btn__spinner"></span><span>Đang gửi mã OTP…</span>';
 
     try {
       await sendLoginOtp(email, password);
       showToast(`Mã OTP đã được gửi tới ${email}`, 'success');
       otpSentTarget.textContent = email;
-
-      // Switch to Step 2
       emailForm.classList.add('hidden-step');
       otpForm.classList.remove('hidden-step');
-
       startCountdown();
-
-      // Focus first OTP box
-      const firstOtpBox = otpForm.querySelector<HTMLInputElement>('.otp-box')!;
-      firstOtpBox.focus();
+      otpForm.querySelector<HTMLInputElement>('.otp-box')?.focus();
     } catch (err) {
       showToast(errorMessage(err, 'Không thể gửi OTP. Kiểm tra thông tin đăng nhập!'), 'error');
     } finally {
       sendOtpBtn.disabled = false;
-      sendOtpBtn.innerHTML = '<span>Gửi mã OTP xác thực</span> <span class="btn-arrow">→</span>';
+      sendOtpBtn.innerHTML = `<span>Gửi mã OTP xác thực</span>${iconMarkup('chevron-right', { size: 16 })}`;
     }
   });
 
-  // OTP Boxes input behavior
   const otpBoxes = Array.from(otpForm.querySelectorAll<HTMLInputElement>('.otp-box'));
-
   otpBoxes.forEach((box, idx) => {
     box.addEventListener('input', () => {
-      const val = box.value;
-      if (val.length === 1 && idx < otpBoxes.length - 1) {
+      const val = box.value.replace(/\D/g, '');
+      box.value = val.slice(-1);
+      if (box.value && idx < otpBoxes.length - 1) {
         otpBoxes[idx + 1].focus();
       }
     });
-
     box.addEventListener('keydown', (e) => {
       if (e.key === 'Backspace' && !box.value && idx > 0) {
         otpBoxes[idx - 1].focus();
       }
     });
-
     box.addEventListener('paste', (e) => {
       e.preventDefault();
-      const pasted = e.clipboardData?.getData('text').trim() || '';
-      if (/^\d{6}$/.test(pasted)) {
+      const pasted = (e.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+      if (pasted.length > 0) {
         pasted.split('').forEach((ch, i) => {
           if (otpBoxes[i]) otpBoxes[i].value = ch;
         });
-        otpBoxes[5].focus();
+        otpBoxes[Math.min(pasted.length, 5)]?.focus();
       }
     });
   });
@@ -381,13 +359,11 @@ export function renderLoginPage(): HTMLElement {
     }
   });
 
-  // Final Login Submission
   otpForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = emailInput.value.trim();
     const password = passwordInput.value;
     const otpCode = otpBoxes.map((b) => b.value).join('');
-
     if (otpCode.length !== 6) {
       showToast('Vui lòng nhập đủ 6 số OTP', 'error');
       return;
@@ -395,7 +371,7 @@ export function renderLoginPage(): HTMLElement {
 
     const finalLoginBtn = otpForm.querySelector<HTMLButtonElement>('#final-login-btn')!;
     finalLoginBtn.disabled = true;
-    finalLoginBtn.innerHTML = '<span class="spinner"></span> Đang xác thực…';
+    finalLoginBtn.innerHTML = '<span class="c-btn__spinner"></span><span>Đang xác thực…</span>';
 
     try {
       const result = await login({ email, password, otpCode });
@@ -405,17 +381,17 @@ export function renderLoginPage(): HTMLElement {
         couple: result.couple,
       });
       localStorage.setItem('lovecheck_token', result.token);
-      showToast('Đăng nhập thành công! 🎉', 'success');
+      triggerHaptic('confirm');
+      showToast('Đăng nhập thành công!', 'success');
       navigate('/app/home', true);
     } catch (err) {
       showToast(errorMessage(err, 'Đăng nhập thất bại. Mã OTP không đúng hoặc hết hạn!'), 'error');
     } finally {
       finalLoginBtn.disabled = false;
-      finalLoginBtn.innerHTML = '<span>Đăng nhập ngay</span>';
+      finalLoginBtn.innerHTML = `${iconMarkup('check', { size: 20 })}<span>Đăng nhập ngay</span>`;
     }
   });
 
-  // Mount Google Sign-in Button
   const googleWrap = googlePanel.querySelector<HTMLElement>('#google-button-wrap')!;
   const googleMount = googlePanel.querySelector<HTMLElement>('#google-signin-button')!;
   const googleStatus = googlePanel.querySelector<HTMLElement>('#google-login-status')!;
@@ -428,23 +404,16 @@ export function renderLoginPage(): HTMLElement {
 }
 
 function loadGoogleSdkScript(): Promise<void> {
-  if (window.google?.accounts?.id) {
-    return Promise.resolve();
-  }
-
-  if (googleSdkPromise) {
-    return googleSdkPromise;
-  }
+  if (window.google?.accounts?.id) return Promise.resolve();
+  if (googleSdkPromise) return googleSdkPromise;
 
   googleSdkPromise = new Promise<void>((resolve, reject) => {
     let attempts = 0;
-
     const load = (): void => {
       if (window.google?.accounts?.id) {
         resolve();
         return;
       }
-
       attempts += 1;
       const script = document.createElement('script');
       script.id = 'google-gsi-script';
@@ -462,16 +431,12 @@ function loadGoogleSdkScript(): Promise<void> {
       };
 
       script.onload = () => {
-        if (window.google?.accounts?.id) {
-          resolve();
-        } else {
-          retryOrReject();
-        }
+        if (window.google?.accounts?.id) resolve();
+        else retryOrReject();
       };
       script.onerror = retryOrReject;
       document.head.appendChild(script);
     };
-
     load();
   });
 
@@ -493,9 +458,7 @@ function mountGoogleSignInButton(
       mount,
       status,
       () => {
-        // Phải gọi trực tiếp window.LoveCheckAndroid.signInWithGoogle()
-        // Không dùng optional chaining ?.() vì TypeScript sẽ biên dịch thành .call()
-        // khiến Chromium Android WebView báo lỗi "non-injected object"
+        // Phải gọi trực tiếp window.LoveCheckAndroid.signInWithGoogle() (không dùng optional chaining ?.())
         if (window.LoveCheckAndroid && typeof window.LoveCheckAndroid.signInWithGoogle === 'function') {
           window.LoveCheckAndroid.signInWithGoogle();
         }
@@ -508,20 +471,16 @@ function mountGoogleSignInButton(
   const createMockGoogleBtn = () => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'btn-ghost btn-full';
+    btn.className = 'p-google-btn';
     btn.dataset.devGoogleLogin = 'true';
-    btn.style.cssText =
-      'margin-top: 10px; font-size: 14px; border: 1.5px dashed var(--accent); color: var(--accent); padding: 12px 16px; border-radius: 20px; background: rgba(255, 59, 127, 0.08); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; width: 280px; max-width: 100%;';
-    btn.innerHTML = '<span>🧪</span><span>Test với Google Mẫu (Dev Local)</span>';
-    btn.addEventListener('click', () => {
-      onCredential('mock-google-new-user');
-    });
+    btn.innerHTML = `${iconMarkup('google', { size: 20 })}<span>Dùng thử Google (Dev Local)</span>`;
+    btn.addEventListener('click', () => onCredential('mock-google-new-user'));
     return btn;
   };
 
   if (!GOOGLE_CLIENT_ID) {
     mount.replaceChildren(createMockGoogleBtn());
-    status.textContent = 'Chế độ Dev Local: Bấm nút trên để thử Luồng Google Mẫu.';
+    status.textContent = 'Chế độ Dev Local: bấm nút trên để thử luồng Google mẫu.';
     return;
   }
 
@@ -530,9 +489,7 @@ function mountGoogleSignInButton(
   void loadGoogleSdkScript()
     .then(() => {
       const googleId = window.google?.accounts?.id;
-      if (!googleId) {
-        throw new Error('Google Identity Services SDK loaded without the identity API');
-      }
+      if (!googleId) throw new Error('Google Identity Services SDK loaded without identity API');
 
       googleId.initialize({
         client_id: GOOGLE_CLIENT_ID,
@@ -558,8 +515,8 @@ function mountGoogleSignInButton(
       }
     })
     .catch((error: unknown) => {
-      console.error('[Google Sign-In] Failed to load or initialize Google Identity Services', error);
-      status.innerHTML = 'Không thể tải đăng nhập Google.<br>Vui lòng kiểm tra kết nối mạng.';
+      console.error('[Google Sign-In] Failed to load Google Identity Services', error);
+      status.textContent = 'Không thể tải đăng nhập Google. Kiểm tra kết nối mạng.';
       mount.replaceChildren(createMockGoogleBtn());
     });
 }
@@ -572,48 +529,37 @@ function mountNativeGoogleSignInButton(
 ): void {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'google-native-signin-button';
-  button.innerHTML = '<span class="google-native-signin-logo">G</span><span>Tiếp tục với Google</span>';
+  button.className = 'google-native-signin-button p-google-btn';
+  button.innerHTML = `${iconMarkup('google', { size: 20 })}<span>Tiếp tục với Google</span>`;
   mount.replaceChildren(button);
   status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
-  status.style.color = '';
 
   window.onNativeGoogleCredential = (credential: string) => {
     button.disabled = false;
     status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
-    status.style.color = '';
     onCredential(credential);
   };
   window.onNativeGoogleSignInError = (message: string) => {
     button.disabled = false;
     if (message === 'CANCELLED' || message.includes('Cancellation') || message.includes('huỷ')) {
       status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
-      status.style.color = '';
-      status.style.fontWeight = '';
       return;
     }
     const displayMsg = message || 'Không thể đăng nhập Google trên thiết bị này.';
-    showToast('❌ ' + displayMsg, 'error');
+    showToast(displayMsg, 'error');
     status.textContent = displayMsg;
-    status.style.color = '#e53935';
-    status.style.fontWeight = '500';
-    console.error('[Google Sign-In] Error:', displayMsg);
   };
 
   button.addEventListener('click', () => {
     button.disabled = true;
     status.textContent = 'Đang mở Google…';
-    status.style.color = '';
-    status.style.fontWeight = '';
     try {
       signInWithGoogle();
     } catch (error) {
       button.disabled = false;
       const errMsg = error instanceof Error ? error.message : 'Không thể gọi native Google sign-in.';
-      showToast('❌ ' + errMsg, 'error');
+      showToast(errMsg, 'error');
       status.textContent = errMsg;
-      status.style.color = '#e53935';
-      console.error('[Google Sign-In] Native call threw:', error);
     }
   });
 }
@@ -629,7 +575,6 @@ async function handleGoogleLogin(
 
   try {
     const result = await loginWithGoogle({ credential });
-
     store.set({
       token: result.token,
       user: result.user,
@@ -643,8 +588,6 @@ async function handleGoogleLogin(
     }
 
     if (!result.couple) {
-      // Google onboarding is a separate flow. Do not resume a stale partial
-      // Email/OTP registration step from the same browser session.
       [
         'dev_onboarding_step',
         'dev_onboarding_partnerName',
@@ -653,19 +596,15 @@ async function handleGoogleLogin(
         'dev_onboarding_useAccount',
       ].forEach((key) => sessionStorage.removeItem(key));
       sessionStorage.setItem('google_authenticated_user', 'true');
-      if (result.user.email) {
-        sessionStorage.setItem('dev_onboarding_email', result.user.email);
-      }
-      if (result.user.displayName) {
-        sessionStorage.setItem('dev_onboarding_displayName', result.user.displayName);
-      }
-      showToast('Đăng nhập Google thành công! Vui lòng hoàn tất thiết lập cặp đôi. ✨', 'info');
+      if (result.user.email) sessionStorage.setItem('dev_onboarding_email', result.user.email);
+      if (result.user.displayName) sessionStorage.setItem('dev_onboarding_displayName', result.user.displayName);
+      showToast('Đăng nhập Google thành công! Hãy hoàn tất ghép đôi nhé.', 'info');
       navigate('/app/google-onboarding', true);
     } else if (isDevGoogleLogin) {
-      showToast('Đăng nhập Dev Google thành công! Hãy kiểm tra thông tin của bạn.', 'info');
+      showToast('Đăng nhập Dev Google thành công!', 'info');
       navigate('/app/profile', true);
     } else {
-      showToast('Đăng nhập Google thành công! 🎉', 'success');
+      showToast('Đăng nhập Google thành công!', 'success');
       navigate('/app/home', true);
     }
   } catch (err) {
@@ -676,41 +615,28 @@ async function handleGoogleLogin(
   }
 }
 
-// Forgot Password Modal Component
 function createResetPasswordModal(): HTMLElement {
   const backdrop = document.createElement('div');
-  backdrop.className = 'auth-modal-backdrop hidden-modal';
+  backdrop.className = 'p-auth-modal-backdrop hidden-modal';
   backdrop.id = 'reset-password-modal';
 
   backdrop.innerHTML = `
-    <div class="auth-modal-card glass-card">
-      <button class="auth-modal-close" id="close-modal-btn">✕</button>
-      <h2 class="auth-modal-title">Khôi phục Mật khẩu</h2>
-      <p class="auth-modal-subtitle">Nhập email để đặt lại mật khẩu mới</p>
+    <div class="p-auth-modal-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h2 style="font-family:var(--font-display);font-size:20px;">Khôi phục mật khẩu</h2>
+        <button type="button" class="c-icon-btn c-icon-btn--ghost" id="close-modal-btn" aria-label="Đóng">${iconMarkup('close', { size: 20 })}</button>
+      </div>
+      <p class="u-text-secondary" style="font-size:13px;margin:0;">Nhập email để nhận mã đặt lại mật khẩu mới</p>
 
-      <!-- Modal Step 1 -->
-      <form id="reset-step1-form" class="auth-step-form">
-        <div class="form-group-v2">
-          <label class="form-label-v2" for="reset-email">Email tài khoản</label>
-          <div class="input-icon-wrapper">
-            <span class="input-icon">📧</span>
-            <input type="email" id="reset-email" class="input input-with-icon" placeholder="nhapemail@gmail.com" required />
-          </div>
-        </div>
-        <button type="submit" class="btn-primary btn-full" id="reset-send-otp-btn">Gửi mã xác thực</button>
+      <form id="reset-step1-form" class="p-auth-step" style="display:flex;flex-direction:column;gap:12px;">
+        <input type="email" id="reset-email" class="c-input" placeholder="ban@gmail.com" aria-label="Email tài khoản" required />
+        <button type="submit" class="c-btn c-btn--primary c-btn--pill c-btn--block" id="reset-send-otp-btn">Gửi mã xác thực</button>
       </form>
 
-      <!-- Modal Step 2 -->
-      <form id="reset-step2-form" class="auth-step-form hidden-step">
-        <div class="form-group-v2">
-          <label class="form-label-v2" for="reset-otp">Mã OTP (6 chữ số)</label>
-          <input type="text" id="reset-otp" class="input" placeholder="123456" maxlength="6" pattern="[0-9]*" inputmode="numeric" required />
-        </div>
-        <div class="form-group-v2">
-          <label class="form-label-v2" for="reset-new-pwd">Mật khẩu mới</label>
-          <input type="password" id="reset-new-pwd" class="input" placeholder="Mật khẩu mới (tối thiểu 6 ký tự)" minlength="6" required />
-        </div>
-        <button type="submit" class="btn-primary btn-full" id="reset-confirm-btn">Đổi mật khẩu & Đăng nhập</button>
+      <form id="reset-step2-form" class="p-auth-step hidden-step" style="display:flex;flex-direction:column;gap:12px;">
+        <input type="text" id="reset-otp" class="c-input" placeholder="Mã OTP 6 chữ số" maxlength="6" pattern="[0-9]*" inputmode="numeric" aria-label="Mã OTP" required />
+        <input type="password" id="reset-new-pwd" class="c-input" placeholder="Mật khẩu mới (tối thiểu 6 ký tự)" minlength="6" aria-label="Mật khẩu mới" required />
+        <button type="submit" class="c-btn c-btn--primary c-btn--pill c-btn--block" id="reset-confirm-btn">Đổi mật khẩu</button>
       </form>
     </div>
   `;
@@ -737,7 +663,7 @@ function createResetPasswordModal(): HTMLElement {
 
     try {
       await requestPasswordReset(email);
-      showToast(`Mã khôi phục đã được gửi tới ${email}`, 'success');
+      showToast(`Mã khôi phục đã gửi tới ${email}`, 'success');
       step1Form.classList.add('hidden-step');
       step2Form.classList.remove('hidden-step');
     } catch (err) {
@@ -753,7 +679,6 @@ function createResetPasswordModal(): HTMLElement {
     const email = resetEmailInput.value.trim();
     const otp = resetOtpInput.value.trim();
     const newPwd = resetNewPwdInput.value;
-
     if (!email || !otp || !newPwd) return;
 
     const btn = backdrop.querySelector<HTMLButtonElement>('#reset-confirm-btn')!;
@@ -762,13 +687,13 @@ function createResetPasswordModal(): HTMLElement {
 
     try {
       await confirmPasswordReset(email, otp, newPwd);
-      showToast('Đã đổi mật khẩu thành công! Vui lòng đăng nhập lại.', 'success');
+      showToast('Đã đổi mật khẩu thành công! Hãy đăng nhập lại nhé.', 'success');
       closeResetModal(backdrop);
     } catch (err) {
       showToast(errorMessage(err, 'Đổi mật khẩu thất bại. Kiểm tra lại mã OTP!'), 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Đổi mật khẩu & Đăng nhập';
+      btn.textContent = 'Đổi mật khẩu';
     }
   });
 

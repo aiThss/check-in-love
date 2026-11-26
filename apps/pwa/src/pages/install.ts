@@ -1,109 +1,110 @@
+import '../styles/20-pages/auth.css';
 import { navigate } from '../router';
+import { iconMarkup } from '../ui/icons/icons';
+import { createBadge, createButton } from '../ui/primitives';
 
-// ── Install Page ──────────────────────────────────────────────────────────────
+function detectInAppBrowser(ua: string): string | null {
+  if (/Zalo/i.test(ua)) return 'Zalo';
+  if (/FBAN|FBAV|Messenger/i.test(ua)) return 'Facebook / Messenger';
+  if (/Instagram/i.test(ua)) return 'Instagram';
+  if (/BytedanceWebview|Musical_ly|TikTok/i.test(ua)) return 'TikTok';
+  return null;
+}
 
 export function renderInstallPage(): HTMLElement {
-  // Detect if already in standalone mode → redirect immediately
   const isStandalone =
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    window.matchMedia('(display-mode: standalone)').matches
+    || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
   if (isStandalone) {
     requestAnimationFrame(() => navigate('/onboarding', true));
     return document.createElement('div');
   }
 
-  // Detect iOS
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as Window & { MSStream?: unknown }).MSStream;
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as Window & { MSStream?: unknown }).MSStream;
+  const inAppName = detectInAppBrowser(ua);
 
   const page = document.createElement('div');
-  page.className = 'page-no-nav animate-fade-in';
-  page.style.cssText = `
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100dvh;
-    padding: 32px 24px;
-    gap: 28px;
-    text-align: center;
-    background: var(--bg);
-  `;
+  page.className = 'page-no-nav p-auth animate-fade-in';
+  page.style.justifyContent = 'center';
 
-  if (!isIOS) {
-    // Non-iOS: show brief PWA message and auto-redirect
+  if (!isIOS && !inAppName) {
     page.innerHTML = `
-      <div style="font-size:72px;line-height:1" class="animate-pulse">💕</div>
-      <div>
-        <h1 style="font-size:26px;font-weight:700;letter-spacing:-0.03em;margin-bottom:8px">Check IN Love</h1>
-        <p style="font-size:15px;color:var(--text-secondary);line-height:1.6">App check-in riêng tư cho hai đứa.<br>Đang mở ứng dụng...</p>
+      <div class="p-auth-hero" style="margin:auto;">
+        <div class="p-auth-emblem">${iconMarkup('couple', { size: 32, variant: 'filled' })}</div>
+        <h1 class="p-auth-title">Check IN Love</h1>
+        <p class="p-auth-sub">Không gian check-in riêng tư của hai đứa.<br>Đang chuẩn bị mở ứng dụng...</p>
       </div>
-      <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
     `;
-    setTimeout(() => navigate('/onboarding', true), 2000);
+    setTimeout(() => navigate('/onboarding', true), 1200);
     return page;
   }
 
-  // iOS guide
-  page.innerHTML = `
-    <div style="font-size:72px;line-height:1" class="animate-pulse">💕</div>
+  const main = document.createElement('main');
+  main.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:18px;margin:auto 0;';
 
-    <div>
-      <h1 style="font-size:26px;font-weight:700;letter-spacing:-0.03em;margin-bottom:8px">
-        Thêm Check IN Love<br>vào màn hình
-      </h1>
-      <p style="font-size:15px;color:var(--text-secondary);line-height:1.6">
-        Để trải nghiệm tốt nhất, hãy thêm app<br>vào màn hình chính của bạn nhé 💕
-      </p>
-    </div>
+  main.appendChild(createBadge('Trải nghiệm trọn vẹn nhất', 'gold'));
 
-    <div class="install-steps">
-      <div class="install-step stagger-1 animate-slide-up">
-        <span class="install-step-icon">📤</span>
-        <span class="install-step-text">Bấm nút <strong>Share</strong> ở thanh dưới cùng Safari</span>
-      </div>
-      <div class="install-arrow animate-bounce">↓</div>
-      <div class="install-step stagger-2 animate-slide-up">
-        <span class="install-step-icon">📲</span>
-        <span class="install-step-text">Kéo xuống và chọn <strong>"Thêm vào Màn hình chính"</strong></span>
-      </div>
-      <div class="install-arrow animate-bounce" style="animation-delay:200ms">↓</div>
-      <div class="install-step stagger-3 animate-slide-up">
-        <span class="install-step-icon">✅</span>
-        <span class="install-step-text">Bấm <strong>"Thêm"</strong> rồi mở app từ màn hình chính</span>
-      </div>
-    </div>
-
-    <div style="width:100%;max-width:320px;margin-top:8px">
-      <div style="
-        background:var(--accent-soft);
-        border:1px solid var(--accent);
-        border-radius:16px;
-        padding:14px 16px;
-        display:flex;
-        align-items:center;
-        gap:10px;
-        text-align:left;
-      ">
-        <span style="font-size:22px">💡</span>
-        <span style="font-size:13px;color:var(--accent);line-height:1.5;font-weight:500">
-          Nút Share trông như thế này: <strong>□↑</strong> ở thanh dưới cùng trình duyệt Safari
-        </span>
-      </div>
-    </div>
-
-    <button
-      id="skip-install-btn"
-      class="btn-ghost"
-      style="margin-top:8px;font-size:14px"
-    >
-      Bỏ qua, tiếp tục trong trình duyệt
-    </button>
+  const hero = document.createElement('div');
+  hero.className = 'p-auth-hero';
+  hero.innerHTML = `
+    <div class="p-auth-emblem">${iconMarkup('install', { size: 32, variant: 'filled' })}</div>
+    <h1 class="p-auth-title">Thêm Check IN Love vào màn hình chính</h1>
+    <p class="p-auth-sub">Mở toàn màn hình mượt như ứng dụng riêng và nhận thông báo tức thì khi người ấy gửi ảnh.</p>
   `;
+  main.appendChild(hero);
 
-  page.querySelector('#skip-install-btn')?.addEventListener('click', () => {
-    navigate('/onboarding', true);
+  if (inAppName) {
+    const alert = document.createElement('div');
+    alert.className = 'p-install-alert';
+    alert.innerHTML = `
+      ${iconMarkup('alert', { size: 20, variant: 'filled' })}
+      <div>
+        <strong>Bạn đang mở trong ${inAppName}.</strong><br>
+        Hãy bấm nút menu <strong>⋯</strong> ở góc trên và chọn <strong>"Mở bằng trình duyệt Safari / Chrome"</strong> để cài đặt ứng dụng nhé.
+      </div>
+    `;
+    main.appendChild(alert);
+  }
+
+  const steps = document.createElement('div');
+  steps.className = 'p-install-steps';
+  steps.innerHTML = `
+    <div class="p-install-step">
+      <span class="p-install-step__num">${iconMarkup('share', { size: 20 })}</span>
+      <div>
+        <strong style="display:block;font-size:14px;">Bước 1 · Bấm nút Chia sẻ (Share)</strong>
+        <span class="u-text-secondary" style="font-size:12px;">Nằm ở thanh công cụ dưới cùng của trình duyệt Safari.</span>
+      </div>
+    </div>
+    <div class="p-install-step">
+      <span class="p-install-step__num">${iconMarkup('install', { size: 20 })}</span>
+      <div>
+        <strong style="display:block;font-size:14px;">Bước 2 · Chọn "Thêm vào Màn hình chính"</strong>
+        <span class="u-text-secondary" style="font-size:12px;">Cuộn nhẹ danh sách tuỳ chọn rồi chạm "Add to Home Screen".</span>
+      </div>
+    </div>
+    <div class="p-install-step">
+      <span class="p-install-step__num">${iconMarkup('heart', { size: 20, variant: 'filled' })}</span>
+      <div>
+        <strong style="display:block;font-size:14px;">Bước 3 · Mở biểu tượng từ Màn hình chính</strong>
+        <span class="u-text-secondary" style="font-size:12px;">Bấm "Thêm" ở góc phải trên cùng là hoàn tất.</span>
+      </div>
+    </div>
+  `;
+  main.appendChild(steps);
+
+  const skipBtn = createButton({
+    label: 'Tiếp tục ngay trong trình duyệt',
+    variant: 'ghost',
+    pill: true,
+    block: true,
+    onClick: () => navigate('/onboarding', true),
   });
+  skipBtn.element.id = 'skip-install-btn';
+  main.appendChild(skipBtn.element);
 
+  page.appendChild(main);
   return page;
 }
