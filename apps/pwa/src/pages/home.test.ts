@@ -81,7 +81,11 @@ describe('Home interaction patches', () => {
     }];
     mocks.addReply.mockResolvedValue(replies);
 
-    const { renderHomePage } = await import('./home');
+    const { renderHomePage, HOME_POLAROID_DEVELOP_MS, renderHomePolaroidDevelop } = await import('./home');
+    expect(HOME_POLAROID_DEVELOP_MS).toBe(2000);
+    const polaroidEl = renderHomePolaroidDevelop();
+    expect(polaroidEl.querySelector('svg.l-polaroid .l-polaroid__photo')).not.toBeNull();
+
     const page = renderHomePage();
     document.body.appendChild(page);
     await flush();

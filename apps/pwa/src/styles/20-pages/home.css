@@ -75,12 +75,15 @@
 
   .p-home-hero__title {
     font-family: var(--font-display);
-    font-size: clamp(22px, 6vw, 28px);
+    font-size: clamp(21px, 5.6vw, 28px);
     font-weight: 600;
-    line-height: 1.15;
+    line-height: 1.18;
     letter-spacing: -0.02em;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .p-home-hero__title em { font-style: italic; color: var(--accent-500); }
@@ -125,11 +128,38 @@
     padding: 0 var(--space-5) var(--space-2);
   }
 
-  .p-home-section-head__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); }
+  .p-home-section-head__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .p-home-section-head__accent { color: var(--accent-600); font-style: italic; }
 
-  .p-home-stage { padding: 0 var(--space-4); }
+  .p-home-stage { position: relative; padding: 0 var(--space-4); }
   .p-home-polaroid-wrap { display: flex; flex-direction: column; gap: var(--space-3); }
+
+  .p-home-polaroid-develop {
+    min-height: 300px;
+    padding: 24px 16px;
+    border-radius: var(--radius-xl);
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-stroke-color);
+    box-shadow: var(--sticker-shadow), var(--elev-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .p-home-polaroid-develop--overlay {
+    position: absolute;
+    inset: 0 var(--space-4);
+    z-index: 6;
+  }
+
+  .p-home-polaroid-develop__label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    letter-spacing: 0.01em;
+  }
 
   .p-home-polaroid {
     position: relative;
@@ -301,7 +331,8 @@
     flex-shrink: 0;
   }
 
-  .p-home-journey__title { display: block; font-family: var(--font-display); font-size: var(--text-base); font-weight: 600; color: var(--text-primary); }
+  .p-home-journey__lead > div:last-child { min-width: 0; }
+  .p-home-journey__title { display: block; font-family: var(--font-display); font-size: clamp(14px, 4vw, 16px); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .p-home-journey__sub { display: block; font-size: var(--text-xs); color: var(--text-secondary); }
 
   .p-home-recent { margin-top: var(--space-5); padding: 0 var(--space-4) var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }

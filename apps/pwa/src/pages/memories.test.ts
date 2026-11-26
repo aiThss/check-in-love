@@ -66,7 +66,11 @@ describe('Memories 3-mode instant filter, metadata format & hidden reaction tray
       });
     });
 
-    const { renderMemoriesPage } = await import('./memories');
+    const { renderMemoriesPage, MEMORIES_POLAROID_DEVELOP_MS, renderMemoriesPolaroidSkeleton } = await import('./memories');
+    expect(MEMORIES_POLAROID_DEVELOP_MS).toBe(1500);
+    const skel = renderMemoriesPolaroidSkeleton();
+    expect(skel.querySelectorAll('.l-polaroid__photo--memories').length).toBe(8);
+
     const page = renderMemoriesPage();
     document.body.appendChild(page);
     await new Promise((r) => setTimeout(r, 25));

@@ -18,10 +18,12 @@
 
   .p-profile-header h1 {
     font-family: var(--font-display);
-    font-size: var(--text-2xl);
+    font-size: clamp(21px, 5.6vw, 26px);
     font-weight: 600;
     letter-spacing: -0.02em;
+    line-height: 1.18;
     color: var(--text-primary);
+    white-space: nowrap;
   }
 
   .p-profile-header p {

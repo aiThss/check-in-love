@@ -331,3 +331,12 @@ Mẫu mỗi mục:
   - Tinh chỉnh hiển thị trên thẻ ảnh Kỷ niệm (`memories.ts`, `memories.css`): dòng 1 là `username`, xuống dòng 2 là `HH:mm dd/mm` (`00:00 dd/mm`), ẩn hoàn toàn dòng mặc định `"Khoảnh khắc chung"`; nếu có lời nhắn riêng thì hiển thị bằng font `var(--font-display)` giống Trang chủ, đồng bộ font chữ này cho cả phần lời nhắn riêng khi bấm xem chi tiết (`polaroid-cover.ts`, `polaroid-cover.css`, `memories.css` — giữ nguyên font thường cho tên & ngày giờ).
   - Đưa style `.choice-reaction-custom` / `.reaction-custom-form` và `.c-reaction-tray` về `10-components/card-avatar-badge.css`, bo tròn viên thuốc (`border-radius: var(--radius-pill)`) cho khung nhập emoji tùy chọn.
 - Kiểm: lint ✅ · test ✅ (33 file / 159 test pass) · build PWA ✅ · deploy Cloudflare Pages + push `main` ✅.
+
+
+## 2026-11-26 23:48 — Chuẩn hoá Tiêu đề, căn giữa nút "Thả", khôi phục Polaroid 2s/1,5s & Bộ Icon Mới (Gemini)
+- Làm:
+  - Chuẩn hoá toàn bộ tiêu đề các màn hình về 1 dòng cho tiêu đề ngắn (`Kỷ niệm hai đứa` + cụm 3 nút lọc `Tất cả - Người ấy - Của mình`, `Hồ sơ hai đứa`, `Gửi khoảnh khắc`, `Thử chút điều mới`, `Phản hồi khoảnh khắc`, `Gửi thử mã OTP`, `Hai đứa mình`) và 2 dòng cân đối `text-wrap: balance` cho tiêu đề dài (`Bản đồ hẹn hò & Điều ước`, `Bộ thiệp cào ngày đặc biệt`, các bước Onboarding dài & modal/sheet).
+  - Sửa dứt điểm lỗi chữ `"Thả"` bị lệch phải trong ô button `.choice-reaction-custom button` do kế thừa `width: 48px` từ `@layer legacy` (`card-avatar-badge.css`).
+  - Bóc tách và khôi phục hiệu ứng tráng ảnh Polaroid `@keyframes photoDevelop` với thời lượng **`2s` ở Home** (`home.ts`, `home.css`) và **`1,5s` ở Kỷ niệm** (`memories.ts`, `memories.css`, `animations.css` — 8 tấm Polaroid nghiêng xen kẽ), chỉ kích hoạt khi mở lần đầu trong phiên và khi bấm nút Làm mới để bảo toàn tốc độ chuyển tab `0ms`.
+  - Triển khai bộ icon mới kết hợp theo lựa chọn user (`icons.ts`, `icons.css`, `smile-plus-icon.ts`): giữ nguyên `streak` & `react-fire`; áp dụng Liquid Glass Đa Lớp (Demo 1) cho `memories`/`gallery`/`image` và `send`; vẽ lại `chat` theo bố cục 2 bong bóng chồng lớp của Ảnh 3 phối men hồng san hô - vàng mật ong viền mực (Demo 3); đổi `settings` sang bánh răng 8 răng cưa tráng men; nâng cấp các icon còn lại sang Enamel Pin Sticker (Demo 3) tương phản cao cả Sáng & Tối.
+- Kiểm: lint ✅ (0 lỗi, 0 cảnh báo) · test ✅ (**33 file / 159 test pass**) · build PWA ✅ · `git diff 65924d3 -- apps/api packages apps/admin` rỗng ✅.

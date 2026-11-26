@@ -1,8 +1,50 @@
 /* ============================================================
-   10-components/icons.css — Bespoke "Nét Yêu" SVG Icon System
+   10-components/icons.css — Hybrid Enamel Sticker & Liquid Glass Icons
    ============================================================ */
 
 @layer components {
+  :root {
+    --cil-enamel-stroke: #461c31;
+    --cil-enamel-rose: rgba(240, 46, 117, 0.34);
+    --cil-enamel-rose-active: var(--accent-500, #ec2a72);
+    --cil-enamel-gold: #f7c154;
+    --cil-enamel-cream: #fff8fb;
+    --cil-lg-stop-1: #ff74aa;
+    --cil-lg-stop-2: #e61e68;
+    --cil-lg-back: rgba(236, 42, 114, 0.28);
+    --cil-lg-detail: #ffffff;
+  }
+
+  [data-theme='dark'] {
+    --cil-enamel-stroke: #ffe0ec;
+    --cil-enamel-rose: rgba(255, 92, 151, 0.44);
+    --cil-enamel-rose-active: var(--accent-500, #ff4788);
+    --cil-enamel-gold: #ffd479;
+    --cil-enamel-cream: #fff0f6;
+    --cil-lg-stop-1: #ff80b3;
+    --cil-lg-stop-2: #ef236f;
+    --cil-lg-back: rgba(255, 71, 136, 0.36);
+    --cil-lg-detail: #ffffff;
+  }
+
+  /* High-contrast adaptation inside solid accent buttons */
+  .c-btn--primary,
+  .rm-send-message,
+  .messages-send-button,
+  .journey-tab-btn.active,
+  .journey-add-pin-btn,
+  .journey-filter-pill.active,
+  .p-checkin-tab.active,
+  .p-auth-tab.active {
+    --cil-enamel-stroke: #3f162b;
+    --cil-enamel-rose: rgba(255, 242, 247, 0.92);
+    --cil-enamel-rose-active: #ffffff;
+    --cil-lg-stop-1: #ffffff;
+    --cil-lg-stop-2: rgba(255, 236, 244, 0.9);
+    --cil-lg-back: rgba(255, 255, 255, 0.34);
+    --cil-lg-detail: #e11d68;
+  }
+
   .c-icon {
     display: inline-block;
     width: 24px;
@@ -12,7 +54,7 @@
     color: currentColor;
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.75;
+    stroke-width: 1.85;
     stroke-linecap: round;
     stroke-linejoin: round;
     overflow: visible;
@@ -21,12 +63,13 @@
       opacity var(--duration-fast) var(--ease-standard);
   }
 
-  .c-icon--16 { width: 16px; height: 16px; stroke-width: 1.9; }
-  .c-icon--20 { width: 20px; height: 20px; stroke-width: 1.8; }
+  .c-icon--16 { width: 16px; height: 16px; stroke-width: 1.95; }
+  .c-icon--20 { width: 20px; height: 20px; stroke-width: 1.85; }
   .c-icon--24 { width: 24px; height: 24px; }
-  .c-icon--28 { width: 28px; height: 28px; stroke-width: 1.65; }
-  .c-icon--32 { width: 32px; height: 32px; stroke-width: 1.6; }
+  .c-icon--28 { width: 28px; height: 28px; stroke-width: 1.75; }
+  .c-icon--32 { width: 32px; height: 32px; stroke-width: 1.7; }
 
+  /* Preserved legacy tone rules for untouched streak / react-fire icons */
   .c-icon .cil-tone {
     fill: currentColor;
     stroke: none;
@@ -47,30 +90,86 @@
     fill: currentColor;
   }
 
+  /* Demo 3 — Enamel Pin Sticker layers */
+  .c-icon .cil-enamel-rose {
+    fill: var(--cil-enamel-rose);
+    stroke: var(--cil-enamel-stroke);
+    stroke-width: 1.85;
+    transition: fill var(--duration-fast) var(--ease-standard);
+  }
+
+  .c-icon--filled .cil-enamel-rose {
+    fill: var(--cil-enamel-rose-active);
+  }
+
+  .c-icon .cil-enamel-gold {
+    fill: var(--cil-enamel-gold);
+    stroke: var(--cil-enamel-stroke);
+    stroke-width: 1.65;
+  }
+
+  .c-icon .cil-enamel-cream {
+    fill: var(--cil-enamel-cream);
+    stroke: var(--cil-enamel-stroke);
+    stroke-width: 1.5;
+  }
+
+  .c-icon .cil-ink {
+    fill: none;
+    stroke: var(--cil-enamel-stroke);
+    stroke-width: 1.85;
+  }
+
+  .c-icon .cil-ink-dot {
+    fill: var(--cil-enamel-stroke);
+    stroke: none;
+  }
+
+  .c-icon .cil-gloss {
+    fill: none;
+    stroke: #ffffff;
+    stroke-opacity: 0.9;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+  }
+
+  /* Demo 1 — Liquid Glass Đa Lớp layers (Memories & Send) */
+  .c-icon .cil-lg-back {
+    fill: var(--cil-lg-back);
+    stroke: none;
+  }
+
+  .c-icon .cil-lg-front {
+    stroke: rgba(255, 255, 255, 0.44);
+    stroke-width: 0.8;
+    opacity: 0.88;
+  }
+
+  .c-icon--filled .cil-lg-front {
+    opacity: 1;
+  }
+
+  .c-icon .cil-lg-detail {
+    fill: var(--cil-lg-detail);
+    fill-opacity: 0.92;
+    stroke: none;
+  }
+
+  .c-icon .cil-lg-stroke {
+    fill: none;
+    stroke: var(--cil-lg-detail);
+    stroke-opacity: 0.92;
+    stroke-width: 1.55;
+    stroke-linecap: round;
+  }
+
   /* ── Compositor & Stroke Micro-Animations ─────────────────── */
-  .c-icon--pop {
-    animation: cil-icon-pop var(--duration-base) var(--ease-spring);
-  }
-
-  .c-icon--heartbeat {
-    animation: cil-icon-heartbeat 420ms var(--ease-spring);
-  }
-
-  .c-icon--shutter {
-    animation: cil-icon-shutter 220ms var(--ease-emphasized);
-  }
-
-  .c-icon--fly {
-    animation: cil-icon-fly 280ms var(--ease-emphasized);
-  }
-
-  .c-icon--spin {
-    animation: cil-icon-spin 720ms linear infinite;
-  }
-
-  .c-icon--shake {
-    animation: cil-icon-shake 380ms var(--ease-standard);
-  }
+  .c-icon--pop { animation: cil-icon-pop var(--duration-base) var(--ease-spring); }
+  .c-icon--heartbeat { animation: cil-icon-heartbeat 420ms var(--ease-spring); }
+  .c-icon--shutter { animation: cil-icon-shutter 220ms var(--ease-emphasized); }
+  .c-icon--fly { animation: cil-icon-fly 280ms var(--ease-emphasized); }
+  .c-icon--spin { animation: cil-icon-spin 720ms linear infinite; }
+  .c-icon--shake { animation: cil-icon-shake 380ms var(--ease-standard); }
 
   .c-icon--draw {
     stroke-dasharray: 36;
@@ -104,9 +203,7 @@
     100% { transform: translate(0, 0) scale(1); }
   }
 
-  @keyframes cil-icon-spin {
-    to { transform: rotate(360deg); }
-  }
+  @keyframes cil-icon-spin { to { transform: rotate(360deg); } }
 
   @keyframes cil-icon-shake {
     0%, 100% { transform: rotate(0deg); }
@@ -115,7 +212,5 @@
     75% { transform: rotate(-8deg); }
   }
 
-  @keyframes cil-icon-draw {
-    to { stroke-dashoffset: 0; }
-  }
+  @keyframes cil-icon-draw { to { stroke-dashoffset: 0; } }
 }

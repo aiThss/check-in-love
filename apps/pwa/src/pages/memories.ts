@@ -14,7 +14,7 @@ import { getReplyPagePath } from '../components/reply-toggle';
 import { iconMarkup } from '../ui/icons/icons';
 import { createButton } from '../ui/primitives';
 import { createSegmentedControl } from '../ui/forms';
-import { createEmptyState, createSkeleton } from '../ui/feedback';
+import { createEmptyState } from '../ui/feedback';
 import { triggerHaptic } from '../ui/haptics';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
@@ -290,16 +290,43 @@ function renderReplies(container: HTMLElement, replies: CheckInReply[]): void {
   });
 }
 
-function renderSkeletonGrid(): HTMLElement {
+export const MEMORIES_POLAROID_DEVELOP_MS = 1500;
+let hasPlayedMemoriesPolaroidIntro = false;
+
+function shouldSkipMemoriesPolaroidDelay(): boolean {
+  const env = (import.meta as unknown as { env?: { VITEST?: boolean; MODE?: string } }).env;
+  if (env?.VITEST || env?.MODE === 'test') return true;
+  if (typeof document !== 'undefined' && document.documentElement.dataset.reducedMotion === 'on') return true;
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+  }
+  return false;
+}
+
+export function renderMemoriesPolaroidSkeleton(): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'p-memories-skel-grid';
-  for (let i = 0; i < 6; i++) {
-    const card = document.createElement('div');
-    card.className = 'p-memory-tile';
-    card.appendChild(createSkeleton({ height: '164px' }));
-    card.appendChild(createSkeleton({ width: '75%', height: '12px' }));
-    wrap.appendChild(card);
-  }
+  const rotations = ['-4deg', '3deg', '2deg', '-3deg', '4deg', '-2deg', '-5deg', '1deg'];
+  wrap.innerHTML = rotations
+    .map(
+      (deg, i) => `
+      <div class="p-memories-polaroid-skel">
+        <svg viewBox="0 0 64 76" width="86" height="102" style="transform:rotate(${deg});filter:drop-shadow(0 4px 14px rgba(115,44,68,0.15));overflow:visible;" aria-hidden="true">
+          <defs>
+            <linearGradient id="memPolGrad${i}" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ffb3cc"/>
+              <stop offset="55%" stop-color="#ff85a1"/>
+              <stop offset="100%" stop-color="#c0456c"/>
+            </linearGradient>
+          </defs>
+          <rect width="64" height="76" rx="4" fill="#fff4f7"/>
+          <rect class="l-polaroid__photo l-polaroid__photo--memories" x="6" y="6" width="52" height="52" rx="2" fill="url(#memPolGrad${i})"/>
+          <rect x="10" y="66" width="26" height="3" rx="1.5" fill="#c0456c" opacity=".4"/>
+        </svg>
+      </div>
+    `,
+    )
+    .join('');
   return wrap;
 }
 
@@ -648,21 +675,34 @@ export function renderMemoriesPage(): HTMLElement {
     }
   }
 
-  async function fetchMemories(page = 1, append = false): Promise<void> {
+  async function fetchMemories(page = 1, append = false, forceDevelop = false): Promise<void> {
     if (isLoading) return;
     isLoading = true;
 
     const refreshBtn = header.querySelector<HTMLButtonElement>('#refresh-btn');
     if (refreshBtn) setRefreshButtonLoading(refreshBtn, true);
 
-    if (page === 1 && !append && allItems.length === 0) {
+    const showPolaroidDevelop =
+      page === 1 && !append && (forceDevelop || (!hasPlayedMemoriesPolaroidIntro && allItems.length === 0));
+    let minWaitPromise: Promise<void> = Promise.resolve();
+
+    if (showPolaroidDevelop) {
       grid.style.display = 'none';
-      skelHolder.replaceChildren(renderSkeletonGrid());
+      skelHolder.replaceChildren(renderMemoriesPolaroidSkeleton());
+      const waitMs = shouldSkipMemoriesPolaroidDelay() ? 0 : MEMORIES_POLAROID_DEVELOP_MS;
+      if (waitMs > 0) {
+        minWaitPromise = new Promise<void>((resolve) => window.setTimeout(resolve, waitMs));
+      }
     }
 
     try {
-      const res = await getCheckins(page, PAGE_BATCH, undefined, 'photo');
+      const [res] = await Promise.all([
+        getCheckins(page, PAGE_BATCH, undefined, 'photo'),
+        minWaitPromise,
+      ]);
+      hasPlayedMemoriesPolaroidIntro = true;
       isLoading = false;
+      skelHolder.replaceChildren();
       if (refreshBtn) setRefreshButtonLoading(refreshBtn, false);
 
       const items = res.data || [];
@@ -1009,7 +1049,7 @@ export function renderMemoriesPage(): HTMLElement {
     displayedLimit = PAGE_BATCH;
     currentPage = 1;
     triggerHaptic('tap');
-    void fetchMemories(1);
+    void fetchMemories(1, false, true);
     showToast('Đang làm mới kỷ niệm...', 'loading-spark');
   });
 

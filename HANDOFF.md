@@ -27,6 +27,12 @@ Yêu cầu phụ: "tôi cần thêm 1 cái log hay gì đó để nếu bạn h�
   - Khôi phục hiệu ứng lò xo mượt mà cho nút `+` thêm ảnh (`nav.ts`, `shell.css`), khôi phục khung Preview Library cổ điển ở `checkin.ts` + trang `/preview/cards` (`card-preview.ts`), rút gọn placeholder Love Foil thành `"Lời nhắn hiển thị trước khi cào"`, và khoá cuộn/chạm nền bản đồ khi mở modal Thêm toạ độ hẹn hò (`love-journey.ts`).
   - Nâng cấp workflow GitHub Actions (`android-patch-release.yml` hỗ trợ SDK 37) và đóng gói phát hành `app-release.apk` `v0.0.50` (`versionCode 62`) lên GitHub Releases + triển khai PWA lên Cloudflare Pages (`couple.io.vn`).
 
+- [x] Chuẩn hoá tiêu đề toàn app, nút `"Thả"`, hiệu ứng tráng ảnh Polaroid & Bộ Icon Mới:
+  - Chuẩn hoá toàn bộ tiêu đề các màn hình về 1 dòng (`Kỷ niệm hai đứa`, `Hồ sơ hai đứa`, `Gửi khoảnh khắc`, `Thử chút điều mới`, v.v.) và 2 dòng cân đối `text-wrap: balance` cho tiêu đề dài, đồng thời ép thanh lọc `Tất cả - Người ấy - Của mình` nằm gọn 1 dòng trên mobile (`memories.css`, `home.css`, `profile.css`, `checkin.css`, `journey.css`, `secondary.css`, `auth.css`, `chat-layout.css`, `overlays.css`).
+  - Sửa lỗi chữ `"Thả"` lệch phải trong modal thả cảm xúc bằng `width: auto; min-width: 60px; display: inline-flex; justify-content: center` (`card-avatar-badge.css`).
+  - Khôi phục hiệu ứng tráng ảnh Polaroid từ commit gốc với thời lượng `2s` ở Trang chủ (`home.ts`) và `1,5s` ở Kỷ niệm (`memories.ts`, `animations.css`), kích hoạt khi mở lần đầu trong phiên và khi bấm nút Làm mới, giữ nguyên chuyển tab tức thì `0ms`.
+  - Nâng cấp hệ thống icon (`icons.ts`, `icons.css`, `smile-plus-icon.ts`): giữ nguyên Chuỗi ngày (`streak`, `react-fire`), áp dụng Liquid Glass Đa Lớp (Demo 1) cho `memories`/`gallery`/`image` & `send`, vẽ lại `chat` theo bố cục 2 bong bóng chồng lớp Ảnh 3 kết hợp tráng men hồng-vàng viền mực (Demo 3), đổi `settings` thành bánh răng 8 cạnh tráng men, và đồng bộ các icon còn lại sang Enamel Pin Sticker (Demo 3).
+
 ## 2. Trạng thái hiện tại
 - **Toàn bộ 10 giai đoạn (P0 → P9) và các bản vá hậu kiểm thực tế đã hoàn thành, triển khai lên `main`, Cloudflare Pages và GitHub Releases (`v0.0.50`).**
 - Kiểm chứng cuối cùng:

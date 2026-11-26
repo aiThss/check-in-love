@@ -124,6 +124,14 @@ describe('Design System v2 (P1 Foundation)', () => {
     expect(labelled.classList.contains('c-icon--pop')).toBe(true);
     expect(REACTION_ICON_MAP['❤️']).toBe('heart');
     expect(REACTION_ICON_MAP['😂']).toBe('react-haha');
+
+    // Verify hybrid icon set contract: streak preserved, memories & send use Liquid Glass, chat & settings use Enamel Sticker
+    expect(iconMarkup('streak')).toContain('cil-tone cil-fill-active');
+    expect(iconMarkup('memories')).toContain('cil-lg-front');
+    expect(iconMarkup('send')).toContain('cil-lg-front');
+    expect(iconMarkup('chat')).toContain('cil-enamel-gold');
+    expect(iconMarkup('chat')).toContain('cil-enamel-rose');
+    expect(iconMarkup('settings')).toContain('M10.6 2.7h2.8');
   });
 
   it('renders accessible UI components and interactive states cleanly', () => {

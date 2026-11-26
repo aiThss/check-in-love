@@ -73,8 +73,16 @@
   .c-sheet__title {
     margin: 0;
     font-family: var(--font-display);
-    font-size: var(--text-lg);
+    font-size: clamp(16px, 4.5vw, 19px);
+    line-height: 1.22;
     font-weight: var(--font-weight-semibold);
+    text-wrap: balance;
+  }
+
+  .modal-title {
+    font-size: clamp(16px, 4.5vw, 19px);
+    line-height: 1.22;
+    text-wrap: balance;
   }
 
   .c-sheet__body {
@@ -116,8 +124,10 @@
   .c-dialog__title {
     margin: 0 0 var(--space-2);
     font-family: var(--font-display);
-    font-size: var(--text-lg);
+    font-size: clamp(16px, 4.5vw, 19px);
+    line-height: 1.22;
     font-weight: var(--font-weight-semibold);
+    text-wrap: balance;
   }
 
   .c-dialog__desc {

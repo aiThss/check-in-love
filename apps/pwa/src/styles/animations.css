@@ -288,5 +288,9 @@
 .l-polaroid__photo {
   transform-box: fill-box;
   transform-origin: center;
-  animation: photoDevelop 2.4s ease-in-out infinite;
+  animation: photoDevelop 2s ease-in-out infinite;
+}
+
+.l-polaroid__photo--memories {
+  animation-duration: 1.5s;
 }

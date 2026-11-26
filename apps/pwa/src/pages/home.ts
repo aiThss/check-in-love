@@ -79,18 +79,39 @@ function getReaction(checkin: CheckIn, type: ReactionType): Reaction | undefined
   return checkin.reactions.find((reaction) => reaction.type === type);
 }
 
-function renderSkeleton(): HTMLElement {
+export const HOME_POLAROID_DEVELOP_MS = 2000;
+let hasPlayedHomePolaroidIntro = false;
+
+function shouldSkipHomePolaroidDelay(): boolean {
+  const env = (import.meta as unknown as { env?: { VITEST?: boolean; MODE?: string } }).env;
+  if (env?.VITEST || env?.MODE === 'test') return true;
+  if (typeof document !== 'undefined' && document.documentElement.dataset.reducedMotion === 'on') return true;
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+  }
+  return false;
+}
+
+export function renderHomePolaroidDevelop(asOverlay = false): HTMLElement {
   const wrapper = document.createElement('div');
-  wrapper.className = 'p-home-polaroid-wrap skeleton';
-  const frame = document.createElement('div');
-  frame.className = 'p-home-polaroid';
-  frame.appendChild(createSkeleton({ height: '310px', className: 'p-home-skel-media' }));
-  const lineWrap = document.createElement('div');
-  lineWrap.className = 'p-home-polaroid__caption-bar';
-  lineWrap.appendChild(createSkeleton({ width: '68%', height: '18px' }));
-  lineWrap.appendChild(createSkeleton({ width: '42%', height: '13px' }));
-  frame.appendChild(lineWrap);
-  wrapper.appendChild(frame);
+  wrapper.className = asOverlay
+    ? 'p-home-polaroid-develop p-home-polaroid-develop--overlay'
+    : 'p-home-polaroid-develop';
+  wrapper.innerHTML = `
+    <svg viewBox="0 0 64 76" width="158" height="188" class="l-polaroid" aria-hidden="true">
+      <defs>
+        <linearGradient id="skelPolGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ffb3cc"/>
+          <stop offset="55%" stop-color="#ff85a1"/>
+          <stop offset="100%" stop-color="#c0456c"/>
+        </linearGradient>
+      </defs>
+      <rect width="64" height="76" rx="4" fill="#fff4f7"/>
+      <rect class="l-polaroid__photo" x="6" y="6" width="52" height="52" rx="2" fill="url(#skelPolGrad)"/>
+      <rect x="10" y="66" width="26" height="3" rx="1.5" fill="#c0456c" opacity=".4"/>
+    </svg>
+    <span class="p-home-polaroid-develop__label">Đang tải check-in của người ấy...</span>
+  `;
   return wrapper;
 }
 
@@ -694,7 +715,7 @@ export function renderHomePage(): HTMLElement {
   refreshBtn.addEventListener('click', () => {
     triggerHaptic('tap');
     showToast('Đang tải lại check-in...', 'loading-spark');
-    void loadCheckin(true);
+    void loadCheckin(true, true);
   });
 
   rightActions.append(themeBtn, refreshBtn);
@@ -875,24 +896,43 @@ export function renderHomePage(): HTMLElement {
     contentArea.replaceChildren(cardView.element);
   }
 
-  async function loadCheckin(useCache = true): Promise<void> {
-    if (useCache) {
+  async function loadCheckin(useCache = true, forceDevelop = false): Promise<void> {
+    const skipDelay = shouldSkipHomePolaroidDelay();
+    const shouldDevelop = (!skipDelay && !hasPlayedHomePolaroidIntro) || (!skipDelay && forceDevelop) || !useCache;
+    let developOverlay: HTMLElement | null = null;
+    let minWaitPromise: Promise<void> = Promise.resolve();
+
+    if (useCache && !shouldDevelop) {
       const cached = getCachedLatestPartnerCheckin();
       if (cached) {
         renderLoadedCheckin(cached);
       } else if (!activeCard) {
-        contentArea.replaceChildren(renderSkeleton());
+        contentArea.replaceChildren(renderHomePolaroidDevelop(false));
+      }
+    } else if (activeCard?.element.isConnected && useCache) {
+      developOverlay = renderHomePolaroidDevelop(true);
+      contentArea.appendChild(developOverlay);
+      if (!skipDelay) {
+        minWaitPromise = new Promise<void>((resolve) => window.setTimeout(resolve, HOME_POLAROID_DEVELOP_MS));
       }
     } else {
       activeCheckin = null;
       activeCard = null;
-      contentArea.replaceChildren(renderSkeleton());
+      contentArea.replaceChildren(renderHomePolaroidDevelop(false));
+      if (!skipDelay) {
+        minWaitPromise = new Promise<void>((resolve) => window.setTimeout(resolve, HOME_POLAROID_DEVELOP_MS));
+      }
     }
 
     setRefreshButtonLoading(refreshBtn, true);
 
     try {
-      const checkin = await getLatestPartnerCheckin({ force: true });
+      const [checkin] = await Promise.all([
+        getLatestPartnerCheckin({ force: true }),
+        minWaitPromise,
+      ]);
+      hasPlayedHomePolaroidIntro = true;
+      developOverlay?.remove();
       setRefreshButtonLoading(refreshBtn, false);
 
       if (!checkin) {
@@ -934,6 +974,7 @@ export function renderHomePage(): HTMLElement {
         // Android bridge is optional
       }
     } catch {
+      developOverlay?.remove();
       setRefreshButtonLoading(refreshBtn, false);
       if (getCachedLatestPartnerCheckin() || activeCard) {
         showToast('Không thể làm mới dữ liệu', 'error');
@@ -962,7 +1003,7 @@ export function renderHomePage(): HTMLElement {
     scrollContainer: page,
     onRefresh: async () => {
       triggerHaptic('tap');
-      await loadCheckin(true);
+      await loadCheckin(true, true);
     },
   });
 
