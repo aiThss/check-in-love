@@ -11,8 +11,8 @@ val LightTextPrimary = Color(0xFF1A0E13)
 val LightTextSecondary = Color(0xFF6B5060)
 
 // Dark Mode Palette — 100% LoveMusic Liquid Glass Edition
-val LoveMusicDarkBg = Color(0xFF14001F)
-val LoveMusicDarkSurface = Color(0xFF240046)
+val LoveMusicDarkBg = Color(0xFF261824)
+val LoveMusicDarkSurface = Color(0xFF3A2230)
 val LoveMusicPinkPrimary = Color(0xFFFF5C93)
 val LoveMusicPurpleSecondary = Color(0xFF9D4EDD)
 val LoveMusicRoseTertiary = Color(0xFFFF85A1)

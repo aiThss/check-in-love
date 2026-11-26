@@ -17,18 +17,20 @@ Yêu cầu phụ: "tôi cần thêm 1 cái log hay gì đó để nếu bạn h�
 - [x] P5 Love Journey + Random + Replies + Card-preview + Test-mail (commit `f1aa6b9`)
 - [x] P6 Auth + Onboarding + Install + Profile/Settings (commit `e5c41ab`)
 - [x] P7 PWA: manifest shortcuts + icon any/maskable riêng, `offline.html`, SW cache v10, toast cập nhật + banner cài đặt (`src/ui/pwa-prompts.ts`), bộ icon app v2 (`scripts/build-app-icons.mjs`), xoá file/asset mồ côi, `storage-compat.test.ts`
-- [ ] P8 Android native restyle + APK (CHỈ khi user đồng ý build APK)
+- [x] P8 Android native restyle + APK v0.0.48 (versionCode 60): adaptive icon + monochrome, icon thông báo vector, splash Android 12+, theme/dark khớp PWA, widget + dialog restyle (user đã đồng ý build APK)
 - [ ] P9 Tối ưu cuối + báo cáo before/after
 
 ## 2. Trạng thái hiện tại
-- Phase vừa xong: **P7 (PWA Upgrade & dọn nợ kỹ thuật)**. P6 đã push ở commit `e5c41ab`.
+- Phase vừa xong: **P8 (Android native restyle + APK 0.0.48 / versionCode 60)**. P7 ở commit `98f65c1`.
+- P8 đã build `assembleRelease` thành công, APK ký release hợp lệ (`apksigner verify`), copy ra `app-release.apk` ở gốc repo. CHƯA chạy thử trên máy/emulator thật (máy chỉ có AVD của dự án khác): user nên cài thử và kiểm 5 điểm — icon launcher (thường + themed icon Android 13+), splash Android 12+ sáng/tối, thông báo (icon nhỏ trắng + avatar/large icon), widget Streak + widget ảnh, màu nền WebView không nháy ở dark.
+- Kotlin chỉ sửa tối thiểu (hiển thị): 3 nơi `R.mipmap.ic_launcher` -> `R.drawable.ic_launcher_bitmap` (vì adaptive icon XML không `BitmapFactory.decodeResource` được), hằng màu nền WebView dark `#14001F` -> `#261824`, `Color.kt`/`PhotoViewerActivity.kt` đổi màu dark sang token PWA. Không đụng bridge/FCM/Google sign-in/share-target.
 - Kiểm chứng: `npm run lint` sạch; `npm test` **30 file / 150 test pass**; `npm run build --workspace=apps/pwa` pass (`tsc` + vite; `index` JS **34,65 kB** gzip); `git diff -- apps/api packages apps/admin` rỗng.
 - Cố ý CHƯA làm trong P7 (nợ cho P9):
   - `styles/auth-interaction-vibe.css` (1.314 dòng, 168 `!important`) VẪN được import: 39/87 class của nó còn dùng bởi `login.ts`, `dev-helper`, `google-native-signin-button`, `otp-box`... Xoá phải chuyển từng khối sang `20-pages/auth.css` rồi chụp ảnh đối chiếu, không xoá mù.
   - `manifest.screenshots` chưa có (cần ảnh chụp thật sau khi xong P9).
 
 ## 3. Bước kế tiếp
-1. **P8 Android native restyle + APK** — CHỈ làm khi user đồng ý build APK (hỏi user trước). Phạm vi: PROMPT.md mục 8. Không đụng bridge `LoveCheckAndroid`/FCM/Google sign-in/share-target. Icon launcher mới sinh từ `scripts/build-app-icons.mjs` (SVG nguồn: `apps/pwa/public/icons/favicon.svg`).
+1. (Nếu user báo lỗi hiển thị native) sửa tài nguyên trong `apps/android/app/src/main/res/`; PNG launcher legacy sinh lại bằng `node scripts\build-app-icons.mjs`. Build APK: xem AGENTS.md mục 3 (tăng versionCode/versionName, `gradlew.bat assembleRelease`, copy `app-release.apk` ra gốc).
 2. **P9 Tối ưu cuối**: đo lại Web Vitals (so `design/redesign-v2/metrics.md`), a11y audit, chuyển nốt `auth-interaction-vibe.css` sang `20-pages`, ảnh chụp after, báo cáo before/after + hướng dẫn rollback.
 3. Nếu user không muốn APK: nhảy thẳng P9.
 

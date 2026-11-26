@@ -231,7 +231,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         notificationId: Int,
         messageId: String?,
     ): NotificationCompat.Builder {
-        val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+        val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(resources, R.drawable.ic_launcher_bitmap)
 
         val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_notification)

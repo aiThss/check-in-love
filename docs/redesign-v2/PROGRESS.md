@@ -223,3 +223,16 @@ Mẫu mỗi mục:
 - Kiểm: lint ✅ · test ✅ (30 file / 150 test) · build ✅ (`index` gzip 34,65 kB) · `git diff apps/api packages apps/admin` rỗng ✅.
 - Dở: `auth-interaction-vibe.css` giữ lại vì 39 class còn dùng (xem HANDOFF mục 2); manifest `screenshots` chưa có.
 - Bước tiếp: hỏi user có build APK không (P8); nếu không thì P9.
+
+## 2026-11-26 10:20 — P8 Android native restyle + APK 0.0.48 (Claude Sonnet 5.5)
+- Làm (chỉ tài nguyên + vài hằng hiển thị, không đụng logic Kotlin/bridge/FCM):
+  - Launcher icon: `mipmap-anydpi-v26/ic_launcher{,_round}.xml` adaptive (nền gradient hồng + tim trong safe-zone 66dp + lớp `monochrome` cho themed icon Android 13+); PNG legacy API 24–25 và `drawable-nodpi/ic_launcher_bitmap.png` sinh bằng `scripts/build-app-icons.mjs`.
+  - Icon thông báo: `drawable/ic_notification.xml` vector trắng (thay PNG cũ), giữ kênh `realtime_interactions`, màu nhấn `#FF3B7F`.
+  - Splash Android 12+: `values-v31` + `values-night-v31` (nền `#F8E2E7` / `#261824`, `avd_splash_heart` nhịp tim 600ms, dùng thuộc tính theme gốc nên không thêm dependency).
+  - Theme: `windowBackground` dark `#14001F` -> `#261824` (khớp PWA) ở `values-night`, WebView nền dark, `Color.kt`, gradient `PhotoViewerActivity`.
+  - Widget: `widget_background`/`widget_add_button` kiểu sticker (kem + viền mực), scrim ảnh tông plum, 🔥 -> vector `ic_widget_flame`; giữ nguyên mọi id (`widget_root`, `widget_streak_value`, `widget_subtitle`, `widget_add_button`, `quick_widget_*`). `dialog_update` + `bg_*` đồng bộ (layout này hiện không có Kotlin tham chiếu).
+  - Kotlin: 3 tham chiếu bitmap fallback + 1 hằng màu (chi tiết ở HANDOFF mục 2).
+  - Phiên bản: `versionCode 59 -> 60`, `versionName 0.0.47 -> 0.0.48`. APK 11,76 MB, ký release, đã copy ra `app-release.apk`.
+- Kiểm: `gradlew assembleRelease` ✅ · `aapt2 dump badging` đúng 60/0.0.48, minSdk 24, targetSdk 36 · `apksigner verify` ✅ · lint ✅ · test ✅ · build PWA ✅ · `git diff apps/api packages apps/admin` rỗng ✅.
+- Dở: chưa chạy thử trên thiết bị/emulator (xem HANDOFF mục 2). Chưa chạy `testDebugUnitTest` Android.
+- Bước tiếp: P9.

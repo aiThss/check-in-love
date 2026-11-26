@@ -18,7 +18,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Check IN Love"
-            android:textColor="#A3A3A3"
+            android:textColor="#6B4A57"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -29,11 +29,11 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🔥"
-                android:textSize="24sp" />
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_widget_flame" />
 
             <TextView
                 android:id="@+id/widget_streak_value"
@@ -41,7 +41,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:text="0"
-                android:textColor="#FFFFFF"
+                android:textColor="#1F0F15"
                 android:textSize="32sp"
                 android:textStyle="bold" />
 
@@ -50,7 +50,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:text="ngay"
-                android:textColor="#FFFFFF"
+                android:textColor="#1F0F15"
                 android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -63,7 +63,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="Nhan + de gui check-in"
-            android:textColor="#A3A3A3"
+            android:textColor="#6B4A57"
             android:textSize="12sp" />
     </LinearLayout>
 
@@ -74,7 +74,7 @@
         android:background="@drawable/widget_add_button"
         android:gravity="center"
         android:text="+"
-        android:textColor="#FFFFFF"
+        android:textColor="#1F0F15"
         android:textSize="28sp"
         android:textStyle="bold" />
 </LinearLayout>

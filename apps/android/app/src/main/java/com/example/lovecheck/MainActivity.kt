@@ -390,7 +390,7 @@ class LoveCheckBridge(
                     }
                 }
 
-                val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
+                val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(context.resources, R.drawable.ic_launcher_bitmap)
 
                 // Download photo preview if attached
                 var photoBitmap: Bitmap? = null
@@ -582,7 +582,7 @@ class MainActivity : ComponentActivity() {
                         val nightBits = context.resources.configuration.uiMode and
                             android.content.res.Configuration.UI_MODE_NIGHT_MASK
                         val isNight = nightBits == android.content.res.Configuration.UI_MODE_NIGHT_YES
-                        setBackgroundColor(if (isNight) 0xFF14001F.toInt() else 0xFFF8E2E7.toInt())
+                        setBackgroundColor(if (isNight) 0xFF261824.toInt() else 0xFFF8E2E7.toInt())
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS

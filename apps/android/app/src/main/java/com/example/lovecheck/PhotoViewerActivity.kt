@@ -100,8 +100,8 @@ fun PhotoViewerScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF240046),
-                        Color(0xFF14001F),
+                        Color(0xFF3A2230),
+                        Color(0xFF261824),
                     ),
                 ),
             ),
