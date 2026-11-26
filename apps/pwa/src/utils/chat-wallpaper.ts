@@ -1,5 +1,6 @@
 import { processImage } from '../components/camera';
 import { showToast } from '../components/toast';
+import { iconMarkup } from '../ui/icons/icons';
 
 export const WALLPAPER_STORAGE_KEY = 'lovecheck_chat_wallpaper';
 
@@ -136,14 +137,14 @@ export function openWallpaperPickerModal(
     <div class="wallpaper-modal-header">
       <div class="wallpaper-modal-title-group">
         <span class="wallpaper-modal-eyebrow">Tùy biến Messenger</span>
-        <h2 class="wallpaper-modal-title">🖼️ Đổi hình nền chat</h2>
+        <h2 class="wallpaper-modal-title">${iconMarkup('image', { size: 20 })} <span>Đổi hình nền chat</span></h2>
       </div>
-      <button type="button" class="wallpaper-modal-close" aria-label="Đóng">✕</button>
+      <button type="button" class="wallpaper-modal-close" aria-label="Đóng">${iconMarkup('close', { size: 20 })}</button>
     </div>
 
     <div class="wallpaper-modal-actions">
       <button type="button" class="wallpaper-action-btn wallpaper-upload-btn">
-        <span class="wallpaper-action-icon">📸</span>
+        <span class="wallpaper-action-icon" aria-hidden="true">${iconMarkup('camera', { size: 20 })}</span>
         <div class="wallpaper-action-text">
           <strong>Chọn từ Album ảnh</strong>
           <small>Tải ảnh bất kỳ từ điện thoại làm nền</small>
@@ -151,12 +152,12 @@ export function openWallpaperPickerModal(
       </button>
 
       <button type="button" class="wallpaper-action-btn wallpaper-reset-btn ${!current ? 'is-active' : ''}">
-        <span class="wallpaper-action-icon">🎨</span>
+        <span class="wallpaper-action-icon" aria-hidden="true">${iconMarkup('palette', { size: 20 })}</span>
         <div class="wallpaper-action-text">
           <strong>Mặc định</strong>
           <small>Sử dụng màu nền chuẩn của ứng dụng</small>
         </div>
-        ${!current ? '<span class="wallpaper-check">✓</span>' : ''}
+        ${!current ? `<span class="wallpaper-check" aria-hidden="true">${iconMarkup('check', { size: 16 })}</span>` : ''}
       </button>
     </div>
 
@@ -166,10 +167,10 @@ export function openWallpaperPickerModal(
         const isActive = current === preset.url;
         return `
           <button type="button" class="wallpaper-preset-card ${isActive ? 'is-active' : ''}" data-wallpaper-url="${preset.url}" data-wallpaper-name="${preset.name}">
-            <img src="${preset.thumbnail}" alt="${preset.name}" loading="lazy" />
+            <img src="${preset.thumbnail}" alt="${preset.name}" loading="lazy" decoding="async" />
             <div class="wallpaper-preset-overlay">
               <span class="wallpaper-preset-name">${preset.name}</span>
-              ${isActive ? '<span class="wallpaper-check-badge">✓</span>' : ''}
+              ${isActive ? `<span class="wallpaper-check-badge" aria-hidden="true">${iconMarkup('check', { size: 16 })}</span>` : ''}
             </div>
           </button>
         `;

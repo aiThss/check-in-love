@@ -35,7 +35,7 @@
     padding: var(--space-5);
     border-radius: var(--radius-xl);
     background: var(--surface-paper);
-    border: 2px solid var(--ink-border);
+    border: 2px solid var(--ink-stroke-color);
     box-shadow: var(--sticker-shadow), var(--elev-2);
     display: flex;
     flex-direction: column;
@@ -54,7 +54,7 @@
     width: 74px;
     height: 74px;
     border-radius: 50%;
-    border: 2.5px solid var(--ink-border);
+    border: 2.5px solid var(--ink-stroke-color);
     background: var(--accent-100);
     color: var(--accent-600);
     padding: 0;
@@ -128,7 +128,7 @@
   .p-profile-stat-pill--gold {
     background: var(--gold-bg);
     color: var(--gold-ink);
-    border: 1.5px solid var(--ink-border);
+    border: 1.5px solid var(--ink-stroke-color);
     cursor: default;
   }
 
@@ -218,7 +218,7 @@
 
   .p-accent-swatch.is-active {
     border-color: var(--ink-border);
-    box-shadow: 2px 2px 0 var(--ink-border);
+    box-shadow: 2px 2px 0 var(--ink-stroke-color);
     transform: scale(1.06);
   }
 

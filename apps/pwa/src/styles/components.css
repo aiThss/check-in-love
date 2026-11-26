@@ -85,7 +85,7 @@ body {
 /* Cached routes stay mounted, but an inactive route must never participate in layout. */
 .route-page[hidden],
 [data-route-page][hidden] {
-  display: none !important;
+  display: none;
 }
 
 img {
@@ -595,7 +595,7 @@ a {
   width: 100%;
   background: var(--surface-solid);
   border: 1.5px solid var(--border);
-  border-radius: 900px !important;
+  border-radius: 900px;
   padding: 14px 16px;
   font-size: 16px;
   color: var(--text-primary);
@@ -787,7 +787,7 @@ textarea.input {
 }
 
 .modal-checkin-detail .modal-title {
-  display: none !important;
+  display: none;
 }
 
 .modal-actions {
@@ -1380,7 +1380,7 @@ textarea.input {
 }
 
 .reply-toggle-panel[hidden] {
-  display: none !important;
+  display: none;
 }
 
 .replies-page {
@@ -1748,7 +1748,7 @@ textarea.input {
 }
 
 .reply-section[hidden] {
-  display: none !important;
+  display: none;
 }
 
 .reply-section-title {
@@ -2359,13 +2359,13 @@ textarea.input {
 }
 
 .love-date-wheel-item.selected {
-  font-size: 18px !important;
-  font-weight: 800 !important;
-  color: var(--accent, #ff3b7f) !important;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--accent, #ff3b7f);
 }
 
 [data-theme='dark'] .love-date-wheel-item.selected {
-  color: #ff6fae !important;
+  color: #ff6fae;
 }
 
 .love-date-native-trigger {
@@ -2460,15 +2460,15 @@ textarea.input {
 
 /* Thin distinct border for Couple Code Box */
 #copy-code-container {
-  background: rgba(255, 255, 255, 0.75) !important;
-  border: 1.5px solid rgba(255, 59, 127, 0.22) !important;
-  border-radius: 16px !important;
-  box-shadow: 0 4px 14px rgba(80, 42, 59, 0.05) !important;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1.5px solid rgba(255, 59, 127, 0.22);
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(80, 42, 59, 0.05);
 }
 
 [data-theme='dark'] #copy-code-container {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 
@@ -3465,7 +3465,7 @@ textarea.input {
 
 /* Áp dụng cho light mode khi theme đã được resolve rõ ràng. */
 [data-theme='light'] body {
-  background: var(--bg) !important;
+  background: var(--bg);
 }
 
 /* Giao diện Liquid Glass cho các card/mục trong Light Mode */
@@ -3479,15 +3479,15 @@ textarea.input {
     135deg,
     rgba(255, 255, 255, 0.82) 0%,
     rgba(255, 244, 248, 0.68) 100%
-  ) !important;
-  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+  );
+  border: 1px solid rgba(255, 255, 255, 0.72);
   box-shadow:
     0 14px 40px -8px rgba(160, 30, 70, 0.1),
     0 2px 6px rgba(0, 0, 0, 0.02),
     inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.3) !important;
-  -webkit-backdrop-filter: blur(26px) saturate(190%) !important;
-  backdrop-filter: blur(26px) saturate(190%) !important;
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.3);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  backdrop-filter: blur(26px) saturate(190%);
 }
 
 /* Giao diện Glass cho các pills/buttons trong Light Mode */
@@ -3504,14 +3504,14 @@ textarea.input {
     135deg,
     rgba(255, 255, 255, 0.82) 0%,
     rgba(255, 240, 246, 0.62) 100%
-  ) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  );
+  border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.03),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.9) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(170%) !important;
-  backdrop-filter: blur(16px) saturate(170%) !important;
-  color: var(--text-primary) !important;
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  backdrop-filter: blur(16px) saturate(170%);
+  color: var(--text-primary);
 }
 
 /* Bo tròn 999px cho các pill */
@@ -3523,13 +3523,13 @@ textarea.input {
 [data-theme='light'] .memory-reaction-summary:not(.has-reactions),
 [data-theme='light'] .reaction-pill,
 [data-theme='light'] .memory-reply-count {
-  border-radius: 999px !important;
+  border-radius: 999px;
 }
 
 /* Bo tròn 16px cho glass actions */
 [data-theme='light'] .glass-action,
 [data-theme='light'] .glass-action {
-  border-radius: 16px !important;
+  border-radius: 16px;
 }
 
 /* Option đang chọn / Trạng thái active trong Light Mode */
@@ -3549,31 +3549,31 @@ textarea.input {
 [data-theme='light'] .reaction-option.selected,
 [data-theme='light'] .reaction-detail-row.selected,
 [data-theme='light'] .reply-detail-item.own {
-  color: var(--accent) !important;
-  border-color: rgba(255, 59, 127, 0.38) !important;
+  color: var(--accent);
+  border-color: rgba(255, 59, 127, 0.38);
   background:
     linear-gradient(
       180deg,
       rgba(255, 255, 255, 0.88),
       rgba(255, 214, 231, 0.48)
     ),
-    rgba(255, 59, 127, 0.12) !important;
-  box-shadow: none !important;
+    rgba(255, 59, 127, 0.12);
+  box-shadow: none;
 }
 
 /* Hiển thị số của reaction pill selected có màu hồng đậm hơn để dễ đọc */
 [data-theme='light'] .reaction-pill.selected strong,
 [data-theme='light'] .reaction-pill.selected strong {
-  color: var(--accent) !important;
+  color: var(--accent);
 }
 
 /* Nút Chi tiết trong Light Mode */
 [data-theme='light'] .memory-react-detail-btn,
 [data-theme='light'] .memory-react-detail-btn {
-  color: var(--accent) !important;
-  background: rgba(255, 59, 127, 0.06) !important;
-  border: 1px solid rgba(255, 59, 127, 0.12) !important;
-  box-shadow: none !important;
+  color: var(--accent);
+  background: rgba(255, 59, 127, 0.06);
+  border: 1px solid rgba(255, 59, 127, 0.12);
+  box-shadow: none;
 }
 
 /* Hộp chọn reaction (Reaction picker popup) trong Light Mode */
@@ -3585,34 +3585,34 @@ textarea.input {
       rgba(255, 255, 255, 0.85),
       rgba(255, 255, 255, 0.6)
     ),
-    rgba(255, 255, 255, 0.4) !important;
-  border: 1px solid rgba(255, 255, 255, 0.76) !important;
-  box-shadow: none !important;
+    rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  box-shadow: none;
 }
 
 /* Tối ưu hóa Copy Code Box ở trang Profile trong Light Mode */
 [data-theme='light'] #copy-code-container {
-  background: rgba(255, 255, 255, 0.75) !important;
-  border: 1.5px solid rgba(255, 59, 127, 0.22) !important;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1.5px solid rgba(255, 59, 127, 0.22);
 }
 
 [data-theme='light'] #copy-code-container span:last-child,
 [data-theme='light'] #copy-code-container span:last-child {
-  background: rgba(255, 255, 255, 0.6) !important;
-  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 /* Tối ưu hóa theme-segmented container trong Light Mode */
 [data-theme='light'] .theme-segmented,
 [data-theme='light'] .theme-segmented {
-  background: rgba(255, 255, 255, 0.3) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 /* Style cho No reply pill trong Light Mode */
 [data-theme='light'] .memory-reply-count.empty,
 [data-theme='light'] .memory-reply-count.empty {
-  color: var(--text-secondary) !important;
+  color: var(--text-secondary);
   opacity: 0.75;
 }
 
@@ -3626,51 +3626,13 @@ html {
 }
 
 body {
-  background: var(--page-background, var(--bg)) !important;
-  background-attachment: fixed !important;
-  background-size: 100% 100% !important;
+  background: var(--page-background, var(--bg));
+  background-attachment: fixed;
+  background-size: 100% 100%;
   isolation: isolate;
 }
 
-/* Three quiet, fixed ambient lights keep the background warm without
-   affecting scrolling or interaction. */
-body::before,
-body::after,
-.page::before {
-  content: '';
-  position: fixed;
-  z-index: -1;
-  pointer-events: none;
-  border-radius: 999px;
-  filter: blur(64px);
-}
-
-body::before {
-  width: 240px;
-  height: 240px;
-  top: -88px;
-  right: -88px;
-  background: #ffc0d6;
-  opacity: 0.28;
-}
-
-body::after {
-  width: 220px;
-  height: 220px;
-  top: 42%;
-  left: -130px;
-  background: #ffd2b7;
-  opacity: 0.24;
-}
-
-.page::before {
-  width: 250px;
-  height: 250px;
-  right: -128px;
-  bottom: -104px;
-  background: #ffb5d0;
-  opacity: 0.22;
-}
+/* Ambient blur orbs removed in v2 MIX Editorial to save GPU compositing */
 
 .page {
   width: min(100%, 480px);
@@ -3695,9 +3657,9 @@ body::after {
 .install-step,
 .mood-btn,
 .photo-drop-area {
-  background: rgba(255, 255, 255, 0.72) !important;
-  border: 1px solid rgba(255, 255, 255, 0.88) !important;
-  box-shadow: var(--shadow) !important;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow);
   -webkit-backdrop-filter: blur(24px) saturate(145%);
   backdrop-filter: blur(24px) saturate(145%);
 }
@@ -3723,8 +3685,8 @@ body::after {
 .memory-reply-count,
 .reaction-option,
 .reaction-custom-form input {
-  border-color: rgba(255, 255, 255, 0.9) !important;
-  background: rgba(255, 255, 255, 0.64) !important;
+  border-color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.64);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   backdrop-filter: blur(18px) saturate(140%);
@@ -3847,9 +3809,9 @@ body::after {
 }
 
 .memory-item {
-  border-radius: 23px !important;
-  border-color: rgba(255, 255, 255, 0.78) !important;
-  box-shadow: var(--shadow) !important;
+  border-radius: 23px;
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow);
 }
 
 .memory-item-info {
@@ -3862,7 +3824,7 @@ body::after {
 }
 
 .memory-tile .reaction-picker {
-  box-shadow: var(--shadow-elevated) !important;
+  box-shadow: var(--shadow-elevated);
 }
 
 .modal-overlay {
@@ -3872,10 +3834,10 @@ body::after {
 }
 
 .modal {
-  background: rgba(255, 255, 255, 0.8) !important;
-  border-color: rgba(255, 255, 255, 0.88) !important;
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.88);
   border-radius: 30px 30px 24px 24px;
-  box-shadow: var(--shadow-elevated) !important;
+  box-shadow: var(--shadow-elevated);
   -webkit-backdrop-filter: blur(24px) saturate(145%);
   backdrop-filter: blur(24px) saturate(145%);
 }
@@ -3931,13 +3893,13 @@ textarea:focus-visible,
   .card:hover,
   .glass-card:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-elevated) !important;
+    box-shadow: var(--shadow-elevated);
   }
 }
 
 @media (max-width: 360px) {
   .nav-label {
-    font-size: 9px !important;
+    font-size: 9px;
   }
 
   .nav-checkin-btn {
@@ -3970,15 +3932,15 @@ textarea:focus-visible,
 [data-theme='dark'] .photo-drop-area,
 [data-theme='dark'] .modal,
 [data-theme='dark'] .bottom-nav-inner {
-  background: linear-gradient(135deg, rgba(54, 30, 48, 0.8) 0%, rgba(36, 20, 32, 0.68) 100%) !important;
-  border: 1px solid rgba(255, 170, 205, 0.22) !important;
+  background: linear-gradient(135deg, rgba(54, 30, 48, 0.8) 0%, rgba(36, 20, 32, 0.68) 100%);
+  border: 1px solid rgba(255, 170, 205, 0.22);
   box-shadow:
     0 20px 48px -6px rgba(0, 0, 0, 0.5),
     0 2px 10px rgba(0, 0, 0, 0.25),
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4) !important;
-  -webkit-backdrop-filter: blur(30px) saturate(190%) contrast(104%) !important;
-  backdrop-filter: blur(30px) saturate(190%) contrast(104%) !important;
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(30px) saturate(190%) contrast(104%);
+  backdrop-filter: blur(30px) saturate(190%) contrast(104%);
 }
 
 [data-theme='dark'] .btn-icon,
@@ -3994,8 +3956,8 @@ textarea:focus-visible,
 [data-theme='dark'] .memory-reply-count,
 [data-theme='dark'] .reaction-option,
 [data-theme='dark'] .reaction-custom-form input {
-  background: rgba(77, 40, 62, 0.9) !important;
-  border-color: rgba(255, 164, 198, 0.2) !important;
+  background: rgba(77, 40, 62, 0.9);
+  border-color: rgba(255, 164, 198, 0.2);
   box-shadow: inset 0 1px 0 rgba(255, 214, 229, 0.08);
 }
 
@@ -4369,7 +4331,7 @@ textarea:focus-visible,
 }
 
 .rm-reaction-choice {
-  font-size: 12px !important;
+  font-size: 12px;
   font-weight: 800;
   color: var(--accent);
   background: var(--accent-soft);
@@ -4393,7 +4355,7 @@ textarea:focus-visible,
 }
 
 .rm-reaction-row > .rm-heart-btn {
-  display: none !important;
+  display: none;
 }
 
 .rm-heart-btn:active {
@@ -4954,7 +4916,7 @@ textarea:focus-visible,
 }
 
 .messages-new-indicator[hidden] {
-  display: none !important;
+  display: none;
 }
 
 :root.keyboard-open .messages-new-indicator {

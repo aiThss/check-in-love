@@ -81,7 +81,7 @@
 
   .p-random-cat.is-selected {
     background: var(--accent-50);
-    border: 2px solid var(--ink-border);
+    border: 2px solid var(--ink-stroke-color);
     box-shadow: var(--sticker-shadow);
     color: var(--accent-600);
   }
@@ -118,7 +118,7 @@
     background:
       radial-gradient(circle at top right, var(--accent-100), transparent 60%),
       var(--surface-paper);
-    border: 2.5px solid var(--ink-border);
+    border: 2.5px solid var(--ink-stroke-color);
     box-shadow: var(--sticker-shadow), var(--elev-3);
     display: flex;
     flex-direction: column;
@@ -157,7 +157,7 @@
     padding: 12px;
     border-radius: var(--radius-xl);
     background: var(--surface-paper);
-    border: 2px solid var(--ink-border);
+    border: 2px solid var(--ink-stroke-color);
     box-shadow: var(--sticker-shadow);
     display: flex;
     align-items: center;
@@ -197,8 +197,8 @@
     padding: 10px 14px;
     border-radius: 18px 18px 18px 6px;
     background: var(--surface-paper);
-    border: 2px solid var(--ink-border);
-    box-shadow: 2px 2px 0 var(--ink-border);
+    border: 2px solid var(--ink-stroke-color);
+    box-shadow: 2px 2px 0 var(--ink-stroke-color);
   }
 
   .p-reply-bubble.own {
@@ -215,7 +215,7 @@
     padding: 6px 6px 6px 14px;
     border-radius: var(--radius-pill);
     background: var(--surface-paper);
-    border: 2px solid var(--ink-border);
+    border: 2px solid var(--ink-stroke-color);
     box-shadow: var(--sticker-shadow);
   }
 

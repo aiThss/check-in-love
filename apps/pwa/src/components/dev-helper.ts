@@ -1,6 +1,8 @@
+import '../styles/10-components/dev-helper.css';
 import { navigate, getCurrentPath } from '../router';
 import { showToast } from './toast';
 import { store, type AppState } from '../store';
+import { iconMarkup } from '../ui/icons/icons';
 import {
   clearMockPreviewData,
   clearMockNewUserData,
@@ -32,43 +34,43 @@ export function initDevHelper(): void {
       <button class="dev-theme-toggle-btn" id="dev-theme-toggle-btn" type="button" aria-pressed="false">
         <span class="dev-theme-icon" aria-hidden="true"></span>
       </button>
-      <button class="dev-helper-toggle-btn" id="dev-toggle-btn" type="button" title="Kéo thả di chuyển / Click mở Dev Panel">
-        <span class="dev-icon">📌</span>
-        <span class="dev-label">Pin</span>
+      <button class="dev-helper-toggle-btn" id="dev-toggle-btn" type="button" aria-label="Mở bảng công cụ Dev" title="Kéo thả di chuyển / Click mở Dev Panel">
+        <span class="dev-icon" aria-hidden="true">${iconMarkup('settings', { size: 16 })}</span>
+        <span class="dev-label">Dev</span>
       </button>
     </div>
 
-    <div class="dev-helper-panel hidden-dev-panel" id="dev-panel">
+    <div class="dev-helper-panel hidden-dev-panel" id="dev-panel" role="dialog" aria-label="Dev Quick Jump & Test">
       <div class="dev-panel-header">
-        <strong>🛠️ Dev Quick Jump & Test</strong>
-        <button class="dev-panel-close" id="dev-close-btn">✕</button>
+        <strong>${iconMarkup('settings', { size: 16 })}<span>Dev Quick Jump & Test</span></strong>
+        <button class="dev-panel-close" id="dev-close-btn" type="button" aria-label="Đóng bảng Dev">${iconMarkup('close', { size: 16 })}</button>
       </div>
 
-      <div class="dev-section-title">📍 Nhảy nhanh các trang</div>
+      <div class="dev-section-title">${iconMarkup('route', { size: 16 })}<span>Nhảy nhanh các trang</span></div>
       <div class="dev-quick-links">
-        <button class="dev-jump-btn" data-target="step-0">1️⃣ Step 1: Tên bạn</button>
-        <button class="dev-jump-btn" data-target="step-1">2️⃣ Step 2: Người ấy</button>
-        <button class="dev-jump-btn" data-target="step-2">3️⃣ Step 3: Code</button>
-        <button class="dev-jump-btn" data-target="step-3">4️⃣ Step 4: Ngày yêu</button>
-        <button class="dev-jump-btn" data-target="login-email">✉️ Login Email</button>
-        <button class="dev-jump-btn" data-target="login-google">🌐 Login Google</button>
+        <button class="dev-jump-btn" type="button" data-target="step-0"><span>1. Tên bạn</span></button>
+        <button class="dev-jump-btn" type="button" data-target="step-1"><span>2. Người ấy</span></button>
+        <button class="dev-jump-btn" type="button" data-target="step-2"><span>3. Couple Code</span></button>
+        <button class="dev-jump-btn" type="button" data-target="step-3"><span>4. Ngày yêu</span></button>
+        <button class="dev-jump-btn" type="button" data-target="login-email">${iconMarkup('mail', { size: 16 })}<span>Login Email</span></button>
+        <button class="dev-jump-btn" type="button" data-target="login-google">${iconMarkup('google', { size: 16 })}<span>Login Google</span></button>
       </div>
 
-      <div class="dev-section-title">🔔 Test Thông báo Toast</div>
+      <div class="dev-section-title">${iconMarkup('bell', { size: 16 })}<span>Test Thông báo Toast</span></div>
       <div class="dev-noti-links">
-        <button class="dev-noti-btn" data-noti="checkin-success">📸 Check-in OK</button>
-        <button class="dev-noti-btn" data-noti="checkin-error">⚠️ Check-in Lỗi</button>
-        <button class="dev-noti-btn" data-noti="eq-info">🎵 Love EQ Sóng</button>
-        <button class="dev-noti-btn" data-noti="spark-loading">✨ Spark Kỷ niệm</button>
-        <button class="dev-noti-btn" data-noti="chat-loading">💬 Chat Kết nối</button>
-        <button class="dev-noti-btn" data-noti="copy-code">📋 Copy Code</button>
-        <button class="dev-noti-btn" data-noti="otp-sent">✉️ Gửi Mã OTP</button>
+        <button class="dev-noti-btn" type="button" data-noti="checkin-success">${iconMarkup('camera', { size: 16 })}<span>Check-in OK</span></button>
+        <button class="dev-noti-btn" type="button" data-noti="checkin-error">${iconMarkup('alert', { size: 16 })}<span>Check-in Lỗi</span></button>
+        <button class="dev-noti-btn" type="button" data-noti="eq-info">${iconMarkup('sparkle', { size: 16 })}<span>Love EQ Sóng</span></button>
+        <button class="dev-noti-btn" type="button" data-noti="spark-loading">${iconMarkup('star', { size: 16 })}<span>Spark Kỷ niệm</span></button>
+        <button class="dev-noti-btn" type="button" data-noti="chat-loading">${iconMarkup('chat', { size: 16 })}<span>Chat Kết nối</span></button>
+        <button class="dev-noti-btn" type="button" data-noti="copy-code">${iconMarkup('copy', { size: 16 })}<span>Copy Code</span></button>
+        <button class="dev-noti-btn" type="button" data-noti="otp-sent">${iconMarkup('mail', { size: 16 })}<span>Gửi Mã OTP</span></button>
       </div>
 
       <div class="dev-panel-footer">
-        <button class="btn-dev-action" id="dev-load-preview-btn">🧪 Mở demo đầy đủ</button>
-        <button class="btn-dev-action" id="dev-fill-mock-btn">⚡ Điền dữ liệu mẫu</button>
-        <button class="btn-dev-action btn-danger-sm" id="dev-clear-btn">🔄 Reset</button>
+        <button class="btn-dev-action" type="button" id="dev-load-preview-btn">${iconMarkup('sparkle', { size: 16 })}<span>Demo đầy đủ</span></button>
+        <button class="btn-dev-action" type="button" id="dev-fill-mock-btn">${iconMarkup('edit', { size: 16 })}<span>Điền mẫu</span></button>
+        <button class="btn-dev-action btn-danger-sm" type="button" id="dev-clear-btn">${iconMarkup('refresh', { size: 16 })}<span>Reset</span></button>
       </div>
     </div>
   `;
@@ -93,7 +95,7 @@ export function initDevHelper(): void {
 
   function updateThemeToggle(theme: AppState['theme']): void {
     const isDark = getEffectiveTheme(theme) === 'dark';
-    themeIcon.textContent = isDark ? '☀️' : '🌙';
+    themeIcon.innerHTML = iconMarkup(isDark ? 'sun' : 'moon', { size: 16 });
     const targetTheme = isDark ? 'sáng' : 'tối';
     const label = `Chuyển sang giao diện ${targetTheme}`;
     themeToggleBtn.title = label;

@@ -2,7 +2,7 @@
    styles/index.css — Layered CSS Architecture Manifest (v2)
    Order: legacy -> tokens -> base -> components -> utilities
    Putting legacy files in `layer(legacy)` ensures v2 `@layer components`
-   and `@layer utilities` naturally win without any `!important`.
+   and `@layer utilities` naturally win by cascade layer priority.
    ============================================================ */
 
 @layer legacy, tokens, base, components, utilities;
@@ -10,8 +10,6 @@
 @import './components.css' layer(legacy);
 @import './animations.css' layer(legacy);
 @import './message-image-viewer.css' layer(legacy);
-@import './auth-interaction-vibe.css' layer(legacy);
-@import './love-journey.css' layer(legacy);
 
 @import './00-fonts.css';
 @import './00-tokens.css';

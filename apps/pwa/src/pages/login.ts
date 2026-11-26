@@ -114,7 +114,7 @@ export function renderLoginPage(): HTMLElement {
   emailPanel.className = 'p-auth-panel active';
   emailPanel.id = 'panel-email';
   emailPanel.innerHTML = `
-    <form id="email-login-form" class="p-auth-step" style="display:flex;flex-direction:column;gap:14px;">
+    <form id="email-login-form" class="p-auth-step">
       <div>
         <label class="c-field__label" for="user-email">Địa chỉ Email</label>
         <div class="p-auth-input-wrap" style="margin-top:6px;">
@@ -143,8 +143,8 @@ export function renderLoginPage(): HTMLElement {
       </button>
     </form>
 
-    <form id="otp-verify-form" class="p-auth-step hidden-step" style="display:flex;flex-direction:column;gap:14px;">
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--accent-50);border:1px solid var(--accent-200);font-size:12px;">
+    <form id="otp-verify-form" class="p-auth-step hidden-step">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--surface-subtle);border:1px solid var(--border-subtle);color:var(--text-primary);font-size:12px;">
         ${iconMarkup('mail', { size: 20, variant: 'filled' })}
         <div>
           <span class="u-text-secondary">Mã 6 chữ số đã gửi tới </span>
@@ -628,12 +628,12 @@ function createResetPasswordModal(): HTMLElement {
       </div>
       <p class="u-text-secondary" style="font-size:13px;margin:0;">Nhập email để nhận mã đặt lại mật khẩu mới</p>
 
-      <form id="reset-step1-form" class="p-auth-step" style="display:flex;flex-direction:column;gap:12px;">
+      <form id="reset-step1-form" class="p-auth-step">
         <input type="email" id="reset-email" class="c-input" placeholder="ban@gmail.com" aria-label="Email tài khoản" required />
         <button type="submit" class="c-btn c-btn--primary c-btn--pill c-btn--block" id="reset-send-otp-btn">Gửi mã xác thực</button>
       </form>
 
-      <form id="reset-step2-form" class="p-auth-step hidden-step" style="display:flex;flex-direction:column;gap:12px;">
+      <form id="reset-step2-form" class="p-auth-step hidden-step">
         <input type="text" id="reset-otp" class="c-input" placeholder="Mã OTP 6 chữ số" maxlength="6" pattern="[0-9]*" inputmode="numeric" aria-label="Mã OTP" required />
         <input type="password" id="reset-new-pwd" class="c-input" placeholder="Mật khẩu mới (tối thiểu 6 ký tự)" minlength="6" aria-label="Mật khẩu mới" required />
         <button type="submit" class="c-btn c-btn--primary c-btn--pill c-btn--block" id="reset-confirm-btn">Đổi mật khẩu</button>

@@ -1,6 +1,7 @@
 import { Map as MapLibreMap, Marker, LngLatBounds, setWorkerUrl } from 'maplibre-gl';
 import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import '../styles/love-journey.css';
 import '../styles/20-pages/journey.css';
 import { navigate } from '../router';
 import { showToast } from '../components/toast';

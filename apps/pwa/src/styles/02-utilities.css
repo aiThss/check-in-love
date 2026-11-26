@@ -3,6 +3,10 @@
    ============================================================ */
 
 @layer utilities {
+  [hidden] {
+    display: none;
+  }
+
   .u-sr-only {
     position: absolute;
     width: 1px;

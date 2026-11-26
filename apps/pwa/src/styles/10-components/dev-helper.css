@@ -1,0 +1,201 @@
+/* ============================================================
+   10-components/dev-helper.css — Local Dev Quick Jump & Test Panel
+   Loaded lazily ONLY when dev-helper.ts is imported on dev/local hosts.
+   ============================================================ */
+
+@layer components {
+  .dev-helper-root {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    font-family: var(--font-sans);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dev-helper-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dev-theme-toggle-btn {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+    border: var(--ink-border-thin);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: var(--sticker-shadow-sm);
+    transition: transform var(--duration-fast) var(--ease-standard);
+  }
+
+  .dev-theme-toggle-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  .dev-theme-icon {
+    display: inline-grid;
+    place-items: center;
+    line-height: 1;
+  }
+
+  .dev-helper-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 38px;
+    background: var(--accent-600);
+    color: #ffffff;
+    border: var(--ink-border-thin);
+    border-radius: var(--radius-pill);
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--sticker-shadow-sm);
+    transition: transform var(--duration-fast) var(--ease-standard);
+  }
+
+  .dev-helper-toggle-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  .dev-helper-panel {
+    position: absolute;
+    bottom: 48px;
+    right: 0;
+    width: 304px;
+    max-height: 72vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding: 14px;
+    border-radius: var(--radius-lg);
+    background: var(--surface-elevated);
+    border: var(--ink-border);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: var(--sticker-shadow), var(--elev-4);
+    animation: fadeIn 180ms ease;
+  }
+
+  .dev-helper-panel.hidden-dev-panel {
+    display: none;
+  }
+
+  .dev-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .dev-panel-header strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dev-panel-close {
+    width: 32px;
+    height: 32px;
+    display: inline-grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+  }
+
+  .dev-panel-close:hover {
+    color: var(--accent-600);
+    background: var(--surface-subtle);
+  }
+
+  .dev-section-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+  }
+
+  .dev-quick-links,
+  .dev-noti-links {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .dev-jump-btn,
+  .dev-noti-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 9px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dev-jump-btn {
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+  }
+
+  .dev-noti-btn {
+    background: var(--accent-50);
+    border: 1px solid var(--accent-200);
+    color: var(--accent-700);
+  }
+
+  .dev-panel-footer {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .btn-dev-action {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-danger-sm {
+    background: rgba(225, 29, 72, 0.12);
+    border-color: rgba(225, 29, 72, 0.28);
+    color: var(--semantic-danger);
+  }
+}

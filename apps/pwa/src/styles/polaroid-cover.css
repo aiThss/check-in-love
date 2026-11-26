@@ -276,23 +276,23 @@
   font-size: 11px;
 }
 
-.polaroid-love-foil-status {
+.polaroid-love-foil-footer span.polaroid-love-foil-status {
   flex: 0 0 auto;
   padding: 7px 10px;
   border: 1px solid rgba(255, 166, 196, 0.34);
   border-radius: 999px;
   background: linear-gradient(135deg, rgba(255, 103, 157, 0.2), rgba(255, 190, 151, 0.16));
-  color: #ffd2df !important;
-  font-size: 9px !important;
+  color: #ffd2df;
+  font-size: 9px;
   font-weight: 750;
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
-.polaroid-love-foil-status.is-opened {
+.polaroid-love-foil-footer span.polaroid-love-foil-status.is-opened {
   border-color: rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.07);
-  color: var(--text-secondary, #b6afb4) !important;
+  color: var(--text-secondary, #b6afb4);
 }
 
 /* star+ belongs only to the latest visible check-in */
@@ -335,7 +335,7 @@
 }
 
 .polaroid-scratch-pill[hidden] {
-  display: none !important;
+  display: none;
 }
 
 .polaroid-scratch-pill::before {
@@ -375,7 +375,7 @@
 .recent-memories-list .recent-memory-item:not(:first-child) .polaroid-scratch-pill,
 .memory-grid .memory-tile:not(:first-child) .polaroid-scratch-pill,
 .love-foil-search-active .memory-grid .polaroid-scratch-pill {
-  display: none !important;
+  display: none;
 }
 
 .btn-polaroid-scratch-trigger {

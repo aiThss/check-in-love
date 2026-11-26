@@ -2,6 +2,7 @@ import { getMe, type MeResponse } from '../api/auth';
 import { updateProfile } from '../api/profile';
 import { store } from '../store/index';
 import { showToast } from '../components/toast';
+import { iconMarkup, type IconName } from '../ui/icons/icons';
 
 const VIETNAM_TIMEZONE = 'Asia/Ho_Chi_Minh';
 const SEEN_PREFIX = 'lovecheck:occasion-card:seen:v1:';
@@ -142,7 +143,7 @@ export interface OccasionCard {
   message: string;
   signature: string;
   coverText: string;
-  icon: string;
+  icon: IconName;
   pattern: Pattern;
   colors: [string, string, string];
   coverImage?: string;
@@ -155,7 +156,7 @@ interface CardDefinition {
   message: (context: OccasionContext) => string;
   signature: (context: OccasionContext) => string;
   coverText: string;
-  icon: string;
+  icon: IconName;
   pattern: Pattern;
   colors: [string, string, string];
   coverImage?: string;
@@ -170,7 +171,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Vậy là anh với em đã đi cùng nhau được 100 ngày rồi. Chưa phải thật lâu, nhưng đủ để anh thấy có em trong những ngày bình thường là một điều rất dễ thương. Mình cứ chậm rãi bên nhau như thế nhé.',
     signature: () => 'Thương em, từ anh.',
     coverText: 'Cào nhẹ để mở 100 ngày đầu tiên của hai đứa',
-    icon: '💯',
+    icon: 'heart-burst',
     pattern: 'hearts',
     colors: ['#ff8fb1', '#ff5f8f', '#9f3564'],
     coverImage: '/design/100-1day.png',
@@ -183,7 +184,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       '500 ngày nghe cũng nhiều thật đấy. Cảm ơn em vì vẫn ở đây, cùng anh đi qua cả những ngày vui lẫn mấy hôm chẳng vui lắm. Anh vẫn muốn những ngày sau này có em.',
     signature: () => 'Anh vẫn chọn em.',
     coverText: 'Mở xem điều anh muốn nhắn ở ngày 500',
-    icon: '🎀',
+    icon: 'gift',
     pattern: 'ribbons',
     colors: ['#d7a8ff', '#9c66db', '#5b338d'],
     coverImage: '/design/500-1day.webp',
@@ -196,7 +197,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Mình đã có một đoạn đường đủ dài để nhớ, và anh vẫn mong phía trước còn thật nhiều ngày để hai đứa cùng kể tiếp. Cảm ơn em vì đã là một phần rất quan trọng trong những ngày của anh.',
     signature: () => 'Còn nhiều ngày nữa nhé em.',
     coverText: 'Chạm cào ngàn ngày bên nhau em nhé',
-    icon: '✨',
+    icon: 'sparkle',
     pattern: 'stars',
     colors: ['#72d7ff', '#5d7df3', '#35408d'],
   },
@@ -208,7 +209,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Thêm một năm anh với em ở cạnh nhau. Anh không hứa lúc nào cũng hoàn hảo, chỉ mong mình vẫn chọn nói chuyện, chọn hiểu nhau và chọn ở lại. Chúc cho hai đứa mình có thêm thật nhiều ngày kỷ niệm như hôm nay.',
     signature: () => 'Mừng ngày của chúng mình.',
     coverText: 'Cào mở ngày kỷ niệm của hai đứa mình',
-    icon: '💍',
+    icon: 'anniversary',
     pattern: 'petals',
     colors: ['#f6c86f', '#e9965b', '#9b5a42'],
   },
@@ -221,7 +222,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Tuổi mới cứ vui hơn một chút, nhẹ lòng hơn một chút và được yêu nhiều thật nhiều. Anh sẽ cố góp phần vào mấy điều đó. Cứ là em như bây giờ nhé, vì anh thương phiên bản ấy lắm.',
     signature: () => 'Sinh nhật vui vẻ, em bé của anh.',
     coverText: 'Món quà nhỏ mừng ngày em ra đời',
-    icon: '🎂',
+    icon: 'anniversary',
     pattern: 'confetti',
     colors: ['#ffd66e', '#ff9c64', '#d94b78'],
   },
@@ -233,7 +234,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Mong anh với em vẫn là một đội: vui thì cùng cười, mệt thì dựa vào nhau, có chuyện gì cũng đừng buông tay quá nhanh. Chúc hai đứa mình một năm bình yên, nhiều niềm vui và nhiều lần được gặp nhau.',
     signature: () => 'Năm mới vẫn thương em.',
     coverText: 'Cào lấy may và thương nhau cả năm mới',
-    icon: '🎆',
+    icon: 'star',
     pattern: 'stars',
     colors: ['#ffcf56', '#ed6a4a', '#8f263d'],
   },
@@ -245,7 +246,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Anh không giỏi nói lời hoa mỹ, nhưng chuyện anh thương em thì là thật. Hôm nay và cả những ngày không phải lễ, anh vẫn mong em luôn cảm thấy mình được yêu và được trân trọng.',
     signature: () => 'Người yêu em.',
     coverText: 'Một chiếc thư Valentine bí mật dành riêng em',
-    icon: '💌',
+    icon: 'mail',
     pattern: 'hearts',
     colors: ['#ff839d', '#e43d68', '#8a2148'],
   },
@@ -257,7 +258,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Hôm nay em cứ việc xinh, vui và được chiều. Còn những ngày bình thường, anh cũng sẽ nhớ thương em tử tế. Mong em luôn tự tin, thoải mái và làm những điều khiến mình hạnh phúc.',
     signature: () => 'Một bông hoa của riêng anh.',
     coverText: 'Một bông hoa nhỏ dành tặng em ngày 8/3',
-    icon: '🌷',
+    icon: 'star',
     pattern: 'petals',
     colors: ['#ffb7cf', '#ef73aa', '#8e416d'],
   },
@@ -269,7 +270,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Người lớn rồi vẫn được quyền nhõng nhẽo, thích quà và cười vì mấy chuyện bé xíu. Với anh, em vẫn là em bé. Hôm nay cứ vui thật nhiều và đừng ngại đòi anh chiều nhé.',
     signature: () => 'Anh của em bé.',
     coverText: 'Em bé cào quà nào',
-    icon: '🍭',
+    icon: 'sparkle',
     pattern: 'candy',
     colors: ['#75e5dc', '#75aef5', '#7657c6'],
   },
@@ -281,7 +282,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Cảm ơn em vì đã xuất hiện và làm những ngày của anh có thêm nhiều điều để mong. Mong em luôn được yêu thương đúng cách, được lắng nghe và được là chính mình.',
     signature: () => 'Thương em nhiều.',
     coverText: 'Lời thương gửi người phụ nữ anh yêu nhất',
-    icon: '🌸',
+    icon: 'heart',
     pattern: 'petals',
     colors: ['#f3a8c8', '#d76da8', '#7f416f'],
   },
@@ -293,7 +294,7 @@ const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
       'Giáng sinh này anh không cần điều ước gì cầu kỳ. Chỉ mong anh với em vẫn có nhau, ấm áp và bình yên. Trời có lạnh thì nhớ ở gần anh thêm một chút nhé.',
     signature: () => 'Quà Noel của anh là em.',
     coverText: 'Cào lớp tuyết lạnh để nhận hơi ấm Noel',
-    icon: '🎄',
+    icon: 'gift',
     pattern: 'snow',
     colors: ['#9be3d2', '#3aa58f', '#1d5e58'],
   },
@@ -420,8 +421,6 @@ function ensureStyles(): void {
   const style = document.createElement('style');
   style.id = 'occasion-card-styles';
   style.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Dancing+Script:wght@700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@700;800&display=swap');
-
     .occasion-overlay {
       position: fixed; inset: 0; z-index: 5000;
       display: flex; align-items: center; justify-content: center;
@@ -550,12 +549,12 @@ function ensureStyles(): void {
     .occasion-art-wrap:hover { transform: rotate(2deg) translateY(-2px); }
     .occasion-art { display: block; width: 100%; height: 100%; overflow: visible; }
     .occasion-eyebrow {
-      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      font-family: var(--font-sans);
       font-size: 11px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
       color: var(--paper-accent); margin-bottom: 8px; opacity: 0.9;
     }
     .occasion-title {
-      font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+      font-family: var(--font-display);
       font-size: 27px; font-weight: 700; line-height: 1.25; color: var(--paper-strong);
       max-width: 100%; margin: 0 0 16px; white-space: nowrap;
       letter-spacing: -0.035em; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
@@ -567,9 +566,9 @@ function ensureStyles(): void {
     .divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--paper-accent), transparent); }
     .divider-heart { font-size: 12px; color: var(--paper-accent); opacity: 0.8; }
     .occasion-message {
-      font-family: 'Cormorant Garamond', Georgia, serif;
-      font-size: 19.5px; font-weight: 600; line-height: 1.72; color: var(--paper-ink); margin: 0;
-      letter-spacing: 0.01em;
+      font-family: var(--font-display);
+      font-size: 18px; font-weight: 500; line-height: 1.68; color: var(--paper-ink); margin: 0;
+      letter-spacing: 0.005em;
     }
     .occasion-signature-wrap {
       margin-top: 26px; display: flex; align-items: flex-end; justify-content: space-between; gap: 14px;
@@ -577,15 +576,15 @@ function ensureStyles(): void {
     }
     .occasion-signature {
       flex: 1 1 auto; min-width: 0; max-width: 210px; margin: 0;
-      font-family: 'Dancing Script', cursive; font-size: 23px; font-weight: 700;
-      line-height: 1.08; text-align: left; color: var(--paper-accent);
+      font-family: var(--font-display); font-style: italic; font-size: 21px; font-weight: 600;
+      line-height: 1.15; text-align: left; color: var(--paper-accent);
     }
     .occasion-signature--birthday { max-width: 178px; }
     .occasion-stamp-wrap {
       position: relative; flex: 0 0 auto; transform: rotate(6deg);
     }
     .occasion-stamp {
-      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 9px; font-weight: 800;
+      font-family: var(--font-sans); font-size: 9px; font-weight: 800;
       letter-spacing: 0.15em; color: rgba(160, 80, 110, 0.65);
       border: 1.5px solid rgba(160, 80, 110, 0.35); padding: 4px 8px; border-radius: 6px;
       color: color-mix(in srgb, var(--paper-accent) 68%, transparent);
@@ -615,7 +614,7 @@ function ensureStyles(): void {
       border: 1px solid rgba(255, 255, 255, 0.28);
       background: var(--hint-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       box-shadow: 0 14px 30px rgba(21, 7, 20, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10.5px; font-weight: 800;
+      font-family: var(--font-sans); font-size: 10.5px; font-weight: 800;
       letter-spacing: 0.12em; white-space: nowrap; color: rgba(255, 255, 255, 0.92); pointer-events: none; transition: opacity 0.2s ease;
     }
     .occasion-shell.is-revealed .occasion-hint { opacity: 0; }
@@ -1516,7 +1515,8 @@ function mountPreviewButton(getLatestMe: () => MeResponse | undefined): void {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'occasion-preview-button';
-  button.textContent = '🎴';
+  button.innerHTML = iconMarkup('scratch-card', { size: 24, variant: 'filled' });
+  button.setAttribute('aria-label', 'Xem demo thiệp kỷ niệm');
   button.title = 'Xem demo thiệp kỷ niệm';
   button.addEventListener('click', () => openPreviewPicker(getLatestMe()));
   document.body.appendChild(button);
@@ -1529,13 +1529,13 @@ function openPreviewPicker(me?: MeResponse): void {
   const overlay = document.createElement('div');
   overlay.className = 'occasion-picker-overlay';
   overlay.innerHTML = `
-    <section class="occasion-picker" role="dialog" aria-modal="true">
+    <section class="occasion-picker" role="dialog" aria-modal="true" aria-label="Demo thiệp cào">
       <h3>Demo thiệp cào</h3>
       <p>Chọn một dịp để ép mở. Chế độ này không đánh dấu đã xem.</p>
       <div class="occasion-picker-grid">
         ${PREVIEW_ORDER.map((id) => {
           const card = buildCard(id, context);
-          return `<button type="button" class="occasion-picker-item" data-card-id="${id}"><span>${card.icon}</span><strong>${escapeHtml(card.title)}</strong></button>`;
+          return `<button type="button" class="occasion-picker-item" data-card-id="${id}"><span style="color:var(--accent-600);">${iconMarkup(card.icon, { size: 24, variant: 'filled' })}</span><strong>${escapeHtml(card.title)}</strong></button>`;
         }).join('')}
       </div>
     </section>
@@ -1623,7 +1623,7 @@ async function mountBirthdaySettings(): Promise<void> {
   const birthdaySetupNeeded = needsBirthdaySetup(me);
   card.innerHTML = `
     <div class="birthday-settings-head">
-      <span class="birthday-settings-icon">🎂</span>
+      <span class="birthday-settings-icon" style="color:var(--accent-600);">${iconMarkup('anniversary', { size: 20, variant: 'filled' })}</span>
       <div>
         <span class="birthday-settings-title">${birthdaySetupNeeded ? 'Chưa thiết lập đủ ngày sinh nhật' : 'Ngày sinh nhật'}</span>
         <span class="birthday-settings-subtitle">${birthdaySetupNeeded ? 'Điền ngày sinh của hai bạn để app nhắc đúng ngày và chuẩn bị bất ngờ.' : 'Cập nhật sinh nhật hai bạn để nhận thiệp chúc mừng tự động'}</span>
@@ -1650,7 +1650,7 @@ async function mountBirthdaySettings(): Promise<void> {
   if (partnerInput) partnerInput.max = max;
   save?.addEventListener('click', async () => {
     save.disabled = true;
-    save.textContent = '⏳ Đang lưu...';
+    save.textContent = 'Đang lưu...';
     try {
       await updateProfile({
         birthday: selfInput?.value || null,
@@ -1658,11 +1658,11 @@ async function mountBirthdaySettings(): Promise<void> {
       });
       await getMe();
       showToast('Đã lưu Birthday!', 'success');
-      save.textContent = '✨ Đã lưu';
+      save.textContent = 'Đã lưu';
       window.setTimeout(() => { save.textContent = 'Lưu ngày sinh'; }, 1200);
     } catch (error) {
       showToast(`Không lưu được Birthday: ${(error as Error).message}`, 'error');
-      save.textContent = '🔄 Thử lại';
+      save.textContent = 'Thử lại';
     } finally {
       save.disabled = false;
     }

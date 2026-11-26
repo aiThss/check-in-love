@@ -26,7 +26,6 @@ initMessageStickerInput();
 initMessageThreadEnhancements();
 initProfileCopyright();
 initRealtimeEvents();
-void import('./utils/anniversary-cards').then(({ initAnniversaryCards }) => initAnniversaryCards());
 
 const devHost = window.location.hostname;
 const isPrivateDevHost = devHost === 'localhost'
@@ -35,11 +34,23 @@ const isPrivateDevHost = devHost === 'localhost'
   || devHost.startsWith('10.')
   || /^172\.(1[6-9]|2\d|3[01])\./.test(devHost);
 const isViteDev = Boolean((import.meta as any).env?.DEV);
-if (isViteDev || isPrivateDevHost) {
-  void import('./components/dev-helper').then(({ initDevHelper }) => initDevHelper());
-}
 
-void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
+const scheduleNonCriticalInit = (fn: () => void, delayMs = 900): void => {
+  const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+  if (typeof w.requestIdleCallback === 'function') {
+    w.requestIdleCallback(fn, { timeout: delayMs + 800 });
+  } else {
+    globalThis.setTimeout(fn, delayMs);
+  }
+};
+
+scheduleNonCriticalInit(() => {
+  void import('./utils/anniversary-cards').then(({ initAnniversaryCards }) => initAnniversaryCards());
+  void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
+  if (isViteDev || isPrivateDevHost) {
+    void import('./components/dev-helper').then(({ initDevHelper }) => initDevHelper());
+  }
+}, 650);
 
 if (navigator.userAgent.includes('LoveCheckAndroidWrapper')) {
   document.documentElement.classList.add('android-wrapper');

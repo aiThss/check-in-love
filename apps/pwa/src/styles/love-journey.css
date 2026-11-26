@@ -1,3 +1,4 @@
+@layer legacy {
 /* ============================================================
    Love Journey & Bucket List Styles — LoveCheck PWA
    Crafted with distinctive romantic keepsake visual identity
@@ -353,67 +354,6 @@
   color: #cbd5e1;
   background: rgba(24, 20, 30, 0.7);
   box-shadow: none;
-}
-
-/* ── MapLibre Attribution Styling (Visible & Accessible) ────── */
-.maplibregl-ctrl-bottom-right {
-  bottom: 8px !important;
-  right: 8px !important;
-  z-index: 10 !important;
-  pointer-events: auto !important;
-}
-
-.maplibregl-ctrl-attrib {
-  font-size: 10px !important;
-  line-height: 1.3 !important;
-  background: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  color: var(--text-secondary) !important;
-  border-radius: 6px !important;
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
-  padding: 2px 6px !important;
-  max-width: 240px !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-[data-theme='dark'] .maplibregl-ctrl-attrib {
-  background: rgba(24, 20, 30, 0.85) !important;
-  color: rgba(255, 255, 255, 0.65) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-}
-
-.maplibregl-ctrl-attrib a {
-  color: inherit !important;
-  text-decoration: underline !important;
-}
-
-/* The compact attribution is a 24px disclosure button. The generic attribution
- * padding above must not shrink its containing box and crop the info circle. */
-.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  padding: 0 !important;
-  overflow: visible !important;
-  border-radius: 50% !important;
-}
-
-.maplibregl-ctrl-attrib-button {
-  width: 24px !important;
-  height: 24px !important;
-  border-radius: 50% !important;
-}
-
-.maplibregl-ctrl-attrib.maplibregl-compact-show {
-  width: auto;
-  height: auto;
-  padding: 2px 28px 2px 8px !important;
-  border-radius: 12px !important;
-  white-space: normal !important;
 }
 
 /* ── Floating Map Controls Bar ─────────────────────────────── */
@@ -1163,3 +1103,68 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
+
+}
+
+/* ── MapLibre Attribution Styling (Visible & Accessible) ────── */
+.maplibregl-ctrl-bottom-right {
+  bottom: 8px;
+  right: 8px;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+  line-height: 1.3;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 2px 6px;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme='dark'] .maplibregl-ctrl-attrib {
+  background: rgba(24, 20, 30, 0.85);
+  color: rgba(255, 255, 255, 0.65);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.maplibregl-ctrl-attrib a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* The compact attribution is a 24px disclosure button. The generic attribution
+ * padding above must not shrink its containing box and crop the info circle. */
+.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  overflow: visible;
+  border-radius: 50%;
+}
+
+.maplibregl-ctrl-attrib-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact-show {
+  width: auto;
+  height: auto;
+  padding: 2px 28px 2px 8px;
+  border-radius: 12px;
+  white-space: normal;
+}
+
+

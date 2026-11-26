@@ -83,7 +83,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Reduced Motion (System or Explicit App Preference) — Sole Legal !important */
+  /* Reduced Motion (System or Explicit App Preference — Sole Permitted Override) */
   @media (prefers-reduced-motion: reduce) {
     :root:not([data-reduced-motion='off']) *,
     :root:not([data-reduced-motion='off']) *::before,

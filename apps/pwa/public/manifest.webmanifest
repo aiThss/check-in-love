@@ -8,6 +8,22 @@
   "display": "standalone",
   "orientation": "portrait",
   "categories": ["lifestyle", "social"],
+  "screenshots": [
+    {
+      "src": "/screenshots/home-mobile.webp",
+      "sizes": "780x1688",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Không gian kỷ niệm & Check-in mỗi ngày"
+    },
+    {
+      "src": "/screenshots/chat-mobile.webp",
+      "sizes": "780x1688",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Trò chuyện riêng tư theo thời gian thực"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Check-in",

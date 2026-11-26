@@ -236,3 +236,56 @@ Mẫu mỗi mục:
 - Kiểm: `gradlew assembleRelease` ✅ · `aapt2 dump badging` đúng 60/0.0.48, minSdk 24, targetSdk 36 · `apksigner verify` ✅ · lint ✅ · test ✅ · build PWA ✅ · `git diff apps/api packages apps/admin` rỗng ✅.
 - Dở: chưa chạy thử trên thiết bị/emulator (xem HANDOFF mục 2). Chưa chạy `testDebugUnitTest` Android.
 - Bước tiếp: P9.
+
+## 2026-11-26 10:45 — P9 Tối ưu cuối, A11y Audit, Ảnh chụp After & Báo cáo nghiệm thu (Gemini)
+- Làm:
+  - Xoá `apps/pwa/src/styles/auth-interaction-vibe.css` (1.314 dòng, 168 `!important`), tách riêng style công cụ dev sang `styles/10-components/dev-helper.css` (chỉ nạp động khi ở dev/local) và thay toàn bộ emoji trong `dev-helper.ts`, `chat-wallpaper.ts`, `anniversary-cards.ts` bằng icon SVG "Nét Yêu".
+  - Chuyển `styles/love-journey.css` khỏi `styles/index.css` về nạp riêng trong `pages/love-journey.ts`; xoá 3 lớp `blur(64px)` toàn cục và gỡ toàn bộ `!important` trong `components.css`, `love-journey.css`, `polaroid-cover.css`, `animations.css` -> **0 `!important`** ngoài khối reduced-motion hợp lệ ở `01-base.css`.
+  - Gỡ `@import` Google Fonts cuối cùng trong `anniversary-cards.ts` (chuyển sang `var(--font-display)` / `var(--font-sans)` tự host); trì hoãn khởi tạo không thiết yếu qua `requestIdleCallback` trong `main.ts`.
+  - Phát hiện qua kiểm tra ảnh chụp thật và sửa triệt để 4 lỗi hiển thị: (1) 45 chỗ dùng nhầm `solid var(--ink-border)` thay vì `solid var(--ink-stroke-color)` ở 7 file `20-pages/*.css` làm mất viền mực sticker, (2) inline `style="display:flex"` trên `#otp-verify-form` ở `login.ts` đè `.hidden-step`, (3) `.memory-mini-composer` bị kéo cao 220px ở `memories.css` do kế thừa `flex-basis` cột, (4) chip gợi ý ở `checkin.css` bị gãy dòng.
+  - Viết `src/ui/p9-acceptance.test.ts` (kiểm tự động 0 non-a11y `!important`, <= 400 dòng/file CSS v2, 0 CDN ngoài, hợp đồng PWA v10, tương phản WCAG AA trên cả nền giấy và nền trang cho 6 màu nhấn, và 100% `<button>` có nhãn tiếp cận + `<img>` có `alt` trên 14 màn hình).
+  - Viết `scripts/capture-after-and-metrics.mjs` đo Web Vitals mobile (`4× CPU`, `Fast 3G`, nén gzip: LCP `/app/home` **200 ms**, `/app/messages` **536 ms**, `/login` cold **1.896 ms**, CLS **0,000**), chụp đủ **44 ảnh `after` WebP** vào `design/redesign-v2/after/` và bổ sung `screenshots` vào `manifest.webmanifest`.
+  - Cập nhật `design/redesign-v2/metrics.md`, `docs/redesign-v2/DECISIONS.md`, `design/redesign-v2/decisions.md`, `docs/redesign-v2/REPORT.md`, `README.md` và `HANDOFF.md`.
+- Kiểm: lint ✅ · test ✅ (**31 file / 155 test pass**) · build ✅ (`index` JS **34,73 kB** gzip, `index` CSS **139,27 kB** raw) · `git diff 65924d3 -- apps/api packages apps/admin` rỗng ✅.
+- Dở: không có (toàn bộ P0 → P9 đã hoàn tất).
+- Bước tiếp: bàn giao báo cáo nghiệm thu cuối cho user; cài thử `app-release.apk` trên thiết bị thật khi thuận tiện.
+
+### Snapshot tự động 2026-11-26 10:47
+- Nhánh: main
+- Commit cuối: ca15167 feat(android): P8 adaptive launcher icon, vector notification icon, Android 12 splash, PWA-matched dark theme, widget restyle, release v0.0.48
+- File thay đổi chưa commit:
+   M HANDOFF.md
+   M README.md
+   M apps/pwa/public/manifest.webmanifest
+   M apps/pwa/src/components/dev-helper.ts
+   M apps/pwa/src/main.ts
+   M apps/pwa/src/pages/login.ts
+   M apps/pwa/src/pages/love-journey.ts
+   M apps/pwa/src/styles/01-base.css
+   M apps/pwa/src/styles/02-utilities.css
+   M apps/pwa/src/styles/20-pages/auth.css
+   M apps/pwa/src/styles/20-pages/checkin.css
+   M apps/pwa/src/styles/20-pages/home.css
+   M apps/pwa/src/styles/20-pages/journey.css
+   M apps/pwa/src/styles/20-pages/memories.css
+   M apps/pwa/src/styles/20-pages/profile.css
+   M apps/pwa/src/styles/20-pages/secondary.css
+   M apps/pwa/src/styles/animations.css
+  D  apps/pwa/src/styles/auth-interaction-vibe.css
+   M apps/pwa/src/styles/components.css
+   M apps/pwa/src/styles/index.css
+   M apps/pwa/src/styles/love-journey.css
+   M apps/pwa/src/styles/polaroid-cover.css
+   M apps/pwa/src/utils/anniversary-cards.ts
+   M apps/pwa/src/utils/chat-wallpaper.ts
+   M design/redesign-v2/decisions.md
+   M design/redesign-v2/metrics.md
+   M docs/redesign-v2/DECISIONS.md
+   M docs/redesign-v2/PROGRESS.md
+  ?? apps/pwa/public/screenshots/
+  ?? apps/pwa/src/styles/10-components/dev-helper.css
+  ?? apps/pwa/src/ui/p9-acceptance.test.ts
+  ?? design/redesign-v2/after/
+  ?? docs/redesign-v2/REPORT.md
+  ?? scripts/capture-after-and-metrics.mjs
+- Diff apps/api + packages (phải rỗng): rỗng (OK)
