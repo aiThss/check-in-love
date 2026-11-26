@@ -5,7 +5,6 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowSplashScreenBackground">#F8E2E7</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/avd_splash_heart</item>
-        <item name="android:windowSplashScreenAnimationDuration">600</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
 </resources>

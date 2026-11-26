@@ -390,7 +390,7 @@ class LoveCheckBridge(
                     }
                 }
 
-                val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(context.resources, R.drawable.ic_launcher_bitmap)
+                val largeIcon = avatarBitmap ?: BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
 
                 // Download photo preview if attached
                 var photoBitmap: Bitmap? = null

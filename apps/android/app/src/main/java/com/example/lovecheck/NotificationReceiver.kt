@@ -84,7 +84,7 @@ class NotificationReceiver : BroadcastReceiver() {
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notification)
-            .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.ic_launcher_bitmap))
+            .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher))
             .setColor(0xFFFF3B7F.toInt())
             .setContentTitle("Check IN Love 💕")
             .setContentText(message)

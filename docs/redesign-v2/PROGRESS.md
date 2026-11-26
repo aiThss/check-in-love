@@ -289,3 +289,10 @@ Mẫu mỗi mục:
   ?? docs/redesign-v2/REPORT.md
   ?? scripts/capture-after-and-metrics.mjs
 - Diff apps/api + packages (phải rỗng): rỗng (OK)
+
+## 2026-11-26 11:03 — Khôi phục Logo gốc & Deploy Cloudflare Workers + Pages (Gemini)
+- Làm:
+  - Theo yêu cầu user giữ lại bộ logo trái tim pixel gốc: khôi phục nguyên bản `apps/pwa/public/icons/{icon-192,icon-512,apple-touch-icon-120/152/180}.png` + `badge.svg` và `apps/android/app/src/main/res/mipmap-*dpi/ic_launcher{,_round}.png` + `drawable/ic_notification.png` từ commit `e5c41ab`; xoá `favicon.svg`, `icon-maskable-512.png`, `scripts/build-app-icons.mjs` và adaptive XML mới.
+  - Cập nhật `index.html`, `offline.html`, `sw.js`, `manifest.webmanifest`, `values{,-night}-v31/themes.xml`, `dialog_update.xml`; nâng Android lên `versionCode 61` / `versionName "0.0.49"` và đóng gói lại `app-release.apk`.
+  - Build production PWA kèm `VITE_GOOGLE_CLIENT_ID` và deploy trực tiếp bằng Wrangler lên Cloudflare Worker (`check-in-love-api` -> `api.couple.io.vn`) + Cloudflare Pages (`check-in-love` -> `couple.io.vn`).
+- Kiểm: lint ✅ · test ✅ (31 file / 155 test pass) · build PWA ✅ · `gradlew assembleRelease` ✅ · Wrangler deploy Worker & Pages ✅.

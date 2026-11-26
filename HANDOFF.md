@@ -16,8 +16,8 @@ Yêu cầu phụ: "tôi cần thêm 1 cái log hay gì đó để nếu bạn h�
 - [x] P4 Home + Check-in camera + Memories + Photo Viewer (commit `5d6495f`)
 - [x] P5 Love Journey + Random + Replies + Card-preview + Test-mail (commit `f1aa6b9`)
 - [x] P6 Auth + Onboarding + Install + Profile/Settings (commit `e5c41ab`)
-- [x] P7 PWA: manifest shortcuts + icon any/maskable riêng, `offline.html`, SW cache v10, toast cập nhật + banner cài đặt (`src/ui/pwa-prompts.ts`), bộ icon app v2 (`scripts/build-app-icons.mjs`), xoá file/asset mồ côi, `storage-compat.test.ts` (commit `98f65c1`)
-- [x] P8 Android native restyle + APK v0.0.48 (`versionCode 60`): adaptive icon + monochrome, icon thông báo vector, splash Android 12+, theme/dark khớp PWA, widget + dialog restyle (commit `ca15167`)
+- [x] P7 PWA: manifest shortcuts + screenshots, `offline.html`, SW cache v10, toast cập nhật + banner cài đặt (`src/ui/pwa-prompts.ts`), giữ nguyên bộ logo trái tim pixel gốc, xoá file/asset mồ côi, `storage-compat.test.ts` (commit `98f65c1`)
+- [x] P8 Android native restyle + APK v0.0.49 (`versionCode 61`): giữ logo launcher & icon thông báo gốc theo yêu cầu user, splash Android 12+, theme/dark `#261824` khớp PWA, widget + dialog restyle
 - [x] P9 Tối ưu cuối + báo cáo before/after: xoá `auth-interaction-vibe.css`, tách `dev-helper.css` & `love-journey.css`, gỡ Google Fonts cuối cùng ở `anniversary-cards.ts`, đưa `!important` ngoài reduced-motion về **0**, sửa 45 viền mực `--ink-stroke-color` & layout `login`/`memories`/`checkin`, bổ sung `manifest.screenshots`, thêm `p9-acceptance.test.ts` (**31 file / 155 test pass**), chụp 44 ảnh `after` WebP và xuất báo cáo [`docs/redesign-v2/REPORT.md`](docs/redesign-v2/REPORT.md).
 
 ## 2. Trạng thái hiện tại
@@ -39,18 +39,17 @@ Yêu cầu phụ: "tôi cần thêm 1 cái log hay gì đó để nếu bạn h�
 - Android: không đụng bridge `LoveCheckAndroid`, FCM, Google sign-in, share-target.
 - Push `main` = auto deploy production thật.
 
-## 5. Lệnh build / test / ship (PowerShell, không dùng &&)
+## 5. Lệnh build / test / deploy Cloudflare (PowerShell, không dùng &&)
 ```powershell
 Set-Location d:\memory\check-in-love
 npm run lint
 npm test
+$env:VITE_GOOGLE_CLIENT_ID = "894898478385-g6e1nfj90upono5559an4r443f13ds9s.apps.googleusercontent.com"
 npm run build --workspace=apps/pwa
-git diff --stat -- apps/api packages apps/admin
-git add .
-git commit -m "feat(pwa): <mô tả>"
-git push
+$env:CLOUDFLARE_ACCOUNT_ID = "8ccdd0f39d9060b1de9fdb6132acbcb7"
+npm run deploy:api
+npx wrangler pages deploy apps/pwa/dist --project-name check-in-love --branch main
 ```
-- Sinh lại bộ icon PWA + Android: `node scripts\build-app-icons.mjs`
 - Đo lại Web Vitals + chụp lại 44 ảnh `after`: `node scripts\capture-after-and-metrics.mjs`
 
 ## 6. Bẫy đã gặp

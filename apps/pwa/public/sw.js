@@ -15,7 +15,6 @@ const SHELL_ASSETS = [
   '/offline.html',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/icons/favicon.svg',
   '/fonts/be-vietnam-pro-vietnamese-400-normal.woff2',
   '/fonts/be-vietnam-pro-latin-400-normal.woff2',
 ];
