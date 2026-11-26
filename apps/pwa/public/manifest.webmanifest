@@ -7,6 +7,30 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
+  "categories": ["lifestyle", "social"],
+  "shortcuts": [
+    {
+      "name": "Check-in",
+      "short_name": "Check-in",
+      "description": "Chụp check-in gửi người ấy",
+      "url": "/app/checkin",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Tin nhắn",
+      "short_name": "Tin nhắn",
+      "description": "Mở cuộc trò chuyện của hai đứa",
+      "url": "/app/messages",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Kỷ niệm",
+      "short_name": "Kỷ niệm",
+      "description": "Xem lại những khoảnh khắc đã lưu",
+      "url": "/app/memories",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "share_target": {
     "action": "/app/messages",
     "method": "POST",
@@ -23,19 +47,26 @@
       ]
     }
   },
-  "background_color": "#FFFFFF",
+  "background_color": "#f8e2e7",
   "theme_color": "#FF3B7F",
   "icons": [
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

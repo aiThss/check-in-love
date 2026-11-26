@@ -1,9 +1,9 @@
 /* ============================================================
    LoveCheck Service Worker
-   Cache name: lovecheck-v9
+   Cache name: lovecheck-v10
    ============================================================ */
 
-const CACHE_NAME = 'lovecheck-v9';
+const CACHE_NAME = 'lovecheck-v10';
 const OFFLINE_URL = '/offline.html';
 const SHARE_DB = 'lovecheck-share-v1';
 const SHARE_STORE = 'pending';
@@ -12,6 +12,12 @@ const SHELL_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/offline.html',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/favicon.svg',
+  '/fonts/be-vietnam-pro-vietnamese-400-normal.woff2',
+  '/fonts/be-vietnam-pro-latin-400-normal.woff2',
 ];
 
 // ── Install ──────────────────────────────────────────────────

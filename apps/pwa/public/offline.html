@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f8e2e7" />
+    <title>Mất kết nối — Check IN Love</title>
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('lovecheck_ui_v2_theme');
+          if (!t) { var s = localStorage.getItem('lovecheck_state'); t = s ? JSON.parse(s).theme : null; }
+          var dark = t === 'dark' || ((t === 'system' || !t) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        } catch (e) { /* mặc định theo hệ thống bằng CSS */ }
+      })();
+    </script>
+    <style>
+      :root { --bg: #f8e2e7; --card: #fff; --ink: #1f0f15; --muted: #6b4a57; --accent: #ff3b7f; --gold: #ffeaa7; }
+      @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --bg: #261824; --card: #3a2336; --ink: #fbeaf0; --muted: #d8b8c6; --gold: #ffeaa7; } }
+      :root[data-theme='dark'] { --bg: #261824; --card: #3a2336; --ink: #fbeaf0; --muted: #d8b8c6; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px;
+        padding-top: max(24px, env(safe-area-inset-top)); padding-bottom: max(24px, env(safe-area-inset-bottom));
+        background: var(--bg); color: var(--ink);
+        font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      }
+      main {
+        width: min(100%, 380px); text-align: center; padding: 32px 24px;
+        background: var(--card); border: 2.5px solid var(--ink); border-radius: 28px; box-shadow: 4px 4px 0 var(--ink);
+      }
+      .mark { width: 88px; height: 88px; margin: 0 auto 16px; display: block; animation: beat 2.4s ease-in-out infinite; }
+      .chip {
+        display: inline-block; padding: 4px 12px; margin-bottom: 12px; border: 2px solid var(--ink); border-radius: 999px;
+        background: var(--gold); color: #1f0f15; font-size: 12px; font-weight: 700; letter-spacing: .02em;
+      }
+      h1 { margin: 0 0 8px; font-size: 24px; line-height: 1.25; }
+      p { margin: 0 0 24px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+      button {
+        min-height: 48px; width: 100%; padding: 0 24px; border: 2.5px solid var(--ink); border-radius: 999px; cursor: pointer;
+        background: var(--accent); color: #1f0f15; font: inherit; font-size: 16px; font-weight: 700; box-shadow: 3px 3px 0 var(--ink);
+        transition: transform 90ms ease, box-shadow 90ms ease;
+      }
+      button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+      button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+      @keyframes beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+      @media (prefers-reduced-motion: reduce) { .mark { animation: none; } button { transition: none; } }
+    </style>
+  </head>
+  <body>
+    <main role="alert">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 20.2s-7.5-4.5-7.5-10.1a4.3 4.3 0 0 1 7.5-2.8 4.3 4.3 0 0 1 7.5 2.8c0 5.6-7.5 10.1-7.5 10.1Z" fill="#ff3b7f" stroke="#1f0f15" stroke-width="1.2" stroke-linejoin="round" />
+        <path d="M3.5 3.5l17 17" stroke="#1f0f15" stroke-width="1.75" stroke-linecap="round" />
+      </svg>
+      <span class="chip">Đang ngoại tuyến</span>
+      <h1>Mất kết nối rồi</h1>
+      <p>Không sao đâu, kỷ niệm của hai đứa vẫn an toàn. Tin nhắn chưa gửi sẽ tự gửi khi có mạng lại.</p>
+      <button type="button" id="retry">Thử lại</button>
+    </main>
+    <script>
+      document.getElementById('retry').addEventListener('click', function () { location.reload(); });
+      window.addEventListener('online', function () { location.reload(); });
+    </script>
+  </body>
+</html>

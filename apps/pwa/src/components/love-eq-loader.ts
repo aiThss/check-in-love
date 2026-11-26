@@ -7,7 +7,7 @@ export function createLoveEqLoaderMarkup(): string {
   <style>
     .loveEq rect{transform-box:fill-box;transform-origin:center;animation:love-eq-wave 1.25s ease-in-out infinite}.loveEq .b2,.loveEq .b10{animation-delay:-.12s}.loveEq .b3,.loveEq .b9{animation-delay:-.24s}.loveEq .b4,.loveEq .b8{animation-delay:-.36s}.loveEq .b5,.loveEq .b7{animation-delay:-.48s}.loveEq .b6{animation-delay:-.6s}
     @keyframes love-eq-wave{0%,100%{transform:scaleY(.62);opacity:.46}50%{transform:scaleY(1);opacity:1}}
-    @media(prefers-reduced-motion:reduce){.loveEq *{animation:none!important}}
+    @media(prefers-reduced-motion:reduce){.loveEq rect[class]{animation:none}}
   </style>
   <defs><linearGradient id="${gradientId}" x1="22" y1="27" x2="98" y2="93" gradientUnits="userSpaceOnUse"><stop stop-color="#ff6fae"/><stop offset="1" stop-color="#b69cff"/></linearGradient></defs>
   <g fill="url(#${gradientId})">

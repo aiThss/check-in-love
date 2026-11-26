@@ -11,10 +11,10 @@ import { initMessageReplyGesture } from './utils/message-reply-gesture';
 import { initMessageStickerInput } from './utils/message-sticker-input';
 import { initMessageThreadEnhancements } from './utils/message-thread-enhancements';
 import { initProfileCopyright } from './utils/profile-copyright';
-import { initProfileUiCleanup } from './utils/profile-ui-cleanup';
 import { ensurePushSubscription, setupAndroidFcm } from './api/push';
 import { initRealtimeEvents } from './api/events';
-import { showModal } from './components/modal';
+import { icon } from './ui/icons/icons';
+import { initInstallPrompt, showUpdateToast } from './ui/pwa-prompts';
 
 store.initTheme();
 initUiThemeEngine();
@@ -25,7 +25,6 @@ initMessageReplyGesture();
 initMessageStickerInput();
 initMessageThreadEnhancements();
 initProfileCopyright();
-initProfileUiCleanup();
 initRealtimeEvents();
 void import('./utils/anniversary-cards').then(({ initAnniversaryCards }) => initAnniversaryCards());
 
@@ -108,15 +107,9 @@ function watchForServiceWorkerUpdate(registration: ServiceWorkerRegistration): v
   const offerUpdate = () => {
     const waitingWorker = registration.waiting;
     if (!waitingWorker || !navigator.serviceWorker.controller) return;
-    showModal({
-      title: 'Đã có bản cập nhật mới',
-      content: 'Cập nhật ngay để dùng phiên bản mới nhất? Dữ liệu đang mở sẽ được giữ lại.',
-      confirmText: 'Cập nhật',
-      cancelText: 'Để sau',
-      onConfirm: () => {
-        navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
-        waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-      },
+    showUpdateToast(() => {
+      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
     });
   };
   registration.addEventListener('updatefound', () => {
@@ -128,6 +121,8 @@ function watchForServiceWorkerUpdate(registration: ServiceWorkerRegistration): v
   offerUpdate();
 }
 
+initInstallPrompt({ isAuthenticated: () => store.isAuthenticated() });
+
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as Window & { MSStream?: unknown }).MSStream;
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 const isCardPreviewHost = window.location.hostname === 'preview.couple.io.vn';
@@ -136,7 +131,10 @@ function renderBlockedPage(): HTMLElement {
   const el = document.createElement('div');
   el.className = 'page blocked-page animate-fade-in';
   el.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:32px;';
-  el.innerHTML = `<div style="font-size:64px;margin-bottom:24px;">🔒</div><h1 style="font-size:24px;font-weight:700;margin-bottom:12px;color:var(--text-primary);">Tài khoản bị tạm khóa</h1><p style="color:var(--text-secondary);margin-bottom:32px;line-height:1.6;">Vui lòng liên hệ để được hỗ trợ mở khóa tài khoản.</p><button id="blocked-logout" class="btn-primary">Đăng xuất</button>`;
+  el.innerHTML = `<div class="blocked-icon" style="margin-bottom:24px;color:var(--accent-500);"></div><h1 style="font-size:24px;font-weight:700;margin-bottom:12px;color:var(--text-primary);">Tài khoản bị tạm khóa</h1><p style="color:var(--text-secondary);margin-bottom:32px;line-height:1.6;">Vui lòng liên hệ để được hỗ trợ mở khóa tài khoản.</p><button id="blocked-logout" class="btn-primary">Đăng xuất</button>`;
+  const lock = icon('lock', { size: 32 });
+  lock.style.cssText = 'width:72px;height:72px;';
+  el.querySelector('.blocked-icon')?.appendChild(lock);
   el.querySelector('#blocked-logout')?.addEventListener('click', () => {
     clearPrivateClientState();
     navigate('/onboarding', true);

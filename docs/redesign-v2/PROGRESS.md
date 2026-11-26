@@ -208,3 +208,18 @@ Mẫu mỗi mục:
 - Kiểm: lint ✅ · test ✅ (28 file / 141 test) · build ✅ · `git diff apps/api packages apps/admin` rỗng ✅.
 - Dở: không có.
 - Bước tiếp: P7 (PWA manifest/shortcuts, `offline.html`, SW cache v10, update toast, icon app v2, dọn file patch & test tương thích ngược storage).
+
+
+## 2026-11-26 10:10 — P7 PWA Upgrade & dọn nợ kỹ thuật (Claude Sonnet 5.5)
+- Làm:
+  - Build/test lại xác nhận trạng thái thật rồi commit + push P6 còn dở (`e5c41ab`).
+  - `manifest.webmanifest`: thêm `shortcuts` (Check-in, Tin nhắn, Kỷ niệm), `categories`, tách icon `any` và `maskable` (`icon-maskable-512.png`), `background_color` khớp nền sáng; GIỮ `id/scope/start_url/share_target`.
+  - `offline.html` tự chứa (sáng/tối theo `lovecheck_ui_v2_theme`, nút Thử lại, tự reload khi online); SW `lovecheck-v10` precache `offline.html` + icon + 2 font; `/api/*` vẫn networkOnly, `captureShareTarget`/push/waiting worker không đổi.
+  - `src/ui/pwa-prompts.ts` + `pwa-prompts.css`: toast cập nhật không chặn màn hình (thay modal, giữ luồng `SKIP_WAITING` + `controllerchange`) và banner `beforeinstallprompt` (chỉ khi đã đăng nhập, trễ 15s, nhớ `lovecheck_ui_v2_install_dismissed`).
+  - `main.ts`: bỏ `initProfileUiCleanup`; trang bị khoá dùng SVG `lock`.
+  - `scripts/build-app-icons.mjs` sinh lại icon tim + ống kính (192/512/maskable/apple 120-152-180/favicon.svg/badge.svg); mỗi PNG giảm từ ~290 KB xuống 4–88 KB.
+  - Xoá (đã grep xác nhận không còn tham chiếu): `profile-ui-cleanup.ts`, `messages-layout-fix.css`, `message-thread-enhancements.css`, 9 file `icons8-*`, `user.png`, `profile.png`. `love-eq-loader` bỏ `!important`.
+  - Test mới: `pwa-prompts.test.ts` (4), `storage-compat.test.ts` (5: snapshot localStorage cũ -> store/theme v2/wallpaper/journey đọc đúng, khoá cũ giữ nguyên byte-for-byte, khoá mới chỉ `lovecheck_ui_v2_*`).
+- Kiểm: lint ✅ · test ✅ (30 file / 150 test) · build ✅ (`index` gzip 34,65 kB) · `git diff apps/api packages apps/admin` rỗng ✅.
+- Dở: `auth-interaction-vibe.css` giữ lại vì 39 class còn dùng (xem HANDOFF mục 2); manifest `screenshots` chưa có.
+- Bước tiếp: hỏi user có build APK không (P8); nếu không thì P9.
