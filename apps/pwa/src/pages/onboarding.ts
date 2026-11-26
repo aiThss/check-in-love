@@ -559,6 +559,9 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
         : 'Nhập mã ghép đôi, sử dụng Google hoặc Email để đăng nhập',
       body,
     );
+    if (!isGoogleUser) {
+      root.querySelector('.p-auth-sub')?.classList.add('p-auth-sub--single');
+    }
     requestAnimationFrame(() => codeBoxes[0]?.focus());
   }
 
