@@ -46,8 +46,23 @@ const GOOGLE_SDK_URL = 'https://accounts.google.com/gsi/client';
 const GOOGLE_SDK_MAX_ATTEMPTS = 3;
 let googleSdkPromise: Promise<void> | null = null;
 
+export const DEV_FLAG_KEY = 'lovecheck_dev_mode';
+
+/** Bật chế độ demo/test nhanh trên mọi domain: mở URL với `?dev=1` (tắt bằng `?dev=0`). */
+export function isDevModeFlagOn(): boolean {
+  try {
+    const q = new URLSearchParams(window.location.search).get('dev');
+    if (q === '1') localStorage.setItem(DEV_FLAG_KEY, '1');
+    if (q === '0') localStorage.removeItem(DEV_FLAG_KEY);
+    return localStorage.getItem(DEV_FLAG_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function isLocalDevHostname(hostname = window.location.hostname): boolean {
   return (
+    isDevModeFlagOn() ||
     hostname === 'localhost'
     || hostname === '127.0.0.1'
     || hostname.startsWith('192.168.')

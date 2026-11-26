@@ -13,6 +13,7 @@ import { triggerHaptic } from '../ui/haptics';
 import { isLocalDevHostname, mountGoogleSignInButton } from '../ui/google-signin';
 
 const WHEEL_ITEM_HEIGHT = 40;
+const DEMO_OTP_PIN = '123456';
 
 function generateDeviceId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -700,6 +701,14 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     }
     body.appendChild(otpWrapper);
 
+    const demoPin = isLocalDevHostname();
+    if (demoPin) {
+      const hint = document.createElement('p');
+      hint.className = 'p-onboard-auth-note';
+      hint.textContent = `Chế độ demo: nhập mã ${DEMO_OTP_PIN} để đi tiếp, không cần email thật.`;
+      body.appendChild(hint);
+    }
+
     const verifyCtrl = createButton({
       label: 'Xác thực Email',
       variant: 'primary',
@@ -754,6 +763,10 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
 
     async function handleSendOtp(isResend: boolean): Promise<void> {
       if (cooldown > 0) return;
+      if (demoPin) {
+        showToast(`Demo: dùng mã ${DEMO_OTP_PIN}`, 'info');
+        return;
+      }
       resendCtrl.setDisabled(true);
       resendCtrl.setLabel('Đang gửi...');
 
@@ -791,7 +804,11 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
 
       verifyCtrl.setLoading(true, 'Đang xác thực...');
       try {
-        await verifyOtp(formData.email, formData.otpCode);
+        if (demoPin) {
+          if (formData.otpCode !== DEMO_OTP_PIN) throw new Error(`Mã demo là ${DEMO_OTP_PIN}`);
+        } else {
+          await verifyOtp(formData.email, formData.otpCode);
+        }
         formData.emailVerified = true;
         if (cooldownInterval) clearInterval(cooldownInterval);
         triggerHaptic('confirm');
@@ -1283,6 +1300,9 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     btnCtrl.setLoading(true, 'Đang khởi tạo...');
 
     try {
+      if (isLocalDevHostname() && !isGoogleUser && formData.otpCode === DEMO_OTP_PIN) {
+        throw new ApiError('Demo', 'NETWORK_ERROR', 0);
+      }
       const payload: Parameters<typeof startOnboarding>[0] = {
         deviceId,
         displayName: formData.displayName,

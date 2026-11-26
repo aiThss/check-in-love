@@ -47,7 +47,7 @@ const scheduleNonCriticalInit = (fn: () => void, delayMs = 900): void => {
 scheduleNonCriticalInit(() => {
   void import('./utils/anniversary-cards').then(({ initAnniversaryCards }) => initAnniversaryCards());
   void import('./pages/profile').then(({ restoreReminderOnLoad }) => restoreReminderOnLoad());
-  if (isViteDev || isPrivateDevHost) {
+  if (isViteDev || isPrivateDevHost || localStorage.getItem('lovecheck_dev_mode') === '1' || new URLSearchParams(window.location.search).get('dev') === '1') {
     void import('./components/dev-helper').then(({ initDevHelper }) => initDevHelper());
   }
 }, 650);
