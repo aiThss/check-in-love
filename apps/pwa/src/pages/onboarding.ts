@@ -318,17 +318,13 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     const body = document.createElement('div');
     body.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
 
-    let boxCount = formData.coupleCode.length > 6 ? 8 : 6;
+    const boxCount = 6;
+    formData.coupleCode = formData.coupleCode.slice(0, boxCount);
     const codeHead = document.createElement('div');
     codeHead.className = 'p-onboard-section-label';
     const codeLabel = document.createElement('span');
-    codeLabel.textContent = 'Mã ghép đôi (4–8 ký tự)';
-
-    const lenToggle = document.createElement('button');
-    lenToggle.type = 'button';
-    lenToggle.className = 'p-auth-link';
-    lenToggle.textContent = boxCount === 6 ? 'Dùng mã 8 ký tự' : 'Dùng mã 6 ký tự';
-    codeHead.append(codeLabel, lenToggle);
+    codeLabel.textContent = 'Mã ghép đôi (6 ký tự)';
+    codeHead.append(codeLabel);
     body.appendChild(codeHead);
 
     const boxesContainer = document.createElement('div');
@@ -370,16 +366,8 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
           const raw = (e.clipboardData?.getData('text') || '')
             .replace(/[^A-Z0-9]/gi, '')
             .toUpperCase()
-            .slice(0, 8);
+            .slice(0, boxCount);
           if (!raw) return;
-          if (raw.length > 6 && boxCount < 8) {
-            boxCount = 8;
-            formData.coupleCode = raw;
-            lenToggle.textContent = 'Dùng mã 6 ký tự';
-            buildCodeBoxes();
-            codeBoxes[Math.min(raw.length - 1, 7)]?.focus();
-            return;
-          }
           raw.split('').forEach((ch, idx) => {
             if (codeBoxes[idx]) codeBoxes[idx].value = ch;
           });
@@ -391,14 +379,6 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
         boxesContainer.appendChild(cell);
       }
     };
-
-    lenToggle.addEventListener('click', () => {
-      boxCount = boxCount === 6 ? 8 : 6;
-      formData.coupleCode = formData.coupleCode.slice(0, boxCount);
-      lenToggle.textContent = boxCount === 6 ? 'Dùng mã 8 ký tự' : 'Dùng mã 6 ký tự';
-      buildCodeBoxes();
-      codeBoxes[0]?.focus();
-    });
 
     buildCodeBoxes();
     body.appendChild(boxesContainer);
@@ -430,8 +410,8 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
           trailingIcon: 'chevron-right',
           onClick: () => {
             syncCodeFromBoxes();
-            if (!formData.coupleCode || formData.coupleCode.length < 4) {
-              showToast('Couple Code cần ít nhất 4 ký tự', 'error');
+            if (!formData.coupleCode || formData.coupleCode.length !== 6) {
+              showToast('Mã ghép đôi cần đủ 6 ký tự', 'error');
               codeBoxes[0]?.focus();
               return;
             }
@@ -451,11 +431,6 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       authHead.className = 'p-onboard-section-label';
       authHead.innerHTML = `<span>Tài khoản bảo mật (bắt buộc)</span>`;
       authBox.appendChild(authHead);
-
-      const authNote = document.createElement('p');
-      authNote.className = 'p-onboard-auth-note';
-      authNote.textContent = 'Nhập Email & mật khẩu (xác thực OTP) hoặc đăng nhập Google để bảo vệ kỷ niệm của hai đứa.';
-      authBox.appendChild(authNote);
 
       const emailWrap = document.createElement('div');
       emailWrap.className = 'p-auth-input-wrap';
@@ -510,8 +485,8 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
 
       const submitStep3Email = () => {
         syncCodeFromBoxes();
-        if (!formData.coupleCode || formData.coupleCode.length < 4) {
-          showToast('Couple Code cần ít nhất 4 ký tự', 'error');
+        if (!formData.coupleCode || formData.coupleCode.length !== 6) {
+          showToast('Mã ghép đôi cần đủ 6 ký tự', 'error');
           codeBoxes[0]?.focus();
           return;
         }
@@ -547,8 +522,8 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
 
       const divider = document.createElement('div');
       divider.className = 'p-auth-divider';
-      divider.innerHTML = '<span>hoặc đăng nhập qua Google</span>';
-      body.appendChild(divider);
+      divider.innerHTML = '<span>hoặc dùng Email</span>';
+      body.insertBefore(divider, authBox);
 
       const googleWrap = document.createElement('div');
       googleWrap.className = 'p-onboard-google-wrap';
@@ -563,7 +538,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       googleStatus.textContent = 'Đang tải đăng nhập Google…';
 
       googleWrap.append(googleMount, googleStatus);
-      body.appendChild(googleWrap);
+      body.insertBefore(googleWrap, divider);
 
       mountGoogleSignInButton(
         googleMount,
@@ -580,8 +555,8 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       'key',
       'Mã ghép đôi & Tài khoản',
       isGoogleUser
-        ? 'Nhập chung một mã bí mật (4–8 ký tự) để nối hai thiết bị vào cùng một nhà.'
-        : 'Nhập Couple Code và xác thực qua Email hoặc Google để lưu giữ an toàn trên mọi thiết bị.',
+        ? 'Nhập chung một mã bí mật (6 ký tự) để nối hai thiết bị vào cùng một nhà.'
+        : 'Nhập mã ghép đôi, rồi đăng nhập Google hoặc dùng Email.',
       body,
     );
     requestAnimationFrame(() => codeBoxes[0]?.focus());
@@ -628,7 +603,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       sessionStorage.setItem('google_authenticated_user', 'true');
       triggerHaptic('confirm');
 
-      if (formData.coupleCode && formData.coupleCode.length >= 4) {
+      if (formData.coupleCode && formData.coupleCode.length === 6) {
         showToast('Đã kết nối Google! Hãy chọn ngày bắt đầu yêu nhé.', 'success');
         currentStep = 3;
         renderCurrentStep();
