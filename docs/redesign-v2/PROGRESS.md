@@ -296,3 +296,12 @@ Mẫu mỗi mục:
   - Cập nhật `index.html`, `offline.html`, `sw.js`, `manifest.webmanifest`, `values{,-night}-v31/themes.xml`, `dialog_update.xml`; nâng Android lên `versionCode 61` / `versionName "0.0.49"` và đóng gói lại `app-release.apk`.
   - Build production PWA kèm `VITE_GOOGLE_CLIENT_ID` và deploy trực tiếp bằng Wrangler lên Cloudflare Worker (`check-in-love-api` -> `api.couple.io.vn`) + Cloudflare Pages (`check-in-love` -> `couple.io.vn`).
 - Kiểm: lint ✅ · test ✅ (31 file / 155 test pass) · build PWA ✅ · `gradlew assembleRelease` ✅ · Wrangler deploy Worker & Pages ✅.
+
+## 2026-11-26 11:25 — Khôi phục vòng quay chọn ngày có hoạt ảnh & bắt buộc Email OTP / Google OAuth ở Bước 3 (Gemini)
+- Làm:
+  - Tách module dùng chung `apps/pwa/src/ui/google-signin.ts` cho cả `/login` và `/onboarding` Bước 3 (giữ nguyên luật gọi trực tiếp `window.LoveCheckAndroid.signInWithGoogle()`).
+  - Cập nhật `apps/pwa/src/pages/onboarding.ts` + `apps/pwa/src/styles/20-pages/onboarding-date.css`:
+    - Bước 3 bắt buộc xác thực tài khoản qua **Email + Mật khẩu** (tiếp nối sang Bước 4 xác thực OTP bắt buộc, bỏ nút bỏ qua OTP) **hoặc** đăng nhập trực tiếp qua **Google OAuth (`ggauth`)** ngay tại Bước 3; chặn rơi nhầm vào dữ liệu mock trên domain thật `couple.io.vn`.
+    - Bước chọn Ngày bắt đầu yêu nhau: khôi phục vòng quay 3 cột **Ngày / Tháng / Năm** có hoạt ảnh cuộn mượt, bấm chọn trực tiếp ngày/tháng/năm bất kỳ, kéo chuột trên desktop, nút **"Mở lịch tháng"** gọi native date picker, huy hiệu lịch mini nảy động và thẻ đếm ngày tương phản rõ trên cả nền Sáng & Tối.
+  - Bổ sung bộ test `apps/pwa/src/pages/onboarding.test.ts` kiểm chứng luồng Bước 3 Email/Google, Bước 4 OTP không có nút bỏ qua, và vòng quay chọn ngày bất kỳ.
+- Kiểm: lint ✅ · test ✅ (32 file / 158 test pass) · build PWA ✅ · Wrangler deploy Pages (`couple.io.vn`) ✅.

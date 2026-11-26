@@ -13,51 +13,7 @@ import { store } from '../store/index';
 import { iconMarkup } from '../ui/icons/icons';
 import { createIconButton } from '../ui/primitives';
 import { triggerHaptic } from '../ui/haptics';
-
-declare const __GOOGLE_CLIENT_ID__: string;
-
-interface GoogleCredentialResponse {
-  credential: string;
-}
-
-interface GoogleIdConfiguration {
-  client_id: string;
-  callback: (response: GoogleCredentialResponse) => void;
-  cancel_on_tap_outside?: boolean;
-}
-
-interface GoogleButtonOptions {
-  type?: 'standard' | 'icon';
-  theme?: 'outline' | 'filled_blue' | 'filled_black';
-  size?: 'large' | 'medium' | 'small';
-  text?: 'signin_with' | 'signup_with' | 'continue_with';
-  shape?: 'rectangular' | 'pill' | 'circle' | 'square';
-  width?: number;
-  logo_alignment?: 'left' | 'center';
-}
-
-interface GoogleIdentityServices {
-  initialize(configuration: GoogleIdConfiguration): void;
-  renderButton(parent: HTMLElement, options: GoogleButtonOptions): void;
-}
-
-declare global {
-  interface Window {
-    google?: {
-      accounts?: {
-        id?: GoogleIdentityServices;
-      };
-    };
-    onNativeGoogleCredential?: (credential: string) => void;
-    onNativeGoogleSignInError?: (message: string) => void;
-  }
-}
-
-const GOOGLE_CLIENT_ID =
-  typeof __GOOGLE_CLIENT_ID__ !== 'undefined' ? __GOOGLE_CLIENT_ID__ : '';
-const GOOGLE_SDK_URL = 'https://accounts.google.com/gsi/client';
-const GOOGLE_SDK_MAX_ATTEMPTS = 3;
-let googleSdkPromise: Promise<void> | null = null;
+import { mountGoogleSignInButton } from '../ui/google-signin';
 
 export function renderLoginPage(): HTMLElement {
   const root = document.createElement('div');
@@ -403,167 +359,6 @@ export function renderLoginPage(): HTMLElement {
   return root;
 }
 
-function loadGoogleSdkScript(): Promise<void> {
-  if (window.google?.accounts?.id) return Promise.resolve();
-  if (googleSdkPromise) return googleSdkPromise;
-
-  googleSdkPromise = new Promise<void>((resolve, reject) => {
-    let attempts = 0;
-    const load = (): void => {
-      if (window.google?.accounts?.id) {
-        resolve();
-        return;
-      }
-      attempts += 1;
-      const script = document.createElement('script');
-      script.id = 'google-gsi-script';
-      script.src = GOOGLE_SDK_URL;
-      script.async = true;
-      script.defer = true;
-
-      const retryOrReject = (): void => {
-        script.remove();
-        if (attempts >= GOOGLE_SDK_MAX_ATTEMPTS) {
-          reject(new Error('Google Identity Services SDK failed to load'));
-          return;
-        }
-        window.setTimeout(load, attempts * 500);
-      };
-
-      script.onload = () => {
-        if (window.google?.accounts?.id) resolve();
-        else retryOrReject();
-      };
-      script.onerror = retryOrReject;
-      document.head.appendChild(script);
-    };
-    load();
-  });
-
-  googleSdkPromise = googleSdkPromise.catch((error: unknown) => {
-    googleSdkPromise = null;
-    throw error;
-  });
-
-  return googleSdkPromise;
-}
-
-function mountGoogleSignInButton(
-  mount: HTMLElement,
-  status: HTMLElement,
-  onCredential: (credential: string) => void,
-): void {
-  if (typeof window.LoveCheckAndroid !== 'undefined' && window.LoveCheckAndroid) {
-    mountNativeGoogleSignInButton(
-      mount,
-      status,
-      () => {
-        // Phải gọi trực tiếp window.LoveCheckAndroid.signInWithGoogle() (không dùng optional chaining ?.())
-        if (window.LoveCheckAndroid && typeof window.LoveCheckAndroid.signInWithGoogle === 'function') {
-          window.LoveCheckAndroid.signInWithGoogle();
-        }
-      },
-      onCredential,
-    );
-    return;
-  }
-
-  const createMockGoogleBtn = () => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'p-google-btn';
-    btn.dataset.devGoogleLogin = 'true';
-    btn.innerHTML = `${iconMarkup('google', { size: 20 })}<span>Dùng thử Google (Dev Local)</span>`;
-    btn.addEventListener('click', () => onCredential('mock-google-new-user'));
-    return btn;
-  };
-
-  if (!GOOGLE_CLIENT_ID) {
-    mount.replaceChildren(createMockGoogleBtn());
-    status.textContent = 'Chế độ Dev Local: bấm nút trên để thử luồng Google mẫu.';
-    return;
-  }
-
-  status.textContent = 'Đang kết nối Google Identity…';
-
-  void loadGoogleSdkScript()
-    .then(() => {
-      const googleId = window.google?.accounts?.id;
-      if (!googleId) throw new Error('Google Identity Services SDK loaded without identity API');
-
-      googleId.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        cancel_on_tap_outside: true,
-        callback: (response) => onCredential(response.credential),
-      });
-      googleId.renderButton(mount, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large',
-        text: 'signin_with',
-        shape: 'pill',
-        width: 280,
-        logo_alignment: 'left',
-      });
-      status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
-
-      const isDevHost = window.location.hostname === 'localhost'
-        || window.location.hostname === '127.0.0.1'
-        || window.location.hostname.startsWith('192.168.');
-      if (isDevHost && !mount.querySelector('[data-dev-google-login]')) {
-        mount.appendChild(createMockGoogleBtn());
-      }
-    })
-    .catch((error: unknown) => {
-      console.error('[Google Sign-In] Failed to load Google Identity Services', error);
-      status.textContent = 'Không thể tải đăng nhập Google. Kiểm tra kết nối mạng.';
-      mount.replaceChildren(createMockGoogleBtn());
-    });
-}
-
-function mountNativeGoogleSignInButton(
-  mount: HTMLElement,
-  status: HTMLElement,
-  signInWithGoogle: () => void,
-  onCredential: (credential: string) => void,
-): void {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'google-native-signin-button p-google-btn';
-  button.innerHTML = `${iconMarkup('google', { size: 20 })}<span>Tiếp tục với Google</span>`;
-  mount.replaceChildren(button);
-  status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
-
-  window.onNativeGoogleCredential = (credential: string) => {
-    button.disabled = false;
-    status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
-    onCredential(credential);
-  };
-  window.onNativeGoogleSignInError = (message: string) => {
-    button.disabled = false;
-    if (message === 'CANCELLED' || message.includes('Cancellation') || message.includes('huỷ')) {
-      status.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
-      return;
-    }
-    const displayMsg = message || 'Không thể đăng nhập Google trên thiết bị này.';
-    showToast(displayMsg, 'error');
-    status.textContent = displayMsg;
-  };
-
-  button.addEventListener('click', () => {
-    button.disabled = true;
-    status.textContent = 'Đang mở Google…';
-    try {
-      signInWithGoogle();
-    } catch (error) {
-      button.disabled = false;
-      const errMsg = error instanceof Error ? error.message : 'Không thể gọi native Google sign-in.';
-      showToast(errMsg, 'error');
-      status.textContent = errMsg;
-    }
-  });
-}
-
 async function handleGoogleLogin(
   credential: string,
   buttonWrap: HTMLElement,
@@ -683,7 +478,7 @@ function createResetPasswordModal(): HTMLElement {
 
     const btn = backdrop.querySelector<HTMLButtonElement>('#reset-confirm-btn')!;
     btn.disabled = true;
-    btn.textContent = 'Đang cập nhật…';
+    btn.textContent = 'Đổi mật khẩu';
 
     try {
       await confirmPasswordReset(email, otp, newPwd);

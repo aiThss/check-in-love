@@ -1,14 +1,18 @@
 import '../styles/20-pages/auth.css';
+import '../styles/20-pages/onboarding-date.css';
 import { navigate } from '../router';
 import { createThemeToggleButton } from '../components/theme-toggle';
 import { store } from '../store/index';
-import { startOnboarding, sendOtp, verifyOtp } from '../api/auth';
+import { startOnboarding, sendOtp, verifyOtp, loginWithGoogle } from '../api/auth';
+import { ApiError } from '../api/client';
 import { showToast } from '../components/toast';
 import { MOCK_PREVIEW_TOKEN, seedMockPreviewData } from '../dev/mock-data';
 import { iconMarkup, type IconName } from '../ui/icons/icons';
-import { createBadge, createButton, createChip, createIconButton } from '../ui/primitives';
-import { createSwitch } from '../ui/forms';
+import { createBadge, createButton, createIconButton } from '../ui/primitives';
 import { triggerHaptic } from '../ui/haptics';
+import { isLocalDevHostname, mountGoogleSignInButton } from '../ui/google-signin';
+
+const WHEEL_ITEM_HEIGHT = 40;
 
 function generateDeviceId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -30,12 +34,36 @@ function getOrCreateDeviceId(): string {
   return id;
 }
 
+function formatLocalIsoDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function calcDaysTogether(dateStr: string): number {
   if (!dateStr) return 0;
-  const start = new Date(dateStr);
-  const now = new Date();
-  const diff = now.getTime() - start.getTime();
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+  const parts = dateStr.split('-').map((n) => parseInt(n, 10));
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 0;
+  const start = new Date(parts[0], parts[1] - 1, parts[2]);
+  const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diff = todayMidnight.getTime() - start.getTime();
+  return Math.max(0, Math.round(diff / (1000 * 60 * 60 * 24)));
+}
+
+function formatDateVietnamese(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-').map((n) => parseInt(n, 10));
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return '';
+  const date = new Date(parts[0], parts[1] - 1, parts[2]);
+  if (Number.isNaN(date.getTime())) return '';
+  const daysOfWeek = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  const dayName = daysOfWeek[date.getDay()];
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${dayName}, ${day}/${month}/${year}`;
 }
 
 export type OnboardingMode = 'email' | 'google';
@@ -47,7 +75,8 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
   let currentStep = savedStep !== null ? Math.max(0, Math.min(4, parseInt(savedStep, 10))) : 0;
   const TOTAL_STEPS = 5;
 
-  const isGoogleUser = options.mode === 'google'
+  let isGoogleUser =
+    options.mode === 'google'
     || sessionStorage.getItem('google_authenticated_user') === 'true'
     || Boolean(store.get().user?.googleId);
 
@@ -59,15 +88,21 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     email: sessionStorage.getItem('dev_onboarding_email') || store.get().user?.email || '',
     password: '',
     otpCode: '',
-    useAccount: isGoogleUser ? false : sessionStorage.getItem('dev_onboarding_useAccount') === 'true',
+    // Mandatory account connection when not Google-authenticated
+    useAccount: !isGoogleUser,
     emailVerified: isGoogleUser,
   };
+
+  // If browser refreshed on OTP or Date step before account was authenticated, return to Step 3 so password can be entered
+  if (!isGoogleUser && currentStep >= 3 && (!formData.email || !formData.password)) {
+    currentStep = 2;
+  }
 
   const root = document.createElement('div');
   root.className = 'page-no-nav p-auth animate-fade-in';
 
   function renderStepShell(
-    emblemIcon: IconName,
+    emblemOrNode: IconName | HTMLElement,
     title: string,
     subtitle: string,
     cardBody: HTMLElement,
@@ -75,7 +110,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
   ): void {
     root.replaceChildren();
 
-    const visibleSteps = formData.useAccount && !isGoogleUser ? TOTAL_STEPS : TOTAL_STEPS - 1;
+    const visibleSteps = isGoogleUser ? TOTAL_STEPS - 1 : TOTAL_STEPS;
     const stepDisplay = Math.min(visibleSteps, currentStep + 1);
     const ratio = Math.max(0.2, Math.min(1, stepDisplay / visibleSteps));
 
@@ -89,7 +124,11 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
           icon: 'back',
           ariaLabel: 'Quay lại bước trước',
           onClick: () => {
-            currentStep--;
+            if (currentStep === 4 && (isGoogleUser || formData.emailVerified)) {
+              currentStep = 2;
+            } else {
+              currentStep = Math.max(0, currentStep - 1);
+            }
             triggerHaptic('tap');
             renderCurrentStep();
           },
@@ -116,11 +155,25 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
 
     const hero = document.createElement('div');
     hero.className = 'p-auth-hero';
-    hero.innerHTML = `
-      <div class="p-auth-emblem">${iconMarkup(emblemIcon, { size: 32, variant: 'filled' })}</div>
-      <h1 class="p-auth-title">${title}</h1>
-      <p class="p-auth-sub">${subtitle}</p>
-    `;
+
+    if (typeof emblemOrNode === 'string') {
+      const emblem = document.createElement('div');
+      emblem.className = 'p-auth-emblem';
+      emblem.innerHTML = iconMarkup(emblemOrNode, { size: 32, variant: 'filled' });
+      hero.appendChild(emblem);
+    } else {
+      hero.appendChild(emblemOrNode);
+    }
+
+    const titleEl = document.createElement('h1');
+    titleEl.className = 'p-auth-title';
+    titleEl.textContent = title;
+
+    const subEl = document.createElement('p');
+    subEl.className = 'p-auth-sub';
+    subEl.textContent = subtitle;
+
+    hero.append(titleEl, subEl);
 
     const card = document.createElement('div');
     card.className = 'p-auth-card u-grain-surface';
@@ -259,12 +312,24 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     requestAnimationFrame(() => input.focus());
   }
 
-  // ── Step 3: Couple Code (OTP-style Individual Boxes) + Optional Account ──
+  // ── Step 3: Couple Code + MANDATORY Email/Password OR Google OAuth ──
   function renderStep3(): void {
     const body = document.createElement('div');
     body.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
 
     let boxCount = formData.coupleCode.length > 6 ? 8 : 6;
+    const codeHead = document.createElement('div');
+    codeHead.className = 'p-onboard-section-label';
+    const codeLabel = document.createElement('span');
+    codeLabel.textContent = 'Mã ghép đôi (4–8 ký tự)';
+
+    const lenToggle = document.createElement('button');
+    lenToggle.type = 'button';
+    lenToggle.className = 'p-auth-link';
+    lenToggle.textContent = boxCount === 6 ? 'Dùng mã 8 ký tự' : 'Dùng mã 6 ký tự';
+    codeHead.append(codeLabel, lenToggle);
+    body.appendChild(codeHead);
+
     const boxesContainer = document.createElement('div');
     boxesContainer.className = 'p-otp-grid';
     let codeBoxes: HTMLInputElement[] = [];
@@ -309,6 +374,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
           if (raw.length > 6 && boxCount < 8) {
             boxCount = 8;
             formData.coupleCode = raw;
+            lenToggle.textContent = 'Dùng mã 6 ký tự';
             buildCodeBoxes();
             codeBoxes[Math.min(raw.length - 1, 7)]?.focus();
             return;
@@ -325,14 +391,6 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       }
     };
 
-    buildCodeBoxes();
-    body.appendChild(boxesContainer);
-
-    const lenToggle = document.createElement('button');
-    lenToggle.type = 'button';
-    lenToggle.className = 'p-auth-link';
-    lenToggle.style.alignSelf = 'center';
-    lenToggle.textContent = boxCount === 6 ? 'Dùng mã 8 ký tự' : 'Dùng mã 6 ký tự';
     lenToggle.addEventListener('click', () => {
       boxCount = boxCount === 6 ? 8 : 6;
       formData.coupleCode = formData.coupleCode.slice(0, boxCount);
@@ -340,101 +398,253 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       buildCodeBoxes();
       codeBoxes[0]?.focus();
     });
-    body.appendChild(lenToggle);
+
+    buildCodeBoxes();
+    body.appendChild(boxesContainer);
 
     let emailInput: HTMLInputElement | null = null;
     let passwordInput: HTMLInputElement | null = null;
 
-    if (!isGoogleUser) {
-      const toggleRow = document.createElement('div');
-      toggleRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;background:var(--bg-canvas);border:1px solid var(--border-subtle);';
-      const copy = document.createElement('span');
-      copy.style.cssText = 'font-size:12px;font-weight:600;color:var(--text-primary);';
-      copy.textContent = 'Đăng ký Email để đăng nhập trên máy khác';
+    if (isGoogleUser) {
+      formData.useAccount = false;
+      formData.emailVerified = true;
 
-      const accountFields = document.createElement('div');
-      accountFields.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
-      accountFields.hidden = !formData.useAccount;
+      const connectedBox = document.createElement('div');
+      connectedBox.className = 'p-onboard-google-connected';
+      connectedBox.innerHTML = `
+        ${iconMarkup('google', { size: 20 })}
+        <div class="p-onboard-google-connected__body">
+          <span>Đã xác thực tài khoản Google</span>
+          <span class="p-onboard-google-connected__email">${formData.email || store.get().user?.email || 'Tài khoản Google của bạn'}</span>
+        </div>
+      `;
+      body.appendChild(connectedBox);
 
-      const sw = createSwitch({
-        ariaLabel: 'Đăng ký tài khoản Email',
-        checked: formData.useAccount,
-        onChange: (checked) => {
-          formData.useAccount = checked;
-          accountFields.hidden = !checked;
-        },
-      });
-      toggleRow.append(copy, sw.element);
+      body.appendChild(
+        createButton({
+          label: 'Tiếp tục chọn ngày kỷ niệm',
+          variant: 'primary',
+          pill: true,
+          block: true,
+          trailingIcon: 'chevron-right',
+          onClick: () => {
+            syncCodeFromBoxes();
+            if (!formData.coupleCode || formData.coupleCode.length < 4) {
+              showToast('Couple Code cần ít nhất 4 ký tự', 'error');
+              codeBoxes[0]?.focus();
+              return;
+            }
+            triggerHaptic('tap');
+            currentStep = 3;
+            renderCurrentStep();
+          },
+        }).element,
+      );
+    } else {
+      formData.useAccount = true;
 
+      const authBox = document.createElement('div');
+      authBox.className = 'p-onboard-auth-box';
+
+      const authHead = document.createElement('div');
+      authHead.className = 'p-onboard-section-label';
+      authHead.innerHTML = `<span>Tài khoản bảo mật (bắt buộc)</span>`;
+      authBox.appendChild(authHead);
+
+      const authNote = document.createElement('p');
+      authNote.className = 'p-onboard-auth-note';
+      authNote.textContent = 'Nhập Email & mật khẩu (xác thực OTP) hoặc đăng nhập Google để bảo vệ kỷ niệm của hai đứa.';
+      authBox.appendChild(authNote);
+
+      const emailWrap = document.createElement('div');
+      emailWrap.className = 'p-auth-input-wrap';
+      emailWrap.innerHTML = `<span class="p-auth-input-wrap__lead">${iconMarkup('mail', { size: 20 })}</span>`;
       emailInput = document.createElement('input');
       emailInput.type = 'email';
       emailInput.className = 'c-input';
-      emailInput.placeholder = 'Email của bạn';
+      emailInput.placeholder = 'Email của bạn (bắt buộc)';
+      emailInput.autocomplete = 'email';
       emailInput.setAttribute('aria-label', 'Email của bạn');
       emailInput.value = formData.email;
       emailInput.addEventListener('input', () => {
-        formData.email = emailInput!.value.trim();
-        formData.emailVerified = false;
-        formData.otpCode = '';
+        const nextEmail = emailInput!.value.trim();
+        if (nextEmail !== formData.email) {
+          formData.emailVerified = false;
+          formData.otpCode = '';
+        }
+        formData.email = nextEmail;
       });
+      emailWrap.appendChild(emailInput);
 
+      const pwdWrap = document.createElement('div');
+      pwdWrap.className = 'p-auth-input-wrap p-auth-input-wrap--trail';
+      pwdWrap.innerHTML = `<span class="p-auth-input-wrap__lead">${iconMarkup('lock', { size: 20 })}</span>`;
       passwordInput = document.createElement('input');
       passwordInput.type = 'password';
       passwordInput.className = 'c-input';
       passwordInput.placeholder = 'Mật khẩu (tối thiểu 6 ký tự)';
+      passwordInput.autocomplete = 'new-password';
       passwordInput.setAttribute('aria-label', 'Mật khẩu');
       passwordInput.value = formData.password;
       passwordInput.addEventListener('input', () => {
         formData.password = passwordInput!.value;
       });
 
-      accountFields.append(emailInput, passwordInput);
-      body.append(toggleRow, accountFields);
-    }
+      const eyeBtn = document.createElement('button');
+      eyeBtn.type = 'button';
+      eyeBtn.className = 'p-auth-eye-btn';
+      eyeBtn.setAttribute('aria-label', 'Hiện mật khẩu');
+      eyeBtn.innerHTML = iconMarkup('eye', { size: 20 });
+      let pwdVisible = false;
+      eyeBtn.addEventListener('click', () => {
+        pwdVisible = !pwdVisible;
+        passwordInput!.type = pwdVisible ? 'text' : 'password';
+        eyeBtn.setAttribute('aria-label', pwdVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+        eyeBtn.innerHTML = iconMarkup(pwdVisible ? 'eye-off' : 'eye', { size: 20 });
+      });
 
-    body.appendChild(
-      createButton({
-        label: 'Tiếp tục',
-        variant: 'primary',
-        pill: true,
-        block: true,
-        trailingIcon: 'chevron-right',
-        onClick: () => {
+      pwdWrap.append(passwordInput, eyeBtn);
+      authBox.append(emailWrap, pwdWrap);
+      body.appendChild(authBox);
+
+      const submitStep3Email = () => {
+        syncCodeFromBoxes();
+        if (!formData.coupleCode || formData.coupleCode.length < 4) {
+          showToast('Couple Code cần ít nhất 4 ký tự', 'error');
+          codeBoxes[0]?.focus();
+          return;
+        }
+        if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+          showToast('Vui lòng nhập Email hợp lệ hoặc đăng nhập qua Google', 'error');
+          emailInput?.focus();
+          return;
+        }
+        if (formData.password.length < 6) {
+          showToast('Mật khẩu cần ít nhất 6 ký tự', 'error');
+          passwordInput?.focus();
+          return;
+        }
+        triggerHaptic('tap');
+        currentStep = formData.emailVerified ? 4 : 3;
+        renderCurrentStep();
+      };
+
+      passwordInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitStep3Email();
+      });
+
+      body.appendChild(
+        createButton({
+          label: 'Tiếp tục xác thực Email',
+          variant: 'primary',
+          pill: true,
+          block: true,
+          trailingIcon: 'chevron-right',
+          onClick: submitStep3Email,
+        }).element,
+      );
+
+      const divider = document.createElement('div');
+      divider.className = 'p-auth-divider';
+      divider.innerHTML = '<span>hoặc đăng nhập qua Google</span>';
+      body.appendChild(divider);
+
+      const googleWrap = document.createElement('div');
+      googleWrap.className = 'p-onboard-google-wrap';
+      googleWrap.setAttribute('aria-live', 'polite');
+
+      const googleMount = document.createElement('div');
+      googleMount.className = 'p-onboard-google-mount';
+      googleMount.id = 'onboarding-google-signin';
+
+      const googleStatus = document.createElement('p');
+      googleStatus.className = 'p-onboard-google-status';
+      googleStatus.textContent = 'Đang tải đăng nhập Google…';
+
+      googleWrap.append(googleMount, googleStatus);
+      body.appendChild(googleWrap);
+
+      mountGoogleSignInButton(
+        googleMount,
+        googleStatus,
+        (credential) => {
           syncCodeFromBoxes();
-          if (!formData.coupleCode || formData.coupleCode.length < 4) {
-            showToast('Couple Code cần ít nhất 4 ký tự', 'error');
-            codeBoxes[0]?.focus();
-            return;
-          }
-          if (formData.useAccount) {
-            if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-              showToast('Vui lòng nhập Email hợp lệ', 'error');
-              emailInput?.focus();
-              return;
-            }
-            if (formData.password.length < 6) {
-              showToast('Mật khẩu cần ít nhất 6 ký tự', 'error');
-              passwordInput?.focus();
-              return;
-            }
-          }
-          triggerHaptic('tap');
-          currentStep++;
-          renderCurrentStep();
+          void handleStep3GoogleCredential(credential, googleWrap, googleStatus);
         },
-      }).element,
-    );
+        { buttonText: 'continue_with', width: 280 },
+      );
+    }
 
     renderStepShell(
       'key',
-      'Mã ghép đôi hai đứa',
-      'Hai người nhập chung một mã bí mật (4–8 ký tự) để nối hai thiết bị vào cùng một nhà.',
+      'Mã ghép đôi & Tài khoản',
+      isGoogleUser
+        ? 'Nhập chung một mã bí mật (4–8 ký tự) để nối hai thiết bị vào cùng một nhà.'
+        : 'Nhập Couple Code và xác thực qua Email hoặc Google để lưu giữ an toàn trên mọi thiết bị.',
       body,
     );
     requestAnimationFrame(() => codeBoxes[0]?.focus());
   }
 
-  // ── Step 4: Email OTP Verification ──
+  async function handleStep3GoogleCredential(
+    credential: string,
+    googleWrap: HTMLElement,
+    googleStatus: HTMLElement,
+  ): Promise<void> {
+    googleWrap.style.pointerEvents = 'none';
+    googleWrap.setAttribute('aria-busy', 'true');
+    googleStatus.textContent = 'Đang xác thực tài khoản Google…';
+
+    try {
+      const result = await loginWithGoogle({ credential });
+      store.set({
+        token: result.token,
+        user: result.user,
+        couple: result.couple,
+      });
+      localStorage.setItem('lovecheck_token', result.token);
+
+      const isDevGoogleLogin = credential.startsWith('mock-google-');
+
+      if (result.couple) {
+        clearOnboardingSessionKeys();
+        triggerHaptic('confirm');
+        showToast('Đăng nhập Google thành công!', 'success');
+        navigate(isDevGoogleLogin ? '/app/profile' : '/app/home', true);
+        return;
+      }
+
+      isGoogleUser = true;
+      formData.useAccount = false;
+      formData.emailVerified = true;
+      if (result.user.email) {
+        formData.email = result.user.email;
+        sessionStorage.setItem('dev_onboarding_email', result.user.email);
+      }
+      if (!formData.displayName && result.user.displayName) {
+        formData.displayName = result.user.displayName;
+      }
+      sessionStorage.setItem('google_authenticated_user', 'true');
+      triggerHaptic('confirm');
+
+      if (formData.coupleCode && formData.coupleCode.length >= 4) {
+        showToast('Đã kết nối Google! Hãy chọn ngày bắt đầu yêu nhé.', 'success');
+        currentStep = 3;
+        renderCurrentStep();
+      } else {
+        showToast('Đã kết nối Google! Hãy nhập Couple Code để tiếp tục.', 'info');
+        currentStep = 2;
+        renderCurrentStep();
+      }
+    } catch (err) {
+      googleWrap.style.pointerEvents = '';
+      googleWrap.removeAttribute('aria-busy');
+      googleStatus.textContent = 'Google sẽ xác thực an toàn tài khoản của bạn.';
+      showToast(err instanceof Error ? err.message : 'Đăng nhập Google thất bại', 'error');
+    }
+  }
+
+  // ── Step 4: Mandatory Email OTP Verification ──
   function renderStep4OTP(): void {
     const body = document.createElement('div');
     body.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
@@ -447,7 +657,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     offlineBanner.hidden = true;
     offlineBanner.innerHTML = `
       ${iconMarkup('wifi-off', { size: 20 })}
-      <div><strong>Chưa có kết nối mạng.</strong> Bạn có thể kết nối lại rồi thử, hoặc bấm bỏ qua xác thực bên dưới.</div>
+      <div><strong>Chưa có kết nối mạng.</strong> Vui lòng kiểm tra kết nối Internet rồi bấm gửi lại mã xác thực.</div>
     `;
     body.appendChild(offlineBanner);
 
@@ -508,22 +718,21 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       onClick: () => void handleSendOtp(true),
     });
 
-    const skipBtn = createButton({
-      label: 'Bỏ qua xác thực lúc này',
+    const changeAuthBtn = createButton({
+      label: 'Đổi Email hoặc dùng Google',
       variant: 'ghost',
       size: 'sm',
       pill: true,
       block: true,
+      leadingIcon: 'back',
       onClick: () => {
         if (cooldownInterval) clearInterval(cooldownInterval);
-        formData.emailVerified = false;
-        formData.otpCode = '';
-        currentStep++;
+        currentStep = 2;
         renderCurrentStep();
       },
     });
 
-    body.append(verifyCtrl.element, resendCtrl.element, skipBtn.element);
+    body.append(verifyCtrl.element, resendCtrl.element, changeAuthBtn.element);
 
     renderStepShell(
       'mail',
@@ -534,6 +743,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
 
     const isNetworkError = (err: unknown): boolean => {
       if (!navigator.onLine) return true;
+      if (err instanceof ApiError && err.code === 'NETWORK_ERROR') return true;
       if (err instanceof TypeError && err.message.toLowerCase().includes('fetch')) return true;
       if (err instanceof Error) {
         const m = err.message.toLowerCase();
@@ -586,7 +796,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
         if (cooldownInterval) clearInterval(cooldownInterval);
         triggerHaptic('confirm');
         showToast('Xác thực Email thành công!', 'success');
-        currentStep++;
+        currentStep = 4;
         renderCurrentStep();
       } catch (err) {
         verifyCtrl.setLoading(false);
@@ -599,77 +809,436 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     requestAnimationFrame(() => otpInputs[0]?.focus());
   }
 
-  // ── Step 5: Love Start Date ──
+  // ── Step 5: Love Start Date (Animated 3-Column Wheel + Clickable Items + Calendar Popup) ──
   function renderStepDate(): void {
     const body = document.createElement('div');
     body.style.cssText = 'display:flex;flex-direction:column;gap:14px;';
 
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = formatLocalIsoDate(today);
 
     if (!formData.loveStartDate) {
-      const oneYearAgo = new Date();
-      oneYearAgo.setFullYear(today.getFullYear() - 1);
-      formData.loveStartDate = oneYearAgo.toISOString().split('T')[0];
+      const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+      formData.loveStartDate = formatLocalIsoDate(oneYearAgo);
     }
 
-    const presetsWrap = document.createElement('div');
-    presetsWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;justify-content:center;';
+    // Animated Mini Calendar Sticker Emblem in Hero
+    const calEmblem = document.createElement('div');
+    calEmblem.className = 'p-date-cal-emblem';
+    const calMonthEl = document.createElement('span');
+    calMonthEl.className = 'p-date-cal-emblem__month';
+    const calDayEl = document.createElement('span');
+    calDayEl.className = 'p-date-cal-emblem__day';
+    const calTagEl = document.createElement('span');
+    calTagEl.className = 'p-date-cal-emblem__tag';
+    calTagEl.textContent = 'LOVE';
+    calEmblem.append(calMonthEl, calDayEl, calTagEl);
+
+    // Hidden native date input for full month-grid popup fallback
+    const nativeDateInput = document.createElement('input');
+    nativeDateInput.type = 'date';
+    nativeDateInput.max = todayStr;
+    nativeDateInput.value = formData.loveStartDate;
+    nativeDateInput.tabIndex = -1;
+    nativeDateInput.setAttribute('aria-label', 'Chọn ngày từ bảng lịch');
+    nativeDateInput.style.cssText = 'position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;';
+    body.appendChild(nativeDateInput);
+
+    // 1. Presets Header + Native Calendar Trigger
+    const presetsHead = document.createElement('div');
+    presetsHead.className = 'p-date-presets-head';
+    presetsHead.innerHTML = `<span class="p-date-presets-title">Chọn nhanh cột mốc</span>`;
+
+    const openCalBtn = document.createElement('button');
+    openCalBtn.type = 'button';
+    openCalBtn.className = 'p-date-cal-btn';
+    openCalBtn.innerHTML = `${iconMarkup('calendar', { size: 16 })}<span>Mở lịch tháng</span>`;
+    openCalBtn.addEventListener('click', () => {
+      const pickerInput = nativeDateInput as HTMLInputElement & { showPicker?: () => void };
+      if (typeof pickerInput.showPicker === 'function') {
+        try {
+          pickerInput.showPicker();
+          return;
+        } catch {
+          // Fall back to click
+        }
+      }
+      nativeDateInput.click();
+    });
+    presetsHead.appendChild(openCalBtn);
+    body.appendChild(presetsHead);
+
+    const presetsList = document.createElement('div');
+    presetsList.className = 'p-date-presets-list';
     const presets = [
       { label: 'Hôm nay', days: 0 },
       { label: '100 ngày', days: 100 },
       { label: '6 tháng', days: 180 },
       { label: '1 năm', days: 365 },
       { label: '2 năm', days: 730 },
+      { label: '3 năm', days: 1095 },
     ];
+    body.appendChild(presetsList);
 
-    const dateInput = document.createElement('input');
-    dateInput.type = 'date';
-    dateInput.className = 'c-input';
-    dateInput.max = todayStr;
-    dateInput.value = formData.loveStartDate;
-    dateInput.setAttribute('aria-label', 'Ngày bắt đầu yêu nhau');
-    dateInput.style.cssText = 'text-align:center;font-size:16px;font-weight:700;min-height:50px;';
+    // 2. Interactive Animated 3-Column Drum Wheel (Ngày / Tháng / Năm)
+    const wheelWrap = document.createElement('div');
+    wheelWrap.className = 'p-date-wheel-wrap';
+    wheelWrap.innerHTML = `
+      <div class="p-date-wheel-headers">
+        <span>Ngày</span>
+        <span>Tháng</span>
+        <span>Năm</span>
+      </div>
+    `;
 
+    const wheelStage = document.createElement('div');
+    wheelStage.className = 'p-date-wheel';
+    wheelStage.innerHTML = `
+      <div class="p-date-wheel__highlight"></div>
+      <div class="p-date-wheel__mask-top"></div>
+      <div class="p-date-wheel__mask-bottom"></div>
+      <div class="p-date-wheel__col" id="wheel-day" role="listbox" aria-label="Chọn ngày"></div>
+      <div class="p-date-wheel__col" id="wheel-month" role="listbox" aria-label="Chọn tháng"></div>
+      <div class="p-date-wheel__col" id="wheel-year" role="listbox" aria-label="Chọn năm"></div>
+    `;
+    wheelWrap.appendChild(wheelStage);
+    body.appendChild(wheelWrap);
+
+    const wheelDay = wheelStage.querySelector<HTMLElement>('#wheel-day')!;
+    const wheelMonth = wheelStage.querySelector<HTMLElement>('#wheel-month')!;
+    const wheelYear = wheelStage.querySelector<HTMLElement>('#wheel-year')!;
+
+    const daysList: string[] = [];
+    const dayButtons: HTMLButtonElement[] = [];
+    for (let d = 1; d <= 31; d++) {
+      const val = String(d).padStart(2, '0');
+      daysList.push(val);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'p-date-wheel__item love-date-wheel-item';
+      btn.dataset.value = val;
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-label', `Ngày ${val}`);
+      btn.textContent = val;
+      const idx = d - 1;
+      btn.addEventListener('click', () => selectFromColumnClick('day', idx));
+      dayButtons.push(btn);
+      wheelDay.appendChild(btn);
+    }
+
+    const monthsList: string[] = [];
+    const monthButtons: HTMLButtonElement[] = [];
+    for (let m = 1; m <= 12; m++) {
+      const val = String(m).padStart(2, '0');
+      monthsList.push(val);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'p-date-wheel__item love-date-wheel-item';
+      btn.dataset.value = val;
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-label', `Tháng ${m}`);
+      btn.textContent = `Tháng ${m}`;
+      const idx = m - 1;
+      btn.addEventListener('click', () => selectFromColumnClick('month', idx));
+      monthButtons.push(btn);
+      wheelMonth.appendChild(btn);
+    }
+
+    const currentYear = today.getFullYear();
+    const yearsList: string[] = [];
+    const yearButtons: HTMLButtonElement[] = [];
+    for (let y = currentYear; y >= 1990; y--) {
+      const val = String(y);
+      yearsList.push(val);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'p-date-wheel__item love-date-wheel-item';
+      btn.dataset.value = val;
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-label', `Năm ${val}`);
+      btn.textContent = val;
+      const idx = yearsList.length - 1;
+      btn.addEventListener('click', () => selectFromColumnClick('year', idx));
+      yearButtons.push(btn);
+      wheelYear.appendChild(btn);
+    }
+
+    // 3. Dark-Mode-Safe Live Preview Card
     const previewBox = document.createElement('div');
-    previewBox.style.cssText = 'padding:14px;border-radius:16px;background:var(--accent-50);border:1.5px solid var(--accent-200);text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;';
+    previewBox.className = 'p-date-preview';
+    const previewLabel = document.createElement('span');
+    previewLabel.className = 'p-date-preview__label';
+    previewLabel.textContent = 'Hai đứa đã đồng hành';
+    const previewCount = document.createElement('strong');
+    previewCount.className = 'p-date-preview__count';
+    const previewSub = document.createElement('span');
+    previewSub.className = 'p-date-preview__sub';
+    const previewMilestone = document.createElement('span');
+    previewMilestone.className = 'p-date-preview__milestone';
+    previewBox.append(previewLabel, previewCount, previewSub, previewMilestone);
+    body.appendChild(previewBox);
 
-    const updatePreview = () => {
-      const days = calcDaysTogether(formData.loveStartDate);
-      previewBox.innerHTML = `
-        <span class="u-text-secondary" style="font-size:12px;">Hai đứa đã đồng hành</span>
-        <strong style="font-family:var(--font-display);font-size:30px;color:var(--accent-600);line-height:1.1;">${days.toLocaleString('vi-VN')} ngày</strong>
-      `;
-    };
+    // State & Animation Helpers
+    let selectedIndices = { day: 0, month: 0, year: 0 };
+    let isProgrammaticScroll = false;
+    let programmaticTimer: ReturnType<typeof setTimeout> | null = null;
+    let scrollSettleTimer: ReturnType<typeof setTimeout> | null = null;
+    let displayedDaysCount: number | null = null;
+    let countRafId: number | null = null;
 
-    presets.forEach((p) => {
-      presetsWrap.appendChild(
-        createChip({
-          label: p.label,
-          interactive: true,
-          onClick: () => {
-            const d = new Date();
-            d.setDate(d.getDate() - p.days);
-            const nextStr = d.toISOString().split('T')[0];
-            formData.loveStartDate = nextStr;
-            dateInput.value = nextStr;
-            triggerHaptic('select');
-            updatePreview();
-          },
-        }),
-      );
-    });
+    function applyColumnHighlight(buttons: HTMLButtonElement[], activeIdx: number): void {
+      buttons.forEach((btn, idx) => {
+        const dist = Math.abs(idx - activeIdx);
+        btn.classList.toggle('selected', dist === 0);
+        btn.classList.toggle('is-near', dist === 1);
+        btn.setAttribute('aria-selected', String(dist === 0));
+      });
+    }
 
-    dateInput.addEventListener('change', () => {
-      if (dateInput.value > todayStr) {
-        dateInput.value = todayStr;
-        showToast('Ngày kỷ niệm không thể ở tương lai nhé', 'info');
+    function scrollColumnToIndex(col: HTMLElement, idx: number, animate: boolean): void {
+      const targetTop = idx * WHEEL_ITEM_HEIGHT;
+      if (animate && typeof col.scrollTo === 'function') {
+        col.classList.add('is-animating');
+        try {
+          col.scrollTo({ top: targetTop, behavior: 'smooth' });
+        } catch {
+          col.scrollTop = targetTop;
+        }
+      } else {
+        col.scrollTop = targetTop;
       }
-      formData.loveStartDate = dateInput.value;
-      updatePreview();
+    }
+
+    function lockProgrammaticScroll(durationMs: number): void {
+      isProgrammaticScroll = true;
+      if (programmaticTimer) clearTimeout(programmaticTimer);
+      programmaticTimer = setTimeout(() => {
+        wheelDay.classList.remove('is-animating');
+        wheelMonth.classList.remove('is-animating');
+        wheelYear.classList.remove('is-animating');
+        wheelDay.scrollTop = selectedIndices.day * WHEEL_ITEM_HEIGHT;
+        wheelMonth.scrollTop = selectedIndices.month * WHEEL_ITEM_HEIGHT;
+        wheelYear.scrollTop = selectedIndices.year * WHEEL_ITEM_HEIGHT;
+        isProgrammaticScroll = false;
+      }, durationMs);
+    }
+
+    function animateDaysCounter(nextDays: number, animate: boolean): void {
+      if (countRafId !== null) {
+        cancelAnimationFrame(countRafId);
+        countRafId = null;
+      }
+      const prefersReducedMotion =
+        typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (!animate || prefersReducedMotion || displayedDaysCount === null || displayedDaysCount === nextDays) {
+        displayedDaysCount = nextDays;
+        previewCount.textContent = `${nextDays.toLocaleString('vi-VN')} ngày`;
+        return;
+      }
+
+      const startVal = displayedDaysCount;
+      const startTime = performance.now();
+      const duration = 220;
+
+      const step = (now: number) => {
+        const t = Math.min(1, (now - startTime) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const cur = Math.round(startVal + (nextDays - startVal) * eased);
+        previewCount.textContent = `${cur.toLocaleString('vi-VN')} ngày`;
+        if (t < 1) {
+          countRafId = requestAnimationFrame(step);
+        } else {
+          displayedDaysCount = nextDays;
+          countRafId = null;
+        }
+      };
+      countRafId = requestAnimationFrame(step);
+    }
+
+    function updatePreviewAndBadge(animate: boolean): void {
+      const days = calcDaysTogether(formData.loveStartDate);
+      animateDaysCounter(days, animate);
+
+      previewSub.textContent = formatDateVietnamese(formData.loveStartDate);
+
+      let milestoneText: string;
+      if (days === 0) milestoneText = 'Ngày đầu tiên bên nhau';
+      else if (days < 30) milestoneText = 'Những ngày đầu rực rỡ';
+      else if (days < 100) milestoneText = 'Sắp chạm mốc 100 ngày';
+      else if (days < 365) milestoneText = 'Hành trình đang đơm hoa';
+      else milestoneText = `Đã gắn bó ${(days / 365).toFixed(1)} năm ngọt ngào`;
+      previewMilestone.textContent = milestoneText;
+
+      const parts = formData.loveStartDate.split('-');
+      if (parts.length === 3) {
+        calMonthEl.textContent = `THÁNG ${parseInt(parts[1], 10)}`;
+        calDayEl.textContent = parts[2];
+        if (animate) {
+          calEmblem.classList.remove('is-popping');
+          void calEmblem.offsetWidth;
+          calEmblem.classList.add('is-popping');
+        }
+      }
+
+      presetsList.querySelectorAll<HTMLButtonElement>('.p-date-preset-chip').forEach((chip) => {
+        const targetDays = parseInt(chip.dataset.days || '-1', 10);
+        chip.classList.toggle('active', targetDays >= 0 && Math.abs(days - targetDays) <= 1);
+      });
+    }
+
+    function setDateFromIndices(dayIdx: number, monthIdx: number, yearIdx: number, animate: boolean): void {
+      const clampedYearIdx = Math.max(0, Math.min(yearsList.length - 1, yearIdx));
+      const clampedMonthIdx = Math.max(0, Math.min(monthsList.length - 1, monthIdx));
+      const y = yearsList[clampedYearIdx];
+      const m = monthsList[clampedMonthIdx];
+
+      const maxDays = new Date(parseInt(y, 10), parseInt(m, 10), 0).getDate();
+      const clampedDayIdx = Math.max(0, Math.min(maxDays - 1, dayIdx));
+      const d = daysList[clampedDayIdx];
+
+      const candidateDate = `${y}-${m}-${d}`;
+      if (candidateDate > todayStr) {
+        showToast('Ngày bắt đầu yêu không thể ở tương lai nhé', 'info');
+        syncFromDateString(todayStr, true);
+        return;
+      }
+
+      selectedIndices = { day: clampedDayIdx, month: clampedMonthIdx, year: clampedYearIdx };
+      applyColumnHighlight(dayButtons, clampedDayIdx);
+      applyColumnHighlight(monthButtons, clampedMonthIdx);
+      applyColumnHighlight(yearButtons, clampedYearIdx);
+
+      lockProgrammaticScroll(animate ? 300 : 60);
+      scrollColumnToIndex(wheelDay, clampedDayIdx, animate);
+      scrollColumnToIndex(wheelMonth, clampedMonthIdx, animate);
+      scrollColumnToIndex(wheelYear, clampedYearIdx, animate);
+
+      formData.loveStartDate = candidateDate;
+      nativeDateInput.value = candidateDate;
+      sessionStorage.setItem('dev_onboarding_loveStartDate', candidateDate);
+      updatePreviewAndBadge(animate);
+    }
+
+    function syncFromDateString(dateStr: string, animate: boolean): void {
+      if (!dateStr) return;
+      const safeStr = dateStr > todayStr ? todayStr : dateStr;
+      const parts = safeStr.split('-');
+      if (parts.length !== 3) return;
+      const yIdx = Math.max(0, yearsList.indexOf(parts[0]));
+      const mIdx = Math.max(0, monthsList.indexOf(parts[1]));
+      const dIdx = Math.max(0, daysList.indexOf(parts[2]));
+      setDateFromIndices(dIdx, mIdx, yIdx, animate);
+    }
+
+    function selectFromColumnClick(colKey: 'day' | 'month' | 'year', idx: number): void {
+      triggerHaptic('select');
+      const next = { ...selectedIndices, [colKey]: idx };
+      setDateFromIndices(next.day, next.month, next.year, true);
+    }
+
+    function readScrollIndex(col: HTMLElement, maxLen: number): number {
+      const idx = Math.round(col.scrollTop / WHEEL_ITEM_HEIGHT);
+      return Math.max(0, Math.min(maxLen - 1, idx));
+    }
+
+    function handleNativeWheelScroll(): void {
+      if (isProgrammaticScroll) return;
+      const dIdx = readScrollIndex(wheelDay, daysList.length);
+      const mIdx = readScrollIndex(wheelMonth, monthsList.length);
+      const yIdx = readScrollIndex(wheelYear, yearsList.length);
+      applyColumnHighlight(dayButtons, dIdx);
+      applyColumnHighlight(monthButtons, mIdx);
+      applyColumnHighlight(yearButtons, yIdx);
+
+      if (scrollSettleTimer) clearTimeout(scrollSettleTimer);
+      scrollSettleTimer = setTimeout(() => {
+        if (isProgrammaticScroll) return;
+        const settledDay = readScrollIndex(wheelDay, daysList.length);
+        const settledMonth = readScrollIndex(wheelMonth, monthsList.length);
+        const settledYear = readScrollIndex(wheelYear, yearsList.length);
+        if (
+          settledDay !== selectedIndices.day
+          || settledMonth !== selectedIndices.month
+          || settledYear !== selectedIndices.year
+        ) {
+          triggerHaptic('select');
+          setDateFromIndices(settledDay, settledMonth, settledYear, false);
+        }
+      }, 90);
+    }
+
+    wheelDay.addEventListener('scroll', handleNativeWheelScroll, { passive: true });
+    wheelMonth.addEventListener('scroll', handleNativeWheelScroll, { passive: true });
+    wheelYear.addEventListener('scroll', handleNativeWheelScroll, { passive: true });
+
+    // Enable smooth mouse drag on desktop columns without interfering with single clicks
+    function attachDesktopMouseDrag(col: HTMLElement): void {
+      let dragging = false;
+      let moved = false;
+      let startY = 0;
+      let startScrollTop = 0;
+
+      col.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        dragging = true;
+        moved = false;
+        startY = e.clientY;
+        startScrollTop = col.scrollTop;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const delta = e.clientY - startY;
+        if (!moved && Math.abs(delta) > 5) {
+          moved = true;
+          col.classList.add('is-dragging');
+        }
+        if (moved) {
+          col.scrollTop = startScrollTop - delta;
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        if (moved) {
+          col.classList.remove('is-dragging');
+          handleNativeWheelScroll();
+        }
+      });
+    }
+
+    attachDesktopMouseDrag(wheelDay);
+    attachDesktopMouseDrag(wheelMonth);
+    attachDesktopMouseDrag(wheelYear);
+
+    // Build preset chips
+    presets.forEach((p) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'p-date-preset-chip';
+      chip.dataset.days = String(p.days);
+      chip.textContent = p.label;
+      chip.addEventListener('click', () => {
+        const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - p.days);
+        triggerHaptic('select');
+        syncFromDateString(formatLocalIsoDate(d), true);
+      });
+      presetsList.appendChild(chip);
     });
 
-    updatePreview();
+    nativeDateInput.addEventListener('change', () => {
+      if (!nativeDateInput.value) return;
+      if (nativeDateInput.value > todayStr) {
+        showToast('Ngày kỷ niệm không thể ở tương lai nhé', 'info');
+        syncFromDateString(todayStr, true);
+        return;
+      }
+      triggerHaptic('select');
+      syncFromDateString(nativeDateInput.value, true);
+    });
 
     const finishCtrl = createButton({
       label: 'Mở không gian hai đứa',
@@ -678,7 +1247,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       pill: true,
       block: true,
       leadingIcon: 'heart',
-      onClick: () => void handleSubmit(finishCtrl),
+      onClick: () => void handleSubmit(finishCtrl, false),
     });
 
     const skipBtn = createButton({
@@ -687,20 +1256,30 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       size: 'sm',
       pill: true,
       block: true,
-      onClick: () => void handleSubmit(finishCtrl),
+      onClick: () => void handleSubmit(finishCtrl, true),
     });
 
-    body.append(presetsWrap, dateInput, previewBox, finishCtrl.element, skipBtn.element);
+    body.append(finishCtrl.element, skipBtn.element);
 
     renderStepShell(
-      'calendar',
+      calEmblem,
       'Ngày bắt đầu yêu nhau',
-      'Chọn cột mốc đầu tiên để ứng dụng đếm từng ngày kỷ niệm và chuẩn bị thiệp bất ngờ.',
+      'Cuộn hoặc chạm vào ngày bất kỳ để đếm từng cột mốc kỷ niệm của hai đứa.',
       body,
     );
+
+    // Sync immediately for instant render + re-align scrollTop after layout paint
+    syncFromDateString(formData.loveStartDate, false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        wheelDay.scrollTop = selectedIndices.day * WHEEL_ITEM_HEIGHT;
+        wheelMonth.scrollTop = selectedIndices.month * WHEEL_ITEM_HEIGHT;
+        wheelYear.scrollTop = selectedIndices.year * WHEEL_ITEM_HEIGHT;
+      });
+    });
   }
 
-  async function handleSubmit(btnCtrl: ReturnType<typeof createButton>): Promise<void> {
+  async function handleSubmit(btnCtrl: ReturnType<typeof createButton>, skipLoveDate: boolean): Promise<void> {
     btnCtrl.setLoading(true, 'Đang khởi tạo...');
 
     try {
@@ -709,10 +1288,10 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
         displayName: formData.displayName,
         partnerName: formData.partnerName,
         coupleCode: formData.coupleCode.toUpperCase(),
-        loveStartDate: formData.loveStartDate || undefined,
-        email: formData.useAccount && formData.email ? formData.email : undefined,
-        password: formData.useAccount && formData.password ? formData.password : undefined,
-        otpCode: formData.useAccount && formData.otpCode ? formData.otpCode : undefined,
+        loveStartDate: skipLoveDate ? undefined : formData.loveStartDate || undefined,
+        email: !isGoogleUser && formData.email ? formData.email : undefined,
+        password: !isGoogleUser && formData.password ? formData.password : undefined,
+        otpCode: !isGoogleUser && formData.otpCode ? formData.otpCode : undefined,
       };
 
       const result = await startOnboarding(payload);
@@ -723,27 +1302,49 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       });
       localStorage.setItem('lovecheck_token', result.token);
       showSuccessAndNavigate();
-    } catch {
-      showToast('Chế độ xem thử Local: Đang mở trang chính...', 'info');
-      const preview = seedMockPreviewData({
-        displayName: formData.displayName,
-        partnerName: formData.partnerName,
-        coupleCode: formData.coupleCode,
-        loveStartDate: formData.loveStartDate,
-        email: formData.useAccount ? formData.email : undefined,
-      });
+    } catch (err) {
+      const canFallbackToLocalPreview =
+        isLocalDevHostname()
+        && err instanceof ApiError
+        && err.code === 'NETWORK_ERROR';
 
-      store.set({
-        token: MOCK_PREVIEW_TOKEN,
-        user: preview.user,
-        couple: preview.couple,
-      });
-      localStorage.setItem('lovecheck_token', MOCK_PREVIEW_TOKEN);
-      showSuccessAndNavigate();
+      if (canFallbackToLocalPreview) {
+        showToast('Chế độ xem thử Local: Đang mở trang chính...', 'info');
+        const preview = seedMockPreviewData({
+          displayName: formData.displayName,
+          partnerName: formData.partnerName,
+          coupleCode: formData.coupleCode,
+          loveStartDate: skipLoveDate ? undefined : formData.loveStartDate,
+          email: !isGoogleUser ? formData.email : undefined,
+        });
+
+        store.set({
+          token: MOCK_PREVIEW_TOKEN,
+          user: preview.user,
+          couple: preview.couple,
+        });
+        localStorage.setItem('lovecheck_token', MOCK_PREVIEW_TOKEN);
+        showSuccessAndNavigate();
+        return;
+      }
+
+      btnCtrl.setLoading(false);
+      const msg = err instanceof Error ? err.message : 'Không thể khởi tạo tài khoản. Vui lòng thử lại.';
+      showToast(msg, 'error');
+
+      if (err instanceof ApiError) {
+        if (err.code === 'EMAIL_EXISTS' || err.code === 'COUPLE_FULL') {
+          currentStep = 2;
+          renderCurrentStep();
+        } else if (err.code === 'INVALID_OTP') {
+          currentStep = 3;
+          renderCurrentStep();
+        }
+      }
     }
   }
 
-  function showSuccessAndNavigate(): void {
+  function clearOnboardingSessionKeys(): void {
     [
       'google_authenticated_user',
       'dev_onboarding_step',
@@ -754,6 +1355,10 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       'dev_onboarding_email',
       'dev_onboarding_useAccount',
     ].forEach((k) => sessionStorage.removeItem(k));
+  }
+
+  function showSuccessAndNavigate(): void {
+    clearOnboardingSessionKeys();
 
     triggerHaptic('confirm');
     root.replaceChildren();
@@ -779,14 +1384,21 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
     sessionStorage.setItem('dev_onboarding_partnerName', formData.partnerName);
     sessionStorage.setItem('dev_onboarding_coupleCode', formData.coupleCode);
     sessionStorage.setItem('dev_onboarding_loveStartDate', formData.loveStartDate);
+    sessionStorage.setItem('dev_onboarding_email', formData.email);
     sessionStorage.setItem('dev_onboarding_useAccount', String(formData.useAccount));
 
     switch (currentStep) {
-      case 0: renderStep1(); break;
-      case 1: renderStep2(); break;
-      case 2: renderStep3(); break;
+      case 0:
+        renderStep1();
+        break;
+      case 1:
+        renderStep2();
+        break;
+      case 2:
+        renderStep3();
+        break;
       case 3:
-        if (formData.useAccount && !isGoogleUser) renderStep4OTP();
+        if (!isGoogleUser && !formData.emailVerified) renderStep4OTP();
         else renderStepDate();
         break;
       case 4:

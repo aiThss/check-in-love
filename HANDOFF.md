@@ -1,5 +1,5 @@
 # HANDOFF — Check IN Love (Redesign v2)
-Updated: 2026-11-26 10:45 bởi Gemini (Antigravity)
+Updated: 2026-11-26 11:25 bởi Gemini (Antigravity)
 
 ## 0. Câu dán cho AI mới
 "Đọc HANDOFF.md ở gốc repo + docs/redesign-v2/REPORT.md + docs/redesign-v2/PROGRESS.md, chạy `git status` và `git log -5` để nắm toàn bộ trạng thái dự án."
@@ -18,7 +18,8 @@ Yêu cầu phụ: "tôi cần thêm 1 cái log hay gì đó để nếu bạn h�
 - [x] P6 Auth + Onboarding + Install + Profile/Settings (commit `e5c41ab`)
 - [x] P7 PWA: manifest shortcuts + screenshots, `offline.html`, SW cache v10, toast cập nhật + banner cài đặt (`src/ui/pwa-prompts.ts`), giữ nguyên bộ logo trái tim pixel gốc, xoá file/asset mồ côi, `storage-compat.test.ts` (commit `98f65c1`)
 - [x] P8 Android native restyle + APK v0.0.49 (`versionCode 61`): giữ logo launcher & icon thông báo gốc theo yêu cầu user, splash Android 12+, theme/dark `#261824` khớp PWA, widget + dialog restyle
-- [x] P9 Tối ưu cuối + báo cáo before/after: xoá `auth-interaction-vibe.css`, tách `dev-helper.css` & `love-journey.css`, gỡ Google Fonts cuối cùng ở `anniversary-cards.ts`, đưa `!important` ngoài reduced-motion về **0**, sửa 45 viền mực `--ink-stroke-color` & layout `login`/`memories`/`checkin`, bổ sung `manifest.screenshots`, thêm `p9-acceptance.test.ts` (**31 file / 155 test pass**), chụp 44 ảnh `after` WebP và xuất báo cáo [`docs/redesign-v2/REPORT.md`](docs/redesign-v2/REPORT.md).
+- [x] P9 Tối ưu cuối + báo cáo before/after: xoá `auth-interaction-vibe.css`, tách `dev-helper.css` & `love-journey.css`, gỡ Google Fonts cuối cùng ở `anniversary-cards.ts`, đưa `!important` ngoài reduced-motion về **0**, sửa 45 viền mực `--ink-stroke-color` & layout `login`/`memories`/`checkin`, bổ sung `manifest.screenshots`, thêm `p9-acceptance.test.ts`, chụp 44 ảnh `after` WebP và xuất báo cáo [`docs/redesign-v2/REPORT.md`](docs/redesign-v2/REPORT.md).
+- [x] Hậu kiểm Onboarding trên `couple.io.vn`: khôi phục vòng quay chọn ngày 3 cột có hoạt ảnh mượt + chọn ngày bất kỳ + tương phản Dark Mode rõ nét (`onboarding-date.css`), và bắt buộc xác thực Email OTP hoặc Google OAuth (`ggauth`) ngay ở Bước 3 (`src/ui/google-signin.ts`, `onboarding.ts`, `onboarding.test.ts`).
 
 ## 2. Trạng thái hiện tại
 - **Toàn bộ 10 giai đoạn (P0 → P9) của Redesign v2 đã hoàn thành và triển khai lên `main`.**
