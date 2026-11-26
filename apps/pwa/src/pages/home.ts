@@ -276,10 +276,12 @@ function buildCheckinCard(
     const mediaEl = card.querySelector<HTMLElement>('.p-home-polaroid__media');
     mediaEl?.addEventListener('click', () => {
       if (!checkin.photoUrl) return;
+      const trimmedCaption = (checkin.caption ?? '').trim();
       openPolaroidCoverModal({
         imageUrl: checkin.photoUrl,
-        title: checkin.caption || `Khoảnh khắc của ${checkin.ownerName}`,
-        dateText: formatTime(checkin.createdAt),
+        title: trimmedCaption || checkin.ownerName,
+        dateText: trimmedCaption ? `${checkin.ownerName} · ${formatTime(checkin.createdAt)}` : formatTime(checkin.createdAt),
+        hasCustomCaption: Boolean(trimmedCaption),
         coverText: checkin.surpriseText,
         forceScratch: false,
       });
@@ -482,10 +484,12 @@ function buildRecentMemoriesSection(): HTMLElement {
           `;
           photoWrap.addEventListener('click', (event) => {
             event.stopPropagation();
+            const trimmedCaption = (item.caption ?? '').trim();
             openPolaroidCoverModal({
               imageUrl: photoUrl,
-              title: item.caption || `Khoảnh khắc của ${item.ownerName}`,
-              dateText: formatTime(item.createdAt),
+              title: trimmedCaption || item.ownerName,
+              dateText: trimmedCaption ? `${item.ownerName} · ${formatTime(item.createdAt)}` : formatTime(item.createdAt),
+              hasCustomCaption: Boolean(trimmedCaption),
               coverText: item.surpriseText,
               forceScratch: false,
             });

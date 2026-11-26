@@ -4,6 +4,7 @@ export interface PolaroidCoverOptions {
   imageUrl: string;
   title?: string;
   dateText?: string;
+  hasCustomCaption?: boolean;
   /** Kept for backward compatibility with the previous cover API. */
   timerSeconds?: number;
   revealThreshold?: number;
@@ -121,37 +122,39 @@ function isLatestPill(pill: Element): boolean {
   return false;
 }
 
-function getSurfaceCopy(pill: Element): { title: string; dateText: string } {
+function getSurfaceCopy(pill: Element): { title: string; dateText: string; hasCustomCaption: boolean } {
   const checkinCard = pill.closest('.checkin-card');
   if (checkinCard) {
+    const custom = checkinCard.querySelector<HTMLElement>('.checkin-card-overlay-text')?.textContent?.trim() || '';
     return {
-      title:
-        checkinCard.querySelector<HTMLElement>('.checkin-card-overlay-text')?.textContent?.trim() ||
-        'Bất ngờ mới dành cho bạn 💖',
+      title: custom || 'Bất ngờ mới dành cho bạn 💖',
       dateText:
         checkinCard.querySelector<HTMLElement>('.checkin-card-overlay-meta')?.textContent?.trim() ||
         'Check-in mới nhất',
+      hasCustomCaption: Boolean(custom),
     };
   }
 
   const recentCard = pill.closest('.recent-memory-card');
   if (recentCard) {
+    const custom = recentCard.querySelector<HTMLElement>('.rm-caption')?.textContent?.trim() || '';
     return {
-      title:
-        recentCard.querySelector<HTMLElement>('.rm-caption')?.textContent?.trim() ||
-        'Bất ngờ mới dành cho bạn 💖',
+      title: custom || 'Bất ngờ mới dành cho bạn 💖',
       dateText:
         recentCard.querySelector<HTMLElement>('.rm-time')?.textContent?.trim() ||
         'Check-in mới nhất',
+      hasCustomCaption: Boolean(custom),
     };
   }
 
   const memoryItem = pill.closest('.memory-item');
+  const custom = memoryItem?.querySelector<HTMLElement>('.memory-item-info-text')?.textContent?.trim() || '';
+  const owner = memoryItem?.querySelector<HTMLElement>('.p-memory-item__owner')?.textContent?.trim() || '';
+  const stamp = memoryItem?.querySelector<HTMLElement>('.p-memory-item__time')?.textContent?.trim() || '';
   return {
-    title:
-      memoryItem?.querySelector<HTMLElement>('.memory-item-info-text')?.textContent?.trim() ||
-      'Bất ngờ mới dành cho bạn 💖',
-    dateText: 'Check-in mới nhất',
+    title: custom || owner || 'Bất ngờ mới dành cho bạn 💖',
+    dateText: custom ? [owner, stamp].filter(Boolean).join(' · ') : (stamp || 'Check-in mới nhất'),
+    hasCustomCaption: Boolean(custom),
   };
 }
 
@@ -219,6 +222,7 @@ function openPillSurprise(pill: Element): void {
     imageUrl: image.currentSrc || image.src,
     title: copy.title,
     dateText: copy.dateText,
+    hasCustomCaption: copy.hasCustomCaption,
     forceScratch: true,
     coverText: image.dataset.surpriseText,
     restartScratch: true,
@@ -511,6 +515,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
     imageUrl,
     title = 'Bất ngờ mới dành cho bạn 💖',
     dateText = 'Check-in mới nhất',
+    hasCustomCaption = false,
     revealThreshold = DEFAULT_REVEAL_THRESHOLD,
     brushRadius,
     forceScratch,
@@ -567,6 +572,7 @@ export function openPolaroidCoverModal(options: PolaroidCoverOptions): { close: 
 
   const copy = document.createElement('div');
   const heading = document.createElement('strong');
+  if (hasCustomCaption) heading.className = 'polaroid-custom-caption';
   heading.textContent = title;
   const meta = document.createElement('span');
   meta.textContent = dateText;

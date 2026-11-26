@@ -199,4 +199,128 @@
     color: var(--accent-on-solid);
     border-color: transparent;
   }
+
+  /* ── Shared Reaction Tray, Emoji Modal & Pill Custom Input ─── */
+  .c-reaction-tray {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--accent-100) 42%, var(--surface-paper));
+    border: 1px solid var(--border-subtle);
+  }
+
+  .c-reaction-tray[hidden] { display: none; }
+
+  .reaction-pill,
+  .c-reaction-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    padding: 3px 9px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-paper);
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .reaction-pill.selected,
+  .c-reaction-chip.selected {
+    background: var(--accent-100);
+    border-color: var(--accent-500);
+    color: var(--accent-700);
+  }
+
+  .c-reaction-emoji { font-size: 16px; line-height: 1; }
+  .c-reaction-emoji-glyph { font-size: 25px; line-height: 1; }
+
+  .c-reaction-modal-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .c-reaction-modal-btn {
+    display: grid;
+    place-items: center;
+    min-height: 50px;
+    aspect-ratio: 1 / 1;
+    padding: 4px;
+    border-radius: 16px;
+    border: 1.5px solid var(--border-subtle);
+    background: var(--surface-paper);
+    cursor: pointer;
+    transition: transform var(--duration-instant) var(--ease-spring);
+  }
+
+  .c-reaction-modal-btn:active { transform: scale(0.92); }
+  .c-reaction-modal-btn.is-selected { background: var(--accent-100); border-color: var(--accent-500); }
+
+  .choice-reaction-custom,
+  .reaction-custom-form {
+    grid-column: 1 / -1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 4px 5px 4px 14px;
+    border-radius: var(--radius-pill);
+    border: 1.5px solid var(--border-strong);
+    background: var(--bg-canvas);
+    box-sizing: border-box;
+  }
+
+  .choice-reaction-custom:focus-within,
+  .reaction-custom-form:focus-within {
+    border-color: var(--accent-500);
+    background: var(--surface-paper);
+  }
+
+  .choice-reaction-custom input,
+  .reaction-custom-form input {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    outline: none;
+  }
+
+  .choice-reaction-custom input::placeholder,
+  .reaction-custom-form input::placeholder {
+    color: var(--text-secondary);
+  }
+
+  .choice-reaction-custom button,
+  .reaction-custom-form button {
+    flex: 0 0 auto;
+    height: 36px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--accent-500);
+    color: var(--text-on-accent);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform var(--duration-instant) var(--ease-standard);
+  }
+
+  .choice-reaction-custom button:active,
+  .reaction-custom-form button:active {
+    transform: scale(0.95);
+  }
 }

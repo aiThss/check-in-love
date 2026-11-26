@@ -324,3 +324,10 @@ Mẫu mỗi mục:
   - Khôi phục hiệu ứng lò xo + xoay mượt của nút `+` thêm ảnh mới (`nav.ts`, `shell.css`), khôi phục khung Preview Library cổ điển ở `checkin.ts` và trang `/preview/cards` (`card-preview.ts`), đổi placeholder Love Foil thành `"Lời nhắn hiển thị trước khi cào"`, và khóa chạm/cuộn nền bản đồ đằng sau modal `Thêm toạ độ hẹn hò` (`love-journey.ts`).
   - Sửa `.github/workflows/android-patch-release.yml` (cài SDK 37), nâng `versionCode = 62` / `versionName = "0.0.50"`, build APK ký số `app-release.apk` (kèm logo trái tim pixel gốc), đẩy tag `v0.0.50` phát hành lên GitHub Releases và deploy PWA lên Cloudflare Pages (`couple.io.vn`).
 - Kiểm: lint ✅ (0 lỗi, 0 cảnh báo) · test ✅ (**33 file / 159 test pass**) · build PWA ✅ (`index` gzip **34,38 kB**) · `gradlew assembleRelease` ✅ (`app-release.apk` 11,80 MB) · `git diff 65924d3 -- apps/api packages apps/admin` rỗng ✅.
+
+## 2026-11-26 13:38 — Tinh chỉnh ô nhắn tin Home, bố cục Kỷ niệm & bo tròn ô emoji custom (Gemini)
+- Làm:
+  - Khóa `flex: 0 0 auto; height: 46px; max-height: 46px` cho `.p-home-inline-composer` (`home.css`) để không kế thừa `flex-basis: 220px` theo trục dọc của `.rm-inline-composer` trong `components.css` (nguyên nhân làm ô nhắn tin bị phình thành hình tròn cao 220px).
+  - Tinh chỉnh hiển thị trên thẻ ảnh Kỷ niệm (`memories.ts`, `memories.css`): dòng 1 là `username`, xuống dòng 2 là `HH:mm dd/mm` (`00:00 dd/mm`), ẩn hoàn toàn dòng mặc định `"Khoảnh khắc chung"`; nếu có lời nhắn riêng thì hiển thị bằng font `var(--font-display)` giống Trang chủ, đồng bộ font chữ này cho cả phần lời nhắn riêng khi bấm xem chi tiết (`polaroid-cover.ts`, `polaroid-cover.css`, `memories.css` — giữ nguyên font thường cho tên & ngày giờ).
+  - Đưa style `.choice-reaction-custom` / `.reaction-custom-form` và `.c-reaction-tray` về `10-components/card-avatar-badge.css`, bo tròn viên thuốc (`border-radius: var(--radius-pill)`) cho khung nhập emoji tùy chọn.
+- Kiểm: lint ✅ · test ✅ (33 file / 159 test pass) · build PWA ✅ · deploy Cloudflare Pages + push `main` ✅.

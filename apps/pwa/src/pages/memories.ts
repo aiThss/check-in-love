@@ -107,11 +107,18 @@ function installAndroidLongPressDownload(image: HTMLImageElement, item: CheckIn)
   image.addEventListener('contextmenu', (event) => event.preventDefault());
 }
 
-function openMemoryPhotoCover(item: CheckIn, photoUrl: string, title: string, dateText: string): void {
+function openMemoryPhotoCover(
+  item: CheckIn,
+  photoUrl: string,
+  title: string,
+  dateText: string,
+  hasCustomCaption: boolean,
+): void {
   openPolaroidCoverModal({
     imageUrl: photoUrl,
     title,
     dateText,
+    hasCustomCaption,
     coverText: item.surpriseText,
     forceScratch: false,
     timerSeconds: 5,
@@ -119,6 +126,12 @@ function openMemoryPhotoCover(item: CheckIn, photoUrl: string, title: string, da
 
   const stageImage = document.querySelector<HTMLImageElement>('.polaroid-modal-backdrop .polaroid-stage-photo');
   if (stageImage) installAndroidLongPressDownload(stageImage, item);
+}
+
+function formatMemoryCardStamp(isoString: string): string {
+  const date = new Date(isoString);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}`;
 }
 
 function formatTime(isoString: string): string {
@@ -714,6 +727,9 @@ export function renderMemoriesPage(): HTMLElement {
     card.className = 'memory-item p-memory-item';
 
     const photoUrl = getCheckinPhotoUrl(item);
+    const trimmedCaption = (item.caption ?? '').trim();
+    const stampText = formatMemoryCardStamp(item.createdAt);
+
     if (item.type === 'photo' || photoUrl) {
       card.innerHTML = `
         <img
@@ -725,10 +741,9 @@ export function renderMemoriesPage(): HTMLElement {
           decoding="async"
         />
         <div class="memory-item-info p-memory-item__scrim">
-          <span class="p-memory-item__owner">${escapeHtml(item.ownerName)} · ${formatTime(item.createdAt)}</span>
-          <span class="memory-item-info-text p-memory-item__caption">
-            ${escapeHtml(item.caption || 'Khoảnh khắc chung')}
-          </span>
+          <span class="p-memory-item__owner">${escapeHtml(item.ownerName)}</span>
+          <span class="p-memory-item__time">${stampText}</span>
+          ${trimmedCaption ? `<span class="memory-item-info-text p-memory-item__caption">${escapeHtml(trimmedCaption)}</span>` : ''}
         </div>
       `;
       const img = card.querySelector<HTMLImageElement>('img');
@@ -739,9 +754,12 @@ export function renderMemoriesPage(): HTMLElement {
       card.innerHTML = `
         <div>
           ${moodMeta ? iconMarkup(moodMeta.icon, { size: 24, variant: 'filled' }) : iconMarkup('heart', { size: 20 })}
-          <p class="p-memory-note-card__body">${escapeHtml(item.caption || 'Cảm xúc hiện tại')}</p>
+          ${trimmedCaption ? `<p class="p-memory-note-card__body">${escapeHtml(trimmedCaption)}</p>` : ''}
         </div>
-        <span class="p-memory-note-card__meta">${escapeHtml(item.ownerName)} · ${formatTime(item.createdAt)}</span>
+        <div class="p-memory-note-card__meta">
+          <span class="p-memory-item__owner">${escapeHtml(item.ownerName)}</span>
+          <span class="p-memory-item__time">${stampText}</span>
+        </div>
       `;
     }
 
@@ -762,8 +780,9 @@ export function renderMemoriesPage(): HTMLElement {
         openMemoryPhotoCover(
           item,
           photoUrl,
-          item.caption || `Kỷ niệm của ${item.ownerName}`,
-          formatTime(item.createdAt),
+          trimmedCaption || item.ownerName,
+          trimmedCaption ? `${item.ownerName} · ${stampText}` : stampText,
+          Boolean(trimmedCaption),
         );
       } else {
         showCheckinDetail(item);
