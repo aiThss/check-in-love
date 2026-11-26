@@ -305,3 +305,11 @@ Mẫu mỗi mục:
     - Bước chọn Ngày bắt đầu yêu nhau: khôi phục vòng quay 3 cột **Ngày / Tháng / Năm** có hoạt ảnh cuộn mượt, bấm chọn trực tiếp ngày/tháng/năm bất kỳ, kéo chuột trên desktop, nút **"Mở lịch tháng"** gọi native date picker, huy hiệu lịch mini nảy động và thẻ đếm ngày tương phản rõ trên cả nền Sáng & Tối.
   - Bổ sung bộ test `apps/pwa/src/pages/onboarding.test.ts` kiểm chứng luồng Bước 3 Email/Google, Bước 4 OTP không có nút bỏ qua, và vòng quay chọn ngày bất kỳ.
 - Kiểm: lint ✅ · test ✅ (32 file / 158 test pass) · build PWA ✅ · Wrangler deploy Pages (`couple.io.vn`) ✅.
+
+## 2026-11-26 12:30 — Sửa 4 lỗi UI/Scroll thực tế trên `couple.io.vn` (Gemini)
+- Làm:
+  - **Love Foil Dark Mode**: bổ sung biến `--accent-50` và `--accent-200` cho `[data-theme='dark']` trong `00-tokens.css` và chuẩn hoá `.p-checkin-scratch` / `.p-checkin-scratch__pill` trong `checkin.css` (không còn chữ trắng trên nền hồng sáng khi bật Love Foil ở chế độ tối).
+  - **Đồng nhất 3 mục đầu Hồ sơ (`profile.ts`)**: bỏ class legacy `.card-solid` gắn nhầm trên dòng `Chỉnh sửa thông tin` (và mở rộng selector dự phòng trong `anniversary-cards.ts`) để 3 hàng đầu trong nhóm cài đặt đồng nhất 100%.
+  - **Khôi phục nút thêm ảnh kiểu cũ & hiệu ứng cũ (`nav.ts`, `shell.css`)**: khôi phục nút tròn nổi dấu `+` màu hồng bóng viền trắng, vòng phát sáng nhịp thở `cil-nav-glow-pulse`, hiệu ứng phóng to khi hover / nhún khi bấm và xoay `135deg` thành `×` khi mở check-in.
+  - **Sửa lỗi Trang chủ không vuốt được (`home.css`, `01-base.css`, `feedback.ts`, `home.ts`)**: đổi `overflow-x: hidden` sang `overflow-x: clip` và bỏ `overscroll-behavior-y: contain` trên `.p-home` để không tạo bẫy cuộn lồng nhau chặn vuốt trên mobile/WebView; sửa `attachPullToRefresh` kiểm tra đúng `window.scrollY` với touch passive; huỷ long-press trên thẻ ảnh khi ngón tay bắt đầu vuốt (> 8px).
+- Kiểm: lint ✅ · test ✅ (32 file / 158 test pass) · build PWA ✅ · Wrangler deploy Pages (`couple.io.vn`) ✅.

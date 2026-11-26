@@ -191,11 +191,11 @@ export function createNav(): HTMLElement {
     if (item.isCheckin) {
       button.className = 'nav-checkin-btn c-nav__checkin';
       button.setAttribute('aria-label', 'Tạo check-in mới');
-      const lensSvg = icon('checkin-lens', { size: 28, variant: 'outline' });
-      button.appendChild(lensSvg);
+      button.innerHTML =
+        '<svg data-cil-icon="plus" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
 
       const slot = document.createElement('div');
-      slot.className = 'c-nav__checkin-slot';
+      slot.className = 'c-nav__checkin-slot nav-checkin-wrapper';
 
       const glow = document.createElement('div');
       glow.className = 'c-nav__checkin-glow';
@@ -207,10 +207,6 @@ export function createNav(): HTMLElement {
       button.addEventListener('pointerdown', triggerPreload, { passive: true });
       button.addEventListener('click', () => {
         triggerHaptic('confirm');
-        lensSvg.classList.remove('c-icon--shutter');
-        void lensSvg.getBoundingClientRect();
-        lensSvg.classList.add('c-icon--shutter');
-
         const currentPath = getCurrentPath().split('?')[0].replace(/\/$/, '') || '/';
         const targetPath = currentPath === item.path ? '/app/home' : item.path;
         applyActiveState(targetPath);

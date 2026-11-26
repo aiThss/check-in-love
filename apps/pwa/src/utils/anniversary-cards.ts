@@ -1603,7 +1603,7 @@ async function mountBirthdaySettings(): Promise<void> {
   ensureStyles();
   const page = document.querySelector<HTMLElement>('.profile-page');
   if (!page || page.querySelector('.birthday-settings-card') || birthdaySettingsLoading) return;
-  const editRow = Array.from(page.querySelectorAll<HTMLElement>('.card-solid')).find((row) =>
+  const editRow = Array.from(page.querySelectorAll<HTMLElement>('.card-solid, .c-list-row')).find((row) =>
     row.textContent?.includes('Chỉnh sửa thông tin'),
   );
   const container = editRow?.parentElement;

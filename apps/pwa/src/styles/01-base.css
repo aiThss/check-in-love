@@ -27,6 +27,7 @@
     font-size: var(--text-base);
     color: var(--ink-1);
     background: var(--bg-canvas-gradient);
+    overflow-x: clip;
     overscroll-behavior-y: none;
   }
 

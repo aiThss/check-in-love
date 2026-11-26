@@ -13,7 +13,7 @@
     flex-direction: column;
     gap: var(--space-3);
     box-sizing: border-box;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   .p-checkin-header {
@@ -97,7 +97,7 @@
 
   .p-checkin-polaroid.has-photo {
     border-style: solid;
-    border-color: var(--ink-border);
+    border-color: var(--ink-stroke-color);
   }
 
   .p-checkin-polaroid__img {
@@ -164,18 +164,20 @@
     padding: 8px 14px;
     border-radius: var(--radius-md);
     border: 1.5px solid var(--border-subtle);
-    background: var(--bg-canvas);
+    background: var(--surface-subtle);
     color: var(--text-primary);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
     cursor: pointer;
+    transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease;
   }
 
   .p-checkin-scratch.is-on {
-    border-color: var(--accent-400);
-    background: var(--accent-50);
+    border-color: var(--accent-500);
+    background: var(--accent-100);
+    color: var(--text-primary);
   }
 
   .p-checkin-scratch__lead {
@@ -184,20 +186,28 @@
     gap: 8px;
     font-size: var(--text-sm);
     font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .p-checkin-scratch.is-on .p-checkin-scratch__lead svg {
+    color: var(--accent-700);
   }
 
   .p-checkin-scratch__pill {
-    padding: 3px 10px;
+    padding: 4px 10px;
     border-radius: var(--radius-pill);
     font-size: 11px;
     font-weight: 700;
-    background: var(--neutral-200);
+    background: var(--surface-elevated);
+    border: 1px solid var(--border-subtle);
     color: var(--text-secondary);
+    flex-shrink: 0;
   }
 
   .p-checkin-scratch.is-on .p-checkin-scratch__pill {
-    background: var(--accent-500);
-    color: var(--text-on-accent);
+    background: var(--accent-600);
+    border-color: transparent;
+    color: var(--accent-on-solid);
   }
 
   .p-checkin-chips {

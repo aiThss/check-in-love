@@ -97,6 +97,8 @@ function renderSkeleton(): HTMLElement {
 function attachLongPress(target: HTMLElement, onLongPress: () => void): void {
   let timer: number | undefined;
   let longPressed = false;
+  let startX = 0;
+  let startY = 0;
 
   const clear = () => {
     if (timer !== undefined) {
@@ -108,6 +110,8 @@ function attachLongPress(target: HTMLElement, onLongPress: () => void): void {
   target.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     longPressed = false;
+    startX = event.clientX;
+    startY = event.clientY;
     clear();
     timer = window.setTimeout(() => {
       longPressed = true;
@@ -115,6 +119,13 @@ function attachLongPress(target: HTMLElement, onLongPress: () => void): void {
       onLongPress();
     }, 420);
   });
+
+  target.addEventListener('pointermove', (event) => {
+    if (timer === undefined) return;
+    if (Math.hypot(event.clientX - startX, event.clientY - startY) > 8) {
+      clear();
+    }
+  }, { passive: true });
 
   target.addEventListener('pointerup', clear);
   target.addEventListener('pointerleave', clear);

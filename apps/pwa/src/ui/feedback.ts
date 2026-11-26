@@ -172,22 +172,39 @@ export function attachPullToRefresh(options: PullToRefreshOptions): () => void {
   indicator.appendChild(pill);
   options.scrollContainer.insertBefore(indicator, options.scrollContainer.firstChild);
 
+  let startX = 0;
   let startY = 0;
   let pulling = false;
   let refreshing = false;
   let pullDistance = 0;
 
-  const onPointerDown = (e: PointerEvent): void => {
-    if (refreshing || options.scrollContainer.scrollTop > 2) return;
-    startY = e.clientY;
+  const getScrollTop = (): number =>
+    Math.max(
+      options.scrollContainer.scrollTop,
+      window.scrollY || 0,
+      document.documentElement.scrollTop || 0,
+    );
+
+  const startPull = (clientX: number, clientY: number, target: EventTarget | null): void => {
+    if (refreshing || getScrollTop() > 2) return;
+    if (target instanceof Element && target.closest('input, textarea, select, canvas')) return;
+    startX = clientX;
+    startY = clientY;
     pulling = true;
     pullDistance = 0;
   };
 
-  const onPointerMove = (e: PointerEvent): void => {
+  const movePull = (clientX: number, clientY: number): void => {
     if (!pulling || refreshing) return;
-    const dy = e.clientY - startY;
-    if (dy <= 0) {
+    if (getScrollTop() > 2) {
+      pulling = false;
+      pullDistance = 0;
+      pill.style.opacity = '0';
+      return;
+    }
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+    if (dy <= 6 || Math.abs(dy) <= Math.abs(dx) * 1.25) {
       pullDistance = 0;
       pill.style.opacity = '0';
       return;
@@ -221,18 +238,46 @@ export function attachPullToRefresh(options: PullToRefreshOptions): () => void {
     pullDistance = 0;
   };
 
+  const onTouchStart = (e: TouchEvent): void => {
+    if (e.touches.length !== 1) return;
+    startPull(e.touches[0].clientX, e.touches[0].clientY, e.target);
+  };
+
+  const onTouchMove = (e: TouchEvent): void => {
+    if (!pulling || e.touches.length !== 1) return;
+    movePull(e.touches[0].clientX, e.touches[0].clientY);
+  };
+
+  const onMouseDown = (e: PointerEvent): void => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    startPull(e.clientX, e.clientY, e.target);
+  };
+
+  const onMouseMove = (e: PointerEvent): void => {
+    if (e.pointerType !== 'mouse') return;
+    movePull(e.clientX, e.clientY);
+  };
+
   const endHandler = (): void => {
     void finishPull();
   };
 
-  options.scrollContainer.addEventListener('pointerdown', onPointerDown, { passive: true });
-  options.scrollContainer.addEventListener('pointermove', onPointerMove, { passive: true });
+  options.scrollContainer.addEventListener('touchstart', onTouchStart, { passive: true });
+  options.scrollContainer.addEventListener('touchmove', onTouchMove, { passive: true });
+  options.scrollContainer.addEventListener('touchend', endHandler, { passive: true });
+  options.scrollContainer.addEventListener('touchcancel', endHandler, { passive: true });
+  options.scrollContainer.addEventListener('pointerdown', onMouseDown, { passive: true });
+  options.scrollContainer.addEventListener('pointermove', onMouseMove, { passive: true });
   options.scrollContainer.addEventListener('pointerup', endHandler);
   options.scrollContainer.addEventListener('pointercancel', endHandler);
 
   return () => {
-    options.scrollContainer.removeEventListener('pointerdown', onPointerDown);
-    options.scrollContainer.removeEventListener('pointermove', onPointerMove);
+    options.scrollContainer.removeEventListener('touchstart', onTouchStart);
+    options.scrollContainer.removeEventListener('touchmove', onTouchMove);
+    options.scrollContainer.removeEventListener('touchend', endHandler);
+    options.scrollContainer.removeEventListener('touchcancel', endHandler);
+    options.scrollContainer.removeEventListener('pointerdown', onMouseDown);
+    options.scrollContainer.removeEventListener('pointermove', onMouseMove);
     options.scrollContainer.removeEventListener('pointerup', endHandler);
     options.scrollContainer.removeEventListener('pointercancel', endHandler);
     indicator.remove();

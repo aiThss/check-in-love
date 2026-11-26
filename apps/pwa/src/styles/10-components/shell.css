@@ -160,62 +160,91 @@
     display: none;
   }
 
-  /* ── Center Check-in Lens-Heart CTA ────────────────────────── */
+  /* ── Center Check-in Classic Floating Plus CTA + Pulsing Glow ── */
   .c-nav__checkin-slot {
     position: relative;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     height: 100%;
   }
 
   .c-nav__checkin-glow {
     position: absolute;
-    top: -18px;
-    width: 60px;
-    height: 60px;
+    width: 58px;
+    height: 58px;
     border-radius: 50%;
-    background: radial-gradient(circle, color-mix(in srgb, var(--accent-500) 42%, transparent) 0%, transparent 72%);
+    background: var(--accent-500);
+    opacity: 0.28;
+    margin-top: -30px;
     pointer-events: none;
-    transition: transform var(--duration-base) var(--ease-spring);
+    z-index: 1;
+    animation: cil-nav-glow-pulse 2.5s infinite ease-in-out;
+  }
+
+  @keyframes cil-nav-glow-pulse {
+    0% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.28); opacity: 0; }
+    100% { transform: scale(1); opacity: 0.3; }
   }
 
   .c-nav__checkin {
     position: relative;
     z-index: 2;
-    margin-top: -26px;
-    width: 60px;
-    height: 60px;
+    margin-top: -30px;
+    width: 58px;
+    height: 58px;
     border-radius: 50%;
-    border: 4px solid var(--surface-paper);
-    background: linear-gradient(155deg, var(--accent-500), var(--accent-600));
-    color: var(--accent-on-solid);
-    box-shadow: var(--elev-btn), var(--elev-2);
-    display: grid;
-    place-items: center;
+    border: 3.5px solid rgba(255, 255, 255, 0.85);
+    background: linear-gradient(135deg, #ff478d 0%, #ff1c6b 100%);
+    color: #ffffff;
+    box-shadow:
+      0 12px 32px rgba(255, 28, 107, 0.45),
+      inset 0 1.5px 1.5px rgba(255, 255, 255, 0.8),
+      inset 0 -1.5px 1.5px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+    flex-shrink: 0;
     touch-action: manipulation;
     transition:
       transform var(--duration-fast) var(--ease-spring),
-      background-color var(--duration-fast) var(--ease-standard);
+      box-shadow var(--duration-fast) var(--ease-standard),
+      filter var(--duration-fast) var(--ease-standard);
+  }
+
+  .c-nav__checkin:hover {
+    transform: scale(1.08);
+    box-shadow:
+      0 14px 36px rgba(255, 28, 107, 0.55),
+      inset 0 1.5px 1.5px rgba(255, 255, 255, 0.9);
+    filter: brightness(1.04);
   }
 
   .c-nav__checkin:active {
-    transform: scale(0.9);
+    transform: scale(0.92) translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 28, 107, 0.25);
   }
 
-  .c-nav__checkin.active {
-    background: var(--ink-1);
-    color: var(--ink-inverse);
+  .c-nav__checkin svg {
+    stroke: #ffffff;
+    transition: transform var(--duration-base) var(--ease-standard);
+  }
+
+  .c-nav__checkin.active svg {
+    transform: rotate(135deg);
   }
 
   @media (max-width: 359px) {
     .c-nav__bar {
       grid-template-columns: 1fr 1fr 58px 1fr 1fr;
     }
-    .c-nav__checkin {
-      width: 54px;
-      height: 54px;
-      margin-top: -22px;
+    .c-nav__checkin,
+    .c-nav__checkin-glow {
+      width: 50px;
+      height: 50px;
+      margin-top: -24px;
     }
     .c-nav__label {
       font-size: 10px;

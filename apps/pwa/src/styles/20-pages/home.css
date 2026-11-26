@@ -10,8 +10,7 @@
     width: 100%;
     min-height: 100dvh;
     padding-bottom: calc(108px + var(--safe-bottom, 0px));
-    overflow-x: hidden;
-    overscroll-behavior-y: contain;
+    overflow-x: clip;
   }
 
   .p-home-topbar {

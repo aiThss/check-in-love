@@ -13,7 +13,7 @@
     flex-direction: column;
     gap: var(--space-4);
     box-sizing: border-box;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   .p-profile-header h1 {
@@ -217,7 +217,7 @@
   }
 
   .p-accent-swatch.is-active {
-    border-color: var(--ink-border);
+    border-color: var(--ink-stroke-color);
     box-shadow: 2px 2px 0 var(--ink-stroke-color);
     transform: scale(1.06);
   }

@@ -608,7 +608,6 @@ export function renderProfilePage(): HTMLElement {
         else showToast('Vui lòng hoàn tất ghép đôi trước.', 'info');
       },
     });
-    editRow.classList.add('card-solid');
 
     const journeyRow = createListRow({
       title: 'Bản đồ hẹn hò & Điều ước',
