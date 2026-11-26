@@ -41,16 +41,44 @@
 
   .p-journey .journey-tabs {
     background: var(--surface-paper);
-    border: 2px solid var(--ink-stroke-color);
+    border: 1.5px solid var(--ink-stroke-color);
     border-radius: var(--radius-pill);
-    box-shadow: 2px 2px 0 var(--ink-stroke-color);
-    padding: 4px;
+    box-shadow: 1.5px 1.5px 0 var(--ink-stroke-color);
+    padding: 3px;
+    gap: 3px;
   }
 
   .p-journey .journey-tab-btn {
     border-radius: var(--radius-pill);
-    min-height: 40px;
+    min-height: 34px;
+    min-width: 0;
+    padding: 6px 10px;
+    gap: 6px;
+    font-size: 12px;
     font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .p-journey .journey-tab-btn svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+
+  .p-journey .journey-tab-btn span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (max-width: 380px) {
+    .p-journey .journey-tab-btn {
+      min-height: 32px;
+      padding: 5px 8px;
+      gap: 5px;
+      font-size: 11.5px;
+    }
   }
 
   .p-journey .journey-tab-btn.active {
