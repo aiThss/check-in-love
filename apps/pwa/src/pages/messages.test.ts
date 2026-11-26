@@ -701,7 +701,7 @@ describe('Messages scroll and reply behavior', () => {
     const bubble = routePage.element.querySelector<HTMLElement>('[data-message-id="g1"] .chat-text-bubble')!;
     bubble.dispatchEvent(pointer('pointerdown', 80, 100));
     await vi.advanceTimersByTimeAsync(600);
-    const reactionButtons = routePage.element.querySelectorAll('.message-reaction-options button svg[data-cil-icon]');
+    const reactionButtons = routePage.element.querySelectorAll('.message-reaction-options button');
     expect(reactionButtons.length).toBeGreaterThanOrEqual(6);
 
     const typingBubble = routePage.element.querySelector<HTMLElement>('.messages-typing-bubble')!;

@@ -1325,7 +1325,101 @@ export function renderLoveJourneyPage(): HTMLElement {
     });
   }
 
-  // ── Modals ───────────────────────────────────────────────────
+  // ── Modals (Background Touch & Scroll Locked) ────────────────
+  let activeModalClose: (() => void) | null = null;
+
+  function mountLockedJourneyModal(modal: HTMLElement): () => void {
+    activeModalClose?.();
+
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    try {
+      map?.dragPan?.disable?.();
+      map?.scrollZoom?.disable?.();
+      map?.touchZoomRotate?.disable?.();
+      map?.doubleClickZoom?.disable?.();
+    } catch {
+      // ignore non-WebGL test mocks
+    }
+
+    const card = modal.querySelector<HTMLElement>('.journey-modal-card');
+    let backdropPointerDown = false;
+
+    modal.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      backdropPointerDown = e.target === modal;
+    });
+    modal.addEventListener('mousedown', (e) => e.stopPropagation());
+    modal.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+
+    modal.addEventListener(
+      'touchmove',
+      (e) => {
+        e.stopPropagation();
+        if (!card || !card.contains(e.target as Node)) {
+          e.preventDefault();
+        }
+      },
+      { passive: false },
+    );
+
+    modal.addEventListener(
+      'wheel',
+      (e) => {
+        e.stopPropagation();
+        if (!card || !card.contains(e.target as Node)) {
+          e.preventDefault();
+        }
+      },
+      { passive: false },
+    );
+
+    let closed = false;
+    const closeModal = () => {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.touchAction = prevBodyTouchAction;
+      try {
+        map?.dragPan?.enable?.();
+        map?.scrollZoom?.enable?.();
+        map?.touchZoomRotate?.enable?.();
+        map?.doubleClickZoom?.enable?.();
+      } catch {
+        // ignore
+      }
+      modal.remove();
+      if (activeModalClose === closeModal) activeModalClose = null;
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeModal();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+
+    modal.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (e.target === modal && backdropPointerDown) {
+        closeModal();
+      }
+      backdropPointerDown = false;
+    });
+
+    document.body.appendChild(modal);
+    activeModalClose = closeModal;
+    return closeModal;
+  }
+
   function openAddPlaceModal(): void {
     const modal = document.createElement('div');
     modal.className = 'journey-modal-backdrop';
@@ -1386,9 +1480,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       </div>
     `;
 
-    document.body.appendChild(modal);
-
-    const closeModal = () => modal.remove();
+    const closeModal = mountLockedJourneyModal(modal);
     modal.querySelector('.journey-modal-close-btn')?.addEventListener('click', closeModal);
     modal.querySelector('#btn-cancel-modal')?.addEventListener('click', closeModal);
 
@@ -1571,9 +1663,7 @@ export function renderLoveJourneyPage(): HTMLElement {
     const photoInput = modal.querySelector<HTMLInputElement>('#edit-place-photo');
     if (photoInput) photoInput.value = place.photoUrl || '';
 
-    document.body.appendChild(modal);
-
-    const closeModal = () => modal.remove();
+    const closeModal = mountLockedJourneyModal(modal);
     modal.querySelector('.journey-modal-close-btn')?.addEventListener('click', closeModal);
     modal.querySelector('#btn-cancel-modal')?.addEventListener('click', closeModal);
 
@@ -1657,9 +1747,7 @@ export function renderLoveJourneyPage(): HTMLElement {
       </div>
     `;
 
-    document.body.appendChild(modal);
-
-    const closeModal = () => modal.remove();
+    const closeModal = mountLockedJourneyModal(modal);
     modal.querySelector('.journey-modal-close-btn')?.addEventListener('click', closeModal);
     modal.querySelector('#btn-cancel-modal')?.addEventListener('click', closeModal);
 
@@ -1738,9 +1826,7 @@ export function renderLoveJourneyPage(): HTMLElement {
     const noteTextarea = modal.querySelector<HTMLTextAreaElement>('#edit-bucket-note');
     if (noteTextarea) noteTextarea.value = item.note || '';
 
-    document.body.appendChild(modal);
-
-    const closeModal = () => modal.remove();
+    const closeModal = mountLockedJourneyModal(modal);
     modal.querySelector('.journey-modal-close-btn')?.addEventListener('click', closeModal);
     modal.querySelector('#btn-cancel-modal')?.addEventListener('click', closeModal);
 
@@ -1861,6 +1947,7 @@ export function renderLoveJourneyPage(): HTMLElement {
 
   // Lifecycle destroy
   root.destroy = () => {
+    activeModalClose?.();
     window.removeEventListener('lovecheck:realtime-event', handleRealtimeEvent);
     window.removeEventListener('resize', updateTabVisibility);
     themeObserver.disconnect();

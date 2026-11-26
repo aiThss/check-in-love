@@ -6,7 +6,7 @@ import { navigate } from '../../router';
 import { store } from '../../store/index';
 import { createField } from '../../ui/forms';
 import { triggerHaptic } from '../../ui/haptics';
-import { REACTION_ICON_MAP, icon, type IconName } from '../../ui/icons/icons';
+import { icon, type IconName } from '../../ui/icons/icons';
 import { openDialog } from '../../ui/overlays';
 import { formatMessageTime, isEmojiOnlyText, messageText } from './format';
 
@@ -14,13 +14,14 @@ const SWIPE_INTENT_DISTANCE = 10;
 const SWIPE_REPLY_THRESHOLD = 56;
 const SWIPE_MAX_TRANSLATE = 76;
 
-export const QUICK_REACTION_ITEMS: ReadonlyArray<{ key: string; icon: IconName; label: string }> = [
-  { key: '❤️', icon: 'heart', label: 'Thả tim' },
-  { key: '🥰', icon: 'react-love', label: 'Thương thương' },
-  { key: '😂', icon: 'react-haha', label: 'Haha' },
-  { key: '😮', icon: 'react-wow', label: 'Bất ngờ' },
-  { key: '😢', icon: 'react-ouch', label: 'Thương quá' },
-  { key: '🔥', icon: 'react-fire', label: 'Bùng cháy' },
+export const QUICK_REACTION_ITEMS: ReadonlyArray<{ key: string; label: string }> = [
+  { key: '❤️', label: 'Thả tim' },
+  { key: '🥰', label: 'Thương thương' },
+  { key: '😘', label: 'Hôn' },
+  { key: '😂', label: 'Haha' },
+  { key: '😮', label: 'Bất ngờ' },
+  { key: '😢', label: 'Thương quá' },
+  { key: '🔥', label: 'Bùng cháy' },
 ];
 
 export interface MessageView {
@@ -184,17 +185,7 @@ export function renderReactions(view: MessageView, item: ChatMessage, ctx: Bubbl
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `message-reaction${reaction.reactedByMe ? ' reacted' : ''}`;
-    const mappedIcon = REACTION_ICON_MAP[reaction.type];
-    if (mappedIcon) {
-      button.appendChild(icon(mappedIcon, { size: 16, variant: reaction.reactedByMe ? 'filled' : 'outline' }));
-      if (reaction.count > 1) {
-        const cnt = document.createElement('span');
-        cnt.textContent = String(reaction.count);
-        button.appendChild(cnt);
-      }
-    } else {
-      button.textContent = `${reaction.type} ${reaction.count > 1 ? reaction.count : ''}`.trim();
-    }
+    button.textContent = `${reaction.type}${reaction.count > 1 ? ` ${reaction.count}` : ''}`;
     button.setAttribute('aria-label', `${reaction.type} ${reaction.count}`);
     button.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -507,7 +498,7 @@ export function createMessageView(
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.setAttribute('aria-label', r.label);
-      btn.appendChild(icon(r.icon, { size: 24, variant: r.icon === 'heart' ? 'filled' : 'outline' }));
+      btn.textContent = r.key;
       btn.addEventListener('click', (event) => {
         event.stopPropagation();
         closePicker();

@@ -1,5 +1,5 @@
 # HANDOFF — Check IN Love (Redesign v2)
-Updated: 2026-11-26 12:30 bởi Gemini (Antigravity)
+Updated: 2026-11-26 13:15 bởi Gemini (Antigravity)
 
 ## 0. Câu dán cho AI mới
 "Đọc HANDOFF.md ở gốc repo + docs/redesign-v2/REPORT.md + docs/redesign-v2/PROGRESS.md, chạy `git status` và `git log -5` để nắm toàn bộ trạng thái dự án."
@@ -20,17 +20,23 @@ Yêu cầu phụ: "tôi cần thêm 1 cái log hay gì đó để nếu bạn h�
 - [x] P8 Android native restyle + APK v0.0.49 (`versionCode 61`): giữ logo launcher & icon thông báo gốc theo yêu cầu user, splash Android 12+, theme/dark `#261824` khớp PWA, widget + dialog restyle
 - [x] P9 Tối ưu cuối + báo cáo before/after: xoá `auth-interaction-vibe.css`, tách `dev-helper.css` & `love-journey.css`, gỡ Google Fonts cuối cùng ở `anniversary-cards.ts`, đưa `!important` ngoài reduced-motion về **0**, sửa 45 viền mực `--ink-stroke-color` & layout `login`/`memories`/`checkin`, bổ sung `manifest.screenshots`, thêm `p9-acceptance.test.ts`, chụp 44 ảnh `after` WebP và xuất báo cáo [`docs/redesign-v2/REPORT.md`](docs/redesign-v2/REPORT.md).
 - [x] Hậu kiểm Onboarding trên `couple.io.vn`: khôi phục vòng quay chọn ngày 3 cột có hoạt ảnh mượt + chọn ngày bất kỳ + tương phản Dark Mode rõ nét (`onboarding-date.css`), và bắt buộc xác thực Email OTP hoặc Google OAuth (`ggauth`) ngay ở Bước 3 (`src/ui/google-signin.ts`, `onboarding.ts`, `onboarding.test.ts`).
+- [x] Hậu kiểm trải nghiệm thực tế trên điện thoại & phát hành APK `v0.0.50` (`versionCode 62`):
+  - Cố định tỷ lệ 1:1 cho mọi vị trí avatar (`card-avatar-badge.css`, `profile.css`, `love-journey.css`) và hiển thị đúng `partnerAvatarUrl` trên Home Hero.
+  - Chuyển sang bộ emoji cảm xúc phổ thông không kèm nhãn chữ (`reactions.ts`, `reaction-picker.ts`, `home.ts`, `memories.ts`, `messages/bubble.ts`), bỏ nút "Trả lời" dư thừa và bổ sung khay ẩn `.c-reaction-tray` dưới thanh nhắn tin chỉ hiện khi có emoji/sticker/icon được thả.
+  - Tối ưu lọc 3 chế độ `Tất cả - Người ấy - Của mình` trên `memories.ts` với bộ nhớ đệm DOM (`tileCache`) + phân trang 20 ảnh/lần + `IntersectionObserver`, loại bỏ giật lag khi bấm liên tục trên 700+ ảnh; gỡ bỏ độ trễ `startViewTransition` ở `router.ts`, tắt lớp lọc hạt nhiễu GPU và giới hạn `MutationObserver` chỉ chạy khi mở trang Chat.
+  - Khôi phục hiệu ứng lò xo mượt mà cho nút `+` thêm ảnh (`nav.ts`, `shell.css`), khôi phục khung Preview Library cổ điển ở `checkin.ts` + trang `/preview/cards` (`card-preview.ts`), rút gọn placeholder Love Foil thành `"Lời nhắn hiển thị trước khi cào"`, và khoá cuộn/chạm nền bản đồ khi mở modal Thêm toạ độ hẹn hò (`love-journey.ts`).
+  - Nâng cấp workflow GitHub Actions (`android-patch-release.yml` hỗ trợ SDK 37) và đóng gói phát hành `app-release.apk` `v0.0.50` (`versionCode 62`) lên GitHub Releases + triển khai PWA lên Cloudflare Pages (`couple.io.vn`).
 
 ## 2. Trạng thái hiện tại
-- **Toàn bộ 10 giai đoạn (P0 → P9) của Redesign v2 đã hoàn thành và triển khai lên `main`.**
+- **Toàn bộ 10 giai đoạn (P0 → P9) và các bản vá hậu kiểm thực tế đã hoàn thành, triển khai lên `main`, Cloudflare Pages và GitHub Releases (`v0.0.50`).**
 - Kiểm chứng cuối cùng:
   - `npm run lint`: sạch (0 lỗi, 0 cảnh báo).
-  - `npm test`: **31 file / 155 test pass**.
-  - `npm run build --workspace=apps/pwa`: `tsc && vite build` xanh (`index` JS **34,73 kB** gzip < baseline 46,40 kB; `index` CSS **139,27 kB** raw < baseline 141,43 kB).
+  - `npm test`: **33 file / 159 test pass**.
+  - `npm run build --workspace=apps/pwa`: `tsc && vite build` xanh.
   - `git diff --stat 65924d3 -- apps/api packages apps/admin`: **rỗng 100%**.
 
 ## 3. Bước kế tiếp (Bảo trì / Hậu kiểm thực tế)
-1. Cài thử `app-release.apk` (`v0.0.48`, `versionCode 60`) trên điện thoại Android thật để kiểm tra trực quan icon Adaptive/Monochrome, Splash Android 12+, thông báo đẩy và 2 widget màn hình chính.
+1. Mở app trên điện thoại (đang ở `v0.0.48`) để nhận thông báo cập nhật tự động lên `v0.0.50` (`versionCode 62`) từ GitHub Releases hoặc cài trực tiếp `app-release.apk`.
 2. Xem báo cáo nghiệm thu đầy đủ và hướng dẫn rollback tại `docs/redesign-v2/REPORT.md` và bảng số liệu tại `design/redesign-v2/metrics.md`.
 
 ## 4. Ràng buộc bất khả xâm phạm (chi tiết: PROMPT.md mục 1)

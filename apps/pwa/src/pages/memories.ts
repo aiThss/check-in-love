@@ -6,22 +6,23 @@ import { createMessage } from '../api/messages';
 import { showToast } from '../components/toast';
 import { showModal } from '../components/modal';
 import { openReactionPicker } from '../components/reaction-picker';
-import { BESPOKE_REACTIONS, MOOD_ICON_LOOKUP, renderReactionSymbolHtml } from '../ui/reactions';
+import { BESPOKE_REACTIONS, MOOD_ICON_LOOKUP, createReactionTray, renderReactionSymbolHtml } from '../ui/reactions';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import { smilePlusIconMarkup } from '../components/smile-plus-icon';
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
-import { createReplyToggle, getReplyPagePath } from '../components/reply-toggle';
+import { getReplyPagePath } from '../components/reply-toggle';
 import { iconMarkup } from '../ui/icons/icons';
 import { createButton } from '../ui/primitives';
 import { createSegmentedControl } from '../ui/forms';
 import { createEmptyState, createSkeleton } from '../ui/feedback';
 import { triggerHaptic } from '../ui/haptics';
-import { runViewTransition } from '../ui/view-transitions';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 
 let cachedMemories: CheckIn[] = [];
 let cachedTotal = 0;
 let cachedTotalPages = 1;
+
+const PAGE_BATCH = 20;
 
 type OwnerFilter = 'all' | 'mine' | 'partner';
 
@@ -107,16 +108,14 @@ function installAndroidLongPressDownload(image: HTMLImageElement, item: CheckIn)
 }
 
 function openMemoryPhotoCover(item: CheckIn, photoUrl: string, title: string, dateText: string): void {
-  runViewTransition(() => {
-    openPolaroidCoverModal({
-      imageUrl: photoUrl,
-      title,
-      dateText,
-      coverText: item.surpriseText,
-      forceScratch: false,
-      timerSeconds: 5,
-    });
-  }, 'viewer');
+  openPolaroidCoverModal({
+    imageUrl: photoUrl,
+    title,
+    dateText,
+    coverText: item.surpriseText,
+    forceScratch: false,
+    timerSeconds: 5,
+  });
 
   const stageImage = document.querySelector<HTMLImageElement>('.polaroid-modal-backdrop .polaroid-stage-photo');
   if (stageImage) installAndroidLongPressDownload(stageImage, item);
@@ -168,6 +167,8 @@ function getReaction(checkin: CheckIn, type: ReactionType): Reaction | undefined
 function attachLongPress(target: HTMLElement, onLongPress: () => void): () => boolean {
   let timer: number | undefined;
   let longPressed = false;
+  let startX = 0;
+  let startY = 0;
 
   const clear = () => {
     if (timer !== undefined) {
@@ -179,6 +180,8 @@ function attachLongPress(target: HTMLElement, onLongPress: () => void): () => bo
   target.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     longPressed = false;
+    startX = event.clientX;
+    startY = event.clientY;
     clear();
     timer = window.setTimeout(() => {
       longPressed = true;
@@ -187,6 +190,11 @@ function attachLongPress(target: HTMLElement, onLongPress: () => void): () => bo
     }, 420);
   });
 
+  target.addEventListener('pointermove', (event) => {
+    if (timer !== undefined && Math.hypot(event.clientX - startX, event.clientY - startY) > 10) {
+      clear();
+    }
+  }, { passive: true });
   target.addEventListener('pointerup', clear);
   target.addEventListener('pointerleave', clear);
   target.addEventListener('pointercancel', clear);
@@ -205,19 +213,20 @@ function attachLongPress(target: HTMLElement, onLongPress: () => void): () => bo
   };
 }
 
-function buildReactionPicker(
+function buildDetailReactionPicker(
   item: CheckIn,
   onReact: (type: ReactionType) => void,
 ): HTMLElement {
   const picker = document.createElement('div');
   picker.className = 'reaction-picker memory-reaction-picker p-reaction-drawer';
 
-  BESPOKE_REACTIONS.forEach(({ type, icon: iconName, label }) => {
+  BESPOKE_REACTIONS.forEach(({ type, label }) => {
     const existing = getReaction(item, type);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `reaction-option${existing?.reactedByMe ? ' selected' : ''}`;
-    btn.innerHTML = `${iconMarkup(iconName, { size: 16, variant: existing?.reactedByMe ? 'filled' : 'outline' })}<span>${label}</span>`;
+    btn.setAttribute('aria-label', `Thả cảm xúc ${label}`);
+    btn.innerHTML = `<span class="c-reaction-emoji" aria-hidden="true">${escapeHtml(type)}</span>`;
     btn.addEventListener('click', () => {
       triggerHaptic('tap');
       onReact(type);
@@ -228,8 +237,8 @@ function buildReactionPicker(
   const custom = document.createElement('form');
   custom.className = 'reaction-custom-form';
   custom.innerHTML = `
-    <input aria-label="Cảm xúc tùy chọn" maxlength="16" placeholder="Ký hiệu..." />
-    <button type="submit">Gửi</button>
+    <input aria-label="Cảm xúc tùy chọn" maxlength="24" placeholder="Thả emoji / icon..." />
+    <button type="submit">Thả</button>
   `;
   custom.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -242,86 +251,6 @@ function buildReactionPicker(
   picker.appendChild(custom);
 
   return picker;
-}
-
-function buildSocialRow(item: CheckIn): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'memory-social-row p-memory-social';
-
-  const form = document.createElement('form');
-  form.className = 'rm-inline-composer memory-mini-composer';
-  form.setAttribute('autocomplete', 'off');
-  form.innerHTML = `
-    <input
-      type="text"
-      name="memory_chat_msg"
-      aria-label="Gửi tin nhắn cho ảnh này"
-      maxlength="500"
-      placeholder="Nhắn tin..."
-      autocomplete="off"
-      autocorrect="off"
-      autocapitalize="sentences"
-      spellcheck="false"
-      data-lpignore="true"
-      data-form-type="other"
-      data-1p-ignore="true"
-    />
-    <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
-    <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">${iconMarkup('send', { size: 16 })}</button>
-  `;
-
-  const input = form.querySelector<HTMLInputElement>('input');
-  const submitButton = form.querySelector<HTMLButtonElement>('.rm-send-message');
-  const replyToggle = createReplyToggle(
-    () => item.replies,
-    () => navigate(getReplyPagePath(item.id)),
-    'Trả lời',
-    () => input?.focus(),
-  );
-
-  let isSending = false;
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const message = input?.value.trim() ?? '';
-    if (!message || isSending) return;
-    isSending = true;
-    if (submitButton) submitButton.disabled = true;
-    try {
-      await createMessage({
-        type: 'text',
-        text: message,
-        referencedCheckinId: item.id,
-        clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
-      });
-      const currentUser = store.get().user;
-      item.replies = [
-        ...item.replies,
-        {
-          userId: currentUser?.id ?? 'me',
-          userName: currentUser?.displayName ?? 'Bạn',
-          message,
-          isOwn: true,
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      replyToggle.sync();
-      if (input) input.value = '';
-      showToast('Đã gửi vào Tin nhắn', 'success');
-    } catch {
-      showToast('Không gửi được tin nhắn', 'error');
-    } finally {
-      isSending = false;
-      if (submitButton) submitButton.disabled = false;
-    }
-  });
-
-  form.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    openReactionPicker(item);
-  });
-
-  row.append(form, replyToggle.toggle, replyToggle.panel);
-  return row;
 }
 
 function renderReplies(container: HTMLElement, replies: CheckInReply[]): void {
@@ -361,8 +290,14 @@ function renderSkeletonGrid(): HTMLElement {
   return wrap;
 }
 
+interface CachedMemoryTile {
+  tile: HTMLElement;
+  item: CheckIn;
+  sync: () => void;
+}
+
 export function renderMemoriesPage(): HTMLElement {
-  const root = document.createElement('div');
+  const root = document.createElement('div') as HTMLElement & { destroy?: () => void };
   root.className = 'page memories-page p-memories animate-fade-in';
 
   const header = document.createElement('header');
@@ -409,6 +344,15 @@ export function renderMemoriesPage(): HTMLElement {
   const toolbar = document.createElement('div');
   toolbar.className = 'p-memories-toolbar';
 
+  let currentPage = 1;
+  let displayedLimit = PAGE_BATCH;
+  let totalPages = cachedTotalPages;
+  let isLoading = false;
+  let backgroundSyncEpoch = 0;
+  let allItems: CheckIn[] = [...cachedMemories];
+  let currentFiltered: CheckIn[] = [];
+  const tileCache = new Map<string, CachedMemoryTile>();
+
   const filterControl = createSegmentedControl<OwnerFilter>({
     ariaLabel: 'Lọc kỷ niệm theo người gửi',
     value: 'all',
@@ -418,7 +362,9 @@ export function renderMemoriesPage(): HTMLElement {
       { value: 'mine', label: 'Của mình' },
     ],
     onChange: (val) => {
+      if (ownerFilter === val) return;
       ownerFilter = val;
+      displayedLimit = PAGE_BATCH;
       triggerHaptic('select');
       applySearch();
     },
@@ -442,27 +388,58 @@ export function renderMemoriesPage(): HTMLElement {
   grid.className = 'memory-grid p-memories-grid';
   content.appendChild(grid);
 
-  let currentPage = 1;
-  let displayedLimit = 14;
-  let totalPages = cachedTotalPages;
-  let isLoading = false;
-  let allItems: CheckIn[] = [...cachedMemories];
-
   const loadMoreBtn = createButton({
     label: 'Xem thêm khoảnh khắc',
     variant: 'secondary',
     pill: true,
     block: true,
     onClick: () => {
-      displayedLimit += 14;
-      applySearch();
-      if (allItems.length < displayedLimit && currentPage < totalPages) {
-        void fetchMemories(currentPage + 1, true);
-      }
+      appendMoreItems();
     },
   }).element;
   loadMoreBtn.style.display = 'none';
   content.appendChild(loadMoreBtn);
+
+  const sentinel = document.createElement('div');
+  sentinel.style.cssText = 'height:1px;width:100%;pointer-events:none;';
+  content.appendChild(sentinel);
+
+  function appendMoreItems(): void {
+    const prevCount = grid.childElementCount;
+    displayedLimit += PAGE_BATCH;
+    if (currentFiltered.length > prevCount) {
+      const nextSlice = currentFiltered.slice(prevCount, displayedLimit);
+      const frag = document.createDocumentFragment();
+      nextSlice.forEach((item) => {
+        frag.appendChild(getOrCreateTile(item).tile);
+      });
+      grid.appendChild(frag);
+      syncHeaderAndLoadMore();
+    } else {
+      applySearch();
+    }
+    if (allItems.length < displayedLimit && currentPage < totalPages) {
+      void fetchMemories(currentPage + 1, true);
+    }
+  }
+
+  let scrollObserver: IntersectionObserver | null = null;
+  if (typeof IntersectionObserver === 'function') {
+    scrollObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && currentFiltered.length > grid.childElementCount) {
+          appendMoreItems();
+        }
+      },
+      { rootMargin: '420px 0px' },
+    );
+    scrollObserver.observe(sentinel);
+  }
+
+  root.destroy = () => {
+    backgroundSyncEpoch++;
+    scrollObserver?.disconnect();
+  };
 
   async function reactToItem(item: CheckIn, type: ReactionType, refreshDetail?: () => void) {
     try {
@@ -470,7 +447,7 @@ export function renderMemoriesPage(): HTMLElement {
       const matchedItem = allItems.find((candidate) => candidate.id === item.id);
       if (matchedItem) matchedItem.reactions = newReactions;
       item.reactions = newReactions;
-      applySearch();
+      tileCache.get(item.id)?.sync();
       refreshDetail?.();
     } catch {
       showToast('Không thả cảm xúc được, thử lại nhé', 'error');
@@ -543,33 +520,41 @@ export function renderMemoriesPage(): HTMLElement {
     return haystack.includes(lower);
   }
 
-  function matchesOwner(item: CheckIn): boolean {
+  function matchesOwner(item: CheckIn, myId: string | undefined): boolean {
     if (ownerFilter === 'all') return true;
-    const myId = store.get().user?.id;
     const isMine = Boolean(item.isOwn || (myId && item.userId === myId));
     return ownerFilter === 'mine' ? isMine : !isMine;
   }
 
+  function computeFiltered(): CheckIn[] {
+    const myId = store.get().user?.id;
+    const byOwner = ownerFilter === 'all' ? allItems : allItems.filter((item) => matchesOwner(item, myId));
+    return searchQuery ? byOwner.filter((item) => matchesSearch(item, searchQuery)) : byOwner;
+  }
+
+  function syncHeaderAndLoadMore(): void {
+    const countEl = header.querySelector('#memories-count');
+    if (countEl) {
+      countEl.textContent = searchQuery || ownerFilter !== 'all'
+        ? `Tìm thấy ${currentFiltered.length} kỷ niệm`
+        : `${Math.max(cachedTotal, allItems.length)} khoảnh khắc đã ghi dấu`;
+    }
+    const hasMoreFiltered = currentFiltered.length > grid.childElementCount;
+    const hasMoreUnfetched = ownerFilter === 'all' && !searchQuery && cachedTotal > allItems.length;
+    loadMoreBtn.style.display = hasMoreFiltered || hasMoreUnfetched ? 'flex' : 'none';
+  }
+
   function applySearch(): void {
     skelHolder.replaceChildren();
-    const byOwner = allItems.filter(matchesOwner);
-    const filtered = searchQuery ? byOwner.filter((item) => matchesSearch(item, searchQuery)) : byOwner;
-    const toRender = searchQuery || ownerFilter !== 'all' ? filtered : filtered.slice(0, displayedLimit);
+    currentFiltered = computeFiltered();
+    const toRender = currentFiltered.slice(0, displayedLimit);
 
     if (toRender[0]?.createdAt) {
       monthPill.textContent = formatMonthStamp(toRender[0].createdAt);
     }
 
     renderGrid(toRender, Boolean(searchQuery || ownerFilter !== 'all'));
-
-    const countEl = header.querySelector('#memories-count');
-    if (countEl) {
-      countEl.textContent = searchQuery || ownerFilter !== 'all'
-        ? `Tìm thấy ${filtered.length} kỷ niệm`
-        : `${Math.max(cachedTotal, allItems.length)} khoảnh khắc đã ghi dấu`;
-    }
-    const hasMoreItems = allItems.length > displayedLimit || cachedTotal > displayedLimit;
-    loadMoreBtn.style.display = !searchQuery && ownerFilter === 'all' && hasMoreItems ? 'flex' : 'none';
+    syncHeaderAndLoadMore();
   }
 
   const searchInput = searchBar.querySelector<HTMLInputElement>('#search-input')!;
@@ -577,6 +562,7 @@ export function renderMemoriesPage(): HTMLElement {
 
   searchInput.addEventListener('input', () => {
     searchQuery = searchInput.value;
+    displayedLimit = PAGE_BATCH;
     searchClear.hidden = !searchQuery;
     applySearch();
   });
@@ -584,6 +570,7 @@ export function renderMemoriesPage(): HTMLElement {
   searchClear.addEventListener('click', () => {
     searchInput.value = '';
     searchQuery = '';
+    displayedLimit = PAGE_BATCH;
     searchClear.hidden = true;
     searchInput.focus();
     applySearch();
@@ -596,31 +583,50 @@ export function renderMemoriesPage(): HTMLElement {
     } else {
       searchInput.value = '';
       searchQuery = '';
+      displayedLimit = PAGE_BATCH;
       searchClear.hidden = true;
       applySearch();
     }
   });
 
-  async function loadAllMemories(): Promise<void> {
+  async function loadAllMemories(syncEpoch: number): Promise<void> {
     try {
       let page = 1;
       let hasMore = true;
-      let tempAll: CheckIn[] = [...allItems];
+      const seenIds = new Set(allItems.map((item) => item.id));
+      const tempAll: CheckIn[] = [...allItems];
 
-      while (hasMore) {
+      while (hasMore && syncEpoch === backgroundSyncEpoch) {
         const res = await getCheckins(page, 50, undefined, 'photo');
-        const newItems = (res.data || []).filter(
-          (item) => !tempAll.some((existing) => existing.id === item.id),
-        );
-        tempAll = [...tempAll, ...newItems];
-        tempAll.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        if (syncEpoch !== backgroundSyncEpoch) return;
+
+        let added = 0;
+        for (const item of res.data || []) {
+          if (!seenIds.has(item.id)) {
+            seenIds.add(item.id);
+            tempAll.push(item);
+            added++;
+          }
+        }
+
+        if (added > 0) {
+          tempAll.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        }
 
         allItems = tempAll;
         cachedMemories = tempAll;
         cachedTotal = Math.max(res.total, tempAll.length);
-        cachedTotalPages = Math.ceil(cachedTotal / 14);
+        cachedTotalPages = Math.ceil(cachedTotal / PAGE_BATCH);
 
-        applySearch();
+        // Avoid tearing down/rebuilding the visible grid on background pages if already filled
+        const prevDisplayedCount = grid.childElementCount;
+        currentFiltered = computeFiltered();
+        if (prevDisplayedCount < displayedLimit && currentFiltered.length > prevDisplayedCount) {
+          applySearch();
+        } else {
+          syncHeaderAndLoadMore();
+        }
+
         hasMore = res.page < Math.ceil(res.total / res.limit);
         page++;
       }
@@ -636,14 +642,13 @@ export function renderMemoriesPage(): HTMLElement {
     const refreshBtn = header.querySelector<HTMLButtonElement>('#refresh-btn');
     if (refreshBtn) setRefreshButtonLoading(refreshBtn, true);
 
-    // Instant SWR: only show skeleton on cold start with zero cached items
     if (page === 1 && !append && allItems.length === 0) {
       grid.style.display = 'none';
       skelHolder.replaceChildren(renderSkeletonGrid());
     }
 
     try {
-      const res = await getCheckins(page, 14, undefined, 'photo');
+      const res = await getCheckins(page, PAGE_BATCH, undefined, 'photo');
       isLoading = false;
       if (refreshBtn) setRefreshButtonLoading(refreshBtn, false);
 
@@ -651,14 +656,22 @@ export function renderMemoriesPage(): HTMLElement {
       currentPage = res.page;
       totalPages = Math.ceil(res.total / res.limit);
 
-      allItems = page === 1 ? items : [...allItems, ...items];
       if (page === 1) {
+        tileCache.clear();
+        allItems = items;
         cachedMemories = items;
         cachedTotal = res.total;
         cachedTotalPages = totalPages;
-        void loadAllMemories();
+        applySearch();
+        const epoch = ++backgroundSyncEpoch;
+        void loadAllMemories(epoch);
+      } else {
+        const seen = new Set(allItems.map((i) => i.id));
+        for (const it of items) {
+          if (!seen.has(it.id)) allItems.push(it);
+        }
+        applySearch();
       }
-      applySearch();
     } catch (err) {
       isLoading = false;
       skelHolder.replaceChildren();
@@ -685,11 +698,163 @@ export function renderMemoriesPage(): HTMLElement {
     }
   }
 
+  function getOrCreateTile(item: CheckIn): CachedMemoryTile {
+    const existing = tileCache.get(item.id);
+    if (existing) {
+      existing.item.reactions = item.reactions;
+      existing.item.replies = item.replies;
+      existing.sync();
+      return existing;
+    }
+
+    const tile = document.createElement('article');
+    tile.className = 'memory-tile p-memory-tile';
+
+    const card = document.createElement('div');
+    card.className = 'memory-item p-memory-item';
+
+    const photoUrl = getCheckinPhotoUrl(item);
+    if (item.type === 'photo' || photoUrl) {
+      card.innerHTML = `
+        <img
+          src="${escapeHtml(photoUrl)}"
+          alt="Ảnh kỷ niệm của ${escapeHtml(item.ownerName)}"
+          data-surprise-text="${escapeHtml(item.surpriseText || '')}"
+          data-scratch-enabled="${item.includeScratch !== false ? 'true' : 'false'}"
+          loading="lazy"
+          decoding="async"
+        />
+        <div class="memory-item-info p-memory-item__scrim">
+          <span class="p-memory-item__owner">${escapeHtml(item.ownerName)} · ${formatTime(item.createdAt)}</span>
+          <span class="memory-item-info-text p-memory-item__caption">
+            ${escapeHtml(item.caption || 'Khoảnh khắc chung')}
+          </span>
+        </div>
+      `;
+      const img = card.querySelector<HTMLImageElement>('img');
+      if (img) installAndroidLongPressDownload(img, item);
+    } else {
+      card.classList.add('p-memory-note-card');
+      const moodMeta = item.mood ? MOOD_ICON_LOOKUP[item.mood] : undefined;
+      card.innerHTML = `
+        <div>
+          ${moodMeta ? iconMarkup(moodMeta.icon, { size: 24, variant: 'filled' }) : iconMarkup('heart', { size: 20 })}
+          <p class="p-memory-note-card__body">${escapeHtml(item.caption || 'Cảm xúc hiện tại')}</p>
+        </div>
+        <span class="p-memory-note-card__meta">${escapeHtml(item.ownerName)} · ${formatTime(item.createdAt)}</span>
+      `;
+    }
+
+    const reactionTray = createReactionTray(
+      () => item.reactions,
+      (type) => void reactToItem(item, type),
+    );
+
+    const openEmojiModal = () => {
+      openReactionPicker(item, () => reactionTray.sync());
+    };
+
+    const consumeLongPress = attachLongPress(card, openEmojiModal);
+
+    card.addEventListener('click', () => {
+      if (consumeLongPress()) return;
+      if (photoUrl) {
+        openMemoryPhotoCover(
+          item,
+          photoUrl,
+          item.caption || `Kỷ niệm của ${item.ownerName}`,
+          formatTime(item.createdAt),
+        );
+      } else {
+        showCheckinDetail(item);
+      }
+    });
+
+    const socialRow = document.createElement('div');
+    socialRow.className = 'memory-social-row p-memory-social';
+
+    const form = document.createElement('form');
+    form.className = 'rm-inline-composer memory-mini-composer';
+    form.setAttribute('autocomplete', 'off');
+    form.innerHTML = `
+      <input
+        type="text"
+        name="memory_chat_msg"
+        aria-label="Gửi tin nhắn cho ảnh này"
+        maxlength="500"
+        placeholder="Nhắn tin..."
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="sentences"
+        spellcheck="false"
+        data-lpignore="true"
+        data-form-type="other"
+        data-1p-ignore="true"
+      />
+      <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Chọn cảm xúc">${smilePlusIconMarkup}</button>
+      <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">${iconMarkup('send', { size: 16 })}</button>
+    `;
+
+    const input = form.querySelector<HTMLInputElement>('input');
+    const submitButton = form.querySelector<HTMLButtonElement>('.rm-send-message');
+
+    let isSending = false;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const message = input?.value.trim() ?? '';
+      if (!message || isSending) return;
+      isSending = true;
+      if (submitButton) submitButton.disabled = true;
+      try {
+        await createMessage({
+          type: 'text',
+          text: message,
+          referencedCheckinId: item.id,
+          clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
+        });
+        const currentUser = store.get().user;
+        item.replies = [
+          ...item.replies,
+          {
+            userId: currentUser?.id ?? 'me',
+            userName: currentUser?.displayName ?? 'Bạn',
+            message,
+            isOwn: true,
+            createdAt: new Date().toISOString(),
+          },
+        ];
+        if (input) input.value = '';
+        showToast('Đã gửi vào Tin nhắn', 'success');
+      } catch {
+        showToast('Không gửi được tin nhắn', 'error');
+      } finally {
+        isSending = false;
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
+
+    form.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      openEmojiModal();
+    });
+
+    socialRow.append(form, reactionTray.element);
+    tile.append(card, socialRow);
+
+    const entry: CachedMemoryTile = {
+      tile,
+      item,
+      sync: () => reactionTray.sync(),
+    };
+    tileCache.set(item.id, entry);
+    return entry;
+  }
+
   function renderGrid(items: CheckIn[], isFiltered = false): void {
-    grid.replaceChildren();
     content.querySelector('.c-empty-state')?.remove();
 
     if (items.length === 0) {
+      grid.replaceChildren();
       grid.style.display = 'none';
       const empty = createEmptyState(
         isFiltered
@@ -712,73 +877,16 @@ export function renderMemoriesPage(): HTMLElement {
             },
       );
       empty.querySelector('button')?.setAttribute('id', 'empty-checkin-btn');
-      content.appendChild(empty);
+      content.insertBefore(empty, loadMoreBtn);
       return;
     }
 
     grid.style.display = 'grid';
-
-    items.forEach((item) => {
-      const tile = document.createElement('article');
-      tile.className = 'memory-tile p-memory-tile';
-
-      const card = document.createElement('div');
-      card.className = 'memory-item p-memory-item';
-
-      const photoUrl = getCheckinPhotoUrl(item);
-      if (item.type === 'photo' || photoUrl) {
-        card.innerHTML = `
-          <img
-            src="${escapeHtml(photoUrl)}"
-            alt="Ảnh kỷ niệm của ${escapeHtml(item.ownerName)}"
-            data-surprise-text="${escapeHtml(item.surpriseText || '')}"
-            data-scratch-enabled="${item.includeScratch !== false ? 'true' : 'false'}"
-            loading="lazy"
-            decoding="async"
-          />
-          <div class="memory-item-info p-memory-item__scrim">
-            <span class="p-memory-item__owner">${escapeHtml(item.ownerName)} · ${formatTime(item.createdAt)}</span>
-            <span class="memory-item-info-text p-memory-item__caption">
-              ${escapeHtml(item.caption || 'Khoảnh khắc chung')}
-            </span>
-          </div>
-        `;
-        const img = card.querySelector<HTMLImageElement>('img');
-        if (img) installAndroidLongPressDownload(img, item);
-      } else {
-        card.classList.add('p-memory-note-card');
-        const moodMeta = item.mood ? MOOD_ICON_LOOKUP[item.mood] : undefined;
-        card.innerHTML = `
-          <div>
-            ${moodMeta ? iconMarkup(moodMeta.icon, { size: 24, variant: 'filled' }) : iconMarkup('heart', { size: 20 })}
-            <p class="p-memory-note-card__body">${escapeHtml(item.caption || 'Cảm xúc hiện tại')}</p>
-          </div>
-          <span class="p-memory-note-card__meta">${escapeHtml(item.ownerName)} · ${formatTime(item.createdAt)}</span>
-        `;
-      }
-
-      const picker = buildReactionPicker(item, (type) => void reactToItem(item, type));
-      const consumeLongPress = attachLongPress(card, () => {
-        picker.classList.toggle('open');
-      });
-
-      card.addEventListener('click', () => {
-        if (consumeLongPress()) return;
-        if (photoUrl) {
-          openMemoryPhotoCover(
-            item,
-            photoUrl,
-            item.caption || `Kỷ niệm của ${item.ownerName}`,
-            formatTime(item.createdAt),
-          );
-        } else {
-          showCheckinDetail(item);
-        }
-      });
-
-      tile.append(card, picker, buildSocialRow(item));
-      grid.appendChild(tile);
-    });
+    const frag = document.createDocumentFragment();
+    for (const item of items) {
+      frag.appendChild(getOrCreateTile(item).tile);
+    }
+    grid.replaceChildren(frag);
   }
 
   function showCheckinDetail(item: CheckIn): void {
@@ -826,7 +934,7 @@ export function renderMemoriesPage(): HTMLElement {
                 ${activeReactions
                   .map(
                     (reaction) =>
-                      `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${renderReactionSymbolHtml(reaction.type, Boolean(reaction.reactedByMe))}<strong>${reaction.count}</strong></span>`,
+                      `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${renderReactionSymbolHtml(reaction.type, Boolean(reaction.reactedByMe))}${reaction.count > 1 ? `<strong>${reaction.count}</strong>` : ''}</span>`,
                   )
                   .join('')}
               </div>
@@ -858,7 +966,7 @@ export function renderMemoriesPage(): HTMLElement {
       if (replyList) renderReplies(replyList, replies);
 
       const replyForm = detail.querySelector<HTMLFormElement>('#reply-form');
-      const detailReactionPicker = buildReactionPicker(item, (type) => {
+      const detailReactionPicker = buildDetailReactionPicker(item, (type) => {
         void reactToItem(item, type, renderDetailContent);
       });
       replyForm?.before(detailReactionPicker);
@@ -873,14 +981,13 @@ export function renderMemoriesPage(): HTMLElement {
     });
   }
 
-  // Render cached memories immediately on frame 0 (SWR), then sync in background
   if (allItems.length > 0) {
     applySearch();
   }
   void fetchMemories(1);
 
   header.querySelector('#refresh-btn')?.addEventListener('click', () => {
-    displayedLimit = 14;
+    displayedLimit = PAGE_BATCH;
     currentPage = 1;
     triggerHaptic('tap');
     void fetchMemories(1);

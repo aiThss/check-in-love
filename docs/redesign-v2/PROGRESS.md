@@ -313,3 +313,14 @@ Mẫu mỗi mục:
   - **Khôi phục nút thêm ảnh kiểu cũ & hiệu ứng cũ (`nav.ts`, `shell.css`)**: khôi phục nút tròn nổi dấu `+` màu hồng bóng viền trắng, vòng phát sáng nhịp thở `cil-nav-glow-pulse`, hiệu ứng phóng to khi hover / nhún khi bấm và xoay `135deg` thành `×` khi mở check-in.
   - **Sửa lỗi Trang chủ không vuốt được (`home.css`, `01-base.css`, `feedback.ts`, `home.ts`)**: đổi `overflow-x: hidden` sang `overflow-x: clip` và bỏ `overscroll-behavior-y: contain` trên `.p-home` để không tạo bẫy cuộn lồng nhau chặn vuốt trên mobile/WebView; sửa `attachPullToRefresh` kiểm tra đúng `window.scrollY` với touch passive; huỷ long-press trên thẻ ảnh khi ngón tay bắt đầu vuốt (> 8px).
 - Kiểm: lint ✅ · test ✅ (32 file / 158 test pass) · build PWA ✅ · Wrangler deploy Pages (`couple.io.vn`) ✅.
+
+
+## 2026-11-26 13:15 — Hậu kiểm Mobile UX, Tối ưu độ mượt & Phát hành APK v0.0.50 (Gemini)
+- Làm:
+  - Khóa tỷ lệ khung 1:1 tròn chuẩn cho toàn bộ avatar (`.c-avatar`, `.p-profile-av-btn`, `.journey-pin-avatar`) với `position: absolute; inset: 0; object-fit: cover` trên ảnh dọc và sửa `partnerAvatarUrl` trên Home Hero (`home.ts`).
+  - Chuyển sang bộ emoji phổ thông (`❤️`, `🥰`, `😘`, `😂`, `🥺`, `🤗`, `🔥`, `✨`, `😍`, `😭`) không kèm chữ ghi chú bên dưới; bỏ nút `Trả lời` dư thừa trên thẻ ảnh Home & Kỷ niệm; thêm khay ẩn `.c-reaction-tray` ngay dưới ô nhắn tin chỉ xuất hiện khi có sticker/icon/emoji được thả.
+  - Xử lý triệt để giật lag khi bấm liên tục 3 chế độ `Tất cả - Người ấy - Của mình` trên tài khoản 736 ảnh (`memories.ts`): cache nút DOM từng thẻ (`tileCache`), giới hạn 20 thẻ/trang cho mọi chế độ kèm tự nạp khi cuộn (`IntersectionObserver`), và chặn đồng bộ nền ghi đè lại lưới đang hiển thị (`memories.test.ts`).
+  - Tối ưu độ mượt chuyển trang/tính năng toàn ứng dụng: gỡ độ trễ chụp màn hình `runViewTransition` khỏi `router.ts` và `memories.ts`, tắt lớp phủ hạt nhiễu SVG `.u-grain-surface::before`, nạp trước 5 trang chính, và giới hạn 2 `MutationObserver` toàn cục chỉ chạy khi đang mở trang Tin nhắn.
+  - Khôi phục hiệu ứng lò xo + xoay mượt của nút `+` thêm ảnh mới (`nav.ts`, `shell.css`), khôi phục khung Preview Library cổ điển ở `checkin.ts` và trang `/preview/cards` (`card-preview.ts`), đổi placeholder Love Foil thành `"Lời nhắn hiển thị trước khi cào"`, và khóa chạm/cuộn nền bản đồ đằng sau modal `Thêm toạ độ hẹn hò` (`love-journey.ts`).
+  - Sửa `.github/workflows/android-patch-release.yml` (cài SDK 37), nâng `versionCode = 62` / `versionName = "0.0.50"`, build APK ký số `app-release.apk` (kèm logo trái tim pixel gốc), đẩy tag `v0.0.50` phát hành lên GitHub Releases và deploy PWA lên Cloudflare Pages (`couple.io.vn`).
+- Kiểm: lint ✅ (0 lỗi, 0 cảnh báo) · test ✅ (**33 file / 159 test pass**) · build PWA ✅ (`index` gzip **34,38 kB**) · `gradlew assembleRelease` ✅ (`app-release.apk` 11,80 MB) · `git diff 65924d3 -- apps/api packages apps/admin` rỗng ✅.

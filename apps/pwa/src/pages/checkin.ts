@@ -210,12 +210,13 @@ export function renderCheckinPage(): HTMLElement {
     if (selectedPreviewUrl) {
       picker.innerHTML = `
         <img class="photo-composer-image p-checkin-polaroid__img" src="${selectedPreviewUrl}" alt="Ảnh check-in đã chọn" />
-        <div class="p-checkin-polaroid__topbar">
-          <button type="button" id="remove-photo" class="c-icon-btn" aria-label="Bỏ chọn ảnh">${iconMarkup('close', { size: 20 })}</button>
+        <div class="photo-composer-vignette" aria-hidden="true"></div>
+        <div class="photo-composer-topbar p-checkin-polaroid__topbar">
+          <button type="button" id="remove-photo" class="photo-icon-button" aria-label="Bỏ chọn ảnh">&times;</button>
         </div>
-        <div class="p-checkin-polaroid__actions">
-          <button id="retake-photo" class="c-btn c-btn--secondary c-btn--sm c-btn--pill" type="button">${iconMarkup('camera', { size: 16 })}<span>Chụp lại</span></button>
-          <button id="change-photo" class="c-btn c-btn--secondary c-btn--sm c-btn--pill" type="button">${iconMarkup('gallery', { size: 16 })}<span>Đổi ảnh</span></button>
+        <div class="photo-composer-actions p-checkin-polaroid__actions">
+          <button id="retake-photo" class="photo-action-button" type="button">Chụp lại</button>
+          <button id="change-photo" class="photo-action-button" type="button">Đổi ảnh</button>
         </div>
       `;
 
@@ -234,25 +235,56 @@ export function renderCheckinPage(): HTMLElement {
       });
     } else if (isProcessingPhoto) {
       picker.innerHTML = `
-        <div class="p-checkin-empty">
-          <div class="p-checkin-empty__lens">${iconMarkup('polaroid', { size: 32, motion: 'pop' })}</div>
-          <div class="p-checkin-empty__copy">
-            <strong>Đang tráng ảnh Polaroid...</strong>
+        <div class="photo-composer-empty">
+          <svg viewBox="0 0 64 76" width="118" height="140" class="l-polaroid" aria-hidden="true">
+            <defs>
+              <linearGradient id="ciPolGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#ffb3cc"/>
+                <stop offset="55%" stop-color="#ff85a1"/>
+                <stop offset="100%" stop-color="#c0456c"/>
+              </linearGradient>
+            </defs>
+            <rect width="64" height="76" rx="5" fill="#fff4f7"/>
+            <rect class="l-polaroid__photo" x="6" y="6" width="52" height="52" rx="3" fill="url(#ciPolGrad)"/>
+            <rect x="10" y="65" width="28" height="3.5" rx="1.75" fill="#c0456c" opacity=".45"/>
+          </svg>
+          <div class="photo-composer-copy">
+            <strong>Đang chuẩn bị ảnh...</strong>
             <span>Đợi một nhịp cho ảnh sắc nét nhé</span>
           </div>
         </div>
       `;
     } else {
       picker.innerHTML = `
-        <div class="photo-composer-empty p-checkin-empty">
-          <div class="p-checkin-empty__lens">${iconMarkup('checkin-lens', { size: 32, variant: 'filled' })}</div>
-          <div class="photo-composer-copy p-checkin-empty__copy">
-            <strong>Gửi ảnh cho người ấy</strong>
-            <span>Mở ống kính chụp mới hoặc chọn từ album</span>
+        <div class="photo-composer-empty">
+          <div class="photo-composer-library-art" aria-hidden="true">
+            <svg viewBox="0 0 96 96" width="92" height="92">
+              <defs>
+                <linearGradient id="libSky" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#ff8ab5"/>
+                  <stop offset="52%" stop-color="#ff4d88"/>
+                  <stop offset="100%" stop-color="#8b5cf6"/>
+                </linearGradient>
+              </defs>
+              <g transform="rotate(-9 44 50)">
+                <rect x="14" y="18" width="52" height="60" rx="8" fill="rgba(255,255,255,0.22)" stroke="rgba(255,255,255,0.38)" stroke-width="1.5"/>
+              </g>
+              <g transform="rotate(5 54 48)">
+                <rect x="24" y="14" width="56" height="64" rx="9" fill="#fff9fb" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/>
+                <rect x="30" y="20" width="44" height="42" rx="5" fill="url(#libSky)"/>
+                <circle cx="42" cy="31" r="5" fill="#ffeaa7"/>
+                <path d="M30 56 L45 41 L56 51 L64 44 L74 56 L74 62 L30 62 Z" fill="rgba(255,255,255,0.88)"/>
+                <rect x="34" y="68" width="24" height="3.5" rx="1.75" fill="#e11d48" opacity="0.45"/>
+              </g>
+            </svg>
           </div>
-          <div class="photo-composer-actions" style="display:flex;gap:10px;margin-top:4px;">
-            <button id="camera-photo" class="c-btn c-btn--primary c-btn--pill" type="button">${iconMarkup('camera', { size: 20 })}<span>Chụp ảnh</span></button>
-            <button id="gallery-photo" class="c-btn c-btn--secondary c-btn--pill" type="button">${iconMarkup('gallery', { size: 20 })}<span>Album</span></button>
+          <div class="photo-composer-copy">
+            <strong>Gửi ảnh cho người ấy</strong>
+            <span>Chụp mới hoặc chọn ảnh từ album</span>
+          </div>
+          <div class="photo-composer-actions photo-composer-actions-empty">
+            <button id="camera-photo" class="photo-action-button primary" type="button">Chụp</button>
+            <button id="gallery-photo" class="photo-action-button" type="button">Album</button>
           </div>
         </div>
       `;
@@ -330,7 +362,7 @@ export function renderCheckinPage(): HTMLElement {
           id="surprise-text-input"
           class="c-input"
           aria-label="Lời nhắn trên lớp cào"
-          placeholder="Lời nhắn hiện trên lớp nhũ trước khi cào..."
+          placeholder="Lời nhắn hiển thị trước khi cào"
           maxlength="120"
           autocomplete="off"
           autocorrect="off"

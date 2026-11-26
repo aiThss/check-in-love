@@ -1,7 +1,6 @@
 import { createNav, setActiveNav } from './components/nav';
 import { consumeRouteInvalidation, clearRouteInvalidations } from './route-invalidation';
 import { store } from './store/index';
-import { inferTransitionKind, runViewTransition } from './ui/view-transitions';
 import { logger } from './utils/logger';
 
 export interface RoutePage {
@@ -498,7 +497,6 @@ async function renderRoute(path: string, locationPath = getCurrentPath()): Promi
       if (isAppRoute) setActiveNav(resolvedPath);
       if (!nextContainer.isConnected) activeShell.pageHost.appendChild(nextContainer);
       setOnlyActivePage(activeShell.pageHost, nextContainer);
-      if (!cachedPage) nextPage.element.classList.add('page-enter');
 
       currentPath = pageKey;
       currentElement = nextContainer;
@@ -507,19 +505,17 @@ async function renderRoute(path: string, locationPath = getCurrentPath()): Promi
       clearChunkRecoveryMarker();
     };
 
-    const vtKind = previousRoutePath
-      ? inferTransitionKind(previousRoutePath, pageKey)
-      : 'none';
-    runViewTransition(commitDomSwap, vtKind);
+    commitDomSwap();
 
-    requestAnimationFrame(() => {
-      if (version !== navigationVersion) return;
+    const nextLeft = restoredScroll?.scrollX ?? 0;
+    const nextTop = restoredScroll?.scrollY ?? 0;
+    if (window.scrollX !== nextLeft || window.scrollY !== nextTop) {
       window.scrollTo({
-        left: restoredScroll?.scrollX ?? 0,
-        top: restoredScroll?.scrollY ?? 0,
+        left: nextLeft,
+        top: nextTop,
         behavior: 'auto',
       });
-    });
+    }
   } catch (error) {
     if (version !== navigationVersion) return;
     logger.error(`[Router] Failed to render route: ${resolvedPath}`, error);

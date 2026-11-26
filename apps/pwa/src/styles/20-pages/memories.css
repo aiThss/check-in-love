@@ -259,12 +259,19 @@
     color: var(--text-on-accent);
   }
 
-  .p-memory-social .c-reply-toggle {
-    min-height: 32px;
-    padding: 4px 10px;
+  .p-memory-social .c-reaction-tray {
+    padding: 4px 6px;
+    gap: 4px;
+  }
+
+  .p-memory-social .c-reaction-chip {
+    min-height: 24px;
+    padding: 2px 7px;
     font-size: 11px;
-    width: 100%;
-    justify-content: center;
+  }
+
+  .p-memory-social .c-reaction-emoji {
+    font-size: 14px;
   }
 
   .p-memories-skel-grid {

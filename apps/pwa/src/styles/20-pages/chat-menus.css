@@ -105,8 +105,9 @@
     border: 1.5px solid var(--ink-stroke-color);
     background-color: var(--surface-elevated);
     color: var(--ink-1);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: var(--font-weight-bold);
+    line-height: 1;
     cursor: pointer;
   }
 
@@ -140,6 +141,8 @@
     border-radius: 50%;
     background: transparent;
     color: var(--accent-600);
+    font-size: 21px;
+    line-height: 1;
     cursor: pointer;
     transition: transform var(--duration-instant) var(--ease-spring);
   }

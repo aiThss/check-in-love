@@ -63,17 +63,9 @@
 
   .u-grain-surface {
     position: relative;
-    isolation: isolate;
   }
 
   .u-grain-surface::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background-image: var(--editorial-grain);
-    opacity: 0.65;
-    pointer-events: none;
-    z-index: 0;
+    display: none;
   }
 }

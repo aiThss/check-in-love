@@ -58,29 +58,6 @@ if (navigator.userAgent.includes('LoveCheckAndroidWrapper')) {
 
 setupAndroidFcm();
 
-function initMemoriesInlineReactionPicker(): void {
-  document.addEventListener('click', (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-
-    const button = target.closest<HTMLButtonElement>('.memory-mini-composer .rm-reaction-choice');
-    if (!button) return;
-
-    const tile = button.closest<HTMLElement>('.memory-tile');
-    const picker = tile?.querySelector<HTMLElement>('.memory-reaction-picker');
-    if (!picker) return;
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    document.querySelectorAll<HTMLElement>('.memory-reaction-picker.open').forEach((openPicker) => {
-      if (openPicker !== picker) openPicker.classList.remove('open');
-    });
-    picker.classList.toggle('open');
-  }, true);
-}
-
-initMemoriesInlineReactionPicker();
-
 if ('serviceWorker' in navigator && isViteDev) {
   // A production service worker can otherwise cache old Vite modules and make
   // local UI work appear unchanged after a source edit.
@@ -183,7 +160,13 @@ initRouter({
 });
 
 const prefetchCommonRoutes = () => {
-  void Promise.all([import('./pages/memories'), import('./pages/profile'), import('./pages/checkin')]);
+  void Promise.all([
+    import('./pages/home'),
+    import('./pages/memories'),
+    import('./pages/checkin'),
+    import('./pages/messages'),
+    import('./pages/profile'),
+  ]);
 };
 const idleWindow = window as Window & { requestIdleCallback?: (callback: () => void) => number };
 const connection = navigator as Navigator & { connection?: { saveData?: boolean } };

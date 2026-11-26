@@ -1,20 +1,19 @@
 import { addReaction } from '../api/checkins';
 import { closeModal, showModal } from './modal';
 import { showToast } from './toast';
-import { iconMarkup } from '../ui/icons/icons';
 import { BESPOKE_REACTIONS, renderReactionSymbolHtml } from '../ui/reactions';
 import { triggerHaptic } from '../ui/haptics';
 import type { CheckIn } from '../api/types';
 
-export { BESPOKE_REACTIONS, MOOD_ICON_LOOKUP, renderReactionSymbolHtml } from '../ui/reactions';
+export { BESPOKE_REACTIONS, MOOD_ICON_LOOKUP, createReactionTray, renderReactionSymbolHtml } from '../ui/reactions';
 
 export function reactionPillsHtml(checkin: CheckIn): string {
   return checkin.reactions
     .filter((reaction) => reaction.count > 0)
-    .slice(0, 5)
+    .slice(0, 6)
     .map(
       (reaction) =>
-        `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${renderReactionSymbolHtml(reaction.type, Boolean(reaction.reactedByMe))}<strong>${reaction.count}</strong></span>`,
+        `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${renderReactionSymbolHtml(reaction.type, Boolean(reaction.reactedByMe))}${reaction.count > 1 ? `<strong>${reaction.count}</strong>` : ''}</span>`,
     )
     .join('');
 }
@@ -44,13 +43,13 @@ export function openReactionPicker(checkin: CheckIn, onUpdated?: () => void): vo
     onUpdated?.();
   };
 
-  BESPOKE_REACTIONS.forEach(({ type, icon: iconName, label }) => {
+  BESPOKE_REACTIONS.forEach(({ type, label }) => {
     const existing = checkin.reactions.find((r) => r.type === type);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `c-reaction-modal-btn${existing?.reactedByMe ? ' is-selected' : ''}`;
     button.setAttribute('aria-label', `Thả cảm xúc ${label}`);
-    button.innerHTML = `${iconMarkup(iconName, { size: 24, variant: existing?.reactedByMe ? 'filled' : 'outline' })}<span>${label}</span>`;
+    button.innerHTML = `<span class="c-reaction-emoji-glyph" aria-hidden="true">${type}</span>`;
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
@@ -66,8 +65,8 @@ export function openReactionPicker(checkin: CheckIn, onUpdated?: () => void): vo
   const custom = document.createElement('form');
   custom.className = 'choice-reaction-custom';
   custom.innerHTML = `
-    <input maxlength="32" placeholder="Lời nhắn ngắn hoặc ký hiệu..." aria-label="Cảm xúc tùy chọn" />
-    <button type="submit">Gửi</button>
+    <input maxlength="32" placeholder="Thả emoji / icon / sticker..." aria-label="Cảm xúc tùy chọn" />
+    <button type="submit">Thả</button>
   `;
   custom.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -82,5 +81,5 @@ export function openReactionPicker(checkin: CheckIn, onUpdated?: () => void): vo
   });
   content.appendChild(custom);
 
-  showModal({ title: 'Thả cảm xúc', content, center: true });
+  showModal({ title: 'Thả biểu tượng cảm xúc', content, center: true });
 }

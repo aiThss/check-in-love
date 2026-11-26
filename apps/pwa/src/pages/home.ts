@@ -11,8 +11,8 @@ import {
 import { ensurePushSubscription, getPushSetupState } from '../api/push';
 import { showModal } from '../components/modal';
 import { showToast } from '../components/toast';
-import { openReactionPicker, reactionPillsHtml } from '../components/reaction-picker';
-import { BESPOKE_REACTIONS, MOOD_ICON_LOOKUP, renderReactionSymbolHtml } from '../ui/reactions';
+import { openReactionPicker } from '../components/reaction-picker';
+import { BESPOKE_REACTIONS, MOOD_ICON_LOOKUP, createReactionTray } from '../ui/reactions';
 import { refreshIconMarkup, setRefreshButtonLoading } from '../components/refresh-icon';
 import { smilePlusIconMarkup } from '../components/smile-plus-icon';
 import { openPolaroidCoverModal } from '../components/polaroid-cover';
@@ -143,18 +143,14 @@ function buildReactionPicker(
   const picker = document.createElement('div');
   picker.className = 'reaction-picker p-reaction-drawer';
 
-  BESPOKE_REACTIONS.forEach(({ type, icon: iconName, label }) => {
+  BESPOKE_REACTIONS.forEach(({ type, label }) => {
     const existing = getReaction(checkin, type);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `reaction-option${existing?.reactedByMe ? ' selected' : ''}`;
     btn.dataset.type = type;
     btn.setAttribute('aria-label', `Thả cảm xúc ${label}`);
-    btn.innerHTML = `${iconMarkup(iconName, {
-      size: 16,
-      variant: existing?.reactedByMe ? 'filled' : 'outline',
-      motion: existing?.reactedByMe ? 'heartbeat' : undefined,
-    })}<span>${label}</span>`;
+    btn.innerHTML = `<span class="c-reaction-emoji" aria-hidden="true">${escapeHtml(type)}</span>`;
     btn.addEventListener('click', () => {
       triggerHaptic('tap');
       onReact(type);
@@ -165,8 +161,8 @@ function buildReactionPicker(
   const custom = document.createElement('form');
   custom.className = 'reaction-custom-form';
   custom.innerHTML = `
-    <input aria-label="Cảm xúc tùy chọn" maxlength="16" placeholder="Ký hiệu riêng..." />
-    <button type="submit">Gửi</button>
+    <input aria-label="Cảm xúc tùy chọn" maxlength="24" placeholder="Thả emoji / icon / sticker..." />
+    <button type="submit">Thả</button>
   `;
   custom.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -180,32 +176,6 @@ function buildReactionPicker(
   picker.appendChild(custom);
 
   return picker;
-}
-
-function buildReactionSummary(
-  checkin: CheckIn,
-  onShowPicker: () => void,
-): HTMLElement {
-  const summary = document.createElement('button');
-  summary.type = 'button';
-  summary.className = 'reaction-summary p-home-react-summary';
-  summary.setAttribute('aria-label', 'Mở bảng thả cảm xúc');
-  summary.addEventListener('click', onShowPicker);
-
-  const activeReactions = checkin.reactions.filter((reaction) => reaction.count > 0);
-
-  if (activeReactions.length === 0) {
-    summary.innerHTML = `${iconMarkup('heart', { size: 16 })}<span class="reaction-hint">Thả cảm xúc</span>`;
-  } else {
-    summary.innerHTML = activeReactions
-      .map(
-        (reaction) =>
-          `<span class="reaction-pill${reaction.reactedByMe ? ' selected' : ''}">${renderReactionSymbolHtml(reaction.type, Boolean(reaction.reactedByMe))}<strong>${reaction.count}</strong></span>`,
-      )
-      .join('');
-  }
-
-  return summary;
 }
 
 function showReplyComposer(
@@ -327,19 +297,47 @@ function buildCheckinCard(
     `;
   }
 
-  const picker = buildReactionPicker(checkin, onReact);
+  const picker = buildReactionPicker(checkin, (type) => {
+    onReact(type);
+    picker.classList.remove('open');
+  });
   const showPicker = () => {
     picker.classList.toggle('open');
   };
 
   attachLongPress(card, showPicker);
   wrapper.appendChild(card);
-  wrapper.appendChild(picker);
 
-  const actionRow = document.createElement('div');
-  actionRow.className = 'checkin-actions-row p-home-react-bar';
-  let summaryBtn = buildReactionSummary(checkin, showPicker);
-  actionRow.appendChild(summaryBtn);
+  const composerForm = document.createElement('form');
+  composerForm.className = 'rm-inline-composer p-home-inline-composer';
+  composerForm.setAttribute('autocomplete', 'off');
+  composerForm.innerHTML = `
+    <input
+      type="text"
+      name="home_partner_msg"
+      aria-label="Gửi tin nhắn cho khoảnh khắc này"
+      maxlength="500"
+      placeholder="Nhắn gì đó cho ảnh này..."
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="sentences"
+      spellcheck="false"
+      data-lpignore="true"
+      data-form-type="other"
+      data-1p-ignore="true"
+    />
+    <button type="button" class="rm-quick-react rm-reaction-choice react-button" data-icon="smile+" aria-label="Thả biểu tượng cảm xúc">${smilePlusIconMarkup}</button>
+    <button type="submit" class="rm-send-message" aria-label="Gửi tin nhắn">${iconMarkup('send', { size: 16 })}</button>
+  `;
+
+  const composerInput = composerForm.querySelector<HTMLInputElement>('input');
+  const composerSendBtn = composerForm.querySelector<HTMLButtonElement>('.rm-send-message');
+  composerForm.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    showPicker();
+  });
+
+  const reactionTray = createReactionTray(() => checkin.reactions, onReact);
 
   const replyToggle = createReplyToggle(
     () => checkin.replies,
@@ -347,30 +345,59 @@ function buildCheckinCard(
     'Trả lời',
     onReply,
   );
-  actionRow.appendChild(replyToggle.toggle);
-  wrapper.appendChild(actionRow);
-  wrapper.appendChild(replyToggle.panel);
+  replyToggle.toggle.hidden = true;
+
+  let sendingInline = false;
+  composerForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = composerInput?.value.trim() ?? '';
+    if (!message || sendingInline) return;
+    sendingInline = true;
+    if (composerSendBtn) composerSendBtn.disabled = true;
+    try {
+      try {
+        await createMessage({
+          type: 'text',
+          text: message,
+          referencedCheckinId: checkin.id,
+          clientMutationId: crypto.randomUUID?.() ?? String(Date.now()),
+        });
+        const currentUser = store.get().user;
+        checkin.replies = [
+          ...checkin.replies,
+          {
+            userId: currentUser?.id ?? 'me',
+            userName: currentUser?.displayName ?? 'Bạn',
+            message,
+            isOwn: true,
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      } catch {
+        checkin.replies = await addReply(checkin.id, message);
+      }
+      replyToggle.sync();
+      if (composerInput) composerInput.value = '';
+      showToast('Đã gửi tin nhắn', 'success');
+    } catch {
+      showToast('Không gửi được tin nhắn, thử lại nhé', 'error');
+    } finally {
+      sendingInline = false;
+      if (composerSendBtn) composerSendBtn.disabled = false;
+    }
+  });
+
+  wrapper.append(composerForm, picker, reactionTray.element, replyToggle.toggle, replyToggle.panel);
 
   return {
     element: wrapper,
     patchInteractions: () => {
-      const nextSummary = buildReactionSummary(checkin, showPicker);
-      summaryBtn.replaceWith(nextSummary);
-      summaryBtn = nextSummary;
+      reactionTray.sync();
 
       picker.querySelectorAll<HTMLButtonElement>('[data-type]').forEach((button) => {
         const type = button.dataset.type ?? '';
         const reaction = getReaction(checkin, type);
-        const isSelected = Boolean(reaction?.reactedByMe);
-        button.classList.toggle('selected', isSelected);
-        const def = BESPOKE_REACTIONS.find((r) => r.type === type);
-        if (def) {
-          button.innerHTML = `${iconMarkup(def.icon, {
-            size: 16,
-            variant: isSelected ? 'filled' : 'outline',
-            motion: isSelected ? 'heartbeat' : undefined,
-          })}<span>${def.label}</span>`;
-        }
+        button.classList.toggle('selected', Boolean(reaction?.reactedByMe));
       });
 
       replyToggle.sync();
@@ -480,14 +507,6 @@ function buildRecentMemoriesSection(): HTMLElement {
         `;
         topRow.appendChild(meta);
 
-        const reactionBadges = document.createElement('div');
-        reactionBadges.className = 'rm-reaction-badges';
-        const updateReactionBadges = () => {
-          reactionBadges.innerHTML = reactionPillsHtml(item);
-        };
-        updateReactionBadges();
-        topRow.appendChild(reactionBadges);
-
         const moodInfo = item.mood ? MOOD_ICON_LOOKUP[item.mood] : undefined;
         if (moodInfo) {
           const moodStamp = document.createElement('div');
@@ -532,21 +551,14 @@ function buildRecentMemoriesSection(): HTMLElement {
         `;
 
         const replyInput = replyForm.querySelector<HTMLInputElement>('input');
-        const inlineReactionPicker = buildReactionPicker(item, async (type) => {
+        const reactionTray = createReactionTray(() => item.reactions, async (type) => {
           try {
             item.reactions = await addReaction(item.id, type);
-            updateReactionBadges();
-            inlineReactionPicker.classList.remove('open');
+            reactionTray.sync();
           } catch {
             showToast('Không thả cảm xúc được, thử lại nhé', 'error');
           }
         });
-        const replyToggle = createReplyToggle(
-          () => item.replies,
-          () => navigate(getReplyPagePath(item.id)),
-          'Trả lời',
-          () => replyInput?.focus(),
-        );
 
         replyForm.addEventListener('submit', async (event) => {
           event.preventDefault();
@@ -572,7 +584,6 @@ function buildRecentMemoriesSection(): HTMLElement {
                 createdAt: new Date().toISOString(),
               },
             ];
-            replyToggle.sync();
             if (replyInput) replyInput.value = '';
             showToast('Đã gửi tin nhắn', 'success');
           } catch {
@@ -582,14 +593,11 @@ function buildRecentMemoriesSection(): HTMLElement {
 
         replyForm.querySelector<HTMLButtonElement>('.rm-reaction-choice')?.addEventListener('click', (event) => {
           event.stopPropagation();
-          openReactionPicker(item, updateReactionBadges);
+          openReactionPicker(item, () => reactionTray.sync());
         });
 
         reactionRow.appendChild(replyForm);
-        body.appendChild(reactionRow);
-        body.appendChild(inlineReactionPicker);
-        body.appendChild(replyToggle.toggle);
-        body.appendChild(replyToggle.panel);
+        body.append(reactionRow, reactionTray.element);
 
         if (idx === items.length - 1) {
           const viewAllButton = createButton({
@@ -710,10 +718,10 @@ export function renderHomePage(): HTMLElement {
     <span class="p-home-hero__eyebrow">Không gian hai đứa</span>
     <h1 class="p-home-hero__title">${days > 0 ? `Ngày thứ <em>${days}</em>` : `Thương chào <em>${escapeHtml(myName)}</em>`}</h1>
   `;
-  const userMedia = user as { avatarUrl?: string; partnerAvatar?: string } | null;
+  const userMedia = user as { avatarUrl?: string; partnerAvatarUrl?: string; partnerAvatar?: string } | null;
   const avatars = createAvatarPair(
     { name: myName, src: userMedia?.avatarUrl, size: 'md' },
-    { name: partnerName, src: userMedia?.partnerAvatar, size: 'md', presence: 'online' },
+    { name: partnerName, src: userMedia?.partnerAvatarUrl || userMedia?.partnerAvatar, size: 'md', presence: 'online' },
     true,
   );
   heroRow.append(heroCopy, avatars);

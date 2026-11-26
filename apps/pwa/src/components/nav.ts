@@ -126,7 +126,6 @@ function applyActiveState(path: string): void {
 
     if (button.classList.contains('nav-checkin-btn')) {
       button.setAttribute('aria-label', active ? 'Đóng check-in' : 'Tạo check-in mới');
-      svgIcon?.classList.toggle('c-icon--filled', active);
     } else if (svgIcon) {
       svgIcon.classList.toggle('c-icon--filled', active);
       if (active && previousPath && previousPath !== path) {

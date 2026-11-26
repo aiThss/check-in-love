@@ -267,6 +267,7 @@ function styleStickerMessages(): void {
 }
 
 function scheduleStickerStyling(): void {
+  if (!document.querySelector('.route-page.is-active .messages-page, body > .messages-page')) return;
   if (styleFrame !== null) return;
   styleFrame = window.requestAnimationFrame(() => {
     styleFrame = null;

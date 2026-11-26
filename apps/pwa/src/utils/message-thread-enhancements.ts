@@ -5,7 +5,7 @@ let enhanceFrame: number | null = null;
 
 function getActiveMessagesPage(): HTMLElement | null {
   return document.querySelector<HTMLElement>('.route-page.is-active .messages-page')
-    ?? document.querySelector<HTMLElement>('.messages-page');
+    ?? document.querySelector<HTMLElement>('body > .messages-page');
 }
 
 function parseMessageTimestamp(message: HTMLElement): number | null {
@@ -86,6 +86,7 @@ export function initMessageThreadEnhancements(): void {
   initialized = true;
 
   const observer = new MutationObserver((mutations) => {
+    if (!getActiveMessagesPage()) return;
     const shouldEnhance = mutations.some((mutation) => (
       [...mutation.addedNodes, ...mutation.removedNodes].some(containsMessageNode)
     ));
