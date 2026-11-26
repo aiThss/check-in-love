@@ -90,6 +90,7 @@
     color: var(--text-secondary);
     line-height: 1.5;
     max-width: 340px;
+    text-wrap: balance;
   }
 
   /* ── Sticker Form Card ── */

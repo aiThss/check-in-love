@@ -556,7 +556,7 @@ export function renderOnboardingPage(options: { mode?: OnboardingMode } = {}): H
       'Mã ghép đôi & Tài khoản',
       isGoogleUser
         ? 'Nhập chung một mã bí mật (6 ký tự) để nối hai thiết bị vào cùng một nhà.'
-        : 'Nhập mã ghép đôi, rồi đăng nhập Google hoặc dùng Email.',
+        : 'Nhập mã ghép đôi, sử dụng Google hoặc Email để đăng nhập',
       body,
     );
     requestAnimationFrame(() => codeBoxes[0]?.focus());
