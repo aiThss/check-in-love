@@ -428,6 +428,19 @@ class StickerWebView(context: Context) : WebView(context) {
                   '.messages-wallpaper-modal .messages-wallpaper-custom{' +
                     'display:flex!important;visibility:visible!important;' +
                     'min-height:58px!important;' +
+                  '}' +
+                  '.journey-modal-backdrop,.c-dialog-wrap{' +
+                    'position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;' +
+                    'width:auto!important;height:auto!important;min-height:0!important;' +
+                    'display:flex!important;align-items:center!important;justify-content:center!important;' +
+                  '}' +
+                  '.journey-modal-card,.c-dialog,.modal{' +
+                    'height:auto!important;min-height:0!important;' +
+                    'max-height:calc(100vh - 48px)!important;overflow-y:auto!important;' +
+                  '}' +
+                  '.c-sheet{' +
+                    'height:auto!important;min-height:0!important;' +
+                    'max-height:88vh!important;' +
                   '}';
                 (document.head || document.documentElement).appendChild(style);
               }
@@ -773,6 +786,6 @@ class StickerWebView(context: Context) : WebView(context) {
             "image/*",
         )
         private val WEB_FIX_DELAYS_MS = longArrayOf(0L, 50L, 150L, 500L, 1_500L, 3_000L)
-        private const val MAX_STICKER_BYTES = 6 * 1024 * 1024
+        private const val MAX_STICKER_BYTES = 15 * 1024 * 1024
     }
 }

@@ -618,11 +618,11 @@ export function renderProfilePage(): HTMLElement {
     });
 
     const cardsRow = createListRow({
-      title: 'Bộ thiệp cào ngày đặc biệt',
-      subtitle: 'Xem trước các thiệp kỷ niệm 100 ngày, sinh nhật, lễ tình nhân',
+      title: 'Album & Xưởng thiệp bí mật',
+      subtitle: 'Xem lại thiệp đã nhận & tự tay làm thiệp tặng người ấy',
       leadingIcon: 'gift',
       chevron: true,
-      onClick: () => navigate('/preview/cards'),
+      onClick: () => navigate('/app/cards'),
     });
 
     // Native Birthday Settings Card (rendered cleanly from frame 0)
@@ -638,7 +638,6 @@ export function renderProfilePage(): HTMLElement {
         </span>
         <div>
           <strong style="display:block;font-size:14px;">Ngày sinh nhật hai đứa</strong>
-          <span class="u-text-secondary" style="font-size:12px;">Tự động mở thiệp chúc mừng đúng 00:00 ngày sinh nhật</span>
         </div>
       </div>
       <div class="p-bday-grid">

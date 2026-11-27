@@ -140,7 +140,14 @@ initRouter({
   ...(isViteDev ? {
     '/preview/ui': () => import('./pages/ui-preview').then(({ renderUiPreviewPage }) => renderUiPreviewPage()),
   } : {}),
-  '/preview/cards': () => import('./pages/card-preview').then(({ renderCardPreviewPage }) => renderCardPreviewPage()),
+  '/preview/cards': () => {
+    if (isViteDev || isCardPreviewHost || isPrivateDevHost) {
+      return import('./pages/card-preview').then(({ renderCardPreviewPage }) => renderCardPreviewPage());
+    }
+    navigate('/app/cards', true);
+    return import('./pages/cards-studio').then(({ renderCardsStudioPage }) => renderCardsStudioPage());
+  },
+  '/app/cards': () => import('./pages/cards-studio').then(({ renderCardsStudioPage }) => renderCardsStudioPage()),
   '/test-mail': () => import('./pages/test-mail').then(({ renderTestMailPage }) => renderTestMailPage()),
   '/install': () => import('./pages/install').then(({ renderInstallPage }) => renderInstallPage()),
   '/login': () => import('./pages/login').then(({ renderLoginPage }) => renderLoginPage()),

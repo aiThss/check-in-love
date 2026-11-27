@@ -259,6 +259,16 @@ export function renderEditHistory(view: MessageView, item: ChatMessage): void {
   view.editHistory.hidden = !wasOpen;
 }
 
+const STICKER_URL_MARKER = 'lc-media=sticker';
+
+export function isStickerMessage(item: Pick<ChatMessage, 'type' | 'imageUrl'>): boolean {
+  return (
+    (item.type as string) === 'sticker' ||
+    Boolean(item.imageUrl?.includes(STICKER_URL_MARKER)) ||
+    Boolean(item.imageUrl && /\/(chat-)?stickers\//i.test(item.imageUrl))
+  );
+}
+
 export function patchView(view: MessageView, item: ChatMessage, ctx: BubbleFactoryContext): void {
   if (JSON.stringify(view.item) === JSON.stringify(item)) return;
   view.item = item;
@@ -274,6 +284,10 @@ export function patchView(view: MessageView, item: ChatMessage, ctx: BubbleFacto
     view.time.title = new Date(item.createdAt).toLocaleString('vi-VN');
     return;
   }
+
+  const isSticker = Boolean(item.imageUrl) && isStickerMessage(item);
+  view.element.classList.toggle('chat-sticker-message', isSticker);
+  view.bubble.classList.toggle('is-sticker', isSticker);
 
   const text = messageText(item);
   view.content.textContent = text;
@@ -344,12 +358,14 @@ export function createMessageView(
   if (item.systemEvent?.kind === 'background_changed') return createSystemEventView(item);
 
   const hasPhoto = Boolean(item.imageUrl);
+  const isSticker = hasPhoto && isStickerMessage(item);
   const text = messageText(item);
   const emojiOnly = !hasPhoto && !item.replyTo && isEmojiOnlyText(text);
 
   const element = document.createElement(hasPhoto ? 'section' : 'article');
   element.className = [
     hasPhoto ? 'chat-checkin-group' : 'chat-text-message',
+    isSticker ? 'chat-sticker-message' : '',
     item.isOwn ? 'own' : '',
     emojiOnly ? 'is-emoji-only' : '',
   ].filter(Boolean).join(' ');
@@ -382,7 +398,9 @@ export function createMessageView(
   primary.append(editedTag, editHistory);
 
   const bubble = document.createElement('div');
-  bubble.className = hasPhoto ? 'chat-bubble has-photo' : 'chat-text-bubble';
+  bubble.className = hasPhoto
+    ? `chat-bubble has-photo${isSticker ? ' is-sticker' : ''}`
+    : 'chat-text-bubble';
   const quote = createQuote(item);
   if (quote) bubble.appendChild(quote);
   const referencedCheckin = createReferencedCheckin(item, ctx);
@@ -391,9 +409,12 @@ export function createMessageView(
   if (hasPhoto) {
     const image = document.createElement('img');
     image.src = item.imageUrl!;
-    image.alt = 'Ảnh tin nhắn';
+    image.alt = isSticker ? 'Sticker' : 'Ảnh tin nhắn';
     image.loading = 'lazy';
     image.decoding = 'async';
+    if (isSticker) {
+      image.draggable = false;
+    }
     image.addEventListener('load', () => {
       if (ctx.isNearBottom()) ctx.scrollToBottom('follow');
     });

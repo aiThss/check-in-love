@@ -24,7 +24,7 @@
     bottom: 0;
     margin: 0 auto;
     max-width: var(--app-max-width);
-    max-height: 88dvh;
+    max-height: calc(var(--app-viewport-height, 100vh) * 0.88);
     z-index: var(--z-sheet);
     display: flex;
     flex-direction: column;

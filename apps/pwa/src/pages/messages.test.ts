@@ -713,4 +713,50 @@ describe('Messages scroll and reply behavior', () => {
     await vi.advanceTimersByTimeAsync(5_100);
     expect(typingBubble.hidden).toBe(true);
   });
+
+  it('attaches a pasted screenshot to composer preview and renders sticker bubbles at frame 0', async () => {
+    const stickerMsg: ChatMessage = {
+      ...message('sticker-1', false, ''),
+      type: 'image',
+      imageUrl: '/uploads/stickers/love-hug.webp',
+    };
+    const routePage = await mount([stickerMsg]);
+
+    const stickerRow = routePage.element.querySelector<HTMLElement>('[data-message-id="sticker-1"]')!;
+    expect(stickerRow.classList.contains('chat-sticker-message')).toBe(true);
+    expect(stickerRow.querySelector('.chat-bubble.is-sticker')).not.toBeNull();
+
+    const screenshot = new File(['png-bytes'], 'Screenshot_20261128.png', { type: 'image/png' });
+    mocks.processImage.mockResolvedValue({ file: screenshot, preview: 'blob:pasted-screenshot' });
+
+    const input = routePage.element.querySelector<HTMLTextAreaElement>('#message-input')!;
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: {
+        files: [screenshot],
+        items: [],
+        getData: () => '',
+      },
+    });
+    input.dispatchEvent(pasteEvent);
+    await flush();
+
+    expect(mocks.processImage).toHaveBeenCalledWith(screenshot, { maxSize: 2560, quality: 0.92 });
+    const preview = routePage.element.querySelector<HTMLElement>('.messages-photo-preview')!;
+    expect(preview.hidden).toBe(false);
+    expect(preview.querySelector('img')?.getAttribute('src')).toBe('blob:pasted-screenshot');
+
+    const liveSticker: ChatMessage = {
+      ...message('sticker-live', true, ''),
+      type: 'image',
+      imageUrl: '/uploads/stickers/kiss.webp',
+    };
+    window.dispatchEvent(new CustomEvent('lovecheck:sticker-created', { detail: { message: liveSticker } }));
+    await flush();
+
+    const liveRow = routePage.element.querySelector<HTMLElement>('[data-message-id="sticker-live"]')!;
+    expect(liveRow).not.toBeNull();
+    expect(liveRow.classList.contains('chat-sticker-message')).toBe(true);
+    expect(liveRow.querySelector('.chat-bubble.is-sticker')).not.toBeNull();
+  });
 });

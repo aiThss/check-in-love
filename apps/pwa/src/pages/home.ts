@@ -22,7 +22,7 @@ import { icon, iconMarkup, type IconName } from '../ui/icons/icons';
 import { createAvatarPair, createButton } from '../ui/primitives';
 import { attachPullToRefresh, createEmptyState, createSkeleton } from '../ui/feedback';
 import { triggerHaptic } from '../ui/haptics';
-import { setUiTheme, type UiThemePreference } from '../ui/theme/index';
+import { getResolvedTheme, setUiTheme, type UiThemePreference } from '../ui/theme/index';
 import type { CheckIn, CheckInReply, Reaction, ReactionType } from '../api/types';
 import type { PushSetupResult } from '../api/push';
 
@@ -70,9 +70,7 @@ function calcDaysTogether(loveStartDate?: string): number {
 }
 
 function getThemeIconName(theme: UiThemePreference): IconName {
-  if (theme === 'dark') return 'sun';
-  if (theme === 'light') return 'moon';
-  return 'palette';
+  return getResolvedTheme(theme) === 'dark' ? 'sun' : 'moon';
 }
 
 function getReaction(checkin: CheckIn, type: ReactionType): Reaction | undefined {
@@ -692,19 +690,28 @@ export function renderHomePage(): HTMLElement {
   const rightActions = document.createElement('div');
   rightActions.className = 'p-home-actions';
 
+  const syncQuickThemeButton = (pref: UiThemePreference): void => {
+    const iconName = getThemeIconName(pref);
+    const isDark = iconName === 'sun';
+    themeBtn.innerHTML = iconMarkup(iconName, { size: 20 });
+    const label = isDark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối';
+    themeBtn.setAttribute('aria-label', label);
+    themeBtn.setAttribute('aria-pressed', String(isDark));
+    themeBtn.title = label;
+  };
+
   const themeBtn = document.createElement('button');
   themeBtn.type = 'button';
   themeBtn.className = 'c-icon-btn';
-  themeBtn.setAttribute('aria-label', 'Đổi giao diện');
-  themeBtn.innerHTML = iconMarkup(getThemeIconName(state.theme), { size: 20 });
+  syncQuickThemeButton(state.theme);
   themeBtn.addEventListener('click', () => {
-    const current = store.get().theme;
-    const next: UiThemePreference = current === 'dark' ? 'light' : current === 'light' ? 'system' : 'dark';
+    const isDark = getResolvedTheme(store.get().theme) === 'dark';
+    const next: 'light' | 'dark' = isDark ? 'light' : 'dark';
     triggerHaptic('select');
     store.set({ theme: next });
     applyTheme(next);
     setUiTheme(next);
-    themeBtn.innerHTML = iconMarkup(getThemeIconName(next), { size: 20 });
+    syncQuickThemeButton(next);
   });
 
   const refreshBtn = document.createElement('button');
@@ -722,7 +729,7 @@ export function renderHomePage(): HTMLElement {
   topBar.append(brandWrap, rightActions);
   page.appendChild(topBar);
 
-  // Live sync streak from store
+  // Live sync streak & theme icon from store
   const unsubStore = store.subscribe?.((nextState) => {
     if (!page.isConnected) {
       unsubStore?.();
@@ -730,6 +737,7 @@ export function renderHomePage(): HTMLElement {
     }
     const nextStreak = calcStreak(nextState.couple);
     streakVal.textContent = `${nextStreak} ngày`;
+    syncQuickThemeButton(nextState.theme);
   });
 
   // ── 2. Couple Hero Card ──

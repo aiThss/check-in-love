@@ -17,6 +17,7 @@ import { renderProfilePage } from '../pages/profile';
 import { renderRandomPage } from '../pages/random';
 import { renderRepliesPage } from '../pages/replies';
 import { renderCardPreviewPage } from '../pages/card-preview';
+import { renderCardsStudioPage } from '../pages/cards-studio';
 import { renderTestMailPage } from '../pages/test-mail';
 
 const PWA_ROOT = path.resolve(__dirname, '../..');
@@ -185,6 +186,7 @@ describe('P9 Acceptance Criteria — Hygiene, PWA & Full-App Accessibility', () 
       ['random', renderRandomPage()],
       ['replies', renderRepliesPage()],
       ['card-preview', renderCardPreviewPage()],
+      ['cards-studio', renderCardsStudioPage()],
       ['test-mail', renderTestMailPage()],
     ];
 

@@ -83,7 +83,7 @@ export async function saveUploadedImage(
   bucket: R2Bucket,
   config: AppConfig,
   file: File,
-  folder: 'checkins' | 'avatars' | 'messages' | 'chat-backgrounds',
+  folder: 'checkins' | 'avatars' | 'messages' | 'chat-backgrounds' | 'occasion-cards',
 ): Promise<StoredUpload> {
   const maxBytes = config.MAX_UPLOAD_MB * 1024 * 1024;
   if (file.size <= 0) {

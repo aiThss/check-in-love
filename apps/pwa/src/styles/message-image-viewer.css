@@ -1,79 +1,132 @@
-.message-image-viewer-backdrop {
-  position: fixed;
-  z-index: 100000;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding:
-    calc(18px + env(safe-area-inset-top, 0px))
-    calc(10px + env(safe-area-inset-right, 0px))
-    calc(18px + env(safe-area-inset-bottom, 0px))
-    calc(10px + env(safe-area-inset-left, 0px));
-  background: rgba(12, 8, 11, 0.94);
-  animation: messageImageViewerIn 160ms ease-out both;
-  overflow: hidden;
-  touch-action: none;
-}
+/* ============================================================
+   message-image-viewer.css — Theme-aware Fullscreen Chat Photo Viewer
+   ============================================================ */
 
-.message-image-viewer-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  touch-action: none;
-}
+@layer components {
+  .message-image-viewer-backdrop {
+    position: fixed;
+    z-index: 100000;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding:
+      max(16px, calc(var(--android-status-bar, env(safe-area-inset-top, 0px)) + 12px))
+      14px
+      max(20px, calc(var(--android-nav-bar, env(safe-area-inset-bottom, 0px)) + 16px));
+    background: var(--bg-canvas-gradient, var(--bg-canvas, #f8e2e7));
+    color: var(--text-primary, #2a101d);
+    animation: messageImageViewerIn 160ms ease-out both;
+    overflow: hidden;
+    touch-action: none;
+  }
 
-.message-image-viewer-image {
-  display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: calc(100dvh - 36px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  border-radius: 12px;
-  object-fit: contain;
-  user-select: none;
-  -webkit-user-drag: none;
-  touch-action: none;
-  will-change: transform;
-  cursor: grab;
-}
+  .message-image-viewer-topbar {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+  }
 
-.message-image-viewer-image:active {
-  cursor: grabbing;
-}
+  .message-image-viewer-btn {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    place-items: center;
+    border-radius: 50%;
+    border: 1.5px solid var(--ink-stroke-color, rgba(42, 16, 29, 0.25));
+    background-color: var(--surface-paper, #fff9fb);
+    color: var(--text-primary, #2a101d);
+    box-shadow: var(--sticker-shadow-sm), var(--elev-2);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform var(--duration-instant) var(--ease-standard);
+  }
 
-.message-image-viewer-close {
-  position: absolute;
-  top: calc(12px + env(safe-area-inset-top, 0px));
-  right: calc(12px + env(safe-area-inset-right, 0px));
-  z-index: 10;
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border: 1.5px solid rgba(255, 255, 255, 0.28);
-  border-radius: 50%;
-  background: rgba(28, 18, 25, 0.76);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #ffffff;
-  cursor: pointer;
-}
+  .message-image-viewer-btn--primary {
+    background-color: var(--accent-500, #ff3b7f);
+    color: var(--text-on-accent, #ffffff);
+  }
 
-.message-image-viewer-close:hover,
-.message-image-viewer-close:focus-visible {
-  background: rgba(255, 255, 255, 0.22);
-  outline: 2px solid rgba(255, 255, 255, 0.85);
-  outline-offset: 2px;
-}
+  .message-image-viewer-btn:active {
+    transform: scale(0.92);
+  }
 
-@keyframes messageImageViewerIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+  .message-image-viewer-btn:focus-visible {
+    outline: 3px solid var(--accent-600);
+    outline-offset: 2px;
+  }
 
-@media (prefers-reduced-motion: reduce) {
-  .message-image-viewer-backdrop { animation: none; }
+  .message-image-viewer-wrap {
+    position: relative;
+    z-index: 2;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 0;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .message-image-viewer-image {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(100%, 520px);
+    max-height: calc(var(--app-viewport-height, 100vh) - 188px);
+    border-radius: 18px;
+    border: 1.5px solid var(--border-subtle);
+    box-shadow: var(--elev-3);
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+    touch-action: none;
+    will-change: transform;
+    cursor: grab;
+  }
+
+  .message-image-viewer-image:active {
+    cursor: grabbing;
+  }
+
+  .message-image-viewer-caption {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 520px;
+    padding: 14px 18px;
+    border-radius: 22px;
+    border: 1.5px solid var(--border-strong);
+    background-color: var(--surface-paper, #fff9fb);
+    color: var(--text-primary, #2a101d);
+    box-shadow: var(--elev-2);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .message-image-viewer-caption[hidden] {
+    display: none;
+  }
+
+  @keyframes messageImageViewerIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .message-image-viewer-backdrop { animation: none; }
+  }
 }

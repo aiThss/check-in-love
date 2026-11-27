@@ -1,8 +1,14 @@
 import type { WorkerEnv } from '../config/env';
 import { resolveConfig } from '../config/env';
-import { execute, findPartnerUser, queryAll, queryOne } from '../db/d1';
+import { execute, findCoupleById, findPartnerUser, queryAll, queryOne } from '../db/d1';
 import { type CheckinRow, type UserRow } from '../db/types';
+import { ensureOccasionCardsSchema } from '../routes/occasion-cards';
 import { logger } from '../utils/logger';
+import {
+  BUILTIN_OCCASIONS,
+  resolveRecipientCardForDate,
+  type OccasionCardRow,
+} from './occasion-schedule';
 import { sendPushToUser } from './push';
 import { emitRealtimeEvent } from './realtime';
 import { deleteStoredFile } from './storage';
@@ -235,7 +241,66 @@ export async function runScheduledTasks(env: WorkerEnv, now: Date = new Date()):
     }
   }
 
-  // 3) 03:00 VN: Purge expired OTPs & soft-deleted check-ins older than 30 days
+  // 3) 09:00 VN: 3-day advance private reminder to prepare secret occasion cards for partner
+  if (vnClock.hour === 9 && vnClock.minute === 0) {
+    const locked = await claimDailyCronLock(env.DB, 'cron:occasion-prep-09', vnClock.dateKey);
+    if (locked) {
+      try {
+        await ensureOccasionCardsSchema(env.DB);
+        const threeDaysAhead = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+        const activeUsers = await queryAll<UserRow>(
+          env.DB,
+          `SELECT * FROM users
+           WHERE status = 'active'
+             AND couple_id IS NOT NULL
+             AND (
+               fcm_tokens_json != '[]'
+               OR EXISTS (SELECT 1 FROM push_subscriptions ps WHERE ps.user_id = users.id)
+             )`,
+        );
+
+        for (const sender of activeUsers) {
+          const partner = await findPartnerUser(env.DB, sender.couple_id, sender.id);
+          if (!partner || !sender.couple_id) continue;
+          const couple = await findCoupleById(env.DB, sender.couple_id);
+          const authored = await queryAll<OccasionCardRow>(
+            env.DB,
+            `SELECT * FROM couple_occasion_cards WHERE couple_id = ? AND author_id = ?`,
+            [sender.couple_id, sender.id],
+          );
+
+          const upcoming = resolveRecipientCardForDate({
+            recipient: partner,
+            sender,
+            couple,
+            senderCards: authored,
+            now: threeDaysAhead,
+          });
+          const meta = upcoming
+            ? BUILTIN_OCCASIONS.find((m) => m.key === upcoming.occasionKey)
+            : undefined;
+          if (upcoming && !upcoming.isCustomized && (!meta || meta.prepRemindable !== false)) {
+            const partnerDisplay = partner.display_name || sender.partner_name || 'người ấy';
+            await sendPushToUser(env, config, sender.id, {
+              title: `Sắp tới ngày đặc biệt của ${partnerDisplay} rồi 🎴`,
+              body: `Còn 3 ngày nữa là tới "${upcoming.occasionLabel}". Ghé Xưởng thiệp chuẩn bị bất ngờ riêng nhé!`,
+              url: '/app/cards?tab=studio',
+              targetUrl: '/app/cards?tab=studio',
+              tag: `occasion-prep-${vnClock.dateKey}-${upcoming.occasionKey}`,
+              kind: 'occasion_prep',
+              actionType: 'occasion_prep',
+              type: 'occasion_prep',
+              senderName: 'Check IN Love',
+            });
+          }
+        }
+      } catch (err) {
+        logger.error('Cron occasion prep error', err);
+      }
+    }
+  }
+
+  // 4) 03:00 VN: Purge expired OTPs & soft-deleted check-ins older than 30 days
   if (vnClock.hour === 3 && vnClock.minute === 0) {
     const locked = await claimDailyCronLock(env.DB, 'cron:cleanup-03', vnClock.dateKey);
     if (!locked) return;

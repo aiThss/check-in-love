@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -90,41 +92,73 @@ fun PhotoViewerScreen(
     onClose:    () -> Unit,
 ) {
     val context = LocalContext.current
+    val isDark = isSystemInDarkTheme()
     var isLoading by remember { mutableStateOf(true) }
     var hasError  by remember { mutableStateOf(false) }
+    var intrinsicRatio by remember { mutableStateOf<Float?>(null) }
     val backdrop = rememberBackdrop()
+
+    val bgBrush = if (isDark) {
+        Brush.verticalGradient(colors = listOf(Color(0xFF3A2230), Color(0xFF261824)))
+    } else {
+        Brush.verticalGradient(colors = listOf(Color(0xFFFFF4F7), Color(0xFFF8E2E7)))
+    }
+    val primaryInk = if (isDark) Color(0xFFFFF0F5) else Color(0xFF2A101D)
+    val secondaryInk = if (isDark) Color(0xFFE5B8CE) else Color(0xFF6F4B5B)
+    val borderTint = if (isDark) Color(0x66FFAACD) else Color(0x442A101D)
+    val photoShape = RoundedCornerShape(18.dp)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF3A2230),
-                        Color(0xFF261824),
-                    ),
-                ),
-            ),
+            .background(bgBrush),
     ) {
-        // ── Backdrop Layer: Ambient Orbs + Photo ─────────────────────────────
-        Box(
+        // ── Backdrop Layer: Rounded Photo Hugging Exact Aspect Ratio ─────────
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 92.dp)
                 .layerBackdrop(backdrop),
+            contentAlignment = Alignment.Center,
         ) {
+            val availW = maxWidth
+            val availH = maxHeight
+            val ratio = intrinsicRatio
+            val photoModifier = if (ratio != null && ratio > 0f && availW > 0.dp && availH > 0.dp) {
+                var w = availW
+                var h = availW / ratio
+                if (h > availH) {
+                    h = availH
+                    w = availH * ratio
+                }
+                Modifier
+                    .size(w, h)
+                    .clip(photoShape)
+                    .border(1.dp, borderTint, photoShape)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .clip(photoShape)
+            }
+
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(photoUrl)
-                    .crossfade(300)
+                    .crossfade(260)
                     .build(),
                 contentDescription = caption.ifEmpty { "Ảnh check-in" },
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .align(Alignment.Center),
-                onLoading = { isLoading = true;  hasError = false },
-                onSuccess = { isLoading = false; hasError = false },
-                onError   = { isLoading = false; hasError = true  },
+                contentScale = if (ratio != null) ContentScale.Crop else ContentScale.Fit,
+                modifier = photoModifier,
+                onLoading = { isLoading = true; hasError = false },
+                onSuccess = { state ->
+                    isLoading = false
+                    hasError = false
+                    val s = state.painter.intrinsicSize
+                    if (s.width > 0f && s.height > 0f && s.width.isFinite() && s.height.isFinite()) {
+                        intrinsicRatio = s.width / s.height
+                    }
+                },
+                onError   = { isLoading = false; hasError = true },
             )
         }
 
@@ -147,7 +181,7 @@ fun PhotoViewerScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text      = "Không tải được ảnh",
-                    color     = Color(0xFFE5B8CE),
+                    color     = secondaryInk,
                     fontSize  = 15.sp,
                     textAlign = TextAlign.Center,
                 )
@@ -166,13 +200,13 @@ fun PhotoViewerScreen(
                         backdrop = backdrop,
                         shape = cardShape,
                         isInteractive = true,
-                        tintColor = Color(0xFFFF85A1),
-                        surfaceAlpha = 0.14f,
+                        tintColor = if (isDark) Color(0xFFFF85A1) else Color.White,
+                        surfaceAlpha = if (isDark) 0.16f else 0.72f,
                         maxScale = 1.035f,
                     )
                     .border(
                         width = 1.dp,
-                        color = Color(0x66FFAACD),
+                        color = borderTint,
                         shape = cardShape,
                     )
                     .padding(horizontal = 20.dp, vertical = 16.dp),
@@ -180,16 +214,16 @@ fun PhotoViewerScreen(
                 if (caption.isNotEmpty()) {
                     Text(
                         text       = caption,
-                        color      = Color(0xFFFFF0F5),
+                        color      = primaryInk,
                         fontSize   = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    Spacer(Modifier.height(6.dp))
+                    if (ownerName.isNotEmpty()) Spacer(Modifier.height(6.dp))
                 }
                 if (ownerName.isNotEmpty()) {
                     Text(
                         text     = "Gửi bởi $ownerName${if (dateStr.isNotEmpty()) "  ·  $dateStr" else ""}",
-                        color    = Color(0xFFE5B8CE),
+                        color    = secondaryInk,
                         fontSize = 13.sp,
                     )
                 }
@@ -204,7 +238,6 @@ fun PhotoViewerScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Close button with real Liquid Glass refraction + bulge
             IconButton(
                 onClick  = onClose,
                 modifier = Modifier
@@ -214,15 +247,14 @@ fun PhotoViewerScreen(
                         shape = CircleShape,
                         isInteractive = true,
                         tintColor = Color.White,
-                        surfaceAlpha = 0.12f,
+                        surfaceAlpha = if (isDark) 0.14f else 0.78f,
                         maxScale = 1.28f,
                     )
-                    .border(1.dp, Color(0x66FFAACD), CircleShape),
+                    .border(1.dp, borderTint, CircleShape),
             ) {
-                Text("✕", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("✕", color = primaryInk, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
 
-            // Download button with real Liquid Glass refraction + bulge
             IconButton(
                 onClick = onDownload,
                 modifier = Modifier
@@ -232,7 +264,7 @@ fun PhotoViewerScreen(
                         shape = CircleShape,
                         isInteractive = true,
                         tintColor = Color(0xFFFF5C93),
-                        surfaceAlpha = 0.42f,
+                        surfaceAlpha = if (isDark) 0.46f else 0.88f,
                         maxScale = 1.28f,
                     )
                     .border(1.dp, Color(0x88FFD2E8), CircleShape),

@@ -9,7 +9,6 @@
 
 @import './components.css' layer(legacy);
 @import './animations.css' layer(legacy);
-@import './message-image-viewer.css' layer(legacy);
 
 @import './00-fonts.css';
 @import './00-tokens.css';
@@ -22,4 +21,5 @@
 @import './10-components/overlays.css';
 @import './10-components/shell.css';
 @import './10-components/pwa-prompts.css';
+@import './message-image-viewer.css';
 @import './02-utilities.css';

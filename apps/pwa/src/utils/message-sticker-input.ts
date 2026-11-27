@@ -1,20 +1,13 @@
 import { apiFetch } from '../api/client';
-import { getMessages } from '../api/messages';
+import { mapChatMessage, type RawMessage } from '../api/messages';
 import { invalidateQueries } from '../api/query-cache';
 import { showToast } from '../components/toast';
 import { invalidateRoutes } from '../route-invalidation';
-import { navigate } from '../router';
 
-const STICKER_URL_MARKER = 'lc-media=sticker';
-const MESSAGE_DRAFT_KEY = 'lovecheck_message_draft_after_sticker';
-const DUPLICATE_WINDOW_MS = 1_200;
+const DUPLICATE_WINDOW_MS = 900;
 
 interface StickerUploadResponse {
-  message: {
-    _id?: string;
-    id?: string;
-    imageUrl?: string;
-  };
+  message: RawMessage;
 }
 
 interface ClipboardItemLike {
@@ -38,19 +31,27 @@ declare global {
 
 let initialized = false;
 let sendingSticker = false;
-let lastStickerSignature = '';
-let lastStickerAcceptedAt = 0;
-let styleFrame: number | null = null;
+let lastMediaSignature = '';
+let lastMediaAcceptedAt = 0;
 
-function isMessageInput(target: EventTarget | null): target is (HTMLInputElement | HTMLTextAreaElement) {
-  return (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
-    && Boolean(target.closest('.messages-page .messages-input-wrap'));
+function getActiveMessagesPage(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('.route-page.is-active .messages-page')
+    ?? document.querySelector<HTMLElement>('.messages-page');
 }
 
 function getActiveMessageInput(): HTMLInputElement | HTMLTextAreaElement | null {
-  return document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-    '.route-page.is-active .messages-page #message-input',
-  ) ?? document.querySelector<HTMLInputElement | HTMLTextAreaElement>('.messages-page #message-input');
+  const page = getActiveMessagesPage();
+  return page?.querySelector<HTMLInputElement | HTMLTextAreaElement>('#message-input') ?? null;
+}
+
+function isInsideActiveChat(target: EventTarget | null): boolean {
+  const page = getActiveMessagesPage();
+  if (!page) return false;
+  if (!(target instanceof Node)) return true;
+  if (target === document || target === document.body || target === document.documentElement) {
+    return !document.querySelector('.modal-overlay, .c-dialog-wrap, .c-sheet.is-open, .journey-modal-backdrop');
+  }
+  return page.contains(target);
 }
 
 function extensionFromMime(mime: string): string {
@@ -60,27 +61,57 @@ function extensionFromMime(mime: string): string {
   return 'png';
 }
 
-function normalizeStickerFile(file: File | Blob): File {
-  const type = file.type.startsWith('image/') ? file.type : 'image/png';
-  const extension = extensionFromMime(type);
-  return new File(
-    [file],
-    `keyboard-sticker-${Date.now()}.${extension}`,
-    { type, lastModified: Date.now() },
-  );
+function normalizeImageFile(file: File | Blob, preferredName?: string): File {
+  const type = file.type && file.type.startsWith('image/') ? file.type : 'image/png';
+  const ext = extensionFromMime(type);
+  const rawName = preferredName?.trim() || (file instanceof File ? file.name : '');
+  const finalName = rawName || `pasted-image-${Date.now()}.${ext}`;
+  return new File([file], finalName, { type, lastModified: Date.now() });
 }
 
-function imageFromDataTransfer(data: DataTransfer | null | undefined): File | null {
+function dataUrlToFile(dataUrl: string): File | null {
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/);
+  if (!match) return null;
+  const mime = match[1].toLowerCase();
+  try {
+    const binary = window.atob(match[2].replace(/\s+/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return normalizeImageFile(new Blob([bytes], { type: mime }), `clipboard-${Date.now()}.${extensionFromMime(mime)}`);
+  } catch {
+    return null;
+  }
+}
+
+export function extractImageFromDataTransfer(data: DataTransfer | null | undefined): File | null {
   if (!data) return null;
 
   for (const file of Array.from(data.files ?? [])) {
-    if (file.type.startsWith('image/')) return normalizeStickerFile(file);
+    if (file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(file.name)) {
+      return normalizeImageFile(file, file.name);
+    }
   }
 
   for (const item of Array.from(data.items ?? [])) {
-    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+    if (item.kind !== 'file') continue;
+    if (item.type && !item.type.startsWith('image/')) continue;
     const file = item.getAsFile();
-    if (file) return normalizeStickerFile(file);
+    if (file) return normalizeImageFile(file, file.name);
+  }
+
+  try {
+    const html = data.getData('text/html');
+    if (html) {
+      const srcMatch = html.match(/<img[^>]+src=["'](data:image\/[^"']+)["']/i);
+      if (srcMatch?.[1]) {
+        const parsed = dataUrlToFile(srcMatch[1]);
+        if (parsed) return parsed;
+      }
+    }
+  } catch {
+    // Accessing getData can throw in synthetic test events.
   }
 
   return null;
@@ -97,11 +128,10 @@ async function imageFromClipboardApi(): Promise<File | null> {
     for (const item of items) {
       const imageType = item.types.find((type) => type.startsWith('image/'));
       if (!imageType) continue;
-      return normalizeStickerFile(await item.getType(imageType));
+      return normalizeImageFile(await item.getType(imageType));
     }
   } catch {
-    // Clipboard read can be denied by the browser. The native input connection and
-    // normal paste payload remain available without an extra permission prompt.
+    // Ignore clipboard permission denials.
   }
 
   return null;
@@ -119,7 +149,7 @@ function fileFromNativePayload(payload: NativeStickerPayload): File | null {
       bytes[index] = binary.charCodeAt(index);
     }
 
-    const fallbackName = `keyboard-sticker-${Date.now()}.${extensionFromMime(mimeType)}`;
+    const fallbackName = `keyboard-media-${Date.now()}.${extensionFromMime(mimeType)}`;
     return new File(
       [bytes],
       payload.fileName?.trim() || fallbackName,
@@ -130,43 +160,97 @@ function fileFromNativePayload(payload: NativeStickerPayload): File | null {
   }
 }
 
-function isDuplicateSticker(file: File): boolean {
-  // Android can dispatch commitContent, beforeinput and paste for the same sticker.
-  const signature = `${file.type}:${file.size}`;
+function isDuplicateMedia(file: File): boolean {
+  const signature = `${file.type}:${file.size}:${file.name}`;
   const now = Date.now();
-  const duplicate = signature === lastStickerSignature
-    && now - lastStickerAcceptedAt < DUPLICATE_WINDOW_MS;
-
-  lastStickerSignature = signature;
-  lastStickerAcceptedAt = now;
+  const duplicate = signature === lastMediaSignature && now - lastMediaAcceptedAt < DUPLICATE_WINDOW_MS;
+  lastMediaSignature = signature;
+  lastMediaAcceptedAt = now;
   return duplicate;
 }
 
-function restoreDraftWhenMounted(): void {
-  const draft = sessionStorage.getItem(MESSAGE_DRAFT_KEY);
-  if (draft === null) return;
+async function classifyAsKeyboardSticker(file: File, fromNativeIme: boolean): Promise<boolean> {
+  const lowerName = file.name.toLowerCase();
+  const mime = file.type.toLowerCase();
 
-  const input = getActiveMessageInput();
-  if (!input) return;
-
-  input.value = draft;
-  sessionStorage.removeItem(MESSAGE_DRAFT_KEY);
-  try {
-    input.focus({ preventScroll: true });
-  } catch {
-    input.focus();
+  if (lowerName.includes('screenshot') || lowerName.includes('snip') || lowerName.startsWith('img_')) {
+    return false;
   }
+  if (mime.includes('gif') || mime.includes('webp')) {
+    return true;
+  }
+  if (mime.includes('jpeg') || mime.includes('jpg') || mime.includes('heic') || mime.includes('heif')) {
+    return false;
+  }
+  if (lowerName.includes('sticker') || lowerName.includes('bitmoji') || lowerName.includes('emoji')) {
+    return true;
+  }
+
+  // For PNGs: check dimensions + corner transparency so Snipping Tool / phone screenshots
+  // attach as photos while small transparent keyboard stickers send as stickers.
+  if (typeof document !== 'undefined' && typeof Image !== 'undefined' && typeof URL?.createObjectURL === 'function') {
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const isTransparentSmallSticker = await new Promise<boolean>((resolve) => {
+        const img = new Image();
+        const timer = window.setTimeout(() => resolve(false), 350);
+        img.onload = () => {
+          window.clearTimeout(timer);
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          if (!w || !h || Math.max(w, h) > 560) {
+            resolve(false);
+            return;
+          }
+          try {
+            const sampleSize = Math.min(64, w, h);
+            const canvas = document.createElement('canvas');
+            canvas.width = sampleSize;
+            canvas.height = sampleSize;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(fromNativeIme && file.size < 260_000);
+              return;
+            }
+            ctx.drawImage(img, 0, 0, sampleSize, sampleSize);
+            const data = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
+            let transparentPixels = 0;
+            for (let i = 3; i < data.length; i += 16) {
+              if (data[i] < 245) transparentPixels += 1;
+            }
+            resolve(transparentPixels >= 3);
+          } catch {
+            resolve(fromNativeIme && file.size < 260_000);
+          }
+        };
+        img.onerror = () => {
+          window.clearTimeout(timer);
+          resolve(false);
+        };
+        img.src = objectUrl;
+      });
+      return isTransparentSmallSticker;
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  return fromNativeIme && file.size < 260_000;
 }
 
-async function sendSticker(file: File, input: HTMLInputElement | HTMLTextAreaElement): Promise<void> {
-  if (sendingSticker || isDuplicateSticker(file)) return;
+function emitPastedPhotoToChat(file: File): void {
+  window.dispatchEvent(new CustomEvent('lovecheck:chat-paste-photo', { detail: { file } }));
+}
 
-  const form = input.closest<HTMLFormElement>('.messages-composer');
+async function sendSticker(file: File): Promise<void> {
+  if (sendingSticker) return;
+
+  const page = getActiveMessagesPage();
+  const form = page?.querySelector<HTMLFormElement>('.messages-composer');
   if (!form) return;
 
   sendingSticker = true;
   form.classList.add('is-sending-sticker');
-  sessionStorage.setItem(MESSAGE_DRAFT_KEY, input.value);
 
   const clientMutationId = `sticker:${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
   const payload = new FormData();
@@ -174,7 +258,7 @@ async function sendSticker(file: File, input: HTMLInputElement | HTMLTextAreaEle
   payload.append('clientMutationId', clientMutationId);
 
   try {
-    await apiFetch<StickerUploadResponse>('/messages/sticker', {
+    const response = await apiFetch<StickerUploadResponse>('/messages/sticker', {
       method: 'POST',
       body: payload,
     });
@@ -182,12 +266,9 @@ async function sendSticker(file: File, input: HTMLInputElement | HTMLTextAreaEle
     invalidateQueries('messages:list:');
     invalidateRoutes('/app/messages');
 
-    // Rebuild the active cached route immediately. This keeps Messages as the single
-    // source of truth and avoids a second optimistic renderer just for stickers.
-    navigate('/app/messages');
-    window.setTimeout(restoreDraftWhenMounted, 120);
+    const created = mapChatMessage(response.message);
+    window.dispatchEvent(new CustomEvent('lovecheck:sticker-created', { detail: { message: created } }));
   } catch {
-    sessionStorage.removeItem(MESSAGE_DRAFT_KEY);
     showToast('Không gửi được sticker, thử lại nhé', 'error');
   } finally {
     sendingSticker = false;
@@ -195,119 +276,72 @@ async function sendSticker(file: File, input: HTMLInputElement | HTMLTextAreaEle
   }
 }
 
+async function handleIncomingClipboardImage(file: File, fromNativeIme: boolean): Promise<void> {
+  if (isDuplicateMedia(file)) return;
+  const isSticker = await classifyAsKeyboardSticker(file, fromNativeIme);
+  if (isSticker) {
+    await sendSticker(file);
+  } else {
+    emitPastedPhotoToChat(file);
+  }
+}
+
 function receiveNativeSticker(payload: NativeStickerPayload): void {
-  const input = getActiveMessageInput();
-  if (!input) {
-    showToast('Mở Tin nhắn rồi chọn lại sticker nhé', 'info');
+  if (!getActiveMessagesPage()) {
+    showToast('Mở Tin nhắn rồi chọn lại ảnh/sticker nhé', 'info');
     return;
   }
 
   const file = fileFromNativePayload(payload);
   if (!file) {
-    showToast('Không đọc được sticker từ bàn phím', 'error');
+    showToast('Không đọc được ảnh từ bàn phím', 'error');
     return;
   }
 
-  void sendSticker(file, input);
+  void handleIncomingClipboardImage(file, true);
 }
 
 function installNativeStickerBridge(): void {
   window.onNativeStickerReceived = receiveNativeSticker;
   window.onNativeStickerError = (message: string) => {
-    showToast(message || 'Không đọc được sticker từ bàn phím', 'error');
+    showToast(message || 'Không đọc được nội dung từ bàn phím', 'error');
   };
 
   const pending = window.__pendingNativeStickers?.splice(0) ?? [];
   pending.forEach(receiveNativeSticker);
 }
 
-function enhanceStickerImage(image: HTMLImageElement): void {
-  if (!image.src.includes(STICKER_URL_MARKER)) return;
-
-  const bubble = image.closest<HTMLElement>('.chat-bubble.has-photo');
-  const message = image.closest<HTMLElement>('[data-message-id]');
-  if (!bubble || !message) return;
-
-  bubble.classList.add('is-sticker');
-  message.classList.add('chat-sticker-message');
-  image.alt = 'Sticker';
-  image.draggable = false;
-}
-
-async function syncStickerOwnership(): Promise<void> {
-  const stickerElements = Array.from(
-    document.querySelectorAll<HTMLElement>('.chat-sticker-message[data-message-id]'),
-  );
-  if (stickerElements.length === 0) return;
-
-  try {
-    const page = await getMessages({ limit: 50 });
-    const ownership = new Map(
-      page.data
-        .filter((message) => message.imageUrl?.includes(STICKER_URL_MARKER))
-        .map((message) => [message.id, message.isOwn]),
-    );
-
-    stickerElements.forEach((element) => {
-      const isOwn = ownership.get(element.dataset.messageId ?? '');
-      if (isOwn !== undefined) element.classList.toggle('own', isOwn);
-    });
-  } catch {
-    // Sticker sizing does not depend on ownership; alignment can wait for next sync.
-  }
-}
-
-function styleStickerMessages(): void {
-  document
-    .querySelectorAll<HTMLImageElement>(`.messages-thread img[src*="${STICKER_URL_MARKER}"]`)
-    .forEach(enhanceStickerImage);
-
-  void syncStickerOwnership();
-  restoreDraftWhenMounted();
-}
-
-function scheduleStickerStyling(): void {
-  if (!document.querySelector('.route-page.is-active .messages-page, body > .messages-page')) return;
-  if (styleFrame !== null) return;
-  styleFrame = window.requestAnimationFrame(() => {
-    styleFrame = null;
-    styleStickerMessages();
-  });
-}
-
 function onPaste(event: ClipboardEvent): void {
-  if (!isMessageInput(event.target)) return;
-  const image = imageFromDataTransfer(event.clipboardData);
+  if (!isInsideActiveChat(event.target)) return;
+  const image = extractImageFromDataTransfer(event.clipboardData);
   if (!image) return;
 
   event.preventDefault();
   event.stopPropagation();
-  void sendSticker(image, event.target);
+  void handleIncomingClipboardImage(image, false);
 }
 
 function onBeforeInput(event: InputEvent): void {
-  if (!isMessageInput(event.target)) return;
+  if (!isInsideActiveChat(event.target)) return;
   if (event.inputType !== 'insertFromPaste' && event.inputType !== 'insertReplacementText') return;
 
   const richInput = event as InputEvent & { dataTransfer?: DataTransfer | null };
-  const image = imageFromDataTransfer(richInput.dataTransfer);
+  const image = extractImageFromDataTransfer(richInput.dataTransfer);
   if (!image) return;
 
   event.preventDefault();
-  void sendSticker(image, event.target);
+  void handleIncomingClipboardImage(image, false);
 }
 
 function onInput(event: Event): void {
-  if (!isMessageInput(event.target)) return;
-  const input = event.target;
+  const input = getActiveMessageInput();
+  if (!input || event.target !== input) return;
 
-  // Some keyboards insert an object-replacement character and leave the actual
-  // image in the clipboard rather than exposing it on the paste event.
   if (!input.value.includes('\uFFFC')) return;
   input.value = input.value.replace(/\uFFFC/g, '');
 
   void imageFromClipboardApi().then((image) => {
-    if (image) void sendSticker(image, input);
+    if (image) void handleIncomingClipboardImage(image, true);
   });
 }
 
@@ -319,12 +353,4 @@ export function initMessageStickerInput(): void {
   document.addEventListener('paste', onPaste, true);
   document.addEventListener('beforeinput', onBeforeInput, true);
   document.addEventListener('input', onInput, true);
-
-  const observer = new MutationObserver(scheduleStickerStyling);
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
-
-  scheduleStickerStyling();
 }

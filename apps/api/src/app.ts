@@ -10,6 +10,7 @@ import { journeyRoutes } from './routes/journey';
 import { meRoutes } from './routes/me';
 import { messageStickerRoutes } from './routes/message-stickers';
 import { messageRoutes } from './routes/messages';
+import { occasionCardRoutes } from './routes/occasion-cards';
 import { passwordResetRoutes } from './routes/password-reset';
 import { pushRoutes } from './routes/push';
 import { randomRoutes } from './routes/random';
@@ -110,6 +111,7 @@ export function createApp(): Hono<HonoAppEnv> {
   api.route('/', messageRoutes);
   api.route('/', messageStickerRoutes);
   api.route('/', chatBackgroundRoutes);
+  api.route('/', occasionCardRoutes);
   api.route('/', journeyRoutes);
   api.route('/', randomRoutes);
   api.route('/', pushRoutes);

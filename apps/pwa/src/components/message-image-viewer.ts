@@ -1,5 +1,6 @@
-import { iconMarkup } from '../ui/icons/icons';
+import { showToast } from './toast';
 import { triggerHaptic } from '../ui/haptics';
+import { iconMarkup } from '../ui/icons/icons';
 
 let activeClose: (() => void) | null = null;
 
@@ -30,14 +31,52 @@ function openNativePhotoViewer(imageUrl: string, alt: string): boolean {
   }
 }
 
+async function downloadViewerImage(url: string): Promise<void> {
+  const fileName = `check-in-love-${Date.now()}.jpg`;
+  const nativeBridge = window.LoveCheckAndroid as {
+    downloadFile?: (url: string, fileName: string) => void;
+  } | undefined;
+  if (nativeBridge?.downloadFile) {
+    nativeBridge.downloadFile(url, fileName);
+    showToast('Đang tải ảnh xuống...', 'success');
+    return;
+  }
+
+  try {
+    const response = await fetch(url, { mode: 'cors' });
+    if (!response.ok) throw new Error('Download failed');
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 2_000);
+    showToast('Đã lưu ảnh về thiết bị!', 'success');
+  } catch {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast('Đã mở ảnh để lưu về máy', 'info');
+  }
+}
+
 export interface ImageViewerOptions {
   gallery?: string[];
   initialIndex?: number;
 }
 
 /**
- * Lightweight, gesture-rich image viewer with pinch-to-zoom, double-tap zoom,
- * swipe-down-to-dismiss, and optional horizontal gallery swipe.
+ * Theme-aware fullscreen image viewer with top Close + Download actions,
+ * bottom caption card, rounded photo corners, pinch-zoom, double-tap zoom,
+ * and swipe-down-to-dismiss.
  */
 export function openMessageImageViewer(
   imageUrl: string,
@@ -60,11 +99,22 @@ export function openMessageImageViewer(
   backdrop.setAttribute('aria-modal', 'true');
   backdrop.setAttribute('aria-label', 'Xem ảnh');
 
+  const topBar = document.createElement('div');
+  topBar.className = 'message-image-viewer-topbar';
+
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
-  closeButton.className = 'message-image-viewer-close';
+  closeButton.className = 'message-image-viewer-btn message-image-viewer-close';
   closeButton.setAttribute('aria-label', 'Đóng ảnh');
   closeButton.innerHTML = iconMarkup('close', { size: 20 });
+
+  const downloadButton = document.createElement('button');
+  downloadButton.type = 'button';
+  downloadButton.className = 'message-image-viewer-btn message-image-viewer-btn--primary message-image-viewer-download';
+  downloadButton.setAttribute('aria-label', 'Tải ảnh về máy');
+  downloadButton.innerHTML = iconMarkup('download', { size: 20 });
+
+  topBar.append(closeButton, downloadButton);
 
   const imageWrap = document.createElement('div');
   imageWrap.className = 'message-image-viewer-wrap';
@@ -74,9 +124,18 @@ export function openMessageImageViewer(
   image.src = gallery[currentIndex] ?? imageUrl;
   image.alt = alt;
   image.decoding = 'async';
-
   imageWrap.appendChild(image);
-  backdrop.append(closeButton, imageWrap);
+
+  const captionBar = document.createElement('div');
+  captionBar.className = 'message-image-viewer-caption';
+  const cleanCaption = alt.trim();
+  if (cleanCaption && cleanCaption !== 'Ảnh tin nhắn') {
+    captionBar.textContent = cleanCaption;
+  } else {
+    captionBar.hidden = true;
+  }
+
+  backdrop.append(topBar, imageWrap, captionBar);
 
   const previousOverflow = document.body.style.overflow;
   let closed = false;
@@ -130,7 +189,17 @@ export function openMessageImageViewer(
     image.src = gallery[currentIndex];
   };
 
-  closeButton.addEventListener('click', close);
+  closeButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    close();
+  });
+
+  downloadButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    triggerHaptic('tap');
+    void downloadViewerImage(gallery[currentIndex] ?? imageUrl);
+  });
+
   backdrop.addEventListener('click', (event) => {
     if (event.target === backdrop || event.target === imageWrap) close();
   });
@@ -222,7 +291,7 @@ export function openMessageImageViewer(
             const currentScale = Math.max(0.72, 1 - pullRatio * 0.25);
             image.style.transition = 'none';
             image.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${currentScale})`;
-            backdrop.style.background = `rgba(12, 8, 11, ${Math.max(0.15, 0.94 * (1 - pullRatio))})`;
+            backdrop.style.opacity = String(Math.max(0.25, 1 - pullRatio * 0.72));
           } else if (!isSwipingDown && gallery.length > 1 && Math.abs(deltaX) > 16 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
             isSwipingHorizontal = true;
             e.preventDefault();
@@ -250,12 +319,12 @@ export function openMessageImageViewer(
         triggerHaptic('tap');
         image.style.transition = 'transform 0.22s cubic-bezier(0.4, 0, 1, 1), opacity 0.2s ease-out';
         image.style.transform = `translate3d(${translateX}px, ${window.innerHeight}px, 0) scale(0.65)`;
-        backdrop.style.transition = 'background 0.22s ease-out';
-        backdrop.style.background = 'rgba(0, 0, 0, 0)';
+        backdrop.style.transition = 'opacity 0.2s ease-out';
+        backdrop.style.opacity = '0';
         window.setTimeout(close, 200);
       } else {
-        backdrop.style.transition = 'background 0.26s ease-out';
-        backdrop.style.background = 'rgba(12, 8, 11, .94)';
+        backdrop.style.transition = 'opacity 0.24s ease-out';
+        backdrop.style.opacity = '1';
         resetZoom(true);
       }
       isSwipingDown = false;

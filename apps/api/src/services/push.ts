@@ -5,7 +5,15 @@ import { base64UrlEncode } from '../utils/crypto';
 import { logger } from '../utils/logger';
 import { sendWebPushNotification } from './webpush';
 
-export type PushActionType = 'checkin' | 'reaction' | 'reply' | 'reminder' | 'message' | 'journey';
+export type PushActionType =
+  | 'checkin'
+  | 'reaction'
+  | 'reply'
+  | 'reminder'
+  | 'message'
+  | 'journey'
+  | 'occasion_revealed'
+  | 'occasion_prep';
 
 export interface PushPayload {
   title: string;
@@ -40,6 +48,10 @@ function normalizePushActionType(payload: PushPayload): PushActionType {
       return 'reply';
     case 'journey':
       return 'journey';
+    case 'occasion_revealed':
+      return 'occasion_revealed';
+    case 'occasion_prep':
+      return 'occasion_prep';
     default:
       return 'reminder';
   }

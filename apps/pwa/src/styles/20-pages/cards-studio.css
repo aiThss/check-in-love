@@ -1,0 +1,323 @@
+/* ============================================================
+   20-pages/cards-studio.css — Secret Occasion Card Album & Studio
+   ============================================================ */
+
+@layer components {
+  .p-cards-studio {
+    max-width: 520px;
+    margin: 0 auto;
+    width: 100%;
+    min-height: 100vh;
+    padding: calc(var(--safe-top, 0px) + 18px) var(--space-4) calc(120px + var(--safe-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    box-sizing: border-box;
+    overflow-x: clip;
+  }
+
+  .p-cards-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .p-cards-header__copy {
+    min-width: 0;
+  }
+
+  .p-cards-header__copy h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(20px, 5.4vw, 25px);
+    font-weight: 600;
+    line-height: 1.18;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+
+  .p-cards-header__copy p {
+    margin: 2px 0 0;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  /* ── Countdown Banner ── */
+  .p-cards-countdown {
+    padding: 14px 16px;
+    border-radius: var(--radius-xl);
+    background: var(--gold-bg);
+    color: var(--gold-ink);
+    border: 2px solid var(--ink-stroke-color);
+    box-shadow: var(--sticker-shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .p-cards-countdown__copy {
+    min-width: 0;
+  }
+
+  .p-cards-countdown__eyebrow {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.84;
+  }
+
+  .p-cards-countdown__title {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  .p-cards-countdown__pill {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-paper);
+    color: var(--accent-700);
+    border: 1.5px solid var(--ink-stroke-color);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Album Grid ── */
+  .p-album-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .p-album-card {
+    position: relative;
+    min-height: 190px;
+    padding: 14px 12px;
+    border-radius: 20px;
+    border: 2px solid var(--ink-stroke-color);
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--sticker-shadow-sm), var(--elev-2);
+    overflow: hidden;
+    transition: transform var(--duration-fast) var(--ease-spring);
+  }
+
+  .p-album-card:active {
+    transform: scale(0.97);
+  }
+
+  .p-album-card__date {
+    padding: 3px 8px;
+    border-radius: var(--radius-pill);
+    background: rgba(18, 6, 20, 0.34);
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .p-album-card__body strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.24;
+    margin-bottom: 4px;
+  }
+
+  .p-album-card__body small {
+    display: block;
+    font-size: 11px;
+    opacity: 0.92;
+  }
+
+  /* ── Studio Occasion Sections ── */
+  .p-studio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .p-studio-group__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-inline: 2px;
+  }
+
+  .p-studio-group__label {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+  }
+
+  .p-studio-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .p-studio-item {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: var(--radius-lg);
+    border: 1.5px solid var(--border-subtle);
+    background: var(--surface-paper);
+    color: var(--text-primary);
+    box-shadow: var(--elev-1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    text-align: left;
+    cursor: pointer;
+    transition: transform var(--duration-instant) ease, border-color var(--duration-instant) ease;
+  }
+
+  .p-studio-item.is-customized {
+    border-color: var(--accent-500);
+    background: color-mix(in srgb, var(--accent-100) 28%, var(--surface-paper));
+  }
+
+  .p-studio-item__lead {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .p-studio-item__swatch {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    border: 1.5px solid var(--ink-stroke-color);
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+
+  .p-studio-item__copy {
+    min-width: 0;
+  }
+
+  .p-studio-item__copy strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .p-studio-item__copy small {
+    display: block;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+
+  .p-studio-badge {
+    flex-shrink: 0;
+    padding: 4px 9px;
+    border-radius: var(--radius-pill);
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    background: var(--bg-canvas);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .p-studio-badge--custom {
+    background: var(--accent-500);
+    color: var(--text-on-accent);
+    border-color: var(--ink-stroke-color);
+  }
+
+  .p-studio-badge--off {
+    opacity: 0.72;
+  }
+
+  /* ── Editor Form inside Sheet ── */
+  .p-card-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 12px;
+  }
+
+  .p-card-upload-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .p-card-upload-box {
+    position: relative;
+    min-height: 88px;
+    padding: 10px;
+    border-radius: var(--radius-md);
+    border: 1.5px dashed var(--border-strong);
+    background: var(--bg-canvas);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .p-card-upload-box.has-img {
+    border-style: solid;
+    color: #ffffff;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .p-card-upload-box.has-img::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 8, 22, 0.46);
+  }
+
+  .p-card-upload-box > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .p-card-upload-box strong {
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+
+  .p-card-upload-box small {
+    font-size: 10px;
+    opacity: 0.85;
+  }
+
+  .p-card-editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 6px;
+  }
+}

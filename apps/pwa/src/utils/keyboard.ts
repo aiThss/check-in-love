@@ -10,8 +10,18 @@ export function initKeyboardViewport(): void {
     root.classList.add('is-ios');
   }
 
+  const syncFallbackViewport = () => {
+    const h = Math.max(window.innerHeight || 0, root.clientHeight || 0);
+    if (h > 0) root.style.setProperty('--app-viewport-height', `${h}px`);
+  };
+  syncFallbackViewport();
+
   const viewport = window.visualViewport;
-  if (!viewport) return;
+  if (!viewport) {
+    window.addEventListener('resize', syncFallbackViewport, { passive: true });
+    window.addEventListener('orientationchange', () => window.setTimeout(syncFallbackViewport, 180));
+    return;
+  }
 
   let largestViewportHeight = Math.max(window.innerHeight, viewport.height);
   let lastViewportWidth = viewport.width;

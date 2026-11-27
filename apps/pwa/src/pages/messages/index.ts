@@ -18,6 +18,9 @@ import { iconMarkup } from '../../ui/icons/icons';
 import { isReducedMotionActive } from '../../ui/theme/index';
 import { createAvatar } from '../../ui/primitives';
 import {
+  extractImageFromDataTransfer,
+} from '../../utils/message-sticker-input';
+import {
   readChatBackground,
   saveChatBackground,
   type ChatBackgroundSelection,
@@ -936,6 +939,51 @@ export function renderMessagesPage(): RoutePage {
   sendButton.addEventListener('mousedown', preserveComposerFocus);
   form.addEventListener('submit', sendMessage);
 
+  async function attachPastedPhoto(file: File): Promise<void> {
+    try {
+      photoButton.disabled = true;
+      const processed = await processImage(file, { maxSize: 2560, quality: 0.92 });
+      setSelectedPhoto(processed.file, processed.preview);
+      window.requestAnimationFrame(() => messageInput.focus());
+    } catch {
+      const fallbackPreview = typeof URL?.createObjectURL === 'function' ? URL.createObjectURL(file) : '';
+      if (fallbackPreview) {
+        setSelectedPhoto(file, fallbackPreview);
+        window.requestAnimationFrame(() => messageInput.focus());
+      } else {
+        showToast('Không xử lý được ảnh vừa dán', 'error');
+      }
+    } finally {
+      photoButton.disabled = false;
+    }
+  }
+
+  const onPagePaste = (event: ClipboardEvent): void => {
+    if (event.defaultPrevented) return;
+    const image = extractImageFromDataTransfer(event.clipboardData);
+    if (!image) return;
+    event.preventDefault();
+    void attachPastedPhoto(image);
+  };
+  page.addEventListener('paste', onPagePaste);
+
+  const handlePastedPhotoEvent = (event: Event): void => {
+    if (!active) return;
+    const detail = (event as CustomEvent<{ file?: File }>).detail;
+    if (detail?.file) void attachPastedPhoto(detail.file);
+  };
+
+  const handleStickerCreatedEvent = (event: Event): void => {
+    if (!active) return;
+    const detail = (event as CustomEvent<{ message?: ChatMessage }>).detail;
+    if (detail?.message) {
+      mergeMessages([detail.message], 'refresh');
+      scrollToBottom('send');
+    } else {
+      void refreshLatestMessages();
+    }
+  };
+
   // Drag & Drop image support onto page/composer
   page.addEventListener('dragover', (e) => {
     if (e.dataTransfer?.types.includes('Files')) {
@@ -949,15 +997,12 @@ export function renderMessagesPage(): RoutePage {
     const file = Array.from(e.dataTransfer?.files ?? []).find((f) => f.type.startsWith('image/'));
     if (!file) return;
     e.preventDefault();
-    try {
-      const processed = await processImage(file, { maxSize: 2560, quality: 0.92 });
-      setSelectedPhoto(processed.file, processed.preview);
-    } catch {
-      showToast('Không xử lý được ảnh kéo thả', 'error');
-    }
+    await attachPastedPhoto(file);
   });
 
   window.addEventListener('lovecheck:realtime-event', handleRealtimeEvent);
+  window.addEventListener('lovecheck:chat-paste-photo', handlePastedPhotoEvent);
+  window.addEventListener('lovecheck:sticker-created', handleStickerCreatedEvent);
   const handleAndroidShare = () => { void handlePendingShare(); };
   window.addEventListener('lovecheck:android-share', handleAndroidShare);
   const handleOnline = () => {
@@ -1180,6 +1225,8 @@ export function renderMessagesPage(): RoutePage {
       stopPolling();
       typingIndicator.destroy();
       window.removeEventListener('lovecheck:realtime-event', handleRealtimeEvent);
+      window.removeEventListener('lovecheck:chat-paste-photo', handlePastedPhotoEvent);
+      window.removeEventListener('lovecheck:sticker-created', handleStickerCreatedEvent);
       window.removeEventListener('lovecheck:android-share', handleAndroidShare);
       window.removeEventListener('online', handleOnline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -1198,6 +1245,7 @@ export function renderMessagesPage(): RoutePage {
       backgroundMenuItem.removeEventListener('click', onHeaderMenuItemClick);
       page.removeEventListener('click', onPageClick);
       page.removeEventListener('keydown', onPageKeyDown);
+      page.removeEventListener('paste', onPagePaste);
       clearSelectedPhoto();
     },
   };

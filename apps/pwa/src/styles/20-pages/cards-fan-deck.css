@@ -1,0 +1,219 @@
+/* ============================================================
+   20-pages/cards-fan-deck.css — Cinema 3-Card Fan Deck Showcase
+   ============================================================ */
+
+@layer components {
+  .p-fan-stage {
+    position: relative;
+    padding: 16px 12px 18px;
+    border-radius: var(--radius-xl);
+    background: var(--surface-paper);
+    border: 2px solid var(--ink-stroke-color);
+    box-shadow: var(--sticker-shadow), var(--elev-2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+  }
+
+  .p-fan-stage__head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .p-fan-stage__copy {
+    min-width: 0;
+  }
+
+  .p-fan-stage__copy strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .p-fan-stage__copy span {
+    display: block;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+
+  .p-fan-deck-tabs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+
+  .p-fan-deck-pill {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 32px;
+    padding: 5px 8px;
+    border-radius: var(--radius-pill);
+    border: 1.5px solid var(--border-subtle);
+    background: var(--bg-canvas);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: transform var(--duration-fast) var(--ease-spring), background-color var(--duration-fast) ease;
+  }
+
+  .p-fan-deck-pill.is-active {
+    background: var(--accent-500);
+    border-color: var(--ink-stroke-color);
+    color: var(--text-on-accent);
+  }
+
+  /* ── 3 Playing Cards Fanned Out Like Cinema Hand ── */
+  .p-fan-hand {
+    position: relative;
+    width: 100%;
+    height: 224px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 10px;
+    perspective: 900px;
+  }
+
+  .p-fan-card {
+    position: relative;
+    width: 112px;
+    height: 164px;
+    margin-inline: -11px;
+    padding: 10px 8px;
+    border-radius: 18px;
+    border: 2px solid rgba(255, 250, 242, 0.85);
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 14px 28px rgba(24, 8, 22, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    transform-origin: 50% 110%;
+    transition:
+      transform 340ms cubic-bezier(0.22, 1.32, 0.36, 1),
+      box-shadow 260ms ease,
+      opacity 220ms ease,
+      filter 220ms ease;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  .p-fan-card::before {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border-radius: 13px;
+    border: 1px solid rgba(255, 245, 225, 0.42);
+    pointer-events: none;
+  }
+
+  .p-fan-card[data-slot='0'] {
+    z-index: 1;
+    transform: translateX(-6px) translateY(10px) rotate(-11deg);
+  }
+
+  .p-fan-card[data-slot='1'] {
+    z-index: 2;
+    transform: translateY(-2px) rotate(0deg);
+  }
+
+  .p-fan-card[data-slot='2'] {
+    z-index: 1;
+    transform: translateX(6px) translateY(10px) rotate(11deg);
+  }
+
+  .p-fan-hand.has-selection .p-fan-card:not(.is-lifted) {
+    opacity: 0.72;
+    filter: saturate(0.84);
+  }
+
+  .p-fan-hand .p-fan-card.is-lifted {
+    z-index: 6;
+    opacity: 1;
+    filter: none;
+    transform: translateY(-30px) scale(1.08) rotate(0deg);
+    border-color: #fff6d6;
+    box-shadow:
+      0 24px 44px rgba(28, 8, 24, 0.42),
+      0 0 0 3px var(--gold-bg),
+      inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  }
+
+  .p-fan-card__badge {
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(20, 8, 22, 0.32);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .p-fan-card__crest {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.44);
+    display: grid;
+    place-items: center;
+  }
+
+  .p-fan-card__title {
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.32);
+  }
+
+  .p-fan-card__sub {
+    font-size: 9.5px;
+    line-height: 1.25;
+    opacity: 0.9;
+  }
+
+  .p-fan-confirm-bar {
+    width: 100%;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .p-fan-confirm-hint {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  .p-fan-confirm-btn {
+    animation: cil-icon-pop 220ms var(--ease-spring);
+  }
+
+  @media (max-width: 370px) {
+    .p-fan-card {
+      width: 100px;
+      height: 152px;
+      margin-inline: -9px;
+    }
+  }
+}

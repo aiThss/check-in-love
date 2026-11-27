@@ -65,11 +65,14 @@ meRoutes.patch('/me', authenticate, async (c) => {
   const nowIso = new Date().toISOString();
   const data = parsed.data;
 
+  const partner = await findPartnerUser(c.env.DB, user.couple_id, user.id);
+
   const nextDisplayName = data.displayName ?? user.display_name;
   const nextPartnerName = data.partnerName ?? user.partner_name;
   const nextBirthday = data.birthday !== undefined ? data.birthday : user.birthday;
-  const nextPartnerBirthday =
+  const rawNextPartnerBirthday =
     data.partnerBirthday !== undefined ? data.partnerBirthday : user.partner_birthday;
+  const nextPartnerBirthday = rawNextPartnerBirthday ?? partner?.birthday ?? null;
 
   await execute(
     c.env.DB,
@@ -87,8 +90,26 @@ meRoutes.patch('/me', authenticate, async (c) => {
     );
   }
 
-  const partner = await findPartnerUser(c.env.DB, user.couple_id, user.id);
   if (partner) {
+    const syncedPartnerSelfBday = !partner.birthday && nextPartnerBirthday
+      ? nextPartnerBirthday
+      : partner.birthday;
+    const syncedPartnerOtherBday = !partner.partner_birthday && nextBirthday
+      ? nextBirthday
+      : partner.partner_birthday;
+    if (
+      syncedPartnerSelfBday !== partner.birthday
+      || syncedPartnerOtherBday !== partner.partner_birthday
+    ) {
+      await execute(
+        c.env.DB,
+        `UPDATE users
+         SET birthday = ?, partner_birthday = ?, updated_at = ?
+         WHERE id = ?`,
+        [syncedPartnerSelfBday, syncedPartnerOtherBday, nowIso, partner.id],
+      );
+    }
+
     await emitRealtimeEvent(c.env, partner.id, {
       type: 'partner.updated',
       senderId: user.id,

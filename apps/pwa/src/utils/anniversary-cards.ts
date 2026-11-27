@@ -1,16 +1,31 @@
 import { getMe, type MeResponse } from '../api/auth';
-import { updateProfile } from '../api/profile';
-import { store } from '../store/index';
+import {
+  getTodayOccasionCard,
+  markOccasionCardRevealed,
+  type AuthoredOccasionCard,
+  type ResolvedServerOccasionCard,
+} from '../api/occasion-cards';
 import { showToast } from '../components/toast';
+import { navigate } from '../router';
+import { store } from '../store/index';
+import { triggerHaptic } from '../ui/haptics';
 import { iconMarkup, type IconName } from '../ui/icons/icons';
+import {
+  OCCASION_CATALOG,
+  VIETNAM_TIMEZONE,
+  getLunarMonthDay,
+  type BuiltinOccasionKey,
+  type OccasionCardId,
+  type OccasionPattern,
+} from './occasion-catalog';
 
-const VIETNAM_TIMEZONE = 'Asia/Ho_Chi_Minh';
+export type { BuiltinOccasionKey, OccasionCardId, OccasionPattern };
+
 const SEEN_PREFIX = 'lovecheck:occasion-card:seen:v1:';
 const PREVIEW_QUERY = 'cardPreview';
-const SCRATCH_THRESHOLD = 0.88;
+const SCRATCH_THRESHOLD = 0.72;
 const BIRTHDAY_NOTICE_PREFIX = 'lovecheck:birthday-setup-notice:v1:';
 const SPECIAL_MODAL_CLOSED_EVENT = 'lovecheck:special-modal-closed';
-let birthdaySettingsLoading = false;
 const birthdayNoticeSession = new Set<string>();
 
 const OCCASION_ART_SVG = `
@@ -68,16 +83,10 @@ const OCCASION_ART_SVG = `
     <g class="occasion-leaf-l" filter="url(#occasionLeafSh)">
       <path d="M58 132 C48 128 36 122 32 116 C28 110 34 104 42 108 C50 112 56 122 58 132Z" fill="url(#occasionLeafGradL)"/>
       <path d="M56 130 Q48 122 40 116" stroke="#1b4332" stroke-width="1.1" fill="none" opacity=".55" stroke-linecap="round"/>
-      <path d="M52 126 Q46 122 42 120" stroke="#2d6a4f" stroke-width=".7" fill="none" opacity=".45"/>
-      <path d="M54 129 Q50 126 46 124" stroke="#2d6a4f" stroke-width=".7" fill="none" opacity=".4"/>
-      <path d="M56 130 C48 126 38 120 34 116" stroke="#95d5b2" stroke-width="1" fill="none" opacity=".35" stroke-linecap="round"/>
     </g>
     <g class="occasion-leaf-r" filter="url(#occasionLeafSh)">
       <path d="M72 134 C82 131 96 126 100 120 C104 114 98 108 90 112 C82 116 76 126 72 134Z" fill="url(#occasionLeafGradR)"/>
       <path d="M74 132 Q82 125 92 118" stroke="#081c15" stroke-width="1.1" fill="none" opacity=".5" stroke-linecap="round"/>
-      <path d="M78 128 Q84 124 88 122" stroke="#1b4332" stroke-width=".7" fill="none" opacity=".4"/>
-      <path d="M76 131 Q80 128 84 126" stroke="#1b4332" stroke-width=".7" fill="none" opacity=".35"/>
-      <path d="M74 132 C82 129 94 124 98 120" stroke="#74c69d" stroke-width="1" fill="none" opacity=".3" stroke-linecap="round"/>
     </g>
     <g filter="url(#occasionDs)">
       <g transform="rotate(0 65 60)"><g class="occasion-petal occasion-p0"><path d="M65 18C65 8 79 2 88 16C97 2 111 8 111 18C111 38 88 58 88 58C88 58 65 38 65 18Z" fill="url(#occasionHp)" transform="translate(-23 10)" filter="url(#occasionGlow)" opacity=".88"/></g></g>
@@ -105,22 +114,7 @@ const OCCASION_ART_SVG = `
   </g>
 </svg>`;
 
-export type OccasionCardId =
-  | 'day-100'
-  | 'day-500'
-  | 'day-1000'
-  | 'anniversary'
-  | 'birthday'
-  | 'new-year'
-  | 'valentine'
-  | 'womens-day'
-  | 'childrens-day'
-  | 'vietnamese-womens-day'
-  | 'christmas';
-
-type Pattern = 'hearts' | 'petals' | 'confetti' | 'stars' | 'snow' | 'ribbons' | 'candy';
-
-interface CalendarDate {
+export interface CalendarDate {
   year: number;
   month: number;
   day: number;
@@ -131,191 +125,44 @@ interface OccasionContext {
   dateKey: string;
   daysTogether: number;
   yearsTogether: number;
-  displayName: string;
-  partnerName: string;
-  partnerAge?: number;
+  recipientName: string;
+  senderName: string;
+  recipientAge?: number;
 }
 
 export interface OccasionCard {
   id: OccasionCardId;
+  occasionKey?: string;
   title: string;
   eyebrow: string;
   message: string;
   signature: string;
   coverText: string;
   icon: IconName;
-  pattern: Pattern;
+  pattern: OccasionPattern;
   colors: [string, string, string];
   coverImage?: string;
+  scratchCoverUrl?: string;
+  backgroundImageUrl?: string;
 }
 
-interface CardDefinition {
-  id: OccasionCardId;
-  title: (context: OccasionContext) => string;
-  eyebrow: (context: OccasionContext) => string;
-  message: (context: OccasionContext) => string;
-  signature: (context: OccasionContext) => string;
-  coverText: string;
-  icon: IconName;
-  pattern: Pattern;
-  colors: [string, string, string];
-  coverImage?: string;
+export interface OpenOccasionCardOptions {
+  skipScratch?: boolean;
+  isDraftPreview?: boolean;
+  onRevealed?: () => void;
 }
 
-const CARD_DEFINITIONS: Record<OccasionCardId, CardDefinition> = {
-  'day-100': {
-    id: 'day-100',
-    title: () => '100 ngày của anh và em',
-    eyebrow: () => 'Một cột mốc nhỏ xinh',
-    message: () =>
-      'Vậy là anh với em đã đi cùng nhau được 100 ngày rồi. Chưa phải thật lâu, nhưng đủ để anh thấy có em trong những ngày bình thường là một điều rất dễ thương. Mình cứ chậm rãi bên nhau như thế nhé.',
-    signature: () => 'Thương em, từ anh.',
-    coverText: 'Cào nhẹ để mở 100 ngày đầu tiên của hai đứa',
-    icon: 'heart-burst',
-    pattern: 'hearts',
-    colors: ['#ff8fb1', '#ff5f8f', '#9f3564'],
-    coverImage: '/design/100-1day.png',
-  },
-  'day-500': {
-    id: 'day-500',
-    title: () => '500 ngày có nhau',
-    eyebrow: () => 'Mình đi được khá xa rồi đấy',
-    message: () =>
-      '500 ngày nghe cũng nhiều thật đấy. Cảm ơn em vì vẫn ở đây, cùng anh đi qua cả những ngày vui lẫn mấy hôm chẳng vui lắm. Anh vẫn muốn những ngày sau này có em.',
-    signature: () => 'Anh vẫn chọn em.',
-    coverText: 'Mở xem điều anh muốn nhắn ở ngày 500',
-    icon: 'gift',
-    pattern: 'ribbons',
-    colors: ['#d7a8ff', '#9c66db', '#5b338d'],
-    coverImage: '/design/500-1day.webp',
-  },
-  'day-1000': {
-    id: 'day-1000',
-    title: () => '1.000 ngày rồi em ạ',
-    eyebrow: () => 'Một nghìn ngày, rất nhiều chuyện để nhớ',
-    message: () =>
-      'Mình đã có một đoạn đường đủ dài để nhớ, và anh vẫn mong phía trước còn thật nhiều ngày để hai đứa cùng kể tiếp. Cảm ơn em vì đã là một phần rất quan trọng trong những ngày của anh.',
-    signature: () => 'Còn nhiều ngày nữa nhé em.',
-    coverText: 'Chạm cào ngàn ngày bên nhau em nhé',
-    icon: 'sparkle',
-    pattern: 'stars',
-    colors: ['#72d7ff', '#5d7df3', '#35408d'],
-  },
-  anniversary: {
-    id: 'anniversary',
-    title: (context) => `${context.yearsTogether} năm bên nhau`,
-    eyebrow: () => 'Ngày mình bắt đầu',
-    message: () =>
-      'Thêm một năm anh với em ở cạnh nhau. Anh không hứa lúc nào cũng hoàn hảo, chỉ mong mình vẫn chọn nói chuyện, chọn hiểu nhau và chọn ở lại. Chúc cho hai đứa mình có thêm thật nhiều ngày kỷ niệm như hôm nay.',
-    signature: () => 'Mừng ngày của chúng mình.',
-    coverText: 'Cào mở ngày kỷ niệm của hai đứa mình',
-    icon: 'anniversary',
-    pattern: 'petals',
-    colors: ['#f6c86f', '#e9965b', '#9b5a42'],
-  },
-  birthday: {
-    id: 'birthday',
-    title: (context) =>
-      context.partnerAge ? `Chúc mừng tuổi ${context.partnerAge}, em nhé` : 'Chúc mừng sinh nhật em',
-    eyebrow: () => 'Hôm nay là ngày của em',
-    message: () =>
-      'Tuổi mới cứ vui hơn một chút, nhẹ lòng hơn một chút và được yêu nhiều thật nhiều. Anh sẽ cố góp phần vào mấy điều đó. Cứ là em như bây giờ nhé, vì anh thương phiên bản ấy lắm.',
-    signature: () => 'Sinh nhật vui vẻ, em bé của anh.',
-    coverText: 'Món quà nhỏ mừng ngày em ra đời',
-    icon: 'anniversary',
-    pattern: 'confetti',
-    colors: ['#ffd66e', '#ff9c64', '#d94b78'],
-  },
-  'new-year': {
-    id: 'new-year',
-    title: () => 'Năm mới, vẫn là anh và em',
-    eyebrow: () => 'Ngày đầu tiên của một năm mới',
-    message: () =>
-      'Mong anh với em vẫn là một đội: vui thì cùng cười, mệt thì dựa vào nhau, có chuyện gì cũng đừng buông tay quá nhanh. Chúc hai đứa mình một năm bình yên, nhiều niềm vui và nhiều lần được gặp nhau.',
-    signature: () => 'Năm mới vẫn thương em.',
-    coverText: 'Cào lấy may và thương nhau cả năm mới',
-    icon: 'star',
-    pattern: 'stars',
-    colors: ['#ffcf56', '#ed6a4a', '#8f263d'],
-  },
-  valentine: {
-    id: 'valentine',
-    title: () => 'Valentine vui vẻ nhé em',
-    eyebrow: () => '14 tháng 2',
-    message: () =>
-      'Anh không giỏi nói lời hoa mỹ, nhưng chuyện anh thương em thì là thật. Hôm nay và cả những ngày không phải lễ, anh vẫn mong em luôn cảm thấy mình được yêu và được trân trọng.',
-    signature: () => 'Người yêu em.',
-    coverText: 'Một chiếc thư Valentine bí mật dành riêng em',
-    icon: 'mail',
-    pattern: 'hearts',
-    colors: ['#ff839d', '#e43d68', '#8a2148'],
-  },
-  'womens-day': {
-    id: 'womens-day',
-    title: () => '8/3 vui vẻ nhé em',
-    eyebrow: () => 'Ngày Quốc tế Phụ nữ',
-    message: () =>
-      'Hôm nay em cứ việc xinh, vui và được chiều. Còn những ngày bình thường, anh cũng sẽ nhớ thương em tử tế. Mong em luôn tự tin, thoải mái và làm những điều khiến mình hạnh phúc.',
-    signature: () => 'Một bông hoa của riêng anh.',
-    coverText: 'Một bông hoa nhỏ dành tặng em ngày 8/3',
-    icon: 'star',
-    pattern: 'petals',
-    colors: ['#ffb7cf', '#ef73aa', '#8e416d'],
-  },
-  'childrens-day': {
-    id: 'childrens-day',
-    title: () => '1/6 vui vẻ, em bé',
-    eyebrow: () => 'Người lớn vẫn được nhận quà',
-    message: () =>
-      'Người lớn rồi vẫn được quyền nhõng nhẽo, thích quà và cười vì mấy chuyện bé xíu. Với anh, em vẫn là em bé. Hôm nay cứ vui thật nhiều và đừng ngại đòi anh chiều nhé.',
-    signature: () => 'Anh của em bé.',
-    coverText: 'Em bé cào quà nào',
-    icon: 'sparkle',
-    pattern: 'candy',
-    colors: ['#75e5dc', '#75aef5', '#7657c6'],
-  },
-  'vietnamese-womens-day': {
-    id: 'vietnamese-womens-day',
-    title: () => '20/10 vui vẻ nhé em',
-    eyebrow: () => 'Ngày Phụ nữ Việt Nam',
-    message: () =>
-      'Cảm ơn em vì đã xuất hiện và làm những ngày của anh có thêm nhiều điều để mong. Mong em luôn được yêu thương đúng cách, được lắng nghe và được là chính mình.',
-    signature: () => 'Thương em nhiều.',
-    coverText: 'Lời thương gửi người phụ nữ anh yêu nhất',
-    icon: 'heart',
-    pattern: 'petals',
-    colors: ['#f3a8c8', '#d76da8', '#7f416f'],
-  },
-  christmas: {
-    id: 'christmas',
-    title: () => 'Giáng sinh ấm áp nhé em',
-    eyebrow: () => 'Merry Christmas',
-    message: () =>
-      'Giáng sinh này anh không cần điều ước gì cầu kỳ. Chỉ mong anh với em vẫn có nhau, ấm áp và bình yên. Trời có lạnh thì nhớ ở gần anh thêm một chút nhé.',
-    signature: () => 'Quà Noel của anh là em.',
-    coverText: 'Cào lớp tuyết lạnh để nhận hơi ấm Noel',
-    icon: 'gift',
-    pattern: 'snow',
-    colors: ['#9be3d2', '#3aa58f', '#1d5e58'],
-  },
-};
+const PREVIEW_ORDER: BuiltinOccasionKey[] = OCCASION_CATALOG.map((item) => item.key);
 
-const PREVIEW_ORDER: OccasionCardId[] = [
-  'day-100',
-  'anniversary',
-  'day-500',
-  'day-1000',
-  'birthday',
-  'valentine',
-  'womens-day',
-  'childrens-day',
-  'vietnamese-womens-day',
-  'christmas',
-  'new-year',
-];
-
-function getCalendarDate(value: Date | string, timeZone = VIETNAM_TIMEZONE): CalendarDate {
+export function getCalendarDate(value: Date | string, timeZone = VIETNAM_TIMEZONE): CalendarDate {
+  if (typeof value === 'string') {
+    const plain = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (plain) {
+      return { year: Number(plain[1]), month: Number(plain[2]), day: Number(plain[3]) };
+    }
+  }
   const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return { year: 0, month: 0, day: 0 };
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -346,73 +193,185 @@ export function calculateAge(birthday: string | undefined, today = getCalendarDa
 }
 
 function isSameDay(left: CalendarDate, right: CalendarDate): boolean {
-  return left.month === right.month && left.day === right.day;
+  return left.month > 0 && left.day > 0 && left.month === right.month && left.day === right.day;
 }
 
 function createContext(me: MeResponse, now = new Date()): OccasionContext {
   const today = getCalendarDate(now);
   const start = me.couple?.loveStartDate ? getCalendarDate(me.couple.loveStartDate) : undefined;
-  const birthday = me.user.partnerBirthday || me.partnerUser?.birthday;
+  const myBirthday = me.user.birthday;
   return {
     today,
     dateKey: toDateKey(today),
-    daysTogether: start ? Math.max(0, dayDifference(start, today)) : 0,
-    yearsTogether: start && isSameDay(start, today) ? Math.max(0, today.year - start.year) : 0,
-    displayName: me.user.displayName || 'anh',
-    partnerName: me.user.partnerName || me.partnerUser?.displayName || 'em',
-    partnerAge: calculateAge(birthday, today),
+    daysTogether: start && start.year ? Math.max(0, dayDifference(start, today)) : 0,
+    yearsTogether: start && start.year && isSameDay(start, today) ? Math.max(0, today.year - start.year) : 0,
+    recipientName: me.user.displayName || 'bạn',
+    senderName: me.user.partnerName || me.partnerUser?.displayName || 'người ấy',
+    recipientAge: calculateAge(myBirthday, today),
   };
 }
 
-function buildCard(id: OccasionCardId, context: OccasionContext): OccasionCard {
-  const definition = CARD_DEFINITIONS[id];
+export function buildBuiltinOccasionCard(
+  key: BuiltinOccasionKey,
+  context: OccasionContext,
+  override?: Partial<AuthoredOccasionCard>,
+): OccasionCard {
+  const entry = OCCASION_CATALOG.find((item) => item.key === key) ?? OCCASION_CATALOG[0];
+  const defaults = entry.defaultCopy({
+    recipientName: context.recipientName,
+    senderName: context.senderName,
+    recipientAge: context.recipientAge,
+    yearsTogether: context.yearsTogether,
+  });
   return {
-    id,
-    title: definition.title(context),
-    eyebrow: definition.eyebrow(context),
-    message: definition.message(context),
-    signature: definition.signature(context),
-    coverText: definition.coverText,
-    icon: definition.icon,
-    pattern: definition.pattern,
-    colors: definition.colors,
-    coverImage: definition.coverImage,
+    id: key,
+    occasionKey: key,
+    eyebrow: override?.eyebrow?.trim() || defaults.eyebrow,
+    title: override?.title?.trim() || defaults.title,
+    message: override?.message?.trim() || defaults.message,
+    signature: override?.signature?.trim() || defaults.signature,
+    coverText: override?.coverText?.trim() || defaults.coverText,
+    icon: entry.icon,
+    pattern: override?.pattern || entry.pattern,
+    colors: override?.colors ?? entry.colors,
+    coverImage: override?.scratchCoverUrl || entry.coverImage,
+    scratchCoverUrl: override?.scratchCoverUrl,
+    backgroundImageUrl: override?.backgroundImageUrl,
   };
 }
 
-export function resolveOccasionCard(me: MeResponse, now = new Date()): OccasionCard | null {
+export function toOccasionCardFromServer(dto: ResolvedServerOccasionCard): OccasionCard {
+  return {
+    id: dto.id,
+    occasionKey: dto.occasionKey,
+    eyebrow: dto.eyebrow,
+    title: dto.title,
+    message: dto.message,
+    signature: dto.signature,
+    coverText: dto.coverText,
+    icon: (dto.icon as IconName) || 'gift',
+    pattern: dto.pattern,
+    colors: dto.colors,
+    coverImage: dto.scratchCoverUrl || dto.coverImage,
+    scratchCoverUrl: dto.scratchCoverUrl,
+    backgroundImageUrl: dto.backgroundImageUrl,
+  };
+}
+
+export function resolveOccasionCard(
+  me: MeResponse,
+  now = new Date(),
+  partnerAuthoredCards: readonly AuthoredOccasionCard[] = [],
+): OccasionCard | null {
   const context = createContext(me, now);
-  const birthday = me.user.partnerBirthday || me.partnerUser?.birthday;
-  if (birthday && isSameDay(getCalendarDate(birthday), context.today)) return buildCard('birthday', context);
+  const byKey = new Map(partnerAuthoredCards.map((c) => [c.occasionKey, c]));
 
-  if (context.daysTogether === 100) return buildCard('day-100', context);
-  if (context.daysTogether === 500) return buildCard('day-500', context);
-  if (context.daysTogether === 1000) return buildCard('day-1000', context);
-  if (context.yearsTogether >= 1) return buildCard('anniversary', context);
+  // 1) Custom date surprise from partner
+  for (const c of partnerAuthoredCards) {
+    if (c.kind !== 'custom' || !c.enabled || !c.customDate) continue;
+    const raw = c.customDate.trim();
+    const matched = c.scheduleType === 'annual'
+      ? (raw.length >= 10 ? raw.slice(5, 10) : raw) === context.dateKey.slice(5, 10)
+      : raw.slice(0, 10) === context.dateKey;
+    if (matched) {
+      return {
+        id: c.occasionKey,
+        occasionKey: c.occasionKey,
+        eyebrow: c.eyebrow?.trim() || 'Món quà bất ngờ dành riêng bạn',
+        title: c.title?.trim() || c.occasionLabel?.trim() || `Gửi ${context.recipientName} thương yêu`,
+        message: c.message?.trim() || `Một lời nhắn nhỏ bí mật từ ${context.senderName} gửi đến ${context.recipientName} hôm nay.`,
+        signature: c.signature?.trim() || `Thương nhiều — ${context.senderName}.`,
+        coverText: c.coverText?.trim() || 'Cào nhẹ để mở bí mật người ấy gửi bạn',
+        icon: 'gift',
+        pattern: c.pattern || 'hearts',
+        colors: c.colors ?? ['#ff8fb1', '#ff4d88', '#8a2148'],
+        coverImage: c.scratchCoverUrl,
+        scratchCoverUrl: c.scratchCoverUrl,
+        backgroundImageUrl: c.backgroundImageUrl,
+      };
+    }
+  }
 
-  const fixed: Array<[number, number, OccasionCardId]> = [
-    [1, 1, 'new-year'],
-    [2, 14, 'valentine'],
-    [3, 8, 'womens-day'],
-    [6, 1, 'childrens-day'],
-    [10, 20, 'vietnamese-womens-day'],
-    [12, 24, 'christmas'],
-  ];
-  const match = fixed.find(([month, day]) => context.today.month === month && context.today.day === day);
-  return match ? buildCard(match[2], context) : null;
+  const pickBuiltin = (key: BuiltinOccasionKey): OccasionCard | null => {
+    const entry = OCCASION_CATALOG.find((item) => item.key === key);
+    if (!entry) return null;
+    const row = byKey.get(key);
+    if (entry.genderSpecific) {
+      if (!row || !row.enabled) return null;
+      return buildBuiltinOccasionCard(key, context, row);
+    }
+    if (row && !row.enabled) return null;
+    return buildBuiltinOccasionCard(key, context, row);
+  };
+
+  // 2) Recipient's own birthday (me.user.birthday)
+  if (me.user.birthday && isSameDay(getCalendarDate(me.user.birthday), context.today)) {
+    const bday = pickBuiltin('birthday');
+    if (bday) return bday;
+  }
+
+  // 3) Love milestones
+  if (context.daysTogether === 100) {
+    const c = pickBuiltin('day-100');
+    if (c) return c;
+  }
+  if (context.daysTogether === 500) {
+    const c = pickBuiltin('day-500');
+    if (c) return c;
+  }
+  if (context.daysTogether === 1000) {
+    const c = pickBuiltin('day-1000');
+    if (c) return c;
+  }
+  if (context.yearsTogether >= 1) {
+    const c = pickBuiltin('anniversary');
+    if (c) return c;
+  }
+
+  // 4) Lunar Vietnamese holidays
+  const lunar = getLunarMonthDay(now);
+  if (lunar && !lunar.isLeapMonth) {
+    for (const item of OCCASION_CATALOG) {
+      if (item.lunar && item.lunar[0] === lunar.month && item.lunar[1] === lunar.day) {
+        const c = pickBuiltin(item.key);
+        if (c) return c;
+      }
+    }
+  }
+
+  // 5) Solar Vietnamese & couple holidays
+  for (const item of OCCASION_CATALOG) {
+    if (item.solar && item.solar[0] === context.today.month && item.solar[1] === context.today.day) {
+      const c = pickBuiltin(item.key);
+      if (c) return c;
+    }
+  }
+
+  return null;
 }
 
 function previewContext(me?: MeResponse): OccasionContext {
-  if (me) return createContext(me);
   const today = getCalendarDate(new Date());
+  if (me) {
+    const partnerBday = me.user.partnerBirthday || me.partnerUser?.birthday;
+    return {
+      today,
+      dateKey: toDateKey(today),
+      daysTogether: 100,
+      yearsTogether: 1,
+      recipientName: me.user.partnerName || me.partnerUser?.displayName || 'người ấy',
+      senderName: me.user.displayName || 'mình',
+      recipientAge: calculateAge(partnerBday, today) ?? 22,
+    };
+  }
   return {
     today,
     dateKey: toDateKey(today),
     daysTogether: 100,
     yearsTogether: 1,
-    displayName: 'anh',
-    partnerName: 'em',
-    partnerAge: 20,
+    recipientName: 'Người thương',
+    senderName: 'Mình',
+    recipientAge: 22,
   };
 }
 
@@ -423,19 +382,19 @@ function ensureStyles(): void {
   style.textContent = `
     .occasion-overlay {
       position: fixed; inset: 0; z-index: 5000;
-      display: flex; align-items: center; justify-content: center;
-      padding: 16px; background: rgba(14, 8, 16, 0.78);
-      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+      padding: max(16px, calc(var(--android-status-bar, env(safe-area-inset-top, 0px)) + 10px)) 16px max(18px, calc(var(--android-nav-bar, env(safe-area-inset-bottom, 0px)) + 12px));
+      background: rgba(18, 10, 18, 0.82);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
       animation: occasionFade 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .occasion-shell {
       position: relative; width: min(390px, 100%);
-      max-height: calc(100dvh - 32px); overflow: auto;
+      max-height: calc(var(--app-viewport-height, 100vh) - 104px); overflow: auto;
       border-radius: 30px;
-      box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.15);
-      background: #1a101b; animation: occasionRise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+      box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.16);
+      background: #1a101b; animation: occasionRise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
-    /* Revealed card: a theme-led paper surface with a calmer text panel. */
     .occasion-paper {
       --paper-start: #fffdf9;
       --paper-mid: #fff2ec;
@@ -446,209 +405,162 @@ function ensureStyles(): void {
       --paper-glow: rgba(255, 133, 177, 0.25);
       --paper-glow-2: rgba(196, 124, 206, 0.17);
       --paper-line: rgba(161, 76, 115, 0.26);
-      --panel: rgba(255, 255, 255, 0.58);
-      --hint-bg: rgba(39, 17, 38, 0.74);
-      position: relative; min-height: 540px; padding: 46px 24px 28px;
+      --panel: rgba(255, 255, 255, 0.72);
+      --hint-bg: rgba(39, 17, 38, 0.76);
+      position: relative; min-height: 520px; padding: 42px 22px 26px;
       overflow: hidden; border-radius: 30px;
       background:
         radial-gradient(circle at 84% 8%, var(--paper-glow), transparent 28%),
         radial-gradient(circle at 10% 94%, var(--paper-glow-2), transparent 31%),
-        repeating-linear-gradient(116deg, transparent 0 24px, rgba(255, 255, 255, 0.12) 25px 26px),
         linear-gradient(150deg, var(--paper-start), var(--paper-mid) 48%, var(--paper-end));
       color: var(--paper-ink);
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.88),
                   inset 0 0 0 6px rgba(255, 255, 255, 0.46),
-                  inset 0 0 0 8px var(--paper-line),
-                  0 22px 70px rgba(32, 11, 27, 0.22);
+                  inset 0 0 0 8px var(--paper-line);
       isolation: isolate;
     }
-    .occasion-paper::before,
-    .occasion-paper::after {
-      content: ''; position: absolute; inset: 0; pointer-events: none;
+    .occasion-custom-bg {
+      position: absolute; inset: 0; z-index: 0;
+      background-position: center; background-size: cover; background-repeat: no-repeat;
+      opacity: 0.92;
     }
-    .occasion-paper::before {
-      z-index: 0; inset: -22%;
-      background:
-        radial-gradient(ellipse at 72% 18%, var(--paper-glow) 0 7%, transparent 22%),
-        radial-gradient(ellipse at 18% 82%, var(--paper-glow-2) 0 6%, transparent 22%);
-      filter: blur(18px); transform: rotate(-9deg);
-    }
-    .occasion-paper::after {
-      z-index: 3; opacity: 0.2; mix-blend-mode: multiply;
-      background-image: radial-gradient(rgba(76, 31, 58, 0.22) 0.55px, transparent 0.7px);
-      background-size: 6px 6px;
+    .occasion-paper.has-custom-bg {
+      --panel: rgba(255, 250, 252, 0.86);
     }
     .occasion-paper[data-pattern='confetti'] {
       --paper-start: #fffdf1; --paper-mid: #fff0c9; --paper-end: #ffd8c9;
       --paper-strong: #8c3d42; --paper-accent: #d46657;
-      --paper-glow: rgba(255, 195, 67, 0.28); --paper-glow-2: rgba(255, 117, 130, 0.18);
-      --paper-line: rgba(208, 105, 79, 0.3);
     }
     .occasion-paper[data-pattern='stars'] {
       --paper-start: #f8fdff; --paper-mid: #e7f1ff; --paper-end: #d8dcfa;
       --paper-ink: #263352; --paper-strong: #334184; --paper-accent: #5267c3;
-      --paper-glow: rgba(86, 187, 255, 0.24); --paper-glow-2: rgba(117, 105, 235, 0.18);
-      --paper-line: rgba(74, 93, 181, 0.28);
     }
-    .occasion-paper[data-card-id='new-year'] {
-      --paper-start: #fff9e9; --paper-mid: #ffedbf; --paper-end: #f7d3c3;
-      --paper-strong: #743849; --paper-accent: #bd6a45;
-      --paper-glow: rgba(255, 201, 67, 0.3); --paper-glow-2: rgba(216, 83, 91, 0.16);
+    .occasion-paper[data-pattern='lanterns'] {
+      --paper-start: #fffaf0; --paper-mid: #ffebd2; --paper-end: #ffd2c9;
+      --paper-ink: #471d1d; --paper-strong: #801b1b; --paper-accent: #c93b2b;
     }
     .occasion-paper[data-pattern='snow'] {
       --paper-start: #f5fffd; --paper-mid: #dcf4ef; --paper-end: #c8e5df;
       --paper-ink: #244745; --paper-strong: #1c5c58; --paper-accent: #2f8d83;
-      --paper-glow: rgba(255, 255, 255, 0.72); --paper-glow-2: rgba(82, 177, 164, 0.18);
-      --paper-line: rgba(38, 126, 117, 0.28);
     }
     .occasion-paper[data-pattern='ribbons'] {
       --paper-start: #fffaff; --paper-mid: #f3e8ff; --paper-end: #dfd1f3;
       --paper-strong: #59397f; --paper-accent: #815ab0;
-      --paper-glow: rgba(215, 173, 255, 0.3); --paper-glow-2: rgba(134, 104, 223, 0.16);
-      --paper-line: rgba(112, 78, 162, 0.26);
     }
     .occasion-paper[data-pattern='candy'] {
       --paper-start: #f8fffe; --paper-mid: #dcfbf5; --paper-end: #d6e5ff;
       --paper-ink: #224250; --paper-strong: #355488; --paper-accent: #4c90bd;
-      --paper-glow: rgba(106, 229, 215, 0.3); --paper-glow-2: rgba(112, 157, 255, 0.18);
-      --paper-line: rgba(69, 132, 180, 0.25);
     }
     .occasion-border-frame {
       position: absolute; inset: 12px; z-index: 1; pointer-events: none;
       border: 1px solid var(--paper-line); border-radius: 22px;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
     }
     .occasion-corner {
-      position: absolute; z-index: 2; width: 24px; height: 24px;
-      color: transparent; font-size: 0; pointer-events: none; line-height: 1;
+      position: absolute; z-index: 2; width: 22px; height: 22px;
+      color: transparent; font-size: 0; pointer-events: none;
     }
-    .occasion-corner.top-left { border-top: 1px solid var(--paper-accent); border-left: 1px solid var(--paper-accent); }
-    .occasion-corner.top-right { border-top: 1px solid var(--paper-accent); border-right: 1px solid var(--paper-accent); }
-    .occasion-corner.bottom-left { border-bottom: 1px solid var(--paper-accent); border-left: 1px solid var(--paper-accent); }
-    .occasion-corner.bottom-right { border-bottom: 1px solid var(--paper-accent); border-right: 1px solid var(--paper-accent); }
-    .occasion-corner.top-left { top: 16px; left: 16px; }
-    .occasion-corner.top-right { top: 16px; right: 16px; }
-    .occasion-corner.bottom-left { bottom: 16px; left: 16px; }
-    .occasion-corner.bottom-right { bottom: 16px; right: 16px; }
-
+    .occasion-corner.top-left { top: 16px; left: 16px; border-top: 1.5px solid var(--paper-accent); border-left: 1.5px solid var(--paper-accent); }
+    .occasion-corner.top-right { top: 16px; right: 16px; border-top: 1.5px solid var(--paper-accent); border-right: 1.5px solid var(--paper-accent); }
+    .occasion-corner.bottom-left { bottom: 16px; left: 16px; border-bottom: 1.5px solid var(--paper-accent); border-left: 1.5px solid var(--paper-accent); }
+    .occasion-corner.bottom-right { bottom: 16px; right: 16px; border-bottom: 1.5px solid var(--paper-accent); border-right: 1.5px solid var(--paper-accent); }
     .occasion-inner {
-      position: relative; z-index: 2; padding: 18px 18px 20px; text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.68); border-radius: 25px;
-      background: linear-gradient(145deg, var(--panel), rgba(255, 255, 255, 0.24));
-      box-shadow: 0 14px 32px rgba(72, 26, 59, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
-      -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
+      position: relative; z-index: 2; padding: 18px 16px 20px; text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.78); border-radius: 24px;
+      background: linear-gradient(145deg, var(--panel), rgba(255, 255, 255, 0.56));
+      box-shadow: 0 14px 32px rgba(72, 26, 59, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     }
     .occasion-art-wrap {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 92px; height: 98px; margin-bottom: 13px; border-radius: 25px;
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.3));
-      box-shadow: 0 14px 28px rgba(78, 32, 70, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
-      transform: rotate(-3deg); transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
-      overflow: visible;
+      width: 86px; height: 92px; margin-bottom: 12px; border-radius: 24px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.35));
+      box-shadow: 0 12px 24px rgba(78, 32, 70, 0.14);
+      transform: rotate(-3deg);
     }
-    .occasion-art-wrap:hover { transform: rotate(2deg) translateY(-2px); }
     .occasion-art { display: block; width: 100%; height: 100%; overflow: visible; }
     .occasion-eyebrow {
-      font-family: var(--font-sans);
-      font-size: 11px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
-      color: var(--paper-accent); margin-bottom: 8px; opacity: 0.9;
+      font-family: var(--font-sans); font-size: 10.5px; font-weight: 800;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--paper-accent); margin-bottom: 8px;
     }
     .occasion-title {
-      font-family: var(--font-display);
-      font-size: 27px; font-weight: 700; line-height: 1.25; color: var(--paper-strong);
-      max-width: 100%; margin: 0 0 16px; white-space: nowrap;
-      letter-spacing: -0.035em; text-shadow: 0 2px 4px rgba(140, 40, 80, 0.08);
+      font-family: var(--font-display); font-size: 25px; font-weight: 700; line-height: 1.24;
+      color: var(--paper-strong); margin: 0 0 14px; text-wrap: balance; letter-spacing: -0.025em;
     }
     .occasion-divider {
       display: flex; align-items: center; justify-content: center; gap: 12px;
-      width: 140px; margin: 0 auto 18px;
+      width: 136px; margin: 0 auto 16px;
     }
     .divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--paper-accent), transparent); }
-    .divider-heart { font-size: 12px; color: var(--paper-accent); opacity: 0.8; }
+    .divider-heart { font-size: 12px; color: var(--paper-accent); }
     .occasion-message {
-      font-family: var(--font-display);
-      font-size: 18px; font-weight: 500; line-height: 1.68; color: var(--paper-ink); margin: 0;
-      letter-spacing: 0.005em;
+      font-family: var(--font-display); font-size: 17px; font-weight: 500; line-height: 1.65;
+      color: var(--paper-ink); margin: 0; white-space: pre-wrap;
     }
     .occasion-signature-wrap {
-      margin-top: 26px; display: flex; align-items: flex-end; justify-content: space-between; gap: 14px;
-      padding-top: 14px; border-top: 1px dashed rgba(180, 120, 145, 0.28);
+      margin-top: 22px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+      padding-top: 14px; border-top: 1px dashed rgba(180, 120, 145, 0.32);
     }
     .occasion-signature {
-      flex: 1 1 auto; min-width: 0; max-width: 210px; margin: 0;
-      font-family: var(--font-display); font-style: italic; font-size: 21px; font-weight: 600;
-      line-height: 1.15; text-align: left; color: var(--paper-accent);
+      flex: 1 1 auto; min-width: 0; margin: 0;
+      font-family: var(--font-display); font-style: italic; font-size: 19px; font-weight: 600;
+      line-height: 1.22; text-align: left; color: var(--paper-accent);
     }
-    .occasion-signature--birthday { max-width: 178px; }
-    .occasion-stamp-wrap {
-      position: relative; flex: 0 0 auto; transform: rotate(6deg);
-    }
+    .occasion-stamp-wrap { position: relative; flex: 0 0 auto; transform: rotate(6deg); }
     .occasion-stamp {
       font-family: var(--font-sans); font-size: 9px; font-weight: 800;
-      letter-spacing: 0.15em; color: rgba(160, 80, 110, 0.65);
-      border: 1.5px solid rgba(160, 80, 110, 0.35); padding: 4px 8px; border-radius: 6px;
-      color: color-mix(in srgb, var(--paper-accent) 68%, transparent);
-      border-color: color-mix(in srgb, var(--paper-accent) 38%, transparent);
-      text-transform: uppercase;
+      letter-spacing: 0.15em; padding: 4px 8px; border-radius: 6px;
+      color: var(--paper-accent); border: 1.5px solid var(--paper-line); text-transform: uppercase;
     }
     .occasion-seal-scratch {
       position: absolute; inset: -3px; z-index: 1; width: calc(100% + 6px); height: calc(100% + 6px);
       border-radius: 9px; cursor: crosshair; touch-action: none;
-      backdrop-filter: blur(4px) saturate(70%); -webkit-backdrop-filter: blur(4px) saturate(70%);
       transition: opacity 360ms ease, transform 360ms ease;
     }
-    .occasion-seal-scratch.is-revealed {
-      opacity: 0; transform: scale(1.08); pointer-events: none;
-    }
-
+    .occasion-seal-scratch.is-revealed { opacity: 0; transform: scale(1.08); pointer-events: none; }
     .occasion-scratch {
       position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4;
-      touch-action: none; cursor: grab; transition: opacity 0.65s ease;
+      touch-action: none; cursor: grab; transition: opacity 0.6s ease;
     }
     .occasion-scratch.scratching { cursor: grabbing; }
     .occasion-scratch.revealed { opacity: 0; pointer-events: none; }
     .occasion-hint {
-      position: absolute; z-index: 5; left: 50%; bottom: 20px; transform: translateX(-50%);
-      display: flex; align-items: center; gap: 10px;
-      padding: 7px 8px 7px 14px; border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.28);
-      background: var(--hint-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      box-shadow: 0 14px 30px rgba(21, 7, 20, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      position: absolute; z-index: 5; left: 50%; bottom: 18px; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.3); background: var(--hint-bg);
       font-family: var(--font-sans); font-size: 10.5px; font-weight: 800;
-      letter-spacing: 0.12em; white-space: nowrap; color: rgba(255, 255, 255, 0.92); pointer-events: none; transition: opacity 0.2s ease;
+      letter-spacing: 0.1em; white-space: nowrap; color: #fff; pointer-events: none; transition: opacity 0.2s ease;
     }
     .occasion-shell.is-revealed .occasion-hint { opacity: 0; }
-
-    .occasion-preview-button { position: fixed; right: 16px; bottom: calc(var(--safe-bottom, 0px) + 92px); z-index: 4500; width: 52px; height: 52px; border: 0; border-radius: 18px; background: linear-gradient(145deg, #ff7ca8, #9c5bda); color: #fff; font-size: 24px; box-shadow: 0 12px 30px rgba(118, 58, 126, 0.35); cursor: pointer; }
-    .occasion-picker-overlay { position: fixed; inset: 0; z-index: 4900; display: flex; align-items: flex-end; justify-content: center; background: rgba(18, 12, 20, 0.58); backdrop-filter: blur(8px); }
-    .occasion-picker { width: min(480px, 100%); max-height: 80dvh; overflow: auto; padding: 18px 16px calc(var(--safe-bottom, 0px) + 20px); border-radius: 26px 26px 0 0; background: var(--bg, #fff); box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.24); }
-    .occasion-picker h3 { font-size: 18px; margin: 0 0 4px; }
-    .occasion-picker p { font-size: 12px; color: var(--text-secondary); margin: 0 0 14px; }
-    .occasion-picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .occasion-picker-item { border: 1px solid var(--border, rgba(0, 0, 0, 0.1)); border-radius: 16px; padding: 13px; text-align: left; background: var(--surface, #fff); color: var(--text-primary, #222); cursor: pointer; }
-    .occasion-picker-item span { display: block; font-size: 23px; margin-bottom: 7px; }
-    .occasion-picker-item strong { display: block; font-size: 13px; }
-    .birthday-settings-card { padding: 16px; display: flex; flex-direction: column; gap: 13px; }
-    .birthday-settings-head { display: flex; gap: 12px; align-items: flex-start; }
-    .birthday-settings-head>span { font-size: 21px; }
-    .birthday-settings-head strong { display: block; font-size: 14px; }
-    .birthday-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .birthday-field { display: flex; flex-direction: column; gap: 6px; }
-    .birthday-field label { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
-    .birthday-field input { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); color: var(--text-primary); }
-    .birthday-save { align-self: flex-end; border: 0; border-radius: 12px; padding: 9px 13px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; }
-    .birthday-save:disabled { opacity: 0.55; }
-
-    @media(max-width:370px) {
-      .occasion-paper { padding-left: 20px; padding-right: 20px; }
-      .occasion-title { font-size: 24px; }
-      .occasion-message { font-size: 18px; }
-      .occasion-signature { font-size: 20px; }
-      .occasion-signature--birthday { max-width: 156px; }
-      .occasion-hint { padding: 7px 10px; font-size: 9px; letter-spacing: 0.08em; }
+    .occasion-actions {
+      display: none; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px;
+      width: min(390px, 100%);
     }
+    .occasion-overlay.is-card-revealed .occasion-actions { display: flex; }
+    .occasion-action-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 40px; padding: 8px 14px; border-radius: 999px;
+      border: 1.5px solid rgba(255, 255, 255, 0.32);
+      background: rgba(42, 22, 38, 0.86); color: #fff;
+      font-family: var(--font-sans); font-size: 12.5px; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
+    }
+    .occasion-action-btn--primary {
+      background: linear-gradient(135deg, #ff4d88, #d9205f);
+      border-color: rgba(255, 220, 234, 0.65);
+    }
+    .occasion-close-top {
+      position: absolute; top: 12px; right: 12px; z-index: 8;
+      width: 34px; height: 34px; display: grid; place-items: center;
+      border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.38);
+      background: rgba(28, 14, 26, 0.52); color: #fff; cursor: pointer;
+    }
+    .occasion-preview-button { position: fixed; right: 16px; bottom: calc(var(--safe-bottom, 0px) + 92px); z-index: 4500; width: 52px; height: 52px; border: 0; border-radius: 18px; background: linear-gradient(145deg, #ff7ca8, #9c5bda); color: #fff; box-shadow: 0 12px 30px rgba(118, 58, 126, 0.35); cursor: pointer; }
+    .occasion-picker-overlay { position: fixed; inset: 0; z-index: 4900; display: flex; align-items: flex-end; justify-content: center; background: rgba(18, 12, 20, 0.58); backdrop-filter: blur(8px); }
+    .occasion-picker { width: min(480px, 100%); max-height: calc(var(--app-viewport-height, 100vh) * 0.8); overflow: auto; padding: 18px 16px calc(var(--safe-bottom, 0px) + 20px); border-radius: 26px 26px 0 0; background: var(--surface-paper, #fff); }
+    .occasion-picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .occasion-picker-item { border: 1px solid var(--border-subtle, rgba(0,0,0,0.1)); border-radius: 16px; padding: 13px; text-align: left; background: var(--bg-canvas, #fff); color: var(--text-primary, #222); cursor: pointer; }
     @keyframes occasionFade { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes occasionRise { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+    @keyframes occasionRise { from { opacity: 0; transform: translateY(22px) scale(0.97); } to { opacity: 1; transform: none; } }
   `;
   document.head.appendChild(style);
 }
@@ -662,20 +574,6 @@ function roundedPath(ctx: CanvasRenderingContext2D, width: number, height: numbe
   ctx.arcTo(0, height, 0, 0, r);
   ctx.arcTo(0, 0, width, 0, r);
   ctx.closePath();
-}
-
-function drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(size / 24, size / 24);
-  ctx.beginPath();
-  ctx.moveTo(12, 21);
-  ctx.bezierCurveTo(10, 18, 2, 13, 2, 7);
-  ctx.bezierCurveTo(2, 2, 8, 0, 12, 5);
-  ctx.bezierCurveTo(16, 0, 22, 2, 22, 7);
-  ctx.bezierCurveTo(22, 13, 14, 18, 12, 21);
-  ctx.fill();
-  ctx.restore();
 }
 
 function roundedRectAt(
@@ -696,6 +594,20 @@ function roundedRectAt(
   ctx.closePath();
 }
 
+function drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 24, size / 24);
+  ctx.beginPath();
+  ctx.moveTo(12, 21);
+  ctx.bezierCurveTo(10, 18, 2, 13, 2, 7);
+  ctx.bezierCurveTo(2, 2, 8, 0, 12, 5);
+  ctx.bezierCurveTo(16, 0, 22, 2, 22, 7);
+  ctx.bezierCurveTo(22, 13, 14, 18, 12, 21);
+  ctx.fill();
+  ctx.restore();
+}
+
 function hexToRgba(value: string, alpha: number): string {
   const hex = value.replace('#', '');
   const normalized = hex.length === 3 ? hex.split('').map((part) => part + part).join('') : hex;
@@ -704,205 +616,23 @@ function hexToRgba(value: string, alpha: number): string {
   return `rgba(${(number >> 16) & 255}, ${(number >> 8) & 255}, ${number & 255}, ${alpha})`;
 }
 
-function drawStarMark(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-  ctx.beginPath();
-  for (let point = 0; point < 10; point += 1) {
-    const radius = point % 2 ? size * 0.38 : size;
-    const angle = -Math.PI / 2 + point * Math.PI / 5;
-    const px = x + Math.cos(angle) * radius;
-    const py = y + Math.sin(angle) * radius;
-    if (point === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawFlowerMark(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  petalColor: string,
-  centerColor: string,
-): void {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.fillStyle = petalColor;
-  for (let petal = 0; petal < 5; petal += 1) {
-    ctx.save();
-    ctx.rotate((petal * Math.PI * 2) / 5);
-    ctx.beginPath();
-    ctx.ellipse(0, -size * 0.45, size * 0.23, size * 0.52, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-  ctx.fillStyle = centerColor;
-  ctx.beginPath();
-  ctx.arc(0, 0, size * 0.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawThemeIllustration(
-  ctx: CanvasRenderingContext2D,
-  card: OccasionCard,
-  x: number,
-  y: number,
-  scale: number,
-  light = false,
-): void {
-  const ink = light ? 'rgba(255, 255, 255, 0.96)' : card.colors[2];
-  const accent = light ? 'rgba(255, 222, 238, 0.98)' : card.colors[1];
-  const soft = light ? 'rgba(255, 255, 255, 0.38)' : hexToRgba(card.colors[0], 0.54);
-
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 2.3;
-  ctx.shadowColor = light ? 'rgba(28, 8, 26, 0.18)' : 'rgba(61, 22, 58, 0.12)';
-  ctx.shadowBlur = light ? 7 : 4;
-
-  ctx.fillStyle = light ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.54)';
-  ctx.beginPath();
-  ctx.arc(0, 0, 34, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (card.id === 'birthday') {
-    ctx.fillStyle = soft;
-    roundedRectAt(ctx, -27, -5, 54, 25, 7);
-    ctx.fill();
-    ctx.fillStyle = accent;
-    roundedRectAt(ctx, -30, -14, 60, 11, 5);
-    ctx.fill();
-    ctx.stroke();
-    [-17, 0, 17].forEach((candleX) => {
-      ctx.strokeStyle = ink;
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(candleX, -17); ctx.lineTo(candleX, -24); ctx.stroke();
-      ctx.fillStyle = accent;
-      ctx.beginPath();
-      ctx.moveTo(candleX, -27); ctx.bezierCurveTo(candleX - 4, -23, candleX + 4, -23, candleX, -17);
-      ctx.fill();
-    });
-  } else if (card.id === 'christmas') {
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.moveTo(0, -28); ctx.lineTo(-24, 8); ctx.lineTo(24, 8); ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(0, -11); ctx.lineTo(-30, 21); ctx.lineTo(30, 21); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = soft;
-    roundedRectAt(ctx, -5, 19, 10, 10, 3); ctx.fill();
-    ctx.fillStyle = ink;
-    drawStarMark(ctx, 0, -30, 5);
-    ctx.fillStyle = light ? 'rgba(255,255,255,.9)' : card.colors[0];
-    [[-15, 11], [13, 5], [-10, 23], [16, 20]].forEach(([dotX, dotY]) => {
-      ctx.beginPath(); ctx.arc(dotX, dotY, 2.3, 0, Math.PI * 2); ctx.fill();
-    });
-  } else if (card.id === 'valentine') {
-    ctx.fillStyle = light ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.65)';
-    roundedRectAt(ctx, -30, -16, 60, 40, 8); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-27, -12); ctx.lineTo(0, 8); ctx.lineTo(27, -12); ctx.stroke();
-    ctx.fillStyle = accent;
-    drawHeart(ctx, 0, 6, 18);
-  } else if (card.id === 'day-500') {
-    ctx.fillStyle = soft;
-    roundedRectAt(ctx, -24, -3, 48, 27, 5); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = accent;
-    roundedRectAt(ctx, -28, -12, 56, 12, 4); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(0, 24); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-27, -6); ctx.bezierCurveTo(-42, -17, -40, -26, -29, -22); ctx.bezierCurveTo(-19, -18, -17, -9, 0, -7); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(27, -6); ctx.bezierCurveTo(42, -17, 40, -26, 29, -22); ctx.bezierCurveTo(19, -18, 17, -9, 0, -7); ctx.stroke();
-  } else if (card.id === 'new-year') {
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 1.8;
-    [[-18, -14, 12], [20, -4, 9], [2, 15, 13]].forEach(([burstX, burstY, radius]) => {
-      for (let ray = 0; ray < 8; ray += 1) {
-        const angle = (ray * Math.PI) / 4;
-        ctx.beginPath();
-        ctx.moveTo(burstX + Math.cos(angle) * (radius * 0.45), burstY + Math.sin(angle) * (radius * 0.45));
-        ctx.lineTo(burstX + Math.cos(angle) * radius, burstY + Math.sin(angle) * radius);
-        ctx.stroke();
-      }
-    });
-    ctx.fillStyle = accent;
-    [[-18, -14, 3], [20, -4, 2.6], [2, 15, 3]].forEach(([dotX, dotY, radius]) => {
-      ctx.beginPath(); ctx.arc(dotX, dotY, radius, 0, Math.PI * 2); ctx.fill();
-    });
-  } else if (card.id === 'day-1000') {
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.ellipse(0, 0, 30, 11, -0.25, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(0, 0, 30, 11, Math.PI / 2 - 0.25, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = accent;
-    drawStarMark(ctx, -1, -1, 7);
-    ctx.fillStyle = light ? '#fff' : card.colors[0];
-    ctx.beginPath(); ctx.arc(-26, -10, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(25, 13, 2.5, 0, Math.PI * 2); ctx.fill();
-  } else if (card.id === 'anniversary') {
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(-9, 1, 14, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(9, 1, 14, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = accent;
-    drawFlowerMark(ctx, -18, -20, 10, accent, ink);
-    drawFlowerMark(ctx, 17, -20, 10, soft, ink);
-  } else if (card.id === 'womens-day' || card.id === 'vietnamese-womens-day') {
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.moveTo(0, 27); ctx.bezierCurveTo(-4, 11, -5, 4, -2, -8); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-3, 14); ctx.bezierCurveTo(-20, 11, -20, 3, -7, 7); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-2, 18); ctx.bezierCurveTo(15, 14, 19, 7, 9, 8); ctx.stroke();
-    drawFlowerMark(ctx, -10, -10, 17, accent, ink);
-    drawFlowerMark(ctx, 10, -15, 15, soft, ink);
-    drawFlowerMark(ctx, 0, -25, 15, accent, ink);
-  } else if (card.id === 'childrens-day') {
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, 28); ctx.stroke();
-    ctx.fillStyle = accent;
-    ctx.beginPath(); ctx.arc(0, -13, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = light ? 'rgba(255,255,255,.85)' : card.colors[2];
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(0, -13, 9, -0.8, 1.4); ctx.stroke();
-    ctx.fillStyle = soft;
-    ctx.beginPath(); ctx.arc(0, -13, 4, 0, Math.PI * 2); ctx.fill();
-  } else {
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 2.4;
-    ctx.beginPath(); ctx.moveTo(0, 27); ctx.bezierCurveTo(-4, 11, -2, 3, 0, -7); ctx.stroke();
-    ctx.fillStyle = accent;
-    drawHeart(ctx, -12, -8, 21);
-    ctx.fillStyle = soft;
-    drawHeart(ctx, 13, -1, 17);
-    ctx.fillStyle = ink;
-    ctx.beginPath(); ctx.arc(0, -16, 3, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-}
-
 function seeded(index: number): number {
   const value = Math.sin(index * 91.733 + 17.17) * 43758.5453;
   return value - Math.floor(value);
 }
 
-function drawPattern(ctx: CanvasRenderingContext2D, width: number, height: number, pattern: Pattern): void {
-  for (let index = 0; index < 46; index += 1) {
+function drawPattern(ctx: CanvasRenderingContext2D, width: number, height: number, pattern: OccasionPattern): void {
+  for (let index = 0; index < 42; index += 1) {
     const x = seeded(index * 3 + 1) * width;
     const y = seeded(index * 3 + 2) * height;
-    const size = 7 + seeded(index * 3 + 3) * 18;
+    const size = 7 + seeded(index * 3 + 3) * 16;
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate((seeded(index + 80) - 0.5) * 1.8);
-    ctx.globalAlpha = 0.16 + seeded(index + 140) * 0.25;
-    ctx.fillStyle = index % 2 ? '#fff' : 'rgba(255,255,255,.55)';
+    ctx.rotate((seeded(index + 80) - 0.5) * 1.6);
+    ctx.globalAlpha = 0.16 + seeded(index + 140) * 0.24;
+    ctx.fillStyle = index % 2 ? '#fff' : 'rgba(255,244,214,.72)';
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.8;
     if (pattern === 'hearts') drawHeart(ctx, 0, 0, size);
     else if (pattern === 'petals') {
       ctx.beginPath();
@@ -910,6 +640,9 @@ function drawPattern(ctx: CanvasRenderingContext2D, width: number, height: numbe
       ctx.fill();
     } else if (pattern === 'confetti') {
       ctx.fillRect(-size * 0.15, -size * 0.55, size * 0.3, size * 1.1);
+    } else if (pattern === 'lanterns') {
+      roundedRectAt(ctx, -size * 0.36, -size * 0.45, size * 0.72, size * 0.9, size * 0.28);
+      ctx.fill();
     } else if (pattern === 'stars') {
       ctx.beginPath();
       for (let point = 0; point < 10; point += 1) {
@@ -945,6 +678,58 @@ function drawPattern(ctx: CanvasRenderingContext2D, width: number, height: numbe
   }
 }
 
+function wrapCanvasLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const paragraphs = text.split(/\n+/);
+  const allLines: string[] = [];
+  for (const para of paragraphs) {
+    const words = para.trim().split(/\s+/).filter(Boolean);
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (line && ctx.measureText(candidate).width > maxWidth) {
+        allLines.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    }
+    if (line) allLines.push(line);
+  }
+  return allLines;
+}
+
+function drawCoverOverlayCopy(ctx: CanvasRenderingContext2D, width: number, height: number, card: OccasionCard, hasPhotoCover: boolean): void {
+  const copyTop = hasPhotoCover ? height * 0.62 : height / 2 - 14;
+  const copyHeight = 112;
+  ctx.save();
+  roundedRectAt(ctx, width * 0.09, copyTop, width * 0.82, copyHeight, 22);
+  const copyPlate = ctx.createLinearGradient(0, copyTop, 0, copyTop + copyHeight);
+  copyPlate.addColorStop(0, 'rgba(26, 8, 28, 0.44)');
+  copyPlate.addColorStop(1, 'rgba(26, 8, 28, 0.72)');
+  ctx.fillStyle = copyPlate;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 245, 225, 0.45)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+  ctx.shadowBlur = 8;
+  ctx.font = '700 16.5px "Be Vietnam Pro", system-ui, sans-serif';
+  const lines = wrapCanvasLines(ctx, card.coverText, width * 0.72).slice(0, 2);
+  const startY = copyTop + 42 - ((lines.length - 1) * 23) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, width / 2, startY + i * 23));
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.92;
+  ctx.font = '800 10px "Be Vietnam Pro", system-ui, sans-serif';
+  ctx.fillText('✦ DÙNG TAY CÀO ĐỂ MỞ BÍ MẬT ✦', width / 2, copyTop + 88);
+  ctx.restore();
+}
+
 function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): CanvasRenderingContext2D | null {
   const rect = canvas.getBoundingClientRect();
   if (rect.width < 2 || rect.height < 2) return null;
@@ -956,31 +741,6 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, rect.width, rect.height);
 
-  const drawCoverImage = (img: HTMLImageElement) => {
-    ctx.save();
-    roundedPath(ctx, rect.width, rect.height, 30);
-    ctx.clip();
-    ctx.globalAlpha = 0.16;
-    ctx.globalCompositeOperation = 'screen';
-    ctx.drawImage(img, 0, 0, rect.width, rect.height);
-    ctx.restore();
-  };
-
-  const drawFullCoverImage = (img: HTMLImageElement) => {
-    ctx.save();
-    roundedPath(ctx, rect.width, rect.height, 30);
-    ctx.clip();
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-    const imageWidth = img.naturalWidth || img.width;
-    const imageHeight = img.naturalHeight || img.height;
-    const scale = Math.max(rect.width / imageWidth, rect.height / imageHeight);
-    const drawWidth = imageWidth * scale;
-    const drawHeight = imageHeight * scale;
-    ctx.drawImage(img, (rect.width - drawWidth) / 2, (rect.height - drawHeight) / 2, drawWidth, drawHeight);
-    ctx.restore();
-  };
-
   const gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
   gradient.addColorStop(0, card.colors[0]);
   gradient.addColorStop(0.52, card.colors[1]);
@@ -989,308 +749,230 @@ function drawScratchCover(canvas: HTMLCanvasElement, card: OccasionCard): Canvas
   ctx.fillStyle = gradient;
   ctx.fill();
 
-  if (card.id === 'day-100' && card.coverImage) {
-    const img = new Image();
-    img.src = card.coverImage;
-    if (img.complete && img.naturalWidth > 0) drawFullCoverImage(img);
-    else img.onload = () => drawFullCoverImage(img);
-    return ctx;
-  }
-
-  // Soft colour blooms make the cover feel like a small illustrated object,
-  // while the deterministic seed keeps every redraw stable during resize.
-  ctx.save();
-  roundedPath(ctx, rect.width, rect.height, 30);
-  ctx.clip();
-  const blooms = [
-    [rect.width * 0.08, rect.height * 0.12, rect.width * 0.52, card.colors[0], 0.48],
-    [rect.width * 0.92, rect.height * 0.24, rect.width * 0.44, card.colors[1], 0.34],
-    [rect.width * 0.72, rect.height * 0.96, rect.width * 0.62, card.colors[2], 0.3],
-  ] as const;
-  blooms.forEach(([x, y, radius, color, alpha]) => {
-    const bloom = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    bloom.addColorStop(0, hexToRgba(color, alpha));
-    bloom.addColorStop(1, hexToRgba(color, 0));
-    ctx.fillStyle = bloom;
-    ctx.fillRect(0, 0, rect.width, rect.height);
-  });
-  ctx.globalAlpha = 0.13;
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 0.8;
-  for (let index = 0; index < 120; index += 1) {
-    const x = seeded(index * 5 + 5) * rect.width;
-    const y = seeded(index * 5 + 6) * rect.height;
-    const length = 7 + seeded(index * 5 + 7) * 18;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + length, y - length * 0.18);
-    ctx.stroke();
-  }
-  ctx.restore();
-
   ctx.save();
   roundedPath(ctx, rect.width, rect.height, 30);
   ctx.clip();
   drawPattern(ctx, rect.width, rect.height, card.pattern);
-
-  // Layered frame and gloss keep the scratch surface tactile instead of flat.
-  ctx.strokeStyle = hexToRgba('#fff5cf', 0.44);
+  ctx.strokeStyle = hexToRgba('#fff5cf', 0.48);
   ctx.lineWidth = 1.6;
-  ctx.save();
-  ctx.translate(14, 14);
-  roundedPath(ctx, rect.width - 28, rect.height - 28, 22);
-  ctx.stroke();
-  ctx.restore();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-  ctx.lineWidth = 1;
-  ctx.save();
-  ctx.translate(21, 21);
-  roundedPath(ctx, rect.width - 42, rect.height - 42, 17);
+  roundedRectAt(ctx, 14, 14, rect.width - 28, rect.height - 28, 22);
   ctx.stroke();
   ctx.restore();
 
-  // Shimmering Diagonal Gloss Highlight
-  const shine = ctx.createLinearGradient(0, 0, rect.width, rect.height);
-  shine.addColorStop(0, 'rgba(255,255,255,0)');
-  shine.addColorStop(0.42, 'rgba(255,255,255,.08)');
-  shine.addColorStop(0.50, 'rgba(255,255,255,.32)');
-  shine.addColorStop(0.58, 'rgba(255,255,255,.08)');
-  shine.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = shine;
-  ctx.fillRect(0, 0, rect.width, rect.height);
-  ctx.restore();
-
-  // The 100-day cover stays intentionally open in the middle. Its reference
-  // artwork contains a faded flower there, so do not place either that asset
-  // or another central badge on this milestone's scratch surface.
-  if (card.id !== 'day-100') {
+  if (!card.scratchCoverUrl && card.id !== 'day-100') {
     ctx.save();
-    ctx.fillStyle = 'rgba(24, 8, 26, 0.2)';
-    ctx.shadowColor = 'rgba(18, 4, 22, 0.32)';
-    ctx.shadowBlur = 24;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.beginPath();
-    ctx.ellipse(rect.width / 2, rect.height / 2 - 58, 58, 46, 0, 0, Math.PI * 2);
+    ctx.arc(rect.width / 2, rect.height / 2 - 74, 42, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    const artHalo = ctx.createRadialGradient(
-      rect.width / 2 - 12, rect.height / 2 - 70, 2,
-      rect.width / 2, rect.height / 2 - 58, 54,
-    );
-    artHalo.addColorStop(0, 'rgba(255, 255, 255, 0.72)');
-    artHalo.addColorStop(0.66, 'rgba(255, 231, 244, 0.2)');
-    artHalo.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = artHalo;
-    ctx.beginPath();
-    ctx.arc(rect.width / 2, rect.height / 2 - 58, 54, 0, Math.PI * 2);
-    ctx.fill();
-    drawThemeIllustration(ctx, card, rect.width / 2, rect.height / 2 - 58, 1.02, true);
+    ctx.fillStyle = '#ffffff';
+    drawHeart(ctx, rect.width / 2 - 14, rect.height / 2 - 88, 28);
     ctx.restore();
   }
 
-  // Keep the existing cover copy verbatim, but give it a soft reading plate.
-  const isHundredDay = card.id === 'day-100';
-  const copyTop = isHundredDay ? rect.height / 2 + 4 : rect.height / 2 - 4;
-  const copyHeight = isHundredDay ? 92 : 116;
-  ctx.save();
-  roundedRectAt(ctx, rect.width * (isHundredDay ? 0.14 : 0.09), copyTop, rect.width * (isHundredDay ? 0.72 : 0.82), copyHeight, 22);
-  const copyPlate = ctx.createLinearGradient(0, copyTop, 0, copyTop + copyHeight);
-  copyPlate.addColorStop(0, 'rgba(26, 8, 28, 0.28)');
-  copyPlate.addColorStop(1, isHundredDay ? 'rgba(26, 8, 28, 0.48)' : 'rgba(26, 8, 28, 0.56)');
-  ctx.fillStyle = copyPlate;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.restore();
+  drawCoverOverlayCopy(ctx, rect.width, rect.height, card, Boolean(card.scratchCoverUrl));
 
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-  ctx.shadowBlur = isHundredDay ? 7 : 10;
-  ctx.font = isHundredDay
-    ? '700 21px "Dancing Script", "Brush Script MT", cursive'
-    : '800 16.5px "Plus Jakarta Sans", Inter, -apple-system, sans-serif';
-  wrapCanvasText(
-    ctx,
-    card.coverText,
-    rect.width / 2,
-    isHundredDay ? rect.height / 2 + 42 : rect.height / 2 + 18,
-    rect.width * (isHundredDay ? 0.66 : 0.76),
-    isHundredDay ? 26 : 24,
-  );
-
-  ctx.shadowBlur = 0;
-  ctx.globalAlpha = 0.92;
-  ctx.font = '800 10.5px "Plus Jakarta Sans", Inter, sans-serif';
-  if (!isHundredDay) ctx.fillText('✦ DÙNG TAY CÀO ĐỂ MỞ BÍ MẬT ✦', rect.width / 2, rect.height / 2 + 82);
-  ctx.globalAlpha = 1;
-
-  if (card.coverImage && card.id !== 'day-100') {
+  const customCoverSrc = card.scratchCoverUrl || (card.id === 'day-100' ? card.coverImage : undefined);
+  if (customCoverSrc) {
     const img = new Image();
-    img.src = card.coverImage;
-    if (img.complete && img.naturalWidth > 0) {
-      drawCoverImage(img);
-    } else {
-      img.onload = () => drawCoverImage(img);
-    }
+    img.crossOrigin = 'anonymous';
+    const paintImage = () => {
+      if (canvas.classList.contains('revealed')) return;
+      ctx.save();
+      roundedPath(ctx, rect.width, rect.height, 30);
+      ctx.clip();
+      const iw = img.naturalWidth || img.width || rect.width;
+      const ih = img.naturalHeight || img.height || rect.height;
+      const scale = Math.max(rect.width / iw, rect.height / ih);
+      const dw = iw * scale;
+      const dh = ih * scale;
+      ctx.drawImage(img, (rect.width - dw) / 2, (rect.height - dh) / 2, dw, dh);
+      const scrim = ctx.createLinearGradient(0, 0, 0, rect.height);
+      scrim.addColorStop(0, 'rgba(22, 8, 24, 0.12)');
+      scrim.addColorStop(1, 'rgba(22, 8, 24, 0.42)');
+      ctx.fillStyle = scrim;
+      ctx.fillRect(0, 0, rect.width, rect.height);
+      ctx.strokeStyle = hexToRgba('#fff5cf', 0.55);
+      ctx.lineWidth = 1.8;
+      roundedRectAt(ctx, 14, 14, rect.width - 28, rect.height - 28, 22);
+      ctx.stroke();
+      ctx.restore();
+      drawCoverOverlayCopy(ctx, rect.width, rect.height, card, true);
+    };
+    img.onload = paintImage;
+    img.src = customCoverSrc;
   }
 
   return ctx;
 }
 
-function wrapCanvasText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-): void {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let line = '';
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (line && ctx.measureText(candidate).width > maxWidth) {
-      lines.push(line);
-      line = word;
-    } else line = candidate;
-  }
-  if (line) lines.push(line);
-  const startY = y - ((lines.length - 1) * lineHeight) / 2;
-  lines.slice(0, 3).forEach((current, index) => ctx.fillText(current, x, startY + index * lineHeight));
-}
+export async function exportOccasionCardPng(card: OccasionCard): Promise<void> {
+  const W = 1080;
+  const H = 1480;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
 
-function fitOccasionTitleToLine(title: HTMLElement): void {
-  title.style.whiteSpace = 'nowrap';
-  let fontSize = 27;
-  title.style.fontSize = `${fontSize}px`;
-  while (title.scrollWidth > title.clientWidth && fontSize > 17) {
-    fontSize -= 0.5;
-    title.style.fontSize = `${fontSize}px`;
-  }
-}
-
-function drawSealScratchCover(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
-  const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.max(1, Math.round(rect.width * dpr));
-  canvas.height = Math.max(1, Math.round(rect.height * dpr));
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return null;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, rect.width, rect.height);
-
-  roundedRectAt(ctx, 0, 0, rect.width, rect.height, 8);
-  const glass = ctx.createLinearGradient(0, 0, rect.width, rect.height);
-  glass.addColorStop(0, 'rgba(255, 255, 255, 0.82)');
-  glass.addColorStop(0.48, 'rgba(255, 255, 255, 0.56)');
-  glass.addColorStop(1, 'rgba(255, 232, 240, 0.72)');
-  ctx.fillStyle = glass;
+  // Paper background
+  const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+  bgGrad.addColorStop(0, '#fffdf9');
+  bgGrad.addColorStop(0.5, '#fff1ec');
+  bgGrad.addColorStop(1, hexToRgba(card.colors[0], 0.35));
+  roundedPath(ctx, W, H, 68);
+  ctx.fillStyle = bgGrad;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.82)';
-  ctx.lineWidth = 1;
+
+  if (card.backgroundImageUrl) {
+    try {
+      const bgImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const im = new Image();
+        im.crossOrigin = 'anonymous';
+        im.onload = () => resolve(im);
+        im.onerror = reject;
+        im.src = card.backgroundImageUrl!;
+      });
+      ctx.save();
+      roundedPath(ctx, W, H, 68);
+      ctx.clip();
+      const scale = Math.max(W / bgImg.naturalWidth, H / bgImg.naturalHeight);
+      const dw = bgImg.naturalWidth * scale;
+      const dh = bgImg.naturalHeight * scale;
+      ctx.drawImage(bgImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      ctx.restore();
+    } catch {
+      // Fallback cleanly to artistic gradient paper if image blocks CORS readback
+    }
+  }
+
+  // Frosted reading panel
+  ctx.save();
+  roundedRectAt(ctx, 68, 84, W - 136, H - 168, 52);
+  ctx.fillStyle = 'rgba(255, 251, 253, 0.88)';
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(card.colors[2], 0.34);
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+
+  // Heart crest
+  ctx.save();
+  ctx.fillStyle = card.colors[1];
+  drawHeart(ctx, W / 2 - 36, 170, 72);
+  ctx.restore();
+
+  // Eyebrow
+  ctx.fillStyle = card.colors[1];
+  ctx.textAlign = 'center';
+  ctx.font = '800 28px "Be Vietnam Pro", sans-serif';
+  ctx.fillText(`◆ ${card.eyebrow.toUpperCase()} ◆`, W / 2, 320);
+
+  // Title
+  ctx.fillStyle = card.colors[2];
+  ctx.font = '700 62px "Fraunces", Georgia, serif';
+  const titleLines = wrapCanvasLines(ctx, card.title, W - 240).slice(0, 2);
+  titleLines.forEach((line, idx) => {
+    ctx.fillText(line, W / 2, 415 + idx * 74);
+  });
+
+  // Divider
+  const divY = 425 + titleLines.length * 74;
+  ctx.strokeStyle = hexToRgba(card.colors[1], 0.45);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(W / 2 - 160, divY);
+  ctx.lineTo(W / 2 + 160, divY);
   ctx.stroke();
 
+  // Message
+  ctx.fillStyle = '#3d2634';
+  ctx.font = '500 42px "Fraunces", Georgia, serif';
+  const msgLines = wrapCanvasLines(ctx, card.message, W - 250).slice(0, 11);
+  msgLines.forEach((line, idx) => {
+    ctx.fillText(line, W / 2, divY + 86 + idx * 66);
+  });
+
+  // Signature + Love Seal
+  ctx.textAlign = 'left';
+  ctx.fillStyle = card.colors[1];
+  ctx.font = 'italic 600 44px "Fraunces", Georgia, serif';
+  const sigLines = wrapCanvasLines(ctx, card.signature, W - 460).slice(0, 2);
+  sigLines.forEach((line, idx) => {
+    ctx.fillText(line, 136, H - 210 + idx * 54);
+  });
+
   ctx.save();
-  roundedRectAt(ctx, 0, 0, rect.width, rect.height, 8);
-  ctx.clip();
-  ctx.globalAlpha = 0.22;
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 0.8;
-  for (let x = -rect.height; x < rect.width + rect.height; x += 8) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x - rect.height, rect.height);
-    ctx.stroke();
-  }
+  ctx.translate(W - 240, H - 185);
+  ctx.rotate(0.09);
+  roundedRectAt(ctx, -95, -34, 190, 68, 16);
+  ctx.strokeStyle = hexToRgba(card.colors[1], 0.65);
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = card.colors[1];
+  ctx.font = '800 24px "Be Vietnam Pro", sans-serif';
+  ctx.fillText('LOVE SEAL', 0, 9);
   ctx.restore();
-  return ctx;
+
+  const fileName = `thiep-ky-niem-${card.id}.png`;
+  const dataUrl = canvas.toDataURL('image/png');
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  showToast('Đã lưu ảnh tấm thiệp kỷ niệm!', 'success');
 }
 
-function installSealScratch(canvas: HTMLCanvasElement): () => void {
-  let ctx = drawSealScratchCover(canvas);
-  if (!ctx) return () => {};
-  let drawing = false;
-  let revealed = false;
-  let lastPoint: { x: number; y: number } | null = null;
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'"]/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  })[ch] || ch);
+}
 
-  const reveal = () => {
-    if (revealed) return;
-    revealed = true;
-    canvas.classList.add('is-revealed');
-  };
-  const point = (event: PointerEvent) => {
-    const rect = canvas.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  };
-  const scratch = (from: { x: number; y: number }, to: { x: number; y: number }) => {
-    if (!ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    ctx.save();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 15;
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
-    ctx.restore();
-    if (clearedRatio(ctx, canvas) >= 0.24) reveal();
-  };
-  canvas.addEventListener('pointerdown', (event) => {
-    drawing = true;
-    lastPoint = point(event);
-    canvas.setPointerCapture?.(event.pointerId);
-    scratch(lastPoint, lastPoint);
-  });
-  canvas.addEventListener('pointermove', (event) => {
-    if (!drawing || !lastPoint) return;
-    const next = point(event);
-    scratch(lastPoint, next);
-    lastPoint = next;
-  });
-  const stop = (event: PointerEvent) => {
-    drawing = false;
-    lastPoint = null;
-    try { canvas.releasePointerCapture?.(event.pointerId); } catch { /* optional */ }
-  };
-  canvas.addEventListener('pointerup', stop);
-  canvas.addEventListener('pointercancel', stop);
+function createGridScratchTracker(cols = 22, rows = 30) {
+  const grid = new Uint8Array(cols * rows);
+  let clearedCount = 0;
 
-  const resize = () => {
-    if (!revealed) ctx = drawSealScratchCover(canvas);
-  };
-  window.addEventListener('resize', resize, { passive: true });
-  return () => {
-    window.removeEventListener('resize', resize);
+  return {
+    markStroke(
+      from: { x: number; y: number },
+      to: { x: number; y: number },
+      width: number,
+      height: number,
+      brushRadius = 24,
+    ): number {
+      if (width <= 0 || height <= 0) return 0;
+      const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / 8));
+      for (let s = 0; s <= steps; s += 1) {
+        const px = from.x + ((to.x - from.x) * s) / steps;
+        const py = from.y + ((to.y - from.y) * s) / steps;
+        const minC = Math.max(0, Math.floor(((px - brushRadius) / width) * cols));
+        const maxC = Math.min(cols - 1, Math.floor(((px + brushRadius) / width) * cols));
+        const minR = Math.max(0, Math.floor(((py - brushRadius) / height) * rows));
+        const maxR = Math.min(rows - 1, Math.floor(((py + brushRadius) / height) * rows));
+        for (let r = minR; r <= maxR; r += 1) {
+          for (let c = minC; c <= maxC; c += 1) {
+            const idx = r * cols + c;
+            if (grid[idx] === 0) {
+              grid[idx] = 1;
+              clearedCount += 1;
+            }
+          }
+        }
+      }
+      return clearedCount / (cols * rows);
+    },
   };
 }
 
-function clearedRatio(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): number {
-  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  const step = Math.max(4, Math.floor((window.devicePixelRatio || 1) * 7));
-  let cleared = 0;
-  let sampled = 0;
-  for (let y = 0; y < canvas.height; y += step) {
-    for (let x = 0; x < canvas.width; x += step) {
-      sampled += 1;
-      if (pixels[(y * canvas.width + x) * 4 + 3] < 30) cleared += 1;
-    }
-  }
-  return sampled ? cleared / sampled : 0;
-}
-
-function openCard(card: OccasionCard, onRevealed?: () => void): void {
+export function openOccasionCardModal(card: OccasionCard, options: OpenOccasionCardOptions = {}): void {
   if (document.querySelector('.polaroid-modal-backdrop')) {
     const openAfterPhotoCloses = () => {
       if (document.querySelector('.polaroid-modal-backdrop')) return;
-      openCard(card, onRevealed);
+      openOccasionCardModal(card, options);
     };
     window.addEventListener(SPECIAL_MODAL_CLOSED_EVENT, openAfterPhotoCloses, { once: true });
     return;
@@ -1299,10 +981,14 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   ensureStyles();
   document.querySelector('.occasion-overlay')?.remove();
   const overlay = document.createElement('div');
-  overlay.className = 'occasion-overlay';
+  overlay.className = `occasion-overlay${options.skipScratch ? ' is-card-revealed' : ''}`;
+  const hasCustomBg = Boolean(card.backgroundImageUrl);
+
   overlay.innerHTML = `
-    <section class="occasion-shell" role="dialog" aria-modal="true" aria-label="${escapeHtml(card.title)}" style="--occasion-a:${card.colors[0]};--occasion-b:${card.colors[1]}">
-      <article class="occasion-paper" data-pattern="${card.pattern}" data-card-id="${card.id}">
+    <section class="occasion-shell${options.skipScratch ? ' is-revealed' : ''}" role="dialog" aria-modal="true" aria-label="${escapeHtml(card.title)}" style="--occasion-a:${card.colors[0]};--occasion-b:${card.colors[1]}">
+      <button type="button" class="occasion-close-top" aria-label="Đóng thiệp">&times;</button>
+      <article class="occasion-paper${hasCustomBg ? ' has-custom-bg' : ''}" data-pattern="${card.pattern}" data-card-id="${escapeHtml(String(card.id))}">
+        ${hasCustomBg ? `<div class="occasion-custom-bg" style="background-image:url('${escapeHtml(card.backgroundImageUrl!)}')"></div>` : ''}
         <div class="occasion-border-frame"></div>
         <div class="occasion-corner top-left">✦</div>
         <div class="occasion-corner top-right">✦</div>
@@ -1321,35 +1007,43 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
           </div>
           <p class="occasion-message">${escapeHtml(card.message)}</p>
           <div class="occasion-signature-wrap">
-            <p class="occasion-signature${card.id === 'birthday' ? ' occasion-signature--birthday' : ''}">${formatOccasionSignature(card)}</p>
+            <p class="occasion-signature">${escapeHtml(card.signature)}</p>
             <div class="occasion-stamp-wrap">
               <div class="occasion-stamp">LOVE SEAL</div>
-              <canvas class="occasion-seal-scratch" aria-label="Cào nhẹ để mở Love Seal"></canvas>
             </div>
           </div>
         </div>
       </article>
-      <canvas class="occasion-scratch" aria-label="Lớp phủ cào để mở thiệp"></canvas>
+      <canvas class="occasion-scratch${options.skipScratch ? ' revealed' : ''}" aria-label="Lớp phủ cào để mở thiệp"></canvas>
       <div class="occasion-hint">
         <span>Cào để mở bí mật</span>
       </div>
     </section>
+    <div class="occasion-actions">
+      <button type="button" class="occasion-action-btn" data-card-action="download">
+        ${iconMarkup('download', { size: 16 })}<span>Lưu ảnh kỷ niệm</span>
+      </button>
+      ${options.isDraftPreview ? '' : `
+        <button type="button" class="occasion-action-btn occasion-action-btn--primary" data-card-action="reply">
+          ${iconMarkup('send', { size: 16 })}<span>Nhắn lời thương</span>
+        </button>
+      `}
+      ${options.skipScratch ? `
+        <button type="button" class="occasion-action-btn" data-card-action="rescratch">
+          ${iconMarkup('scratch-card', { size: 16 })}<span>Cào lại</span>
+        </button>
+      ` : ''}
+    </div>
   `;
+
   document.body.appendChild(overlay);
-  const title = overlay.querySelector<HTMLElement>('.occasion-title');
-  if (title) {
-    const fitTitle = () => {
-      if (title.isConnected) fitOccasionTitleToLine(title);
-    };
-    fitTitle();
-    window.setTimeout(fitTitle, 80);
-    document.fonts?.ready.then(fitTitle).catch(() => {});
-  }
+
   const shell = overlay.querySelector<HTMLElement>('.occasion-shell');
   const canvas = overlay.querySelector<HTMLCanvasElement>('.occasion-scratch');
   let cleanup = () => {};
   let initFrame: number | null = null;
   let closed = false;
+
   const onKey = (event: KeyboardEvent) => {
     if (event.key === 'Escape') close();
   };
@@ -1362,21 +1056,42 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     overlay.remove();
     window.dispatchEvent(new Event(SPECIAL_MODAL_CLOSED_EVENT));
   };
+
+  overlay.querySelector('.occasion-close-top')?.addEventListener('click', close);
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) close();
   });
   window.addEventListener('keydown', onKey);
+
+  overlay.querySelector('[data-card-action="download"]')?.addEventListener('click', () => {
+    triggerHaptic('tap');
+    void exportOccasionCardPng(card);
+  });
+  overlay.querySelector('[data-card-action="reply"]')?.addEventListener('click', () => {
+    triggerHaptic('tap');
+    close();
+    navigate('/app/messages');
+  });
+  overlay.querySelector('[data-card-action="rescratch"]')?.addEventListener('click', () => {
+    triggerHaptic('tap');
+    close();
+    openOccasionCardModal(card, { ...options, skipScratch: false });
+  });
+
   if (!canvas || !shell) {
     close();
     return;
   }
+
+  if (options.skipScratch) {
+    return;
+  }
+
   let ctx: CanvasRenderingContext2D | null = null;
-  const sealScratchCanvas = overlay.querySelector<HTMLCanvasElement>('.occasion-seal-scratch');
-  const cleanupSealScratch = sealScratchCanvas ? installSealScratch(sealScratchCanvas) : () => {};
   let drawing = false;
   let lastPoint: { x: number; y: number } | null = null;
-  let checkTimer: number | null = null;
   let revealed = false;
+  const tracker = createGridScratchTracker();
 
   const initializeScratch = (attempt = 0): void => {
     if (closed || revealed || ctx) return;
@@ -1385,7 +1100,7 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
       ctx = nextContext;
       return;
     }
-    if (attempt >= 8) {
+    if (attempt >= 10) {
       close();
       showToast('Thiệp chưa tải xong, bạn thử lại nhé.', 'error');
       return;
@@ -1396,42 +1111,44 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   const reveal = () => {
     if (revealed) return;
     revealed = true;
+    triggerHaptic('confirm');
     canvas.classList.add('revealed');
     shell.classList.add('is-revealed');
+    overlay.classList.add('is-card-revealed');
     try {
-      onRevealed?.();
+      options.onRevealed?.();
     } catch (error) {
-      // A storage restriction must not tear down the app after the card is revealed.
       console.warn('[Occasion card] Could not persist seen state', error);
     }
   };
-  const check = () => {
-    if (checkTimer !== null || revealed) return;
-    checkTimer = window.setTimeout(() => {
-      checkTimer = null;
-      if (ctx && clearedRatio(ctx, canvas) >= SCRATCH_THRESHOLD) reveal();
-    }, 110);
-  };
+
   const point = (event: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
+
   const scratch = (from: { x: number; y: number }, to: { x: number; y: number }) => {
-    if (!ctx) return;
+    if (!ctx || revealed) return;
+    const rect = canvas.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalCompositeOperation = 'destination-out';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 42;
+    ctx.lineWidth = 44;
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
     ctx.stroke();
     ctx.restore();
-    check();
+
+    const ratio = tracker.markStroke(from, to, rect.width, rect.height, 24);
+    if (ratio >= SCRATCH_THRESHOLD) {
+      reveal();
+    }
   };
+
   canvas.addEventListener('pointerdown', (event) => {
     drawing = true;
     canvas.classList.add('scratching');
@@ -1450,11 +1167,11 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
     drawing = false;
     canvas.classList.remove('scratching');
     lastPoint = null;
-    try { canvas.releasePointerCapture?.(event.pointerId); } catch { /* optional */ }
-    check();
+    try { canvas.releasePointerCapture?.(event.pointerId); } catch {}
   };
   canvas.addEventListener('pointerup', stop);
   canvas.addEventListener('pointercancel', stop);
+
   const resize = () => {
     if (revealed) return;
     const nextContext = drawScratchCover(canvas, card);
@@ -1463,30 +1180,17 @@ function openCard(card: OccasionCard, onRevealed?: () => void): void {
   window.addEventListener('resize', resize, { passive: true });
   const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
   resizeObserver?.observe(shell);
+
   cleanup = () => {
-    window.removeEventListener('keydown', onKey);
     window.removeEventListener('resize', resize);
     resizeObserver?.disconnect();
-    if (checkTimer !== null) window.clearTimeout(checkTimer);
-    cleanupSealScratch();
   };
 
   initializeScratch();
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>'"]/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-  })[character] || character);
-}
-
-function formatOccasionSignature(card: OccasionCard): string {
-  const signature = escapeHtml(card.signature);
-  return card.id === 'birthday' ? signature.replace(', ', ',<br>') : signature;
-}
-
-function seenKey(card: OccasionCard, context: OccasionContext, userId: string): string {
-  return `${SEEN_PREFIX}${userId}:${context.dateKey}:${card.id}`;
+function seenKey(occasionKey: string, dateKey: string, userId: string): string {
+  return `${SEEN_PREFIX}${userId}:${dateKey}:${occasionKey}`;
 }
 
 function hasSeenCard(key: string): boolean {
@@ -1500,9 +1204,7 @@ function hasSeenCard(key: string): boolean {
 function markCardSeen(key: string): void {
   try {
     localStorage.setItem(key, '1');
-  } catch {
-    // The card is still usable for this session if storage is unavailable.
-  }
+  } catch {}
 }
 
 function isPreviewEnabled(): boolean {
@@ -1531,10 +1233,10 @@ function openPreviewPicker(me?: MeResponse): void {
   overlay.innerHTML = `
     <section class="occasion-picker" role="dialog" aria-modal="true" aria-label="Demo thiệp cào">
       <h3>Demo thiệp cào</h3>
-      <p>Chọn một dịp để ép mở. Chế độ này không đánh dấu đã xem.</p>
+      <p>Chọn một dịp để kiểm thử nhanh.</p>
       <div class="occasion-picker-grid">
         ${PREVIEW_ORDER.map((id) => {
-          const card = buildCard(id, context);
+          const card = buildBuiltinOccasionCard(id, context);
           return `<button type="button" class="occasion-picker-item" data-card-id="${id}"><span style="color:var(--accent-600);">${iconMarkup(card.icon, { size: 24, variant: 'filled' })}</span><strong>${escapeHtml(card.title)}</strong></button>`;
         }).join('')}
       </div>
@@ -1543,20 +1245,14 @@ function openPreviewPicker(me?: MeResponse): void {
   document.body.appendChild(overlay);
   overlay.querySelectorAll<HTMLButtonElement>('[data-card-id]').forEach((button) => {
     button.addEventListener('click', () => {
-      const id = button.dataset.cardId as OccasionCardId;
+      const id = button.dataset.cardId as BuiltinOccasionKey;
       overlay.remove();
-      openCard(buildCard(id, context));
+      openOccasionCardModal(buildBuiltinOccasionCard(id, context), { isDraftPreview: true });
     });
   });
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) overlay.remove();
   });
-}
-
-function toInputDate(value?: string): string {
-  if (!value) return '';
-  const date = getCalendarDate(value);
-  return date.year ? toDateKey(date) : '';
 }
 
 export function needsBirthdaySetup(me: Pick<MeResponse, 'user' | 'partnerUser'>): boolean {
@@ -1574,9 +1270,6 @@ function hasSpecialModal(): boolean {
 
 function notifyMissingBirthday(me: MeResponse): void {
   if (!needsBirthdaySetup(me)) return;
-
-  // Không hiển thị thông báo sinh nhật khi đang ở luồng Onboarding hoặc Đăng nhập.
-  // Đợi sau khi user hoàn tất onboarding vào app chính mới nhắc để user nhớ vào setup sau cùng.
   const pathname = window.location.pathname;
   if (pathname.includes('/onboarding') || pathname.includes('/login')) return;
 
@@ -1589,84 +1282,12 @@ function notifyMissingBirthday(me: MeResponse): void {
       return;
     }
     sessionStorage.setItem(key, '1');
-  } catch {
-    // The in-memory guard still prevents duplicate notices if storage is unavailable.
-  }
+  } catch {}
 
   birthdayNoticeSession.add(key);
   window.setTimeout(() => {
-    showToast('Bạn chưa thiết lập đủ ngày sinh nhật. Vào Profile để bổ sung nhé 🎂', 'info');
+    showToast('Bạn chưa thiết lập đủ ngày sinh nhật. Vào Hồ sơ để bổ sung nhé 🎂', 'info');
   }, 700);
-}
-
-async function mountBirthdaySettings(): Promise<void> {
-  ensureStyles();
-  const page = document.querySelector<HTMLElement>('.profile-page');
-  if (!page || page.querySelector('.birthday-settings-card') || birthdaySettingsLoading) return;
-  const editRow = Array.from(page.querySelectorAll<HTMLElement>('.card-solid, .c-list-row')).find((row) =>
-    row.textContent?.includes('Chỉnh sửa thông tin'),
-  );
-  const container = editRow?.parentElement;
-  if (!container) return;
-  birthdaySettingsLoading = true;
-  let me: MeResponse;
-  try {
-    me = await getMe({ preserveSessionOnUnauthorized: true });
-  } catch {
-    return;
-  } finally {
-    birthdaySettingsLoading = false;
-  }
-  if (!document.body.contains(page) || page.querySelector('.birthday-settings-card')) return;
-  const card = document.createElement('div');
-  card.className = 'card-solid birthday-settings-card';
-  const birthdaySetupNeeded = needsBirthdaySetup(me);
-  card.innerHTML = `
-    <div class="birthday-settings-head">
-      <span class="birthday-settings-icon" style="color:var(--accent-600);">${iconMarkup('anniversary', { size: 20, variant: 'filled' })}</span>
-      <div>
-        <span class="birthday-settings-title">${birthdaySetupNeeded ? 'Chưa thiết lập đủ ngày sinh nhật' : 'Ngày sinh nhật'}</span>
-        <span class="birthday-settings-subtitle">${birthdaySetupNeeded ? 'Điền ngày sinh của hai bạn để app nhắc đúng ngày và chuẩn bị bất ngờ.' : 'Cập nhật sinh nhật hai bạn để nhận thiệp chúc mừng tự động'}</span>
-      </div>
-    </div>
-    <div class="birthday-settings-grid">
-      <div class="birthday-field">
-        <label for="birthday-self">Sinh nhật của bạn</label>
-        <input id="birthday-self" type="date" value="${toInputDate(me.user.birthday)}" />
-      </div>
-      <div class="birthday-field">
-        <label for="birthday-partner">Sinh nhật người ấy</label>
-        <input id="birthday-partner" type="date" value="${toInputDate(me.user.partnerBirthday || me.partnerUser?.birthday)}" />
-      </div>
-    </div>
-    <button type="button" class="birthday-save">${birthdaySetupNeeded ? 'Thiết lập ngày sinh' : 'Lưu ngày sinh'}</button>
-  `;
-  editRow.insertAdjacentElement('afterend', card);
-  const selfInput = card.querySelector<HTMLInputElement>('#birthday-self');
-  const partnerInput = card.querySelector<HTMLInputElement>('#birthday-partner');
-  const save = card.querySelector<HTMLButtonElement>('.birthday-save');
-  const max = toDateKey(getCalendarDate(new Date()));
-  if (selfInput) selfInput.max = max;
-  if (partnerInput) partnerInput.max = max;
-  save?.addEventListener('click', async () => {
-    save.disabled = true;
-    save.textContent = 'Đang lưu...';
-    try {
-      await updateProfile({
-        birthday: selfInput?.value || null,
-        partnerBirthday: partnerInput?.value || null,
-      });
-      await getMe();
-      showToast('Đã lưu Birthday!', 'success');
-      save.textContent = 'Đã lưu';
-      window.setTimeout(() => { save.textContent = 'Lưu ngày sinh'; }, 1200);
-    } catch (error) {
-      showToast(`Không lưu được Birthday: ${(error as Error).message}`, 'error');
-      save.textContent = 'Thử lại';
-    } finally {
-      save.disabled = false;
-    }
-  });
 }
 
 declare global {
@@ -1683,19 +1304,6 @@ export function initAnniversaryCards(): void {
   let checking = false;
   let checkedSessionKey: string | null = null;
   let scheduledCardKey: string | null = null;
-  let mountTimer: number | null = null;
-
-  const scheduleProfileMount = () => {
-    if (mountTimer !== null) return;
-    mountTimer = window.setTimeout(() => {
-      mountTimer = null;
-      void mountBirthdaySettings();
-      mountPreviewButton(() => latestMe);
-      // Router navigation uses history.replaceState/pushState without a
-      // popstate event, so re-check after the newly rendered page settles.
-      void checkToday();
-    }, 60);
-  };
 
   const checkToday = async (force = false) => {
     const token = store.getToken();
@@ -1705,21 +1313,44 @@ export function initAnniversaryCards(): void {
     checking = true;
     try {
       latestMe = await getMe({ preserveSessionOnUnauthorized: true });
-      // Do not interrupt onboarding with a birthday reminder. The session
-      // remains unchecked so the reminder can run after the final navigation.
       if (isOnboardingRoute()) return;
       checkedSessionKey = sessionKey;
       notifyMissingBirthday(latestMe);
-      const card = resolveOccasionCard(latestMe);
-      if (!card) return;
-      const context = createContext(latestMe);
-      const key = seenKey(card, context, latestMe.user.id);
-      if (hasSeenCard(key) || scheduledCardKey === key || hasSpecialModal()) return;
-      scheduledCardKey = key;
+
+      let card: OccasionCard | null = null;
+      let occasionKey = '';
+      let alreadyRevealed = false;
+
+      try {
+        const serverToday = await getTodayOccasionCard();
+        if (serverToday.card) {
+          card = toOccasionCardFromServer(serverToday.card);
+          occasionKey = serverToday.card.occasionKey;
+          alreadyRevealed = serverToday.alreadyRevealed;
+        }
+      } catch {
+        card = resolveOccasionCard(latestMe);
+        occasionKey = String(card?.occasionKey ?? card?.id ?? '');
+      }
+
+      if (!card || !occasionKey) return;
+      const localKey = seenKey(occasionKey, todayKey, latestMe.user.id);
+      if (alreadyRevealed) {
+        markCardSeen(localKey);
+        return;
+      }
+      if (hasSeenCard(localKey) || scheduledCardKey === localKey || hasSpecialModal()) return;
+      scheduledCardKey = localKey;
+      const cardToOpen = card;
       window.setTimeout(() => {
         scheduledCardKey = null;
-        if (hasSeenCard(key) || hasSpecialModal()) return;
-        openCard(card, () => markCardSeen(key));
+        if (hasSeenCard(localKey) || hasSpecialModal()) return;
+        openOccasionCardModal(cardToOpen, {
+          onRevealed: () => {
+            markCardSeen(localKey);
+            void markOccasionCardRevealed(occasionKey).catch(() => {});
+          },
+        });
       }, 350);
     } catch {
       // Occasion cards are a non-blocking enhancement.
@@ -1729,23 +1360,22 @@ export function initAnniversaryCards(): void {
     }
   };
 
-  const observer = new MutationObserver(scheduleProfileMount);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
   store.subscribe((state, previous) => {
     if (state.token && state.token !== previous.token) void checkToday(true);
-    scheduleProfileMount();
   });
-  window.addEventListener('popstate', () => {
-    scheduleProfileMount();
-    void checkToday();
-  });
+  window.addEventListener('popstate', () => void checkToday());
   window.addEventListener('focus', () => void checkToday(true));
   window.addEventListener('pageshow', () => void checkToday(true));
   window.addEventListener(SPECIAL_MODAL_CLOSED_EVENT, () => void checkToday(true));
+
   window.LoveCheckCards = {
-    open: (id) => openCard(buildCard(id, previewContext(latestMe))),
+    open: (id) => {
+      const key = (OCCASION_CATALOG.find((c) => c.key === id)?.key ?? 'day-100') as BuiltinOccasionKey;
+      openOccasionCardModal(buildBuiltinOccasionCard(key, previewContext(latestMe)), { isDraftPreview: true });
+    },
     list: () => [...PREVIEW_ORDER],
   };
-  scheduleProfileMount();
+
+  mountPreviewButton(() => latestMe);
   void checkToday();
 }

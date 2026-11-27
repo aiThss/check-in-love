@@ -99,11 +99,33 @@
     -webkit-backdrop-filter: none;
   }
 
+  .p-journey .journey-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
   .p-journey .journey-panel-title {
+    min-width: 0;
+    flex: 1 1 auto;
     font-family: var(--font-display);
-    font-size: clamp(16px, 4.5vw, 18px);
+    font-size: clamp(14.5px, 4.2vw, 17.5px);
     font-weight: 600;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .p-journey .journey-panel-title svg {
+    flex-shrink: 0;
+  }
+
+  .p-journey .journey-panel-title span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .journey-modal-backdrop .journey-modal-title {
@@ -113,12 +135,35 @@
   }
 
   .p-journey .journey-add-pin-btn {
-    min-height: 40px;
-    padding: 6px 14px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 34px;
+    padding: 5px 11px;
     border-radius: var(--radius-pill);
     background: var(--accent-500);
     color: var(--text-on-accent);
     border: 1.5px solid var(--ink-stroke-color);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .p-journey .journey-add-pin-btn span,
+  .p-journey #btn-empty-add-place,
+  .p-journey #btn-empty-add-bucket {
+    white-space: nowrap;
+  }
+
+  @media (max-width: 380px) {
+    .p-journey .journey-add-pin-btn {
+      min-height: 32px;
+      padding: 4px 9px;
+      font-size: 11.5px;
+    }
   }
 
   .p-journey .journey-map-ctrl-btn {
@@ -136,7 +181,7 @@
   .p-journey .journey-pin-dot.wishlist {
     background: var(--gold-bg);
     color: var(--gold-ink);
-    border: 2px dashed var(--ink-border);
+    border: 2px dashed var(--ink-stroke-color);
   }
 
   .p-journey .journey-pin-mini-badge {
@@ -201,7 +246,7 @@
 
   .p-journey .journey-filter-pill.active {
     background: var(--accent-500);
-    border-color: var(--ink-border);
+    border-color: var(--ink-stroke-color);
     color: var(--text-on-accent);
   }
 
@@ -228,7 +273,7 @@
 
   .p-journey .journey-bucket-card.completed .journey-checkbox-btn {
     background: var(--accent-500);
-    border-color: var(--ink-border);
+    border-color: var(--ink-stroke-color);
     color: var(--text-on-accent);
   }
 
@@ -237,6 +282,7 @@
     border: 2px solid var(--ink-stroke-color);
     border-radius: var(--radius-xl);
     box-shadow: var(--sticker-shadow), var(--elev-4);
+    max-height: min(calc(var(--app-viewport-height, 100vh) - 36px), 660px);
   }
 
   .p-journey-sparkle {
